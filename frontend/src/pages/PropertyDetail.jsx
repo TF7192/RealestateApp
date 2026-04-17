@@ -146,6 +146,11 @@ export default function PropertyDetail() {
                   הצעה אחרונה: {formatPrice(property.offer)}
                 </div>
               )}
+              {property.closingPrice && (
+                <div className="detail-offer">
+                  מחיר סגירה: {formatPrice(property.closingPrice)}
+                </div>
+              )}
             </div>
             <div className="detail-share-actions">
               <button className="btn btn-primary" onClick={handleWhatsApp}>
@@ -244,15 +249,15 @@ export default function PropertyDetail() {
             </div>
           </div>
 
-          {/* Additional info */}
+          {/* Additional info — labels matching the intake doc */}
           <div className="info-grid">
             <div className="info-item">
-              <span className="info-label">מצב הנכס</span>
+              <span className="info-label">עברה שיפוץ?</span>
               <span className="info-value">{property.renovated}</span>
             </div>
             <div className="info-item">
               <span className="info-label">כיווני אוויר</span>
-              <span className="info-value">{property.airDirections}</span>
+              <span className="info-value">{property.airDirections || '—'}</span>
             </div>
             <div className="info-item">
               <span className="info-label">מעלית</span>
@@ -261,13 +266,13 @@ export default function PropertyDetail() {
               </span>
             </div>
             <div className="info-item">
-              <span className="info-label">גיל הבניין</span>
+              <span className="info-label">בניין בן</span>
               <span className="info-value">
                 {property.buildingAge === 0 ? 'חדש' : `${property.buildingAge} שנים`}
               </span>
             </div>
             <div className="info-item">
-              <span className="info-label">מועד פינוי</span>
+              <span className="info-label">תאריך פינוי</span>
               <span className="info-value">{property.vacancyDate}</span>
             </div>
             <div className="info-item">
@@ -276,35 +281,21 @@ export default function PropertyDetail() {
             </div>
           </div>
 
-          {/* Commercial-specific details */}
-          {property.assetClass === 'commercial' && (
+          {/* Commercial: show מ"ר ארנונה from doc/spreadsheet */}
+          {property.assetClass === 'commercial' && property.sqmArnona && (
             <div className="info-grid">
-              {property.usagePermit && (
-                <div className="info-item">
-                  <span className="info-label">ייעוד / היתר שימוש</span>
-                  <span className="info-value">{property.usagePermit}</span>
-                </div>
-              )}
-              {property.monthlyArnona && (
-                <div className="info-item">
-                  <span className="info-label">ארנונה חודשית</span>
-                  <span className="info-value">₪{property.monthlyArnona.toLocaleString('he-IL')}</span>
-                </div>
-              )}
               <div className="info-item">
-                <span className="info-label">רמפת פריקה</span>
-                <span className="info-value">{property.loadingArea ? 'יש' : 'אין'}</span>
+                <span className="info-label">מ״ר ארנונה</span>
+                <span className="info-value">{property.sqmArnona}</span>
               </div>
               <div className="info-item">
-                <span className="info-label">נגישות לנכים</span>
-                <span className="info-value">{property.handicapAccess ? 'יש' : 'אין'}</span>
+                <span className="info-label">מצב הנכס</span>
+                <span className="info-value">{property.renovated}</span>
               </div>
-              {property.currentTenant && (
-                <div className="info-item">
-                  <span className="info-label">שוכר נוכחי</span>
-                  <span className="info-value">{property.currentTenant}</span>
-                </div>
-              )}
+              <div className="info-item">
+                <span className="info-label">מועד פינוי</span>
+                <span className="info-value">{property.vacancyDate}</span>
+              </div>
             </div>
           )}
 

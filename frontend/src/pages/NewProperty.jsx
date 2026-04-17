@@ -29,16 +29,11 @@ export default function NewProperty() {
     safeRoom: false,
     buildingAge: '',
     sector: 'כללי',
+    closingPrice: '',
     notes: '',
     exclusiveStart: '',
     exclusiveEnd: '',
-    // Commercial-specific
-    commercialType: '',
-    usagePermit: '',
-    monthlyArnona: '',
-    loadingArea: false,
-    handicapAccess: false,
-    currentTenant: '',
+    sqmArnona: '',
   });
 
   const isCommercial = form.assetClass === 'commercial';
@@ -198,45 +193,48 @@ export default function NewProperty() {
         {!isCommercial && (
           <div className="form-section">
             <h3 className="form-section-title">מאפייני דירה</h3>
+            {/* Row 1: pricing + size — fields 4,5,9,10 from doc */}
             <div className="form-row form-row-4">
               <div className="form-group">
                 <label className="form-label">מחיר שיווק</label>
                 <input type="number" className="form-input" placeholder="₪" value={form.marketingPrice} onChange={(e) => update('marketingPrice', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">שטח (מ״ר)</label>
-                <input type="number" className="form-input" value={form.sqm} onChange={(e) => update('sqm', e.target.value)} />
+                <label className="form-label">מחיר סגירה</label>
+                <input type="number" className="form-input" placeholder="₪" value={form.closingPrice} onChange={(e) => update('closingPrice', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">חדרים</label>
+                <label className="form-label">מספר חדרים</label>
                 <input type="number" step="0.5" className="form-input" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">מרפסת (מ״ר)</label>
-                <input type="number" className="form-input" value={form.balconySize} onChange={(e) => update('balconySize', e.target.value)} />
+                <label className="form-label">גודל דירה (מ״ר)</label>
+                <input type="number" className="form-input" value={form.sqm} onChange={(e) => update('sqm', e.target.value)} />
               </div>
             </div>
+            {/* Row 2: floor, building, balcony — fields 8,11,19 from doc */}
             <div className="form-row form-row-4">
               <div className="form-group">
                 <label className="form-label">קומה</label>
                 <input type="number" className="form-input" value={form.floor} onChange={(e) => update('floor', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">מתוך קומות</label>
+                <label className="form-label">מתוך</label>
                 <input type="number" className="form-input" value={form.totalFloors} onChange={(e) => update('totalFloors', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">גיל הבניין</label>
+                <label className="form-label">גודל מרפסת (מ״ר)</label>
+                <input type="number" className="form-input" value={form.balconySize} onChange={(e) => update('balconySize', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">בניין בן (שנים)</label>
                 <input type="number" className="form-input" value={form.buildingAge} onChange={(e) => update('buildingAge', e.target.value)} />
               </div>
-              <div className="form-group">
-                <label className="form-label">כיווני אוויר</label>
-                <input className="form-input" placeholder="דרום-מערב" value={form.airDirections} onChange={(e) => update('airDirections', e.target.value)} />
-              </div>
             </div>
-            <div className="form-row">
+            {/* Row 3: condition, vacancy, sector, airDirections — fields 6,7,14,16 from doc */}
+            <div className="form-row form-row-4">
               <div className="form-group">
-                <label className="form-label">מצב הנכס</label>
+                <label className="form-label">עברה שיפוץ?</label>
                 <select className="form-select" value={form.renovated} onChange={(e) => update('renovated', e.target.value)}>
                   <option value="">בחר...</option>
                   <option>חדש מקבלן</option>
@@ -247,7 +245,7 @@ export default function NewProperty() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">מועד פינוי</label>
+                <label className="form-label">תאריך פינוי</label>
                 <input className="form-input" placeholder="מיידי / 3 חודשים" value={form.vacancyDate} onChange={(e) => update('vacancyDate', e.target.value)} />
               </div>
               <div className="form-group">
@@ -258,6 +256,10 @@ export default function NewProperty() {
                   <option>חרדי</option>
                   <option>ערבי</option>
                 </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">כיווני אוויר</label>
+                <input className="form-input" placeholder="דרום-מערב" value={form.airDirections} onChange={(e) => update('airDirections', e.target.value)} />
               </div>
             </div>
             <div className="checkbox-grid">
@@ -279,65 +281,79 @@ export default function NewProperty() {
         )}
 
         {/* Property details — COMMERCIAL */}
+        {/* Same fields from the intake doc, minus rooms/balcony/safeRoom, plus מ"ר ארנונה */}
         {isCommercial && (
           <div className="form-section">
             <h3 className="form-section-title">מאפייני נכס מסחרי</h3>
-            <div className="form-row form-row-3">
+            <div className="form-row form-row-4">
               <div className="form-group">
                 <label className="form-label">מחיר שיווק</label>
                 <input type="number" className="form-input" placeholder="₪" value={form.marketingPrice} onChange={(e) => update('marketingPrice', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">שטח (מ״ר)</label>
+                <label className="form-label">גודל נכס (מ״ר)</label>
                 <input type="number" className="form-input" value={form.sqm} onChange={(e) => update('sqm', e.target.value)} />
               </div>
+              <div className="form-group">
+                <label className="form-label">מ״ר ארנונה</label>
+                <input type="number" className="form-input" value={form.sqmArnona} onChange={(e) => update('sqmArnona', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">מחיר סגירה</label>
+                <input type="number" className="form-input" placeholder="₪" value={form.closingPrice} onChange={(e) => update('closingPrice', e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row form-row-4">
               <div className="form-group">
                 <label className="form-label">קומה</label>
                 <input type="number" className="form-input" value={form.floor} onChange={(e) => update('floor', e.target.value)} />
               </div>
-            </div>
-            <div className="form-row form-row-3">
               <div className="form-group">
-                <label className="form-label">סוג שימוש</label>
-                <input className="form-input" placeholder="משרדים / מסחר / תעשייה" value={form.usagePermit} onChange={(e) => update('usagePermit', e.target.value)} />
+                <label className="form-label">מתוך קומות</label>
+                <input type="number" className="form-input" value={form.totalFloors} onChange={(e) => update('totalFloors', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">ארנונה חודשית</label>
-                <input type="number" className="form-input" placeholder="₪/חודש" value={form.monthlyArnona} onChange={(e) => update('monthlyArnona', e.target.value)} />
+                <label className="form-label">בניין בן (שנים)</label>
+                <input type="number" className="form-input" value={form.buildingAge} onChange={(e) => update('buildingAge', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">שוכר נוכחי</label>
-                <input className="form-input" placeholder="ריק / שם השוכר" value={form.currentTenant} onChange={(e) => update('currentTenant', e.target.value)} />
+                <label className="form-label">כיווני אוויר</label>
+                <input className="form-input" placeholder="מערב" value={form.airDirections} onChange={(e) => update('airDirections', e.target.value)} />
               </div>
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">מצב הנכס</label>
+                <label className="form-label">עבר שיפוץ?</label>
                 <select className="form-select" value={form.renovated} onChange={(e) => update('renovated', e.target.value)}>
                   <option value="">בחר...</option>
                   <option>חדש</option>
                   <option>משופץ</option>
+                  <option>שמור</option>
                   <option>סביר</option>
                   <option>דרוש שיפוץ</option>
                   <option>מעטפת בלבד</option>
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">מועד פינוי</label>
+                <label className="form-label">תאריך פינוי</label>
                 <input className="form-input" placeholder="מיידי / תאריך" value={form.vacancyDate} onChange={(e) => update('vacancyDate', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">גיל הבניין</label>
-                <input type="number" className="form-input" value={form.buildingAge} onChange={(e) => update('buildingAge', e.target.value)} />
+                <label className="form-label">מגזר</label>
+                <select className="form-select" value={form.sector} onChange={(e) => update('sector', e.target.value)}>
+                  <option>כללי</option>
+                  <option>דתי</option>
+                  <option>חרדי</option>
+                  <option>ערבי</option>
+                </select>
               </div>
             </div>
             <div className="checkbox-grid">
               {[
                 { key: 'elevator', label: 'מעלית' },
                 { key: 'parking', label: 'חניה' },
-                { key: 'ac', label: 'מיזוג' },
-                { key: 'loadingArea', label: 'רמפת פריקה' },
-                { key: 'handicapAccess', label: 'נגישות לנכים' },
+                { key: 'storage', label: 'מחסן' },
+                { key: 'ac', label: 'מזגנים' },
               ].map(({ key, label }) => (
                 <label key={key} className="checkbox-item">
                   <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />

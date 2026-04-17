@@ -60,6 +60,11 @@ html {
 body {
   font-family: var(--font-body);
   background: var(--bg-primary);
+  /* PWA safe area for iPhone notch/dynamic island */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   color: var(--text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;

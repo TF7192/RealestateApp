@@ -25,11 +25,12 @@ export default function App() {
     setUser(null);
   };
 
-  // Not logged in
+  // Not logged in — allow public property pages and shared filter links
   if (!user) {
     return (
       <Routes>
         <Route path="/p/:id" element={<CustomerPropertyView />} />
+        <Route path="/share" element={<CustomerPortal onLogout={() => {}} isPublic />} />
         <Route path="*" element={<Login onLogin={handleLogin} />} />
       </Routes>
     );

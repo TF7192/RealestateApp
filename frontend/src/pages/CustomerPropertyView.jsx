@@ -73,10 +73,10 @@ export default function CustomerPropertyView() {
             <ArrowRight size={18} />
             חזרה לנכסים
           </Link>
-          <div className="cpv-header-logo">
+          <Link to="/customer" className="cpv-header-logo">
             <span className="logo-icon-sm">◆</span>
             <span>Estia</span>
-          </div>
+          </Link>
           <button className="btn btn-ghost btn-sm" onClick={handleShare}>
             <Share2 size={16} />
             שתף
@@ -139,13 +139,15 @@ export default function CustomerPropertyView() {
 
           {/* Specs */}
           <div className="cpv-specs">
-            <div className="cpv-spec">
-              <Bed size={22} />
-              <div>
-                <strong>{property.rooms}</strong>
-                <span>חדרים</span>
+            {property.rooms != null && (
+              <div className="cpv-spec">
+                <Bed size={22} />
+                <div>
+                  <strong>{property.rooms}</strong>
+                  <span>חדרים</span>
+                </div>
               </div>
-            </div>
+            )}
             <div className="cpv-spec">
               <Maximize size={22} />
               <div>
@@ -153,6 +155,15 @@ export default function CustomerPropertyView() {
                 <span>שטח</span>
               </div>
             </div>
+            {property.sqmArnona && (
+              <div className="cpv-spec">
+                <Maximize size={22} />
+                <div>
+                  <strong>{property.sqmArnona} מ״ר</strong>
+                  <span>ארנונה</span>
+                </div>
+              </div>
+            )}
             <div className="cpv-spec">
               <Building2 size={22} />
               <div>
@@ -171,15 +182,17 @@ export default function CustomerPropertyView() {
             )}
           </div>
 
-          {/* Features */}
+          {/* Features — show relevant ones based on asset class */}
           <div className="cpv-features">
             <h3>מאפייני הנכס</h3>
             <div className="cpv-features-grid">
               {[
                 { icon: ParkingCircle, label: 'חניה', value: property.parking },
                 { icon: Warehouse, label: 'מחסן', value: property.storage },
-                { icon: Snowflake, label: 'מזגן', value: property.ac },
-                { icon: Shield, label: 'ממ״ד', value: property.safeRoom },
+                { icon: Snowflake, label: 'מזגנים', value: property.ac },
+                ...(property.assetClass === 'residential'
+                  ? [{ icon: Shield, label: 'ממ״ד', value: property.safeRoom }]
+                  : []),
               ].map((feat) => (
                 <div
                   key={feat.label}
@@ -195,18 +208,20 @@ export default function CustomerPropertyView() {
             </div>
           </div>
 
-          {/* Details */}
+          {/* Details — fields from the intake doc, for all asset types */}
           <div className="cpv-details">
             <h3>פרטים נוספים</h3>
             <div className="cpv-details-grid">
               <div>
-                <span className="cpv-detail-label">מצב</span>
+                <span className="cpv-detail-label">עבר שיפוץ</span>
                 <span className="cpv-detail-value">{property.renovated}</span>
               </div>
-              <div>
-                <span className="cpv-detail-label">כיווני אוויר</span>
-                <span className="cpv-detail-value">{property.airDirections}</span>
-              </div>
+              {property.airDirections && (
+                <div>
+                  <span className="cpv-detail-label">כיווני אוויר</span>
+                  <span className="cpv-detail-value">{property.airDirections}</span>
+                </div>
+              )}
               <div>
                 <span className="cpv-detail-label">מעלית</span>
                 <span className="cpv-detail-value">
@@ -214,7 +229,7 @@ export default function CustomerPropertyView() {
                 </span>
               </div>
               <div>
-                <span className="cpv-detail-label">גיל הבניין</span>
+                <span className="cpv-detail-label">בניין בן</span>
                 <span className="cpv-detail-value">
                   {property.buildingAge === 0
                     ? 'חדש'
@@ -222,9 +237,15 @@ export default function CustomerPropertyView() {
                 </span>
               </div>
               <div>
-                <span className="cpv-detail-label">מועד פינוי</span>
+                <span className="cpv-detail-label">תאריך פינוי</span>
                 <span className="cpv-detail-value">{property.vacancyDate}</span>
               </div>
+              {property.assetClass === 'residential' && (
+                <div>
+                  <span className="cpv-detail-label">מגזר</span>
+                  <span className="cpv-detail-value">{property.sector}</span>
+                </div>
+              )}
             </div>
           </div>
 

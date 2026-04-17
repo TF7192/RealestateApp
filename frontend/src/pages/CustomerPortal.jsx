@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search,
@@ -26,24 +26,35 @@ import {
 } from '../data/mockData';
 import './CustomerPortal.css';
 
-export default function CustomerPortal({ onLogout }) {
+export default function CustomerPortal({ onLogout, isPublic }) {
   const [searchParams] = useSearchParams();
-  const initialAssetClass = searchParams.get('assetClass') || 'all';
+
+  // Read all possible filter params from URL
+  const urlFilters = {
+    city: searchParams.get('city') || '',
+    category: searchParams.get('category') || 'all',
+    assetClass: searchParams.get('assetClass') || 'all',
+    minPrice: searchParams.get('minPrice') || '',
+    maxPrice: searchParams.get('maxPrice') || '',
+    minSqm: searchParams.get('minSqm') || '',
+    maxSqm: searchParams.get('maxSqm') || '',
+    minFloor: searchParams.get('minFloor') || '',
+    maxFloor: searchParams.get('maxFloor') || '',
+    minRooms: searchParams.get('minRooms') || '',
+    maxRooms: searchParams.get('maxRooms') || '',
+    minBalcony: searchParams.get('minBalcony') || '',
+    sector: searchParams.get('sector') || '',
+    safeRoom: searchParams.get('safeRoom') || '',
+    elevator: searchParams.get('elevator') || '',
+    minSqmArnona: searchParams.get('minSqmArnona') || '',
+  };
 
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState([]);
   const [locationQuery, setLocationQuery] = useState('');
-  const [locationRadius, setLocationRadius] = useState(10); // km
-  const [filters, setFilters] = useState({
-    city: '',
-    category: 'all',
-    assetClass: initialAssetClass,
-    minPrice: '',
-    maxPrice: '',
-    minRooms: '',
-    maxRooms: '',
-  });
+  const [locationRadius, setLocationRadius] = useState(10);
+  const [filters, setFilters] = useState(urlFilters);
 
   const filtered = useMemo(() => {
     // Resolve location coordinates
@@ -73,10 +84,24 @@ export default function CustomerPortal({ onLogout }) {
         if (filters.category === 'sale' && p.category !== 'sale') return false;
         if (filters.category === 'rent' && p.category !== 'rent') return false;
         if (filters.city && p.city !== filters.city) return false;
+        // Shared fields
         if (filters.minPrice && p.marketingPrice < Number(filters.minPrice)) return false;
         if (filters.maxPrice && p.marketingPrice > Number(filters.maxPrice)) return false;
+        if (filters.minSqm && p.sqm < Number(filters.minSqm)) return false;
+        if (filters.maxSqm && p.sqm > Number(filters.maxSqm)) return false;
+        if (filters.minFloor && p.floor < Number(filters.minFloor)) return false;
+        if (filters.maxFloor && p.floor > Number(filters.maxFloor)) return false;
+        if (filters.elevator === 'yes' && !p.elevator) return false;
+        if (filters.elevator === 'no' && p.elevator) return false;
+        // Residential-only
         if (filters.minRooms && p.rooms != null && p.rooms < Number(filters.minRooms)) return false;
         if (filters.maxRooms && p.rooms != null && p.rooms > Number(filters.maxRooms)) return false;
+        if (filters.minBalcony && (p.balconySize || 0) < Number(filters.minBalcony)) return false;
+        if (filters.sector && p.sector !== filters.sector) return false;
+        if (filters.safeRoom === 'yes' && !p.safeRoom) return false;
+        if (filters.safeRoom === 'no' && p.safeRoom) return false;
+        // Commercial-only
+        if (filters.minSqmArnona && (p.sqmArnona || 0) < Number(filters.minSqmArnona)) return false;
         // Proximity filter
         if (locationCenter && p._distance != null && p._distance > locationRadius) return false;
         if (search) {
@@ -108,6 +133,35 @@ export default function CustomerPortal({ onLogout }) {
     );
   };
 
+  const [activeSection, setActiveSection] = useState('properties');
+
+  const scrollTo = useCallback((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActiveSection(id);
+    }
+  }, []);
+
+  useEffect(() => {
+    const sections = ['properties', 'contact'];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: '-40% 0px -40% 0px', threshold: 0 }
+    );
+    sections.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
   const clearFilters = () => {
     setFilters({
       city: '',
@@ -115,8 +169,17 @@ export default function CustomerPortal({ onLogout }) {
       assetClass: 'all',
       minPrice: '',
       maxPrice: '',
+      minSqm: '',
+      maxSqm: '',
+      minFloor: '',
+      maxFloor: '',
       minRooms: '',
       maxRooms: '',
+      minBalcony: '',
+      sector: '',
+      safeRoom: '',
+      elevator: '',
+      minSqmArnona: '',
     });
     setLocationQuery('');
     setLocationRadius(10);
@@ -129,23 +192,31 @@ export default function CustomerPortal({ onLogout }) {
       {/* Header */}
       <header className="cp-header">
         <div className="cp-header-inner">
-          <div className="cp-logo">
+          <Link to="/customer" className="cp-logo">
             <span className="logo-icon-sm">◆</span>
             <span>Estia</span>
-          </div>
+          </Link>
           <nav className="cp-nav">
-            <a href="#properties" className="cp-nav-link active">
+            <button
+              className={`cp-nav-link ${activeSection === 'properties' ? 'active' : ''}`}
+              onClick={() => scrollTo('properties')}
+            >
               נכסים
-            </a>
-            <a href="#contact" className="cp-nav-link">
+            </button>
+            <button
+              className={`cp-nav-link ${activeSection === 'contact' ? 'active' : ''}`}
+              onClick={() => scrollTo('contact')}
+            >
               צור קשר
-            </a>
+            </button>
           </nav>
           <div className="cp-header-actions">
-            <button className="btn btn-ghost btn-sm" onClick={onLogout}>
-              <LogOut size={16} />
-              יציאה
-            </button>
+            {!isPublic && (
+              <button className="btn btn-ghost btn-sm" onClick={onLogout}>
+                <LogOut size={16} />
+                יציאה
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -239,49 +310,109 @@ export default function CustomerPortal({ onLogout }) {
               )}
             </div>
 
+            {/* Shared fields — always visible */}
+            <div className="cp-filters-section-label">שדות כלליים</div>
             <div className="cp-filters-grid">
               <div className="form-group">
                 <label className="form-label">עיר</label>
-                <select
-                  className="form-select"
-                  value={filters.city}
-                  onChange={(e) => setFilters({ ...filters, city: e.target.value })}
-                >
+                <select className="form-select" value={filters.city} onChange={(e) => setFilters({ ...filters, city: e.target.value })}>
                   <option value="">כל הערים</option>
-                  {cities.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
+                  {cities.map((c) => (<option key={c} value={c}>{c}</option>))}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">מכירה / השכרה</label>
-                <select
-                  className="form-select"
-                  value={filters.category}
-                  onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-                >
+                <select className="form-select" value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
                   <option value="all">הכל</option>
                   <option value="sale">מכירה</option>
                   <option value="rent">השכרה</option>
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">מחיר מינימום</label>
+                <label className="form-label">מחיר מ-</label>
                 <input type="number" className="form-input" placeholder="₪" value={filters.minPrice} onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })} />
               </div>
               <div className="form-group">
-                <label className="form-label">מחיר מקסימום</label>
+                <label className="form-label">מחיר עד</label>
                 <input type="number" className="form-input" placeholder="₪" value={filters.maxPrice} onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })} />
               </div>
               <div className="form-group">
-                <label className="form-label">חדרים מ-</label>
-                <input type="number" className="form-input" value={filters.minRooms} onChange={(e) => setFilters({ ...filters, minRooms: e.target.value })} />
+                <label className="form-label">שטח מ- (מ״ר)</label>
+                <input type="number" className="form-input" value={filters.minSqm} onChange={(e) => setFilters({ ...filters, minSqm: e.target.value })} />
               </div>
               <div className="form-group">
-                <label className="form-label">חדרים עד</label>
-                <input type="number" className="form-input" value={filters.maxRooms} onChange={(e) => setFilters({ ...filters, maxRooms: e.target.value })} />
+                <label className="form-label">שטח עד (מ״ר)</label>
+                <input type="number" className="form-input" value={filters.maxSqm} onChange={(e) => setFilters({ ...filters, maxSqm: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">קומה מ-</label>
+                <input type="number" className="form-input" value={filters.minFloor} onChange={(e) => setFilters({ ...filters, minFloor: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">קומה עד</label>
+                <input type="number" className="form-input" value={filters.maxFloor} onChange={(e) => setFilters({ ...filters, maxFloor: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">מעלית</label>
+                <select className="form-select" value={filters.elevator} onChange={(e) => setFilters({ ...filters, elevator: e.target.value })}>
+                  <option value="">לא משנה</option>
+                  <option value="yes">יש</option>
+                  <option value="no">אין</option>
+                </select>
               </div>
             </div>
+
+            {/* Residential-only fields — only when explicitly selecting מגורים */}
+            {filters.assetClass === 'residential' && (
+              <>
+                <div className="cp-filters-section-label">מגורים</div>
+                <div className="cp-filters-grid">
+                  <div className="form-group">
+                    <label className="form-label">חדרים מ-</label>
+                    <input type="number" className="form-input" value={filters.minRooms} onChange={(e) => setFilters({ ...filters, minRooms: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">חדרים עד</label>
+                    <input type="number" className="form-input" value={filters.maxRooms} onChange={(e) => setFilters({ ...filters, maxRooms: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">מרפסת מ- (מ״ר)</label>
+                    <input type="number" className="form-input" value={filters.minBalcony} onChange={(e) => setFilters({ ...filters, minBalcony: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">מגזר</label>
+                    <select className="form-select" value={filters.sector} onChange={(e) => setFilters({ ...filters, sector: e.target.value })}>
+                      <option value="">הכל</option>
+                      <option>כללי</option>
+                      <option>דתי</option>
+                      <option>חרדי</option>
+                      <option>ערבי</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">ממ״ד</label>
+                    <select className="form-select" value={filters.safeRoom} onChange={(e) => setFilters({ ...filters, safeRoom: e.target.value })}>
+                      <option value="">לא משנה</option>
+                      <option value="yes">יש</option>
+                      <option value="no">אין</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Commercial-only fields */}
+            {filters.assetClass === 'commercial' && (
+              <>
+                <div className="cp-filters-section-label">מסחרי</div>
+                <div className="cp-filters-grid">
+                  <div className="form-group">
+                    <label className="form-label">מ״ר ארנונה מ-</label>
+                    <input type="number" className="form-input" value={filters.minSqmArnona} onChange={(e) => setFilters({ ...filters, minSqmArnona: e.target.value })} />
+                  </div>
+                </div>
+              </>
+            )}
             <button className="btn btn-secondary btn-sm" onClick={clearFilters}>
               נקה סינון
             </button>

@@ -1,6 +1,6 @@
 // Mock data based on the actual spreadsheets and PRD
 
-// Known city coordinates for proximity search
+// Known locations for proximity search — cities + well-known streets
 export const cityCoords = {
   'רמלה': { lat: 31.928, lng: 34.862 },
   'באר יעקב': { lat: 31.943, lng: 34.835 },
@@ -9,6 +9,71 @@ export const cityCoords = {
   'רחובות': { lat: 31.894, lng: 34.810 },
   'נס ציונה': { lat: 31.929, lng: 34.798 },
 };
+
+// Street-level coordinates (approximate) for proximity search
+export const streetCoords = {
+  // רמלה
+  'הרצל, רמלה': { lat: 31.927, lng: 34.866 },
+  'איינשטיין, רמלה': { lat: 31.929, lng: 34.864 },
+  'שלמה המלך, רמלה': { lat: 31.926, lng: 34.858 },
+  'בן גוריון, רמלה': { lat: 31.930, lng: 34.860 },
+  'ויצמן, רמלה': { lat: 31.925, lng: 34.861 },
+  'ז׳בוטינסקי, רמלה': { lat: 31.931, lng: 34.863 },
+  'דני מס, רמלה': { lat: 31.924, lng: 34.859 },
+  // באר יעקב
+  'הרצל, באר יעקב': { lat: 31.944, lng: 34.838 },
+  'השקד, באר יעקב': { lat: 31.941, lng: 34.832 },
+  'הדקל, באר יעקב': { lat: 31.942, lng: 34.836 },
+  'הברוש, באר יעקב': { lat: 31.945, lng: 34.834 },
+  // ראשון לציון
+  'ויצמן, ראשון לציון': { lat: 31.966, lng: 34.806 },
+  'רוטשילד, ראשון לציון': { lat: 31.963, lng: 34.792 },
+  'הרצל, ראשון לציון': { lat: 31.965, lng: 34.800 },
+  'סוקולוב, ראשון לציון': { lat: 31.968, lng: 34.802 },
+  'ז׳בוטינסקי, ראשון לציון': { lat: 31.960, lng: 34.808 },
+  'דיזנגוף, ראשון לציון': { lat: 31.962, lng: 34.798 },
+  // לוד
+  'התעשייה, לוד': { lat: 31.952, lng: 34.898 },
+  'הרצל, לוד': { lat: 31.950, lng: 34.893 },
+};
+
+// Resolve a free-text query to coordinates. Tries street match first, then city.
+export function resolveLocation(query) {
+  if (!query || !query.trim()) return null;
+  const q = query.trim();
+
+  // Exact street match
+  for (const [name, coords] of Object.entries(streetCoords)) {
+    if (name.includes(q) || q.includes(name.split(',')[0].trim())) {
+      return { ...coords, label: name };
+    }
+  }
+
+  // Partial street match (first word)
+  const firstWord = q.split(/[\s,]/)[0];
+  if (firstWord.length >= 2) {
+    for (const [name, coords] of Object.entries(streetCoords)) {
+      if (name.startsWith(firstWord)) {
+        return { ...coords, label: name };
+      }
+    }
+  }
+
+  // City match
+  for (const [name, coords] of Object.entries(cityCoords)) {
+    if (name.includes(q) || q.includes(name)) {
+      return { ...coords, label: name };
+    }
+  }
+
+  return null;
+}
+
+// All known location names for autocomplete
+export const allLocationNames = [
+  ...Object.keys(cityCoords),
+  ...Object.keys(streetCoords),
+];
 
 // Haversine distance in km
 export function getDistanceKm(lat1, lng1, lat2, lng2) {
@@ -316,6 +381,9 @@ export const properties = [
   },
 
   // ── COMMERCIAL ──
+  // Same core fields from the intake doc (שם בעל הנכס, כתובת, מחיר שיווק, מ"ר,
+  // קומה/מתוך, מחסן, חניה, שיפוץ, מזגנים, כיווני אוויר, ממ"ד, הערות, בניין בן)
+  // plus מ"ר ארנונה from spreadsheet. "rooms" is optional for commercial.
   {
     id: 7,
     assetClass: 'commercial',
@@ -330,6 +398,7 @@ export const properties = [
     marketingPrice: 980000,
     closingPrice: null,
     sqm: 120,
+    sqmArnona: 120,
     rooms: null,
     floor: 2,
     totalFloors: 4,
@@ -342,7 +411,7 @@ export const properties = [
     parking: true,
     storage: false,
     balconySize: 0,
-    airDirections: '',
+    airDirections: 'מערב',
     ac: true,
     safeRoom: false,
     buildingAge: 10,
@@ -350,13 +419,6 @@ export const properties = [
     notes: 'משרד ייצוגי במרכז העיר, מתאים לעו״ד / רו״ח',
     status: 'active',
     category: 'sale',
-    // Commercial-specific fields
-    commercialType: 'משרד',
-    usagePermit: 'משרדים',
-    monthlyArnona: 1800,
-    loadingArea: false,
-    handicapAccess: true,
-    currentTenant: null,
     images: [
       'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80',
       'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=800&q=80',
@@ -385,6 +447,7 @@ export const properties = [
     marketingPrice: 12000,
     closingPrice: null,
     sqm: 65,
+    sqmArnona: 65,
     rooms: null,
     floor: 0,
     totalFloors: 3,
@@ -405,12 +468,6 @@ export const properties = [
     notes: 'חנות ברחוב מרכזי, חזית רחבה, תנועת הולכי רגל ערה',
     status: 'active',
     category: 'rent',
-    commercialType: 'חנות',
-    usagePermit: 'מסחר',
-    monthlyArnona: 2200,
-    loadingArea: true,
-    handicapAccess: true,
-    currentTenant: null,
     images: [
       'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=800&q=80',
     ],
@@ -438,6 +495,7 @@ export const properties = [
     marketingPrice: 1450000,
     closingPrice: null,
     sqm: 300,
+    sqmArnona: 300,
     rooms: null,
     floor: 0,
     totalFloors: 1,
@@ -458,12 +516,6 @@ export const properties = [
     notes: 'מחסן / מבנה תעשייתי, גישה נוחה לכבישים ראשיים',
     status: 'active',
     category: 'sale',
-    commercialType: 'מחסן/לוגיסטיקה',
-    usagePermit: 'תעשייה ואחסנה',
-    monthlyArnona: 3500,
-    loadingArea: true,
-    handicapAccess: false,
-    currentTenant: 'חברת שילוח (עד 06/2025)',
     images: [
       'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&q=80',
     ],

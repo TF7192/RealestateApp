@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
   Building2,
@@ -44,10 +44,10 @@ export default function Layout({ onLogout }) {
         <button className="btn-ghost" onClick={() => setSidebarOpen(true)}>
           <Menu size={24} />
         </button>
-        <div className="mobile-logo">
+        <Link to="/" className="mobile-logo">
           <span className="logo-icon">◆</span>
           <span>Estia</span>
-        </div>
+        </Link>
         <div style={{ width: 40 }} />
       </header>
 
@@ -59,7 +59,7 @@ export default function Layout({ onLogout }) {
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <div className="logo">
+          <Link to="/" className="logo">
             <div className="logo-mark">
               <span>◆</span>
             </div>
@@ -67,7 +67,7 @@ export default function Layout({ onLogout }) {
               <h1>Estia</h1>
               <p>ניהול נכסים ולידים</p>
             </div>
-          </div>
+          </Link>
           <button
             className="sidebar-close btn-ghost"
             onClick={() => setSidebarOpen(false)}

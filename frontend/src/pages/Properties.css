@@ -1,9 +1,9 @@
 /* Filters bar */
 .filters-bar {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
 }
 
@@ -76,6 +76,169 @@
   color: var(--gold);
 }
 
+/* Advanced filter toggle */
+.btn-ghost.has-filters {
+  color: var(--gold);
+}
+
+.filter-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  display: inline-block;
+  margin-right: 2px;
+}
+
+/* Agent advanced filters panel */
+.agent-filters-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+/* Proximity search */
+.agent-proximity-section {
+  margin-bottom: 16px;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.agent-proximity-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-proximity-input svg {
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+.agent-proximity-input input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+}
+
+.agent-proximity-input input::placeholder {
+  color: var(--text-muted);
+}
+
+.proximity-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  transition: color 0.2s;
+}
+
+.proximity-clear:hover {
+  color: var(--text-primary);
+}
+
+.agent-proximity-radius {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.proximity-match {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+.proximity-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.proximity-slider-wrap .form-label {
+  white-space: nowrap;
+  min-width: 85px;
+  margin: 0;
+}
+
+.proximity-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-card);
+  outline: none;
+}
+
+.proximity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--gold);
+  cursor: pointer;
+  box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+.proximity-no-match {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Distance badge on card */
+.property-distance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  margin-bottom: 10px;
+  padding: 3px 8px;
+  background: var(--gold-glow);
+  border-radius: 10px;
+  width: fit-content;
+}
+
+.agent-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.agent-filters-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Copied link button state */
+.btn-copied {
+  border-color: var(--success) !important;
+  color: var(--success) !important;
+  background: var(--success-bg) !important;
+}
+
 /* Properties grid */
 .properties-grid {
   display: grid;
@@ -88,15 +251,22 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  text-decoration: none;
-  color: inherit;
   transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .property-card:hover {
   transform: translateY(-4px);
   border-color: var(--gold-border);
   box-shadow: var(--shadow-lg);
+}
+
+.property-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  flex: 1;
 }
 
 .property-image {
@@ -220,6 +390,33 @@
   color: var(--gold);
 }
 
+/* WhatsApp quick-send button on each card */
+.property-wa-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: rgba(37, 211, 102, 0.06);
+  color: #25d366;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.property-wa-btn:hover {
+  background: rgba(37, 211, 102, 0.14);
+  color: #22c55e;
+}
+
+.property-wa-btn:active {
+  background: rgba(37, 211, 102, 0.22);
+}
+
 @media (max-width: 640px) {
   .properties-grid {
     grid-template-columns: 1fr;
@@ -231,5 +428,9 @@
 
   .search-box {
     width: 100%;
+  }
+
+  .agent-filters-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
