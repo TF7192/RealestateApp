@@ -44,11 +44,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # Exposed for admin / health-check access (browsers can't hit a port under
-    # Chrome's unsafe-ports list, so all browser traffic goes via the nginx
-    # container on 6001 which proxies /api through the internal network).
+    # Exposed for admin / health-check access. Browser traffic flows via the
+    # nginx container on ${FRONTEND_PORT} (which proxies /api through the
+    # internal Docker network), so this is localhost-bound in production.
     ports:
-      - "${BACKEND_PORT:-6002}:4000"
+      - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT:-6002}:4000"
 
   frontend:
     build:
