@@ -60,6 +60,32 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
+.gallery-manage-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gallery-manage-btn:hover {
+  background: var(--gold);
+  color: var(--bg-primary);
+  border-color: var(--gold);
+}
+
 .gallery-thumbs {
   display: flex;
   gap: 8px;
@@ -527,6 +553,132 @@
 
 .checklist-item.interactive.is-done {
   color: var(--text-primary);
+}
+
+/* Split toggle + detail button */
+.checklist-item.interactive {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.checklist-item.interactive:hover {
+  background: var(--gold-glow);
+}
+
+.checklist-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  text-align: right;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: inherit;
+  border-radius: 6px;
+}
+
+.checklist-detail-btn {
+  padding: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.checklist-item.interactive:hover .checklist-detail-btn {
+  opacity: 1;
+}
+
+.checklist-detail-btn:hover {
+  color: var(--gold);
+  background: var(--bg-card);
+}
+
+/* Marketing groups */
+.mg-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.mg-section.open {
+  border-color: var(--gold-border);
+}
+
+.mg-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: right;
+  transition: background 0.15s;
+}
+
+.mg-header:hover { background: var(--gold-glow); }
+
+.mg-chev {
+  color: var(--gold);
+  font-size: 12px;
+  width: 10px;
+  flex-shrink: 0;
+}
+
+.mg-title { flex: 1; }
+
+.mg-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mg-bar {
+  display: inline-block;
+  width: 56px;
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mg-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+  border-radius: 2px;
+  transition: width 0.25s;
+}
+
+.mg-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mg-body {
+  padding: 6px 8px 10px;
+  background: var(--bg-card);
 }
 
 .ma-row-icon {

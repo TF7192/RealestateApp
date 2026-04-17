@@ -1,0 +1,39 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  line-height: 1.6;
+}
+
+.chip-sm { font-size: 11px; }
+.chip-md { font-size: 12px; padding: 3px 10px; }
+
+.chip-clickable {
+  cursor: pointer;
+  background-color: var(--bg-elevated);
+  transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
+}
+
+.chip-clickable:hover { transform: translateY(-1px); }
+
+/* Tonal variants — carefully tuned so they read cleanly in both themes */
+.chip-neutral  { background: var(--bg-elevated); color: var(--text-secondary); }
+.chip-gold     { background: var(--gold-glow); color: var(--gold); }
+.chip-info     { background: var(--info-bg); color: var(--info); }
+.chip-success  { background: var(--success-bg); color: var(--success); }
+.chip-warning  { background: var(--warning-bg); color: var(--warning); }
+.chip-danger   { background: var(--danger-bg); color: var(--danger); }
+
+/* Semantic variants for this app */
+.chip-hot   { background: var(--danger-bg); color: var(--danger); }
+.chip-warm  { background: var(--warning-bg); color: var(--warning); }
+.chip-cold  { background: var(--info-bg); color: var(--info); }
+.chip-buy   { background: var(--gold-glow); color: var(--gold); }
+.chip-rent  { background: var(--info-bg); color: var(--info); }

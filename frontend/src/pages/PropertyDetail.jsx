@@ -27,11 +27,15 @@ import {
   Trash2,
   Link2,
   X,
+  Images,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import MarketingActionDialog from '../components/MarketingActionDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
+import PropertyPhotoManager from '../components/PropertyPhotoManager';
+import { useToast, optimisticUpdate } from '../lib/toast';
+import { relativeTime, absoluteTime } from '../lib/time';
 import './PropertyDetail.css';
 
 const MARKETING_LABELS = {
@@ -58,6 +62,26 @@ const MARKETING_LABELS = {
   agentTour: 'סיור סוכנים',
   openHouse: 'בית פתוח',
 };
+
+// Group the 22 actions into three scannable sections so the agent can find
+// and mark the one they want in a couple of glances instead of scrolling.
+const MARKETING_GROUPS = [
+  {
+    key: 'digital',
+    label: 'פרסום דיגיטלי',
+    keys: ['iList', 'yad2', 'facebook', 'marketplace', 'onMap', 'madlan', 'virtualTour', 'video'],
+  },
+  {
+    key: 'field',
+    label: 'שטח ופרינט',
+    keys: ['sign', 'tabuExtract', 'photography', 'buildingPhoto', 'dronePhoto', 'flyers', 'coupons', 'newspaper', 'neighborLetters'],
+  },
+  {
+    key: 'agent',
+    label: 'פעילות סוכנים',
+    keys: ['whatsappGroup', 'officeWhatsapp', 'externalCoop', 'agentTour', 'openHouse'],
+  },
+];
 
 function formatPrice(price) {
   if (!price) return '—';
@@ -103,6 +127,7 @@ export default function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -113,6 +138,7 @@ export default function PropertyDetail() {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [managingPhotos, setManagingPhotos] = useState(false);
 
   const load = async () => {
     try {
@@ -233,6 +259,14 @@ export default function PropertyDetail() {
           <div className="gallery-counter">
             {currentImage + 1} / {images.length}
           </div>
+          <button
+            className="gallery-manage-btn"
+            onClick={() => setManagingPhotos(true)}
+            title="ניהול תמונות — הוספה, מחיקה וסידור"
+          >
+            <Images size={14} />
+            ניהול תמונות
+          </button>
         </div>
         {images.length > 1 && (
           <div className="gallery-thumbs">
@@ -368,29 +402,83 @@ export default function PropertyDetail() {
             <div className="progress-bar" style={{ marginBottom: 16 }}>
               <div className="progress-fill" style={{ width: `${pct}%` }} />
             </div>
-            <p className="marketing-hint">לחץ על פעולה כדי להוסיף קישור, תמונה או לסמן כהושלם</p>
-            <div className="marketing-checklist">
-              {Object.entries(MARKETING_LABELS).map(([key, label]) => {
-                const detail = actionsDetail[key] || { done: false };
-                return (
-                  <button
-                    type="button"
-                    key={key}
-                    className={`checklist-item interactive ${detail.done ? 'is-done' : ''}`}
-                    onClick={() => setActionDialog({ key, detail })}
-                  >
-                    {detail.done ? (
-                      <CheckCircle2 size={18} className="check-done" />
-                    ) : (
-                      <Circle size={18} className="check-pending" />
-                    )}
-                    <span className={detail.done ? 'done' : ''}>{label}</span>
-                    {detail.link && <Link2 size={13} className="ma-row-icon" />}
-                    {detail.notes && !detail.link && <FileText size={13} className="ma-row-icon" />}
-                  </button>
-                );
-              })}
-            </div>
+            <p className="marketing-hint">סמן כהושלם בלחיצה · פרטים נוספים בכפתור הצד</p>
+
+            {MARKETING_GROUPS.map((group) => {
+              const total = group.keys.length;
+              const groupDone = group.keys.filter((k) => actionsMap[k]).length;
+              return (
+                <MarketingGroup
+                  key={group.key}
+                  id={group.key}
+                  label={group.label}
+                  done={groupDone}
+                  total={total}
+                >
+                  <div className="marketing-checklist">
+                    {group.keys.map((key) => {
+                      const label = MARKETING_LABELS[key];
+                      const detail = actionsDetail[key] || { done: false };
+                      const handleToggle = async () => {
+                        const nextDone = !detail.done;
+                        const next = {
+                          ...property,
+                          marketingActions: { ...actionsMap, [key]: nextDone },
+                          marketingActionsDetail: {
+                            ...actionsDetail,
+                            [key]: { ...detail, done: nextDone, doneAt: nextDone ? new Date().toISOString() : null },
+                          },
+                        };
+                        setProperty(next);
+                        try {
+                          await api.toggleMarketingAction(property.id, {
+                            actionKey: key,
+                            done: nextDone,
+                            notes: detail.notes || null,
+                            link: detail.link || null,
+                          });
+                          toast.success(nextDone ? `${label} · סומן כהושלם` : `${label} · סימון הוסר`);
+                        } catch (e) {
+                          setProperty(property);
+                          toast.error(e?.message || 'שגיאה — השינוי בוטל');
+                        }
+                      };
+                      return (
+                        <div key={key} className={`checklist-item interactive ${detail.done ? 'is-done' : ''}`}>
+                          <button
+                            type="button"
+                            className="checklist-toggle"
+                            onClick={handleToggle}
+                          >
+                            {detail.done ? (
+                              <CheckCircle2 size={18} className="check-done" />
+                            ) : (
+                              <Circle size={18} className="check-pending" />
+                            )}
+                            <span className={detail.done ? 'done' : ''}>{label}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="checklist-detail-btn"
+                            onClick={() => setActionDialog({ key, detail })}
+                            title="פרטים / העלאה / קישור"
+                            aria-label={`פרטי ${label}`}
+                          >
+                            {detail.link
+                              ? <Link2 size={13} />
+                              : detail.notes
+                              ? <FileText size={13} />
+                              : <FileText size={13} style={{ opacity: 0.4 }} />}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </MarketingGroup>
+              );
+            })}
+
+            {/* Legacy flat list removed — grouped layout above replaces it */}
           </div>
         </div>
       </div>
@@ -427,6 +515,15 @@ export default function PropertyDetail() {
           onConfirm={handleDelete}
           onClose={() => setConfirmDelete(false)}
           busy={deleting}
+        />
+      )}
+
+      {managingPhotos && (
+        <PropertyPhotoManager
+          propertyId={property.id}
+          initial={property.imageList || []}
+          onClose={() => setManagingPhotos(false)}
+          onChange={async () => { await load(); }}
         />
       )}
     </div>
@@ -594,6 +691,34 @@ function Field({ label, children, wide }) {
     <div className={`form-group ${wide ? 'form-group-wide' : ''}`}>
       <label className="form-label">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function MarketingGroup({ id, label, done, total, children }) {
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem(`estia-mg-${id}`) !== '0'; }
+    catch { return true; }
+  });
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const toggle = () => {
+    setOpen((v) => {
+      const next = !v;
+      try { localStorage.setItem(`estia-mg-${id}`, next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
+  return (
+    <div className={`mg-section ${open ? 'open' : ''}`}>
+      <button type="button" className="mg-header" onClick={toggle}>
+        <span className="mg-chev">{open ? '▾' : '◂'}</span>
+        <span className="mg-title">{label}</span>
+        <span className="mg-progress">
+          <span className="mg-bar"><span style={{ width: `${pct}%` }} /></span>
+          <span className="mg-count">{done}/{total}</span>
+        </span>
+      </button>
+      {open && <div className="mg-body">{children}</div>}
     </div>
   );
 }

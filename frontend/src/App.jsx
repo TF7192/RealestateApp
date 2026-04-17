@@ -13,6 +13,7 @@ import AgentPortal from './pages/AgentPortal';
 import CustomerPropertyView from './pages/CustomerPropertyView';
 import Profile from './pages/Profile';
 import { AuthProvider, useAuth } from './lib/auth';
+import CommandPalette from './components/CommandPalette';
 
 // Mobile-optimized shell
 import MobileLayout from './mobile/MobileLayout';
@@ -25,7 +26,6 @@ import MobileLogin from './mobile/pages/MobileLogin';
 import MobileNewLead from './mobile/pages/MobileNewLead';
 import MobileNewProperty from './mobile/pages/MobileNewProperty';
 import MobileSettings from './mobile/pages/MobileSettings';
-import { ToastProvider } from './mobile/components/Toast';
 
 import { shouldUseMobileUI, initStatusBar } from './native';
 import './App.css';
@@ -33,6 +33,7 @@ import './App.css';
 function AppRoutes() {
   const { user, loading, logout } = useAuth();
   const [isMobile, setIsMobile] = useState(() => shouldUseMobileUI());
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     initStatusBar();
@@ -45,6 +46,20 @@ function AppRoutes() {
     };
   }, []);
 
+  // Global ⌘K / Ctrl+K → command palette
+  useEffect(() => {
+    if (!user || user.role !== 'AGENT') return undefined;
+    const onKey = (e) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [user]);
+
   if (loading) {
     return (
       <div className="app-loading">
@@ -53,8 +68,16 @@ function AppRoutes() {
     );
   }
 
-  if (isMobile) return <MobileAppRoutes user={user} logout={logout} />;
-  return <DesktopAppRoutes user={user} logout={logout} />;
+  return (
+    <>
+      {isMobile
+        ? <MobileAppRoutes user={user} logout={logout} />
+        : <DesktopAppRoutes user={user} logout={logout} />}
+      {user?.role === 'AGENT' && (
+        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      )}
+    </>
+  );
 }
 
 function MobileAppRoutes({ user, logout }) {
@@ -128,9 +151,7 @@ function DesktopAppRoutes({ user, logout }) {
 export default function App() {
   return (
     <AuthProvider>
-      <ToastProvider>
-        <AppRoutes />
-      </ToastProvider>
+      <AppRoutes />
     </AuthProvider>
   );
 }

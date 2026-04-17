@@ -64,6 +64,10 @@ export const api = {
     fd.append('file', file);
     return request(`/properties/${id}/images`, { method: 'POST', body: fd });
   },
+  deletePropertyImage: (id, imageId) =>
+    request(`/properties/${id}/images/${imageId}`, { method: 'DELETE' }),
+  reorderPropertyImages: (id, order) =>
+    request(`/properties/${id}/images/reorder`, { method: 'PUT', body: { order } }),
 
   listLeads: (params = {}) => {
     const qs = new URLSearchParams(params).toString();

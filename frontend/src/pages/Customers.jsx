@@ -24,6 +24,10 @@ import api from '../lib/api';
 import AgreementDialog from '../components/AgreementDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CustomerEditDialog from '../components/CustomerEditDialog';
+import InlineText from '../components/InlineText';
+import Chip from '../components/Chip';
+import { useToast, optimisticUpdate } from '../lib/toast';
+import { relativeTime, absoluteTime } from '../lib/time';
 import './Customers.css';
 
 // Heuristic "active" client = brokerage agreement signed and not yet expired.
@@ -56,6 +60,7 @@ function statusLabel(status) {
 
 export default function Customers() {
   const [searchParams] = useSearchParams();
+  const toast = useToast();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('leads'); // 'leads' | 'active'
@@ -141,10 +146,23 @@ export default function Customers() {
     await loadLeads();
   };
 
-  const handleStatusChange = async (lead, newStatus) => {
-    await api.updateLead(lead.id, { status: newStatus });
-    await loadLeads();
+  const patchLead = async (leadId, patch, { label, success } = {}) => {
+    // Optimistic in-place update
+    setLeads((cur) => cur.map((l) => (l.id === leadId ? { ...l, ...patch } : l)));
+    try {
+      await optimisticUpdate(toast, {
+        label: label || 'שומר…',
+        success: success || 'נשמר',
+        onSave: () => api.updateLead(leadId, patch),
+      });
+    } catch {
+      // Rewind by re-fetching on failure
+      await loadLeads();
+    }
   };
+
+  const handleStatusChange = (lead, newStatus) =>
+    patchLead(lead.id, { status: newStatus }, { success: `סטטוס עודכן ל-${newStatus === 'HOT' ? 'חם' : newStatus === 'WARM' ? 'חמים' : 'קר'}` });
 
   const confirmDeleteLead = async () => {
     if (!deleteTarget) return;
@@ -335,15 +353,33 @@ export default function Customers() {
                 </div>
                 <div className="cc-row">
                   <span className="cc-label">עיר</span>
-                  <span className="cc-value">{lead.city || '—'}</span>
+                  <span className="cc-value">
+                    <InlineText
+                      value={lead.city || ''}
+                      onCommit={(v) => patchLead(lead.id, { city: v || null }, { success: 'עיר עודכנה' })}
+                      placeholder="הוסף עיר"
+                    />
+                  </span>
                 </div>
                 <div className="cc-row">
                   <span className="cc-label">חדרים</span>
-                  <span className="cc-value">{lead.rooms || '—'}</span>
+                  <span className="cc-value">
+                    <InlineText
+                      value={lead.rooms || ''}
+                      onCommit={(v) => patchLead(lead.id, { rooms: v || null })}
+                      placeholder="—"
+                    />
+                  </span>
                 </div>
                 <div className="cc-row">
                   <span className="cc-label">תקציב</span>
-                  <span className="cc-value">{lead.priceRangeLabel || '—'}</span>
+                  <span className="cc-value">
+                    <InlineText
+                      value={lead.priceRangeLabel || ''}
+                      onCommit={(v) => patchLead(lead.id, { priceRangeLabel: v || null })}
+                      placeholder="הוסף תקציב"
+                    />
+                  </span>
                 </div>
                 {lead.sector && lead.sector !== 'כללי' && (
                   <div className="cc-row">
@@ -386,20 +422,28 @@ export default function Customers() {
                 )}
               </div>
 
-              {lead.notes && (
-                <div className="customer-notes">
-                  <p>{lead.notes}</p>
-                </div>
-              )}
+              <div className="customer-notes">
+                <InlineText
+                  value={lead.notes || ''}
+                  onCommit={(v) => patchLead(lead.id, { notes: v || null }, { success: 'הערות עודכנו' })}
+                  multiline
+                  placeholder="הוסף הערות..."
+                  className="customer-notes-inline"
+                />
+              </div>
+
+              {/* eslint-disable-next-line react/jsx-no-useless-fragment */}
 
               <div className="customer-card-footer">
                 <div className="customer-dates">
-                  {lead.lastContact && (
-                    <span>
-                      <Calendar size={12} />
-                      {new Date(lead.lastContact).toLocaleDateString('he-IL')}
-                    </span>
-                  )}
+                  <button
+                    className="cc-last-contact"
+                    title={lead.lastContact ? absoluteTime(lead.lastContact) : 'לחץ לעדכון קשר אחרון לעכשיו'}
+                    onClick={() => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: 'קשר אחרון עודכן' })}
+                  >
+                    <Calendar size={12} />
+                    {lead.lastContact ? relativeTime(lead.lastContact) : 'ללא קשר'}
+                  </button>
                 </div>
                 <div className="customer-actions">
                   <a href={`tel:${lead.phone}`} className="btn btn-ghost btn-sm" title={lead.phone}>
@@ -441,8 +485,22 @@ export default function Customers() {
           );
         })}
         {filtered.length === 0 && (
-          <div className="customers-empty">
-            <p>אין לקוחות בסינון הנוכחי</p>
+          <div className="customers-empty rich">
+            <div className="ce-illustration">👥</div>
+            <h3>
+              {leads.length === 0
+                ? 'אין עדיין לקוחות במערכת'
+                : 'אין לקוחות בסינון הנוכחי'}
+            </h3>
+            <p>
+              {leads.length === 0
+                ? 'הוסף את הליד הראשון שלך כדי להתחיל לעקוב אחר הלקוחות הפוטנציאליים.'
+                : 'נסה לשנות את הסינון או לחפש לקוח בשם אחר.'}
+            </p>
+            <Link to="/customers/new" className="btn btn-primary btn-lg">
+              <UserPlus size={18} />
+              ליד חדש
+            </Link>
           </div>
         )}
       </div>
@@ -526,12 +584,12 @@ function CustomerList({
               <StatusPicker lead={lead} onChange={onStatusChange} />
             </span>
             <span className="cl-type">
-              <span className="cl-chip">
+              <Chip tone="neutral">
                 {lead.interestType === 'COMMERCIAL' ? 'מסחרי' : 'פרטי'}
-              </span>
-              <span className={`cl-chip ${lead.lookingFor === 'RENT' ? 'rent' : 'buy'}`}>
+              </Chip>
+              <Chip tone={lead.lookingFor === 'RENT' ? 'rent' : 'buy'}>
                 {lead.lookingFor === 'RENT' ? 'שכירות' : 'קנייה'}
-              </span>
+              </Chip>
             </span>
             <span className="cl-muted">{lead.city || '—'}</span>
             <span className="cl-muted">{lead.rooms || '—'}</span>
@@ -549,10 +607,8 @@ function CustomerList({
                 <span className="cl-muted">—</span>
               )}
             </span>
-            <span className="cl-muted">
-              {lead.lastContact
-                ? new Date(lead.lastContact).toLocaleDateString('he-IL')
-                : '—'}
+            <span className="cl-muted" title={lead.lastContact ? absoluteTime(lead.lastContact) : ''}>
+              {lead.lastContact ? relativeTime(lead.lastContact) : '—'}
             </span>
             <span className="cl-actions">
               <a href={`tel:${lead.phone}`} className="cl-btn" title={lead.phone}>

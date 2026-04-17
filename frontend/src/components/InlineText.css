@@ -1,0 +1,44 @@
+.inline-text {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px dashed transparent;
+  cursor: text;
+  transition: background 0.12s, border-color 0.12s;
+  min-width: 24px;
+}
+
+.inline-text:hover {
+  background: var(--gold-glow);
+  border-color: var(--gold-border);
+}
+
+.inline-text:focus {
+  outline: none;
+  background: var(--gold-glow);
+  border-color: var(--gold);
+}
+
+.inline-text.is-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.inline-text-input {
+  display: inline-block;
+  padding: 4px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px var(--gold-glow);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: inherit;
+  line-height: 1.4;
+  outline: none;
+  direction: inherit;
+  min-width: 80px;
+  width: 100%;
+  max-width: 260px;
+  resize: vertical;
+}

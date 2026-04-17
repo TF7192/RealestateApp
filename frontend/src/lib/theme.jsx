@@ -11,7 +11,13 @@ function applyTheme(theme) {
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light';
-    return localStorage.getItem(STORAGE_KEY) || 'light';
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === 'dark' || stored === 'light') return stored;
+    } catch { /* storage disabled */ }
+    // First visit — respect the user's OS preference, default to light
+    if (window.matchMedia?.('(prefers-color-scheme: dark)')?.matches) return 'dark';
+    return 'light';
   });
 
   useEffect(() => {

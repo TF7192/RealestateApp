@@ -186,6 +186,57 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     return { action };
   });
 
+  // Delete a property image
+  app.delete('/:id/images/:imageId', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id, imageId } = req.params as { id: string; imageId: string };
+    const property = await prisma.property.findUnique({ where: { id } });
+    if (!property || property.agentId !== requireUser(req).id) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    const img = await prisma.propertyImage.findUnique({ where: { id: imageId } });
+    if (!img || img.propertyId !== id) {
+      return reply.code(404).send({ error: { message: 'Image not found' } });
+    }
+    // Try to remove the file from disk (only for uploads — skip external URLs)
+    if (img.url.startsWith('/uploads/')) {
+      try {
+        const uploadsDir = path.resolve(process.env.UPLOADS_DIR || './uploads');
+        const rel = img.url.replace(/^\/uploads\//, '');
+        await fs.unlink(path.join(uploadsDir, rel));
+      } catch { /* ignore missing file */ }
+    }
+    await prisma.propertyImage.delete({ where: { id: imageId } });
+    return { ok: true };
+  });
+
+  // Reorder — accepts {order: [imageId, imageId, ...]}; images not listed keep
+  // their current sortOrder. Useful for drag-reorder and set-as-cover flows.
+  const reorderInput = z.object({ order: z.array(z.string()).min(1) });
+  app.put('/:id/images/reorder', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = reorderInput.parse(req.body);
+    const property = await prisma.property.findUnique({
+      where: { id },
+      include: { images: true },
+    });
+    if (!property || property.agentId !== requireUser(req).id) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    const owned = new Set(property.images.map((i) => i.id));
+    const ops = body.order
+      .filter((imgId) => owned.has(imgId))
+      .map((imgId, idx) => prisma.propertyImage.update({
+        where: { id: imgId },
+        data: { sortOrder: idx },
+      }));
+    await prisma.$transaction(ops);
+    const updated = await prisma.propertyImage.findMany({
+      where: { propertyId: id },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return { images: updated };
+  });
+
   // Upload a property image
   app.post('/:id/images', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
@@ -237,7 +288,12 @@ function serialize(prop: any) {
   }
   return {
     ...prop,
+    // Back-compat: `images` is the list of URLs (what most UI uses today).
+    // `imageList` is the full [{id, url, sortOrder}] for the photo manager.
     images: (prop.images || []).map((i: any) => i.url),
+    imageList: (prop.images || []).map((i: any) => ({
+      id: i.id, url: i.url, sortOrder: i.sortOrder,
+    })),
     marketingActions: actionsMap,
     marketingActionsDetail: actionsDetail,
   };

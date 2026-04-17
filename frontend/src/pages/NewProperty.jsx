@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Upload, FileSignature } from 'lucide-react';
+import { ArrowRight, Save, Upload, FileSignature, X, AlertCircle } from 'lucide-react';
+import api from '../lib/api';
 import { cityNames, streetNames } from '../data/mockData';
 import './Forms.css';
 
@@ -47,9 +48,92 @@ export default function NewProperty() {
     setForm((prev) => ({ ...prev, assetClass: cls, type: typeDefault }));
   };
 
-  const handleSubmit = (e) => {
+  const [photoFiles, setPhotoFiles] = useState([]); // {file, url}
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInput = useRef(null);
+
+  const addFiles = (fileList) => {
+    const imgs = Array.from(fileList || [])
+      .filter((f) => f.type.startsWith('image/'))
+      .map((file) => ({ file, url: URL.createObjectURL(file) }));
+    setPhotoFiles((prev) => [...prev, ...imgs]);
+  };
+
+  const removePhoto = (idx) => {
+    setPhotoFiles((prev) => {
+      const next = [...prev];
+      const [removed] = next.splice(idx, 1);
+      if (removed) URL.revokeObjectURL(removed.url);
+      return next;
+    });
+  };
+
+  const onDropFiles = (e) => {
     e.preventDefault();
-    navigate('/properties');
+    setDragOver(false);
+    if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      // Validate & map lowercase form → backend enums
+      if (!form.street || !form.city || !form.owner || !form.ownerPhone) {
+        throw new Error('יש למלא שדות חובה: רחוב, עיר, בעל הנכס, טלפון');
+      }
+      if (!form.marketingPrice) throw new Error('יש להזין מחיר שיווק');
+      if (!form.sqm) throw new Error('יש להזין שטח במ״ר');
+
+      const body = {
+        assetClass: isCommercial ? 'COMMERCIAL' : 'RESIDENTIAL',
+        category: form.category === 'rent' ? 'RENT' : 'SALE',
+        type: form.type,
+        street: form.street,
+        city: form.city,
+        owner: form.owner,
+        ownerPhone: form.ownerPhone,
+        marketingPrice: Number(form.marketingPrice) || 0,
+        sqm: Number(form.sqm) || 0,
+        rooms: form.rooms !== '' ? Number(form.rooms) : null,
+        floor: form.floor !== '' ? Number(form.floor) : null,
+        totalFloors: form.totalFloors !== '' ? Number(form.totalFloors) : null,
+        balconySize: Number(form.balconySize) || 0,
+        buildingAge: form.buildingAge !== '' ? Number(form.buildingAge) : null,
+        renovated: form.renovated || null,
+        vacancyDate: form.vacancyDate || null,
+        sector: form.sector || null,
+        airDirections: form.airDirections || null,
+        notes: form.notes || null,
+        elevator: form.elevator,
+        parking: form.parking,
+        storage: form.storage,
+        ac: form.ac,
+        safeRoom: form.safeRoom,
+        sqmArnona: form.sqmArnona !== '' ? Number(form.sqmArnona) : null,
+        closingPrice: form.closingPrice !== '' ? Number(form.closingPrice) : null,
+        exclusiveStart: form.exclusiveStart ? new Date(form.exclusiveStart).toISOString() : null,
+        exclusiveEnd: form.exclusiveEnd ? new Date(form.exclusiveEnd).toISOString() : null,
+      };
+      const res = await api.createProperty(body);
+      const newId = res.property?.id;
+      // Upload images sequentially so they land in order
+      for (const p of photoFiles) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await api.uploadPropertyImage(newId, p.file);
+        } catch (_) { /* continue on individual failure */ }
+      }
+      // Revoke object URLs
+      photoFiles.forEach((p) => URL.revokeObjectURL(p.url));
+      navigate(newId ? `/properties/${newId}` : '/properties');
+    } catch (err) {
+      setError(err.message || 'שמירה נכשלה');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -206,22 +290,14 @@ export default function NewProperty() {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => {
-                if (!form.owner || !form.ownerPhone) {
-                  alert('יש למלא שם בעל הנכס וטלפון לפני שליחה לחתימה');
-                  return;
-                }
-                alert(
-                  `נשלח הסכם תיווך לחתימה דיגיטלית אל ${form.owner} (${form.ownerPhone}).\n` +
-                    'לאחר חתימה הקובץ יצורף אוטומטית לכרטיס הלקוח.'
-                );
-              }}
+              disabled
+              title="זמין רק לאחר שמירת הנכס — גש לעמוד הנכס כדי לנהל הסכם תיווך"
             >
               <FileSignature size={16} />
-              שלח הסכם תיווך לחתימה דיגיטלית
+              שלח הסכם תיווך לחתימה
             </button>
             <span className="inline-action-hint">
-              הקובץ החתום יישמר תחת כרטיס הלקוח באופן אוטומטי
+              ניהול ההסכם זמין בכרטיס הלקוח לאחר שמירת הנכס
             </span>
           </div>
         </div>
@@ -413,18 +489,60 @@ export default function NewProperty() {
         {/* Images */}
         <div className="form-section">
           <h3 className="form-section-title">תמונות</h3>
-          <div className="upload-area">
+          <div
+            className={`upload-area ${dragOver ? 'is-over' : ''}`}
+            onClick={() => fileInput.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDropFiles}
+          >
             <Upload size={32} />
             <p>גרור תמונות לכאן או לחץ להעלאה</p>
-            <span>JPG, PNG עד 10MB</span>
+            <span>JPG, PNG עד 10MB · ניתן לבחור מספר קבצים</span>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
           </div>
+          {photoFiles.length > 0 && (
+            <div className="np-photo-strip">
+              {photoFiles.map((p, i) => (
+                <div key={p.url} className={`np-photo ${i === 0 ? 'is-cover' : ''}`}>
+                  <img src={p.url} alt={`תמונה ${i + 1}`} />
+                  <button
+                    type="button"
+                    className="np-photo-remove"
+                    onClick={(e) => { e.stopPropagation(); removePhoto(i); }}
+                    title="הסר"
+                  >
+                    <X size={12} />
+                  </button>
+                  {i === 0 && <span className="np-photo-cover">שער</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {error && (
+          <div className="np-error">
+            <AlertCircle size={14} />
+            {error}
+          </div>
+        )}
 
         {/* Submit */}
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary btn-lg">
+          <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
             <Save size={18} />
-            שמור נכס
+            {submitting ? 'שומר…' : 'שמור נכס'}
           </button>
           <Link to="/properties" className="btn btn-secondary btn-lg">
             ביטול
