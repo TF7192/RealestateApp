@@ -428,6 +428,80 @@
   color: #60a5fa;
 }
 
+/* Signup button — tinted to match role */
+.auth-method-btn.signup-btn {
+  border: 1px dashed var(--border-light);
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.mode-agent .auth-method-btn.signup-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(201, 169, 110, 0.06);
+}
+
+.mode-customer .auth-method-btn.signup-btn:hover {
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.05);
+}
+
+/* Inline error message for login/signup failures */
+.auth-error {
+  margin-top: 6px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #f87171;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Switch link between login & signup */
+.auth-switch {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.auth-switch button {
+  background: none;
+  border: none;
+  color: var(--gold);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 13px;
+}
+
+.auth-switch button:hover {
+  text-decoration: underline;
+}
+
+/* Global app loading screen (shown while /api/me is in-flight) */
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.app-loading-spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid rgba(201, 169, 110, 0.15);
+  border-top-color: var(--gold);
+  animation: app-loading-spin 0.9s linear infinite;
+}
+
+@keyframes app-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Divider */
 .auth-divider {
   display: flex;

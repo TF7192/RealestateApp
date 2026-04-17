@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Save } from 'lucide-react';
+import { cityNames, streetNames } from '../data/mockData';
 import './Forms.css';
 
 export default function NewLead() {
@@ -9,6 +10,7 @@ export default function NewLead() {
     name: '',
     phone: '',
     interestType: 'פרטי',
+    lookingFor: 'buy',
     city: '',
     street: '',
     rooms: '',
@@ -16,16 +18,45 @@ export default function NewLead() {
     priceMax: '',
     preApproval: false,
     source: '',
+    sector: 'כללי',
+    balconyRequired: false,
+    schoolProximity: '',
+    parkingRequired: false,
+    elevatorRequired: false,
+    safeRoomRequired: false,
+    acRequired: false,
+    storageRequired: false,
+    brokerageSignedAt: '',
+    brokerageExpiresAt: '',
     notes: '',
   });
 
   const update = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  // Default end-of-agreement to 6 months after signing — industry default
+  const onSignedAtChange = (value) => {
+    setForm((prev) => {
+      const next = { ...prev, brokerageSignedAt: value };
+      if (value && !prev.brokerageExpiresAt) {
+        const d = new Date(value);
+        d.setMonth(d.getMonth() + 6);
+        next.brokerageExpiresAt = d.toISOString().slice(0, 10);
+      }
+      return next;
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     navigate('/leads');
   };
+
+  // Street autocomplete is narrowed by the selected city when there's a match
+  const streetOptions = useMemo(() => {
+    if (!form.city) return streetNames;
+    return streetNames;
+  }, [form.city]);
 
   return (
     <div className="form-page">
@@ -66,7 +97,7 @@ export default function NewLead() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">מקור הלי��</label>
+              <label className="form-label">מקור הליד</label>
               <select
                 className="form-select"
                 value={form.source}
@@ -104,6 +135,40 @@ export default function NewLead() {
               </div>
             </div>
           </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">קנייה / שכירות</label>
+              <div className="toggle-group">
+                <button
+                  type="button"
+                  className={`toggle-btn ${form.lookingFor === 'buy' ? 'active' : ''}`}
+                  onClick={() => update('lookingFor', 'buy')}
+                >
+                  קנייה
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-btn ${form.lookingFor === 'rent' ? 'active' : ''}`}
+                  onClick={() => update('lookingFor', 'rent')}
+                >
+                  שכירות
+                </button>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">מגזר</label>
+              <select
+                className="form-select"
+                value={form.sector}
+                onChange={(e) => update('sector', e.target.value)}
+              >
+                <option>כללי</option>
+                <option>דתי</option>
+                <option>חרדי</option>
+                <option>ערבי</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="form-section">
@@ -113,19 +178,33 @@ export default function NewLead() {
               <label className="form-label">עיר מבוקשת</label>
               <input
                 className="form-input"
-                placeholder="לדוגמה: רמלה"
+                placeholder="התחל להקליד — לדוגמה: רא..."
                 value={form.city}
                 onChange={(e) => update('city', e.target.value)}
+                list="lead-city-list"
+                autoComplete="off"
               />
+              <datalist id="lead-city-list">
+                {cityNames.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
             <div className="form-group">
               <label className="form-label">רחוב (אופציונלי)</label>
               <input
                 className="form-input"
-                placeholder="רחוב מועדף"
+                placeholder="התחל להקליד רחוב..."
                 value={form.street}
                 onChange={(e) => update('street', e.target.value)}
+                list="lead-street-list"
+                autoComplete="off"
               />
+              <datalist id="lead-street-list">
+                {streetOptions.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </div>
           </div>
           <div className="form-row form-row-3">
@@ -159,6 +238,22 @@ export default function NewLead() {
               />
             </div>
           </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">קירבה לבית ספר</label>
+              <select
+                className="form-select"
+                value={form.schoolProximity}
+                onChange={(e) => update('schoolProximity', e.target.value)}
+              >
+                <option value="">לא חשוב</option>
+                <option>עד 200 מטר</option>
+                <option>עד 500 מטר</option>
+                <option>הליכה</option>
+                <option>עד ק״מ</option>
+              </select>
+            </div>
+          </div>
           <div className="checkbox-grid">
             <label className="checkbox-item">
               <input
@@ -169,6 +264,84 @@ export default function NewLead() {
               <span className="checkbox-custom" />
               אישור עקרוני למשכנתא
             </label>
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                checked={form.balconyRequired}
+                onChange={(e) => update('balconyRequired', e.target.checked)}
+              />
+              <span className="checkbox-custom" />
+              מרפסת
+            </label>
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                checked={form.parkingRequired}
+                onChange={(e) => update('parkingRequired', e.target.checked)}
+              />
+              <span className="checkbox-custom" />
+              חניה
+            </label>
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                checked={form.elevatorRequired}
+                onChange={(e) => update('elevatorRequired', e.target.checked)}
+              />
+              <span className="checkbox-custom" />
+              מעלית
+            </label>
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                checked={form.safeRoomRequired}
+                onChange={(e) => update('safeRoomRequired', e.target.checked)}
+              />
+              <span className="checkbox-custom" />
+              ממ״ד
+            </label>
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                checked={form.acRequired}
+                onChange={(e) => update('acRequired', e.target.checked)}
+              />
+              <span className="checkbox-custom" />
+              מזגנים
+            </label>
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                checked={form.storageRequired}
+                onChange={(e) => update('storageRequired', e.target.checked)}
+              />
+              <span className="checkbox-custom" />
+              מחסן
+            </label>
+          </div>
+        </div>
+
+        <div className="form-section">
+          <h3 className="form-section-title">הסכם תיווך</h3>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">מועד חתימה על הסכם תיווך</label>
+              <input
+                type="date"
+                className="form-input"
+                value={form.brokerageSignedAt}
+                onChange={(e) => onSignedAtChange(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">מועד סיום הסכם תיווך</label>
+              <input
+                type="date"
+                className="form-input"
+                value={form.brokerageExpiresAt}
+                onChange={(e) => update('brokerageExpiresAt', e.target.value)}
+              />
+            </div>
           </div>
         </div>
 

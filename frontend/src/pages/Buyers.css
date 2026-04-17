@@ -61,3 +61,49 @@
   display: flex;
   gap: 4px;
 }
+
+.type-pill {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin: 0 0 0 4px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.type-pill.buy {
+  background: var(--gold-glow);
+  color: var(--gold);
+}
+
+.type-pill.rent {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--success-bg);
+  color: var(--success);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.file-missing {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.empty-row {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 28px 16px;
+}
+
+/* Nav label also renamed in the sidebar, but any layout changes live here */

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   UserPlus,
   Search,
@@ -8,8 +8,9 @@ import {
   Flame,
   Thermometer,
   Snowflake,
-  Eye,
   Calendar,
+  FileSignature,
+  FileCheck2,
 } from 'lucide-react';
 import {
   leads,
@@ -20,8 +21,26 @@ import {
 import './Leads.css';
 
 export default function Leads() {
+  const [searchParams] = useSearchParams();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [highlightId, setHighlightId] = useState(null);
+  const cardRefs = useRef({});
+
+  // Accept ?filter= and ?selected= from the dashboard
+  useEffect(() => {
+    const f = searchParams.get('filter');
+    if (f && ['hot', 'warm', 'cold'].includes(f)) setFilter(f);
+    const sel = searchParams.get('selected');
+    if (sel) {
+      setHighlightId(Number(sel));
+      const t = setTimeout(() => {
+        const el = cardRefs.current[sel];
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [searchParams]);
 
   const filtered = leads.filter((l) => {
     if (filter !== 'all' && l.status !== filter) return false;
@@ -54,6 +73,13 @@ export default function Leads() {
     window.open(
       `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`,
       '_blank'
+    );
+  };
+
+  const handleSendForSignature = (lead) => {
+    alert(
+      `נשלח להסכם תיווך דיגיטלי אל ${lead.name} (${lead.phone}).\n` +
+        'לאחר החתימה הקובץ יצורף אוטומטית לכרטיס הלקוח.'
     );
   };
 
@@ -103,7 +129,13 @@ export default function Leads() {
 
       <div className="leads-grid animate-in animate-in-delay-2">
         {filtered.map((lead) => (
-          <div key={lead.id} className="lead-card">
+          <div
+            key={lead.id}
+            ref={(el) => {
+              if (el) cardRefs.current[lead.id] = el;
+            }}
+            className={`lead-card ${highlightId === lead.id ? 'highlight' : ''}`}
+          >
             <div className="lead-card-header">
               <div className="lead-card-avatar">
                 {lead.name.charAt(0)}
@@ -133,8 +165,29 @@ export default function Leads() {
               </div>
               <div className="lcd-row">
                 <span className="lcd-label">סוג</span>
-                <span className="lcd-value">{lead.interestType}</span>
+                <span className="lcd-value">
+                  {lead.interestType}
+                  {lead.lookingFor && (
+                    <> · {lead.lookingFor === 'buy' ? 'קנייה' : 'שכירות'}</>
+                  )}
+                </span>
               </div>
+              <div className="lcd-row">
+                <span className="lcd-label">מגזר</span>
+                <span className="lcd-value">{lead.sector || '—'}</span>
+              </div>
+              {lead.balconyRequired && (
+                <div className="lcd-row">
+                  <span className="lcd-label">מרפסת</span>
+                  <span className="lcd-value">חובה</span>
+                </div>
+              )}
+              {lead.schoolProximity && (
+                <div className="lcd-row">
+                  <span className="lcd-label">קירבה לבית ספר</span>
+                  <span className="lcd-value">{lead.schoolProximity}</span>
+                </div>
+              )}
               <div className="lcd-row">
                 <span className="lcd-label">אישור עקרוני</span>
                 <span className="lcd-value">
@@ -145,6 +198,23 @@ export default function Leads() {
                   )}
                 </span>
               </div>
+              <div className="lcd-row">
+                <span className="lcd-label">חתימת הסכם תיווך</span>
+                <span className="lcd-value">{lead.brokerageSignedAt || '—'}</span>
+              </div>
+              <div className="lcd-row">
+                <span className="lcd-label">סיום הסכם תיווך</span>
+                <span className="lcd-value">{lead.brokerageExpiresAt || '—'}</span>
+              </div>
+              {lead.signedAgreementFile && (
+                <div className="lcd-row">
+                  <span className="lcd-label">קובץ חתום</span>
+                  <span className="lcd-value signed-file">
+                    <FileCheck2 size={13} />
+                    {lead.signedAgreementFile}
+                  </span>
+                </div>
+              )}
               {lead.propertiesViewed.length > 0 && (
                 <div className="lcd-row">
                   <span className="lcd-label">נכסים שנצפו</span>
@@ -187,6 +257,14 @@ export default function Leads() {
                   <Phone size={14} />
                   {lead.phone}
                 </a>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => handleSendForSignature(lead)}
+                  title="שליחת הסכם לחתימה דיגיטלית"
+                >
+                  <FileSignature size={14} />
+                  חתימה
+                </button>
                 <button
                   className="btn btn-sm btn-primary"
                   onClick={() => handleWhatsApp(lead)}

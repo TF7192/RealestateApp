@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   Building2,
-  Users,
+  Store,
   Target,
   Handshake,
   TrendingUp,
@@ -17,8 +17,12 @@ import './Dashboard.css';
 
 export default function Dashboard() {
   const activeProperties = properties.filter((p) => p.status === 'active');
-  const saleProperties = activeProperties.filter((p) => p.category === 'sale');
-  const rentProperties = activeProperties.filter((p) => p.category === 'rent');
+  const residential = activeProperties.filter((p) => p.assetClass === 'residential');
+  const commercial = activeProperties.filter((p) => p.assetClass === 'commercial');
+  const resSale = residential.filter((p) => p.category === 'sale').length;
+  const resRent = residential.filter((p) => p.category === 'rent').length;
+  const comSale = commercial.filter((p) => p.category === 'sale').length;
+  const comRent = commercial.filter((p) => p.category === 'rent').length;
   const hotLeads = leads.filter((l) => l.status === 'hot');
   const activeDeals = deals.filter((d) => d.status !== 'נחתם');
   const closedDeals = deals.filter((d) => d.status === 'נחתם');
@@ -31,14 +35,25 @@ export default function Dashboard() {
     return total + Object.values(p.marketingActions).length;
   }, 0);
 
+  // Each stat card now links to a relevant page — full-row clickable.
   const stats = [
     {
       icon: Building2,
-      label: 'נכסים פעילים',
-      value: activeProperties.length,
-      sub: `${saleProperties.length} מכירה · ${rentProperties.length} השכרה`,
+      label: 'נכסי מגורים פעילים',
+      value: residential.length,
+      sub: `${resSale} מכירה · ${resRent} השכרה`,
       color: 'var(--gold)',
       bg: 'var(--gold-glow)',
+      to: '/properties?assetClass=residential',
+    },
+    {
+      icon: Store,
+      label: 'נכסים מסחריים פעילים',
+      value: commercial.length,
+      sub: `${comSale} מכירה · ${comRent} השכרה`,
+      color: 'var(--warning)',
+      bg: 'var(--warning-bg)',
+      to: '/properties?assetClass=commercial',
     },
     {
       icon: Target,
@@ -47,6 +62,7 @@ export default function Dashboard() {
       sub: `מתוך ${leads.length} לידים`,
       color: 'var(--danger)',
       bg: 'var(--danger-bg)',
+      to: '/leads?filter=hot',
     },
     {
       icon: Handshake,
@@ -55,6 +71,7 @@ export default function Dashboard() {
       sub: `${closedDeals.length} נסגרו`,
       color: 'var(--success)',
       bg: 'var(--success-bg)',
+      to: '/deals',
     },
     {
       icon: TrendingUp,
@@ -63,6 +80,7 @@ export default function Dashboard() {
       sub: 'סה״כ עמלות שנגבו',
       color: 'var(--info)',
       bg: 'var(--info-bg)',
+      to: '/deals?tab=signed',
     },
   ];
 
@@ -113,12 +131,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats grid */}
+      {/* Stats grid — whole card is clickable */}
       <div className="stats-grid">
         {stats.map((stat, i) => (
-          <div
+          <Link
             key={stat.label}
-            className={`stat-card animate-in animate-in-delay-${i + 1}`}
+            to={stat.to}
+            className={`stat-card animate-in animate-in-delay-${Math.min(i + 1, 5)}`}
           >
             <div className="stat-icon" style={{ background: stat.bg, color: stat.color }}>
               <stat.icon size={22} />
@@ -128,7 +147,7 @@ export default function Dashboard() {
               <span className="stat-label">{stat.label}</span>
               <span className="stat-sub">{stat.sub}</span>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 
@@ -202,7 +221,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Hot leads */}
+        {/* Hot leads — each item links to that specific lead, not the full list */}
         <div className="card dashboard-card animate-in animate-in-delay-5">
           <div className="card-header">
             <h3>לידים חמים</h3>
@@ -213,7 +232,11 @@ export default function Dashboard() {
           </div>
           <div className="hot-leads-list">
             {hotLeads.map((lead) => (
-              <Link key={lead.id} to="/leads" className="hot-lead-item">
+              <Link
+                key={lead.id}
+                to={`/leads?selected=${lead.id}`}
+                className="hot-lead-item"
+              >
                 <div className="lead-avatar hot">
                   {lead.name.charAt(0)}
                 </div>

@@ -4,6 +4,44 @@
   gap: 16px;
 }
 
+.deal-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.deals-totals {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.deals-total {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius-sm);
+}
+
+.dt-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dt-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.dt-value.success {
+  color: var(--success);
+}
+
 .deal-card {
   background: var(--bg-card);
   border: 1px solid var(--border);

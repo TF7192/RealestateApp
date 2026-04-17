@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { LogIn, User, Building2, Phone, Mail, ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+import { LogIn, User, Building2, Mail, Lock, ArrowLeft, UserPlus } from 'lucide-react';
+import { useAuth } from '../lib/auth';
 import './Login.css';
 
 const AGENT_IMG = 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=900&q=80';
@@ -20,44 +20,71 @@ const customerFeatures = [
   'שמירת נכסים מועדפים',
 ];
 
-export default function Login({ onLogin }) {
-  const navigate = useNavigate();
+export default function Login() {
+  const { login, signup, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState('agent');
-  const [authMethod, setAuthMethod] = useState(null); // null | 'google' | 'phone'
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
+  const [flow, setFlow] = useState(null); // null | 'email-login' | 'email-signup'
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+    displayName: '',
+    phone: '',
+  });
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
 
   const isAgent = mode === 'agent';
+  const role = isAgent ? 'AGENT' : 'CUSTOMER';
 
   const switchMode = (newMode) => {
     if (newMode === mode) return;
     setTransitioning(true);
     setTimeout(() => {
       setMode(newMode);
-      setAuthMethod(null);
-      setCodeSent(false);
-      setPhone('');
-      setCode('');
+      setFlow(null);
+      setError('');
+      setForm({ email: '', password: '', displayName: '', phone: '' });
       setTransitioning(false);
-    }, 300);
+    }, 280);
   };
 
-  const handleGoogleLogin = () => {
-    // Mock Google login
-    onLogin(mode);
-    navigate(isAgent ? '/' : '/customer');
-  };
+  const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
-  const handlePhoneSubmit = (e) => {
-    e.preventDefault();
-    if (!codeSent) {
-      setCodeSent(true);
-      return;
+  const handleGoogle = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      await loginWithGoogle(role);
+    } catch (e) {
+      setError(e.message || 'התחברות נכשלה');
+    } finally {
+      setSubmitting(false);
     }
-    onLogin(mode);
-    navigate(isAgent ? '/' : '/customer');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      if (flow === 'email-signup') {
+        if (form.password.length < 8) throw new Error('הסיסמה חייבת להיות באורך 8 תווים לפחות');
+        await signup({
+          email: form.email,
+          password: form.password,
+          role,
+          displayName: form.displayName || form.email.split('@')[0],
+          phone: form.phone || undefined,
+        });
+      } else {
+        await login({ email: form.email, password: form.password });
+      }
+    } catch (err) {
+      setError(err.message || (flow === 'email-signup' ? 'הרשמה נכשלה' : 'התחברות נכשלה'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const features = isAgent ? agentFeatures : customerFeatures;
@@ -67,7 +94,6 @@ export default function Login({ onLogin }) {
     <div className={`login-page ${isAgent ? 'mode-agent' : 'mode-customer'}`}>
       <div className="noise-overlay" />
 
-      {/* Animated background */}
       <div className="login-bg">
         <div className="login-bg-orb login-bg-orb-1" />
         <div className="login-bg-orb login-bg-orb-2" />
@@ -75,7 +101,6 @@ export default function Login({ onLogin }) {
       </div>
 
       <div className={`login-container ${transitioning ? 'fade-out' : 'fade-in'}`}>
-        {/* Branding panel */}
         <div className="login-branding">
           <div className="login-brand-bg">
             <img src={heroImg} alt="" key={heroImg} />
@@ -121,9 +146,7 @@ export default function Login({ onLogin }) {
           </div>
         </div>
 
-        {/* Form panel */}
         <div className="login-form-panel">
-          {/* Role toggle */}
           <div className="login-role-toggle">
             <button
               className={`role-tab ${isAgent ? 'active' : ''}`}
@@ -145,20 +168,24 @@ export default function Login({ onLogin }) {
             />
           </div>
 
-          {/* Form header */}
           <div className="login-form-header">
-            <h2>{isAgent ? 'כניסה למערכת' : 'כניסה לאזור האישי'}</h2>
+            <h2>
+              {flow === 'email-signup'
+                ? isAgent ? 'הרשמה כסוכן' : 'הרשמה כלקוח'
+                : isAgent ? 'כניסה למערכת' : 'כניסה לאזור האישי'}
+            </h2>
             <p>
-              {isAgent
+              {flow === 'email-signup'
+                ? 'צרו חשבון חדש — כך תתחילו'
+                : isAgent
                 ? 'נהל את הנכסים, הלידים והעסקאות שלך'
                 : 'צפה בנכסים שנבחרו עבורך'}
             </p>
           </div>
 
-          {/* Auth method selection */}
-          {!authMethod && (
+          {!flow && (
             <div className="auth-methods">
-              <button className="auth-method-btn google" onClick={handleGoogleLogin}>
+              <button className="auth-method-btn google" onClick={handleGoogle} disabled={submitting}>
                 <svg width="20" height="20" viewBox="0 0 48 48">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -174,81 +201,125 @@ export default function Login({ onLogin }) {
 
               <button
                 className="auth-method-btn phone-btn"
-                onClick={() => setAuthMethod('phone')}
+                onClick={() => setFlow('email-login')}
               >
-                <Phone size={20} />
-                <span>כניסה עם מספר טלפון</span>
+                <Mail size={20} />
+                <span>כניסה עם אימייל וסיסמה</span>
               </button>
+
+              <button
+                className="auth-method-btn signup-btn"
+                onClick={() => setFlow('email-signup')}
+              >
+                <UserPlus size={20} />
+                <span>יצירת חשבון חדש</span>
+              </button>
+
+              {error && <div className="auth-error">{error}</div>}
             </div>
           )}
 
-          {/* Phone auth flow */}
-          {authMethod === 'phone' && (
-            <form onSubmit={handlePhoneSubmit} className="phone-auth-form animate-in">
+          {(flow === 'email-login' || flow === 'email-signup') && (
+            <form onSubmit={handleSubmit} className="phone-auth-form animate-in">
               <button
                 type="button"
                 className="auth-back-btn"
-                onClick={() => { setAuthMethod(null); setCodeSent(false); setPhone(''); setCode(''); }}
+                onClick={() => { setFlow(null); setError(''); }}
               >
                 <ArrowLeft size={16} />
                 חזרה
               </button>
 
-              <div className="form-group">
-                <label className="form-label">מספר טלפון</label>
-                <div className="phone-input-wrapper">
-                  <span className="phone-prefix">+972</span>
-                  <input
-                    type="tel"
-                    className="form-input phone-field"
-                    placeholder="50-1234567"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={codeSent}
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {codeSent && (
-                <div className="form-group animate-in">
-                  <label className="form-label">קוד אימות</label>
-                  <div className="code-boxes">
-                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                      <div
-                        key={i}
-                        className={`code-box ${code.length > i ? 'filled' : ''} ${code.length === i ? 'current' : ''}`}
-                      >
-                        {code[i] || ''}
-                      </div>
-                    ))}
+              {flow === 'email-signup' && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">שם מלא</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder={isAgent ? 'יוסי כהן' : 'רינה שמעון'}
+                      value={form.displayName}
+                      onChange={(e) => update('displayName', e.target.value)}
+                      required
+                    />
                   </div>
-                  <input
-                    type="text"
-                    className="code-hidden-input"
-                    maxLength={6}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    className="resend-link"
-                    onClick={() => {}}
-                  >
-                    שלח קוד מחדש
-                  </button>
-                </div>
+                  <div className="form-group">
+                    <label className="form-label">טלפון (אופציונלי)</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      placeholder="050-1234567"
+                      value={form.phone}
+                      onChange={(e) => update('phone', e.target.value)}
+                    />
+                  </div>
+                </>
               )}
 
-              <button type="submit" className="btn btn-primary btn-lg login-submit-btn">
-                <LogIn size={18} />
-                {codeSent ? 'כניסה' : 'שלח קוד'}
+              <div className="form-group">
+                <label className="form-label">אימייל</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  placeholder="you@example.com"
+                  value={form.email}
+                  onChange={(e) => update('email', e.target.value)}
+                  required
+                  autoFocus={flow === 'email-login'}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  <Lock size={13} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
+                  סיסמה {flow === 'email-signup' && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>(8 תווים לפחות)</span>}
+                </label>
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={(e) => update('password', e.target.value)}
+                  required
+                  minLength={flow === 'email-signup' ? 8 : undefined}
+                />
+              </div>
+
+              {error && <div className="auth-error">{error}</div>}
+
+              <button
+                type="submit"
+                className="btn btn-primary btn-lg login-submit-btn"
+                disabled={submitting}
+              >
+                {flow === 'email-signup' ? <UserPlus size={18} /> : <LogIn size={18} />}
+                {submitting
+                  ? 'שולח…'
+                  : flow === 'email-signup'
+                  ? 'יצירת חשבון'
+                  : 'כניסה'}
               </button>
+
+              <div className="auth-switch">
+                {flow === 'email-login' ? (
+                  <>
+                    אין חשבון?{' '}
+                    <button type="button" onClick={() => { setFlow('email-signup'); setError(''); }}>
+                      להרשמה
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    כבר יש חשבון?{' '}
+                    <button type="button" onClick={() => { setFlow('email-login'); setError(''); }}>
+                      לכניסה
+                    </button>
+                  </>
+                )}
+              </div>
             </form>
           )}
 
-          {/* Footer */}
           <div className="login-footer">
             <span>© 2025 Estia</span>
           </div>

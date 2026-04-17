@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -58,9 +58,18 @@ function buildShareUrl(filters) {
 }
 
 export default function Properties() {
+  const [searchParams] = useSearchParams();
   const [filter, setFilter] = useState('all');
   const [assetClassFilter, setAssetClassFilter] = useState('all');
   const [search, setSearch] = useState('');
+
+  // Apply incoming URL filters from the dashboard cards (e.g. ?assetClass=commercial)
+  useEffect(() => {
+    const ac = searchParams.get('assetClass');
+    if (ac === 'residential' || ac === 'commercial') setAssetClassFilter(ac);
+    const cat = searchParams.get('category');
+    if (cat === 'sale' || cat === 'rent') setFilter(cat);
+  }, [searchParams]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [locationQuery, setLocationQuery] = useState('');
