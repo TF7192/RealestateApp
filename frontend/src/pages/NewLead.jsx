@@ -60,7 +60,7 @@ export default function NewLead() {
 
   return (
     <div className="form-page">
-      <Link to="/leads" className="back-link animate-in">
+      <Link to="/customers" className="back-link animate-in">
         <ArrowRight size={16} />
         חזרה ללידים
       </Link>
@@ -363,7 +363,7 @@ export default function NewLead() {
             <Save size={18} />
             שמור ליד
           </button>
-          <Link to="/leads" className="btn btn-secondary btn-lg">
+          <Link to="/customers" className="btn btn-secondary btn-lg">
             ביטול
           </Link>
         </div>

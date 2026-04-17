@@ -205,6 +205,7 @@ model MarketingAction {
   done       Boolean  @default(false)
   doneAt     DateTime?
   notes      String?
+  link       String?  // Listing URL (yad2/madlan/facebook) or any reference URL
 
   @@unique([propertyId, actionKey])
   @@index([propertyId])

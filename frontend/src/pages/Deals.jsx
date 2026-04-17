@@ -1,21 +1,52 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle,
   Clock,
   AlertCircle,
+  Edit3,
+  X,
+  Handshake,
 } from 'lucide-react';
-import { deals, formatPrice, getAssetClassLabel } from '../data/mockData';
+import api from '../lib/api';
 import './Deals.css';
+
+const STATUS_OPTIONS = [
+  { key: 'NEGOTIATING', label: 'משא ומתן' },
+  { key: 'WAITING_MORTGAGE', label: 'ממתין לאישור משכנתא' },
+  { key: 'PENDING_CONTRACT', label: 'ממתין לחוזה' },
+  { key: 'SIGNED', label: 'נחתם' },
+  { key: 'FELL_THROUGH', label: 'לא יצא לפועל' },
+];
+
+const statusLabelMap = Object.fromEntries(STATUS_OPTIONS.map((o) => [o.key, o.label]));
+
+function formatPrice(price) {
+  if (price == null) return '—';
+  if (price < 10000) return `₪${price.toLocaleString('he-IL')}/חודש`;
+  return `₪${price.toLocaleString('he-IL')}`;
+}
+
+function assetLabel(ac) { return ac === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'; }
+function categoryLabel(c) { return c === 'SALE' ? 'מכירה' : 'השכרה'; }
 
 export default function Deals() {
   const [searchParams] = useSearchParams();
-  // 'active' | 'signed' | 'all'
+  const [deals, setDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('active');
-  // 'all' | 'sale' | 'rent'
   const [categoryFilter, setCategoryFilter] = useState('all');
-  // 'all' | 'residential' | 'commercial'
   const [assetFilter, setAssetFilter] = useState('all');
+  const [editing, setEditing] = useState(null);
+
+  const load = async () => {
+    const res = await api.listDeals();
+    setDeals(res.items || []);
+  };
+
+  useEffect(() => {
+    load().finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     const t = searchParams.get('tab');
@@ -24,39 +55,36 @@ export default function Deals() {
 
   const filtered = useMemo(() => {
     return deals.filter((d) => {
-      if (tab === 'active' && d.status === 'נחתם') return false;
-      if (tab === 'signed' && d.status !== 'נחתם') return false;
+      if (tab === 'active' && d.status === 'SIGNED') return false;
+      if (tab === 'signed' && d.status !== 'SIGNED') return false;
       if (categoryFilter !== 'all' && d.category !== categoryFilter) return false;
       if (assetFilter !== 'all' && d.assetClass !== assetFilter) return false;
       return true;
     });
-  }, [tab, categoryFilter, assetFilter]);
+  }, [tab, categoryFilter, assetFilter, deals]);
 
   const counts = {
     all: deals.length,
-    active: deals.filter((d) => d.status !== 'נחתם').length,
-    signed: deals.filter((d) => d.status === 'נחתם').length,
+    active: deals.filter((d) => d.status !== 'SIGNED').length,
+    signed: deals.filter((d) => d.status === 'SIGNED').length,
   };
 
-  const categoryCount = (cat) => deals.filter((d) => d.category === cat).length;
-  const assetCount = (cls) => deals.filter((d) => d.assetClass === cls).length;
-
   const totalSignedValue = deals
-    .filter((d) => d.status === 'נחתם')
+    .filter((d) => d.status === 'SIGNED')
     .reduce((s, d) => s + (d.closedPrice || 0), 0);
   const totalCommission = deals
-    .filter((d) => d.status === 'נחתם')
+    .filter((d) => d.status === 'SIGNED')
     .reduce((s, d) => s + (d.commission || 0), 0);
 
   const getStatusBadge = (status) => {
-    if (status === 'נחתם') return 'success';
-    if (status.includes('ממתין')) return 'warning';
+    if (status === 'SIGNED') return 'success';
+    if (status === 'WAITING_MORTGAGE' || status === 'PENDING_CONTRACT') return 'warning';
+    if (status === 'FELL_THROUGH') return 'danger';
     return 'info';
   };
-
   const getStatusIcon = (status) => {
-    if (status === 'נחתם') return <CheckCircle size={14} />;
-    if (status.includes('ממתין')) return <Clock size={14} />;
+    if (status === 'SIGNED') return <CheckCircle size={14} />;
+    if (status === 'WAITING_MORTGAGE' || status === 'PENDING_CONTRACT') return <Clock size={14} />;
     return <AlertCircle size={14} />;
   };
 
@@ -82,7 +110,6 @@ export default function Deals() {
       </div>
 
       <div className="filters-bar animate-in animate-in-delay-1">
-        {/* Active / signed / all */}
         <div className="filter-tabs">
           {[
             { key: 'active', label: 'פעילות', count: counts.active },
@@ -100,12 +127,11 @@ export default function Deals() {
           ))}
         </div>
 
-        {/* Sale vs rent */}
         <div className="filter-tabs">
           {[
-            { key: 'all', label: 'מכירה + השכרה', count: deals.length },
-            { key: 'sale', label: 'מכירה', count: categoryCount('sale') },
-            { key: 'rent', label: 'השכרה', count: categoryCount('rent') },
+            { key: 'all', label: 'מכירה + השכרה' },
+            { key: 'SALE', label: 'מכירה' },
+            { key: 'RENT', label: 'השכרה' },
           ].map((f) => (
             <button
               key={f.key}
@@ -113,17 +139,15 @@ export default function Deals() {
               onClick={() => setCategoryFilter(f.key)}
             >
               {f.label}
-              <span className="filter-count">{f.count}</span>
             </button>
           ))}
         </div>
 
-        {/* Private vs commercial */}
         <div className="filter-tabs">
           {[
-            { key: 'all', label: 'פרטי + מסחרי', count: deals.length },
-            { key: 'residential', label: 'פרטי', count: assetCount('residential') },
-            { key: 'commercial', label: 'מסחרי', count: assetCount('commercial') },
+            { key: 'all', label: 'פרטי + מסחרי' },
+            { key: 'RESIDENTIAL', label: 'פרטי' },
+            { key: 'COMMERCIAL', label: 'מסחרי' },
           ].map((f) => (
             <button
               key={f.key}
@@ -131,81 +155,283 @@ export default function Deals() {
               onClick={() => setAssetFilter(f.key)}
             >
               {f.label}
-              <span className="filter-count">{f.count}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="deals-cards animate-in animate-in-delay-2">
-        {filtered.map((deal) => (
-          <div key={deal.id} className="deal-card">
-            <div className="deal-card-top">
-              <div className="deal-property-info">
-                <h4>{deal.propertyStreet}, {deal.city}</h4>
-                <div className="deal-chip-row">
-                  <span className={`badge badge-${getStatusBadge(deal.status)}`}>
-                    {getStatusIcon(deal.status)}
-                    {deal.status}
-                  </span>
-                  <span className={`badge ${deal.assetClass === 'commercial' ? 'badge-warning' : 'badge-success'}`}>
-                    {getAssetClassLabel(deal.assetClass)}
-                  </span>
-                  <span className={`badge ${deal.category === 'sale' ? 'badge-gold' : 'badge-info'}`}>
-                    {deal.category === 'sale' ? 'מכירה' : 'השכרה'}
-                  </span>
+      {loading ? (
+        <div className="deals-loading"><div className="spinner-gold" /></div>
+      ) : (
+        <div className="deals-cards animate-in animate-in-delay-2">
+          {filtered.map((deal) => (
+            <div key={deal.id} className={`deal-card ${deal.status === 'SIGNED' ? 'is-signed' : ''}`}>
+              <div className="deal-card-top">
+                <div className="deal-property-info">
+                  <h4>{deal.propertyStreet}, {deal.city}</h4>
+                  <div className="deal-chip-row">
+                    <span className={`badge badge-${getStatusBadge(deal.status)}`}>
+                      {getStatusIcon(deal.status)}
+                      {statusLabelMap[deal.status] || deal.status}
+                    </span>
+                    <span className={`badge ${deal.assetClass === 'COMMERCIAL' ? 'badge-warning' : 'badge-success'}`}>
+                      {assetLabel(deal.assetClass)}
+                    </span>
+                    <span className={`badge ${deal.category === 'SALE' ? 'badge-gold' : 'badge-info'}`}>
+                      {categoryLabel(deal.category)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <span className="deal-date">{deal.updateDate}</span>
-            </div>
-
-            <div className="deal-prices">
-              <div className="deal-price-item">
-                <span className="dp-label">מחיר שיווק</span>
-                <span className="dp-value">{formatPrice(deal.marketingPrice)}</span>
-              </div>
-              <div className="deal-price-item">
-                <span className="dp-label">הצעה</span>
-                <span className="dp-value">{formatPrice(deal.offer)}</span>
-              </div>
-              <div className="deal-price-item">
-                <span className="dp-label">מחיר סגירה</span>
-                <span className="dp-value highlight">
-                  {deal.closedPrice ? formatPrice(deal.closedPrice) : '—'}
+                <span className="deal-date">
+                  {new Date(deal.updateDate).toLocaleDateString('he-IL')}
                 </span>
               </div>
-              {deal.commission && (
-                <div className="deal-price-item">
-                  <span className="dp-label">עמלה</span>
-                  <span className="dp-value commission">
-                    {formatPrice(deal.commission)}
-                  </span>
-                </div>
-              )}
-            </div>
 
-            <div className="deal-agents">
-              <div className="deal-agent">
-                <span className="da-label">סוכן צד קונים</span>
-                <span className="da-value">{deal.buyerAgent}</span>
+              <div className="deal-prices">
+                <div className="deal-price-item">
+                  <span className="dp-label">מחיר שיווק</span>
+                  <span className="dp-value">{formatPrice(deal.marketingPrice)}</span>
+                </div>
+                <div className="deal-price-item">
+                  <span className="dp-label">הצעה</span>
+                  <span className="dp-value">{formatPrice(deal.offer)}</span>
+                </div>
+                <div className="deal-price-item">
+                  <span className="dp-label">מחיר סגירה</span>
+                  <span className="dp-value highlight">{formatPrice(deal.closedPrice)}</span>
+                </div>
+                {deal.commission != null && (
+                  <div className="deal-price-item">
+                    <span className="dp-label">עמלה</span>
+                    <span className="dp-value commission">{formatPrice(deal.commission)}</span>
+                  </div>
+                )}
               </div>
-              <div className="deal-agent">
-                <span className="da-label">סוכן צד מוכרים</span>
-                <span className="da-value">{deal.sellerAgent}</span>
+
+              <div className="deal-agents">
+                <div className="deal-agent">
+                  <span className="da-label">סוכן צד קונים</span>
+                  <span className="da-value">{deal.buyerAgent || '—'}</span>
+                </div>
+                <div className="deal-agent">
+                  <span className="da-label">סוכן צד מוכרים</span>
+                  <span className="da-value">{deal.sellerAgent || '—'}</span>
+                </div>
+                <div className="deal-agent">
+                  <span className="da-label">עו״ד</span>
+                  <span className="da-value">{deal.lawyer || '—'}</span>
+                </div>
               </div>
-              <div className="deal-agent">
-                <span className="da-label">עו״ד</span>
-                <span className="da-value">{deal.lawyer}</span>
+
+              <div className="deal-actions">
+                {deal.status !== 'SIGNED' && (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setEditing({ deal, mode: 'sign' })}
+                  >
+                    <Handshake size={14} />
+                    סמן כנחתם
+                  </button>
+                )}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setEditing({ deal, mode: 'edit' })}
+                >
+                  <Edit3 size={14} />
+                  עריכת עסקה
+                </button>
               </div>
             </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="deals-empty">
+              <p>אין עסקאות בסינון הנוכחי</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {editing && (
+        <DealEditModal
+          deal={editing.deal}
+          mode={editing.mode}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            setEditing(null);
+            await load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function DealEditModal({ deal, mode, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    status: mode === 'sign' ? 'SIGNED' : deal.status,
+    marketingPrice: deal.marketingPrice ?? '',
+    offer: deal.offer ?? '',
+    closedPrice: deal.closedPrice ?? '',
+    commission: deal.commission ?? '',
+    buyerAgent: deal.buyerAgent ?? '',
+    sellerAgent: deal.sellerAgent ?? '',
+    lawyer: deal.lawyer ?? '',
+    signedAt: deal.signedAt ? deal.signedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleSave = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const body = {
+        status: form.status,
+        marketingPrice: Number(form.marketingPrice) || 0,
+        offer: form.offer !== '' ? Number(form.offer) : null,
+        closedPrice: form.closedPrice !== '' ? Number(form.closedPrice) : null,
+        commission: form.commission !== '' ? Number(form.commission) : null,
+        buyerAgent: form.buyerAgent || null,
+        sellerAgent: form.sellerAgent || null,
+        lawyer: form.lawyer || null,
+        signedAt: form.status === 'SIGNED' && form.signedAt
+          ? new Date(form.signedAt).toISOString()
+          : null,
+      };
+      await api.updateDeal(deal.id, body);
+      onSaved();
+    } catch (e) {
+      setError(e.message || 'עדכון נכשל');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="agreement-backdrop" onClick={onClose}>
+      <div className="agreement-modal" onClick={(e) => e.stopPropagation()}>
+        <header className="agreement-header">
+          <div>
+            <h3>{mode === 'sign' ? 'סימון עסקה כנחתמה' : 'עריכת עסקה'}</h3>
+            <p>{deal.propertyStreet}, {deal.city}</p>
           </div>
-        ))}
-        {filtered.length === 0 && (
-          <div className="empty-state">
-            <h3>לא נמצאו עסקאות</h3>
-            <p>שנה את הסינון כדי לראות עסקאות נוספות</p>
+          <button className="btn-ghost" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </header>
+
+        <div className="agreement-body">
+          {error && (
+            <div className="agreement-error">
+              <AlertCircle size={14} />
+              {error}
+            </div>
+          )}
+
+          <div className="deal-form-grid">
+            <div className="form-group">
+              <label className="form-label">סטטוס</label>
+              <select
+                className="form-select"
+                value={form.status}
+                onChange={(e) => update('status', e.target.value)}
+              >
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.key} value={o.key}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            {form.status === 'SIGNED' && (
+              <div className="form-group">
+                <label className="form-label">תאריך חתימה</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={form.signedAt}
+                  onChange={(e) => update('signedAt', e.target.value)}
+                />
+              </div>
+            )}
+            <div className="form-group">
+              <label className="form-label">מחיר שיווק</label>
+              <input
+                type="number"
+                className="form-input"
+                value={form.marketingPrice}
+                onChange={(e) => update('marketingPrice', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">הצעה</label>
+              <input
+                type="number"
+                className="form-input"
+                value={form.offer}
+                onChange={(e) => update('offer', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">מחיר סגירה</label>
+              <input
+                type="number"
+                className="form-input"
+                value={form.closedPrice}
+                onChange={(e) => update('closedPrice', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">עמלה</label>
+              <input
+                type="number"
+                className="form-input"
+                value={form.commission}
+                onChange={(e) => update('commission', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">סוכן צד קונים</label>
+              <input
+                type="text"
+                className="form-input"
+                value={form.buyerAgent}
+                onChange={(e) => update('buyerAgent', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">סוכן צד מוכרים</label>
+              <input
+                type="text"
+                className="form-input"
+                value={form.sellerAgent}
+                onChange={(e) => update('sellerAgent', e.target.value)}
+              />
+            </div>
+            <div className="form-group form-group-wide">
+              <label className="form-label">עו״ד</label>
+              <input
+                type="text"
+                className="form-input"
+                value={form.lawyer}
+                onChange={(e) => update('lawyer', e.target.value)}
+              />
+            </div>
           </div>
-        )}
+
+          <div className="deal-form-actions">
+            <button
+              className="btn btn-primary"
+              onClick={handleSave}
+              disabled={busy}
+            >
+              {busy ? 'שומר…' : mode === 'sign' ? 'סמן כנחתם' : 'שמור שינויים'}
+            </button>
+            <button className="btn btn-secondary" onClick={onClose}>
+              ביטול
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

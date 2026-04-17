@@ -1,0 +1,156 @@
+.ma-modal .agreement-header p {
+  max-width: 500px;
+}
+
+.ma-done-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--success-bg);
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.ma-section {
+  padding: 10px 0 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ma-section:first-child { border-top: none; padding-top: 0; }
+
+.ma-section h4 {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+.ma-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 28px;
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ma-dropzone:hover {
+  border-color: var(--gold-border);
+  background: var(--gold-glow);
+  color: var(--gold);
+}
+
+.ma-dropzone.is-busy {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.ma-dropzone p {
+  margin: 6px 0 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.ma-dropzone span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ma-field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0;
+}
+
+.ma-textarea,
+.ma-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  resize: vertical;
+  direction: rtl;
+}
+
+.ma-textarea:focus,
+.ma-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+.ma-link-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.ma-input-with-icon {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ma-input-with-icon svg {
+  position: absolute;
+  right: 10px;
+  color: var(--text-muted);
+}
+
+.ma-input-with-icon .ma-input {
+  padding-right: 32px;
+  direction: ltr;
+  text-align: left;
+}
+
+.ma-save-btn {
+  align-self: flex-end;
+}
+
+.ma-clear-row {
+  display: flex;
+  justify-content: flex-start;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+}
+
+.ma-saved-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.ma-saved-row a {
+  color: var(--gold);
+  word-break: break-all;
+  direction: ltr;
+}
+
+.ma-saved-row svg { color: var(--gold); flex-shrink: 0; }

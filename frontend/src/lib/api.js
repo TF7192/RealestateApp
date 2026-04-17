@@ -42,6 +42,11 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/me'),
   updateMe: (body) => request('/me', { method: 'PATCH', body }),
+  uploadAvatar: (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return request('/me/avatar', { method: 'POST', body: fd });
+  },
 
   // Resources
   listProperties: (params = {}) => {
@@ -76,6 +81,10 @@ export const api = {
   createDeal: (body) => request('/deals', { method: 'POST', body }),
   updateDeal: (id, body) => request(`/deals/${id}`, { method: 'PATCH', body }),
 
+  listAgreements: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/agreements${qs ? `?${qs}` : ''}`);
+  },
   sendAgreement: (body) => request('/agreements/send', { method: 'POST', body }),
   uploadAgreement: (id, file) => {
     const fd = new FormData();
@@ -89,6 +98,13 @@ export const api = {
     request(`/lookups/resolve?q=${encodeURIComponent(q)}`),
   cities: () => request('/lookups/cities'),
   streets: (city) => request(`/lookups/streets${city ? `?city=${encodeURIComponent(city)}` : ''}`),
+
+  // Public agent storefront (no auth)
+  getAgentPublic: (agentId) => request(`/agents/${agentId}/public`),
+  listAgentProperties: (agentId, params = {}) => {
+    const qs = new URLSearchParams({ agentId, ...params }).toString();
+    return request(`/properties?${qs}`);
+  },
 };
 
 export default api;

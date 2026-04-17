@@ -13,11 +13,25 @@ import {
   SlidersHorizontal,
   X,
   Navigation,
+  Trash2,
 } from 'lucide-react';
-import { properties, formatPrice, getAssetClassLabel, agentProfile, getDistanceKm, resolveLocation, allLocationNames } from '../data/mockData';
+import api from '../lib/api';
+import { useAuth } from '../lib/auth';
+import ConfirmDialog from '../components/ConfirmDialog';
+import {
+  getDistanceKm,
+  resolveLocation,
+  allLocationNames,
+} from '../data/mockData';
 import './Properties.css';
 
-function buildWhatsAppMessage(prop) {
+function formatPrice(price) {
+  if (!price) return '—';
+  if (price < 10000) return `₪${price.toLocaleString('he-IL')}/חודש`;
+  return `₪${price.toLocaleString('he-IL')}`;
+}
+
+function buildWhatsAppMessage(prop, agent) {
   const lines = [];
   lines.push(`*${prop.type} — ${prop.street}, ${prop.city}*`);
   lines.push('');
@@ -29,23 +43,22 @@ function buildWhatsAppMessage(prop) {
   lines.push(`חניה: ${prop.parking ? 'יש' : 'אין'}`);
   lines.push(`מחסן: ${prop.storage ? 'יש' : 'אין'}`);
   lines.push(`מזגנים: ${prop.ac ? 'יש' : 'אין'}`);
-  if (prop.assetClass === 'residential') {
+  if (prop.assetClass === 'RESIDENTIAL') {
     lines.push(`ממ״ד: ${prop.safeRoom ? 'יש' : 'אין'}`);
   }
   lines.push(`מעלית: ${prop.elevator ? 'יש' : 'אין'}`);
   if (prop.airDirections) lines.push(`כיווני אוויר: ${prop.airDirections}`);
-  lines.push(`מצב: ${prop.renovated}`);
-  lines.push(`בניין בן: ${prop.buildingAge === 0 ? 'חדש' : `${prop.buildingAge} שנים`}`);
-  lines.push(`פינוי: ${prop.vacancyDate}`);
-  if (prop.notes) {
-    lines.push('');
-    lines.push(prop.notes);
-  }
+  lines.push(`מצב: ${prop.renovated || '—'}`);
+  if (prop.buildingAge != null) lines.push(`בניין בן: ${prop.buildingAge === 0 ? 'חדש' : `${prop.buildingAge} שנים`}`);
+  if (prop.vacancyDate) lines.push(`פינוי: ${prop.vacancyDate}`);
+  if (prop.notes) { lines.push(''); lines.push(prop.notes); }
   lines.push('');
   lines.push(`📷 תמונות ופרטים נוספים:`);
   lines.push(`${window.location.origin}/p/${prop.id}`);
-  lines.push('');
-  lines.push(`${agentProfile.name} | ${agentProfile.agency} | ${agentProfile.phone}`);
+  if (agent?.displayName) {
+    lines.push('');
+    lines.push(`${agent.displayName} | ${agent.agency || ''} | ${agent.phone || ''}`);
+  }
   return lines.join('\n');
 }
 
@@ -59,17 +72,12 @@ function buildShareUrl(filters) {
 
 export default function Properties() {
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [assetClassFilter, setAssetClassFilter] = useState('all');
   const [search, setSearch] = useState('');
-
-  // Apply incoming URL filters from the dashboard cards (e.g. ?assetClass=commercial)
-  useEffect(() => {
-    const ac = searchParams.get('assetClass');
-    if (ac === 'residential' || ac === 'commercial') setAssetClassFilter(ac);
-    const cat = searchParams.get('category');
-    if (cat === 'sale' || cat === 'rent') setFilter(cat);
-  }, [searchParams]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [locationQuery, setLocationQuery] = useState('');
@@ -83,11 +91,32 @@ export default function Properties() {
     minSqm: '',
     maxSqm: '',
   });
+  const [toDelete, setToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const load = async () => {
+    try {
+      const res = await api.listProperties({ mine: '1' });
+      setItems(res.items || []);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    const ac = searchParams.get('assetClass');
+    if (ac === 'residential') setAssetClassFilter('RESIDENTIAL');
+    if (ac === 'commercial') setAssetClassFilter('COMMERCIAL');
+    const cat = searchParams.get('category');
+    if (cat === 'sale') setFilter('SALE');
+    if (cat === 'rent') setFilter('RENT');
+  }, [searchParams]);
 
   const locationCenter = useMemo(() => resolveLocation(locationQuery), [locationQuery]);
 
   const filtered = useMemo(() => {
-    return properties
+    return items
       .map((p) => {
         let distance = null;
         if (locationCenter && p.lat && p.lng) {
@@ -96,10 +125,10 @@ export default function Properties() {
         return { ...p, _distance: distance };
       })
       .filter((p) => {
-        if (filter === 'sale' && p.category !== 'sale') return false;
-        if (filter === 'rent' && p.category !== 'rent') return false;
-        if (assetClassFilter === 'residential' && p.assetClass !== 'residential') return false;
-        if (assetClassFilter === 'commercial' && p.assetClass !== 'commercial') return false;
+        if (filter === 'SALE' && p.category !== 'SALE') return false;
+        if (filter === 'RENT' && p.category !== 'RENT') return false;
+        if (assetClassFilter === 'RESIDENTIAL' && p.assetClass !== 'RESIDENTIAL') return false;
+        if (assetClassFilter === 'COMMERCIAL' && p.assetClass !== 'COMMERCIAL') return false;
         if (advFilters.city && p.city !== advFilters.city) return false;
         if (advFilters.minPrice && p.marketingPrice < Number(advFilters.minPrice)) return false;
         if (advFilters.maxPrice && p.marketingPrice > Number(advFilters.maxPrice)) return false;
@@ -107,11 +136,15 @@ export default function Properties() {
         if (advFilters.maxRooms && p.rooms != null && p.rooms > Number(advFilters.maxRooms)) return false;
         if (advFilters.minSqm && p.sqm < Number(advFilters.minSqm)) return false;
         if (advFilters.maxSqm && p.sqm > Number(advFilters.maxSqm)) return false;
-        // Proximity filter
         if (locationCenter && p._distance != null && p._distance > locationRadius) return false;
         if (search) {
           const s = search.toLowerCase();
-          return p.street.includes(s) || p.city.includes(s) || p.owner.includes(s) || p.type.includes(s);
+          return (
+            p.street?.toLowerCase().includes(s) ||
+            p.city?.toLowerCase().includes(s) ||
+            p.owner?.toLowerCase().includes(s) ||
+            p.type?.toLowerCase().includes(s)
+          );
         }
         return true;
       })
@@ -119,14 +152,20 @@ export default function Properties() {
         if (a._distance != null && b._distance != null) return a._distance - b._distance;
         return 0;
       });
-  }, [filter, assetClassFilter, advFilters, search, locationCenter, locationRadius]);
+  }, [items, filter, assetClassFilter, advFilters, search, locationCenter, locationRadius]);
 
-  const cities = [...new Set(properties.map((p) => p.city))];
+  const cities = [...new Set(items.map((p) => p.city))];
+
+  const agentInfo = {
+    displayName: user?.displayName,
+    agency: user?.agentProfile?.agency,
+    phone: user?.phone,
+  };
 
   const handleWhatsApp = (e, prop) => {
     e.preventDefault();
     e.stopPropagation();
-    const text = buildWhatsAppMessage(prop);
+    const text = buildWhatsAppMessage(prop, agentInfo);
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -158,12 +197,29 @@ export default function Properties() {
     advFilters.maxSqm ||
     locationQuery;
 
+  const handleDeleteClick = (e, prop) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setToDelete(prop);
+  };
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await api.deleteProperty(toDelete.id);
+      setToDelete(null);
+      await load();
+    } catch { /* ignore */ }
+    setDeleting(false);
+  };
+
   return (
     <div className="properties-page">
       <div className="page-header animate-in">
         <div className="page-header-info">
           <h2>הנכסים שלי</h2>
-          <p>{filtered.length} מתוך {properties.length} נכסים</p>
+          <p>{filtered.length} מתוך {items.length} נכסים</p>
         </div>
         <div className="page-header-actions">
           <button
@@ -181,7 +237,6 @@ export default function Properties() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="filters-bar animate-in animate-in-delay-1">
         <div className="search-box">
           <Search size={18} />
@@ -195,8 +250,8 @@ export default function Properties() {
         <div className="filter-tabs">
           {[
             { key: 'all', label: 'הכל' },
-            { key: 'residential', label: 'מגורים' },
-            { key: 'commercial', label: 'מסחרי' },
+            { key: 'RESIDENTIAL', label: 'מגורים' },
+            { key: 'COMMERCIAL', label: 'מסחרי' },
           ].map((f) => (
             <button
               key={f.key}
@@ -210,8 +265,8 @@ export default function Properties() {
         <div className="filter-tabs">
           {[
             { key: 'all', label: 'הכל' },
-            { key: 'sale', label: 'מכירה' },
-            { key: 'rent', label: 'השכרה' },
+            { key: 'SALE', label: 'מכירה' },
+            { key: 'RENT', label: 'השכרה' },
           ].map((f) => (
             <button
               key={f.key}
@@ -232,10 +287,8 @@ export default function Properties() {
         </button>
       </div>
 
-      {/* Advanced filters panel */}
       {showAdvanced && (
         <div className="agent-filters-panel animate-in">
-          {/* Proximity search */}
           <div className="agent-proximity-section">
             <div className="agent-proximity-input">
               <Navigation size={18} />
@@ -247,9 +300,7 @@ export default function Properties() {
                 list="agent-location-list"
               />
               <datalist id="agent-location-list">
-                {allLocationNames.map((n) => (
-                  <option key={n} value={n} />
-                ))}
+                {allLocationNames.map((n) => (<option key={n} value={n} />))}
               </datalist>
               {locationQuery && (
                 <button className="proximity-clear" onClick={() => setLocationQuery('')}>
@@ -290,9 +341,7 @@ export default function Properties() {
                 onChange={(e) => setAdvFilters({ ...advFilters, city: e.target.value })}
               >
                 <option value="">כל הערים</option>
-                {cities.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+                {cities.map((c) => (<option key={c} value={c}>{c}</option>))}
               </select>
             </div>
             <div className="form-group">
@@ -325,92 +374,112 @@ export default function Properties() {
               className="btn btn-ghost btn-sm"
               onClick={() => { setAdvFilters({ city: '', minPrice: '', maxPrice: '', minRooms: '', maxRooms: '', minSqm: '', maxSqm: '' }); setLocationQuery(''); }}
             >
-              <X size={14} />
-              נקה סינון
+              <X size={14} /> נקה סינון
             </button>
           </div>
         </div>
       )}
 
-      {/* Properties grid */}
-      <div className="properties-grid">
-        {filtered.map((prop, i) => {
-          const done = Object.values(prop.marketingActions).filter(Boolean).length;
-          const total = Object.values(prop.marketingActions).length;
-          const pct = Math.round((done / total) * 100);
+      {loading ? (
+        <div className="empty-state">
+          <Building2 size={48} />
+          <h3>טוען נכסים…</h3>
+        </div>
+      ) : (
+        <div className="properties-grid">
+          {filtered.map((prop, i) => {
+            const actions = prop.marketingActions || {};
+            const done = Object.values(actions).filter(Boolean).length;
+            const total = Object.values(actions).length || 22;
+            const pct = Math.round((done / total) * 100);
 
-          return (
-            <div
-              key={prop.id}
-              className={`property-card animate-in animate-in-delay-${Math.min(i + 1, 5)}`}
-            >
-              <Link to={`/properties/${prop.id}`} className="property-card-link">
-                <div className="property-image">
-                  <img src={prop.images[0]} alt={prop.street} loading="lazy" />
-                  <div className="property-badges">
-                    <span className={`badge ${prop.assetClass === 'commercial' ? 'badge-warning' : 'badge-success'}`}>
-                      {getAssetClassLabel(prop.assetClass)}
-                    </span>
-                    <span className={`badge ${prop.category === 'sale' ? 'badge-gold' : 'badge-info'}`}>
-                      {prop.category === 'sale' ? 'מכירה' : 'השכרה'}
-                    </span>
-                  </div>
-                  <div className="property-price-overlay">
-                    {formatPrice(prop.marketingPrice)}
-                  </div>
-                </div>
-                <div className="property-card-body">
-                  <div className="property-address">
-                    <MapPin size={14} />
-                    <span>{prop.street}, {prop.city}</span>
-                  </div>
-                  <div className="property-specs">
-                    {prop.rooms != null && (
-                      <span><Bed size={14} />{prop.rooms} חד׳</span>
-                    )}
-                    <span><Maximize size={14} />{prop.sqm} מ״ר</span>
-                    <span><Building2 size={14} />{prop.type}</span>
-                  </div>
-                  {prop._distance != null && (
-                    <div className="property-distance-badge">
-                      <Navigation size={12} />
-                      {prop._distance.toFixed(1)} ק״מ
+            return (
+              <div key={prop.id} className={`property-card animate-in animate-in-delay-${Math.min(i + 1, 5)}`}>
+                <Link to={`/properties/${prop.id}`} className="property-card-link">
+                  <div className="property-image">
+                    <img src={prop.images?.[0] || 'https://via.placeholder.com/800x450'} alt={prop.street} loading="lazy" />
+                    <div className="property-badges">
+                      <span className={`badge ${prop.assetClass === 'COMMERCIAL' ? 'badge-warning' : 'badge-success'}`}>
+                        {prop.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}
+                      </span>
+                      <span className={`badge ${prop.category === 'SALE' ? 'badge-gold' : 'badge-info'}`}>
+                        {prop.category === 'SALE' ? 'מכירה' : 'השכרה'}
+                      </span>
                     </div>
-                  )}
-                  <div className="property-card-footer">
-                    <div className="property-owner">
-                      <div className="owner-avatar">{prop.owner.charAt(0)}</div>
-                      <span>{prop.owner}</span>
+                    <div className="property-price-overlay">
+                      {formatPrice(prop.marketingPrice)}
                     </div>
-                    <div className="marketing-mini-progress">
-                      <div className="progress-bar small">
-                        <div className="progress-fill" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="property-card-body">
+                    <div className="property-address">
+                      <MapPin size={14} />
+                      <span>{prop.street}, {prop.city}</span>
+                    </div>
+                    <div className="property-specs">
+                      {prop.rooms != null && (
+                        <span><Bed size={14} />{prop.rooms} חד׳</span>
+                      )}
+                      <span><Maximize size={14} />{prop.sqm} מ״ר</span>
+                      <span><Building2 size={14} />{prop.type}</span>
+                    </div>
+                    {prop._distance != null && (
+                      <div className="property-distance-badge">
+                        <Navigation size={12} />
+                        {prop._distance.toFixed(1)} ק״מ
                       </div>
-                      <span>{pct}%</span>
+                    )}
+                    <div className="property-card-footer">
+                      <div className="property-owner">
+                        <div className="owner-avatar">{prop.owner?.charAt(0)}</div>
+                        <span>{prop.owner}</span>
+                      </div>
+                      <div className="marketing-mini-progress">
+                        <div className="progress-bar small">
+                          <div className="progress-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span>{pct}%</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-              {/* Quick WhatsApp send — sends ALL details + photos in one click */}
-              <button
-                className="property-wa-btn"
-                onClick={(e) => handleWhatsApp(e, prop)}
-                title="שלח את כל פרטי הנכס + תמונות בוואטסאפ"
-              >
-                <MessageCircle size={16} />
-                <span>שלח ללקוח</span>
-              </button>
-            </div>
-          );
-        })}
-      </div>
+                </Link>
+                <button
+                  className="property-wa-btn"
+                  onClick={(e) => handleWhatsApp(e, prop)}
+                  title="שלח את כל פרטי הנכס + תמונות בוואטסאפ"
+                >
+                  <MessageCircle size={16} />
+                  <span>שלח ללקוח</span>
+                </button>
+                <button
+                  className="property-del-btn"
+                  onClick={(e) => handleDeleteClick(e, prop)}
+                  title="מחיקת נכס"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-      {filtered.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="empty-state">
           <Building2 size={48} />
           <h3>לא נמצאו נכסים</h3>
           <p>נסה לשנות את הסינון או לחפש ביטוי אחר</p>
         </div>
+      )}
+
+      {toDelete && (
+        <ConfirmDialog
+          title="מחיקת נכס"
+          message={`למחוק את "${toDelete.street}, ${toDelete.city}"? הפעולה אינה הפיכה.`}
+          confirmLabel="מחק"
+          onConfirm={confirmDelete}
+          onClose={() => setToDelete(null)}
+          busy={deleting}
+        />
       )}
     </div>
   );

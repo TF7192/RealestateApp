@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { LogIn, User, Building2, Mail, Lock, ArrowLeft, UserPlus } from 'lucide-react';
+import { LogIn, Building2, Mail, Lock, ArrowLeft, UserPlus } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import './Login.css';
 
 const AGENT_IMG = 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=900&q=80';
-const CUSTOMER_IMG = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&q=80';
 
 const agentFeatures = [
   'ניהול נכסים ובלעדיויות',
@@ -13,16 +12,8 @@ const agentFeatures = [
   'דפי נכס ללקוחות',
 ];
 
-const customerFeatures = [
-  'צפייה בנכסים זמינים',
-  'חיפוש לפי מיקום וקרבה',
-  'יצירת קשר ישירה עם הסוכן',
-  'שמירת נכסים מועדפים',
-];
-
 export default function Login() {
   const { login, signup, loginWithGoogle } = useAuth();
-  const [mode, setMode] = useState('agent');
   const [flow, setFlow] = useState(null); // null | 'email-login' | 'email-signup'
   const [form, setForm] = useState({
     email: '',
@@ -32,22 +23,8 @@ export default function Login() {
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [transitioning, setTransitioning] = useState(false);
 
-  const isAgent = mode === 'agent';
-  const role = isAgent ? 'AGENT' : 'CUSTOMER';
-
-  const switchMode = (newMode) => {
-    if (newMode === mode) return;
-    setTransitioning(true);
-    setTimeout(() => {
-      setMode(newMode);
-      setFlow(null);
-      setError('');
-      setForm({ email: '', password: '', displayName: '', phone: '' });
-      setTransitioning(false);
-    }, 280);
-  };
+  const role = 'AGENT';
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
@@ -87,11 +64,8 @@ export default function Login() {
     }
   };
 
-  const features = isAgent ? agentFeatures : customerFeatures;
-  const heroImg = isAgent ? AGENT_IMG : CUSTOMER_IMG;
-
   return (
-    <div className={`login-page ${isAgent ? 'mode-agent' : 'mode-customer'}`}>
+    <div className="login-page mode-agent">
       <div className="noise-overlay" />
 
       <div className="login-bg">
@@ -100,10 +74,10 @@ export default function Login() {
         <div className="login-bg-orb login-bg-orb-3" />
       </div>
 
-      <div className={`login-container ${transitioning ? 'fade-out' : 'fade-in'}`}>
+      <div className="login-container fade-in">
         <div className="login-branding">
           <div className="login-brand-bg">
-            <img src={heroImg} alt="" key={heroImg} />
+            <img src={AGENT_IMG} alt="" />
             <div className="login-brand-overlay" />
           </div>
 
@@ -113,12 +87,10 @@ export default function Login() {
               <h1>Estia</h1>
             </div>
 
-            <h2 className="login-tagline">
-              {isAgent ? 'מערכת ניהול נדל״ן' : 'הנכס הבא שלך מחכה'}
-            </h2>
+            <h2 className="login-tagline">מערכת ניהול נדל״ן</h2>
 
             <div className="login-features-list">
-              {features.map((f, i) => (
+              {agentFeatures.map((f, i) => (
                 <div
                   key={f}
                   className="login-feature-item"
@@ -131,55 +103,21 @@ export default function Login() {
             </div>
 
             <div className="login-brand-badge">
-              {isAgent ? (
-                <>
-                  <Building2 size={14} />
-                  <span>ממשק סוכנים</span>
-                </>
-              ) : (
-                <>
-                  <User size={14} />
-                  <span>ממשק לקוחות</span>
-                </>
-              )}
+              <Building2 size={14} />
+              <span>ממשק סוכנים</span>
             </div>
           </div>
         </div>
 
         <div className="login-form-panel">
-          <div className="login-role-toggle">
-            <button
-              className={`role-tab ${isAgent ? 'active' : ''}`}
-              onClick={() => switchMode('agent')}
-            >
-              <Building2 size={18} />
-              <span>סוכן נדל״ן</span>
-            </button>
-            <button
-              className={`role-tab ${!isAgent ? 'active' : ''}`}
-              onClick={() => switchMode('customer')}
-            >
-              <User size={18} />
-              <span>לקוח</span>
-            </button>
-            <div
-              className="role-tab-indicator"
-              style={{ transform: isAgent ? 'translateX(0)' : 'translateX(-100%)' }}
-            />
-          </div>
-
           <div className="login-form-header">
             <h2>
-              {flow === 'email-signup'
-                ? isAgent ? 'הרשמה כסוכן' : 'הרשמה כלקוח'
-                : isAgent ? 'כניסה למערכת' : 'כניסה לאזור האישי'}
+              {flow === 'email-signup' ? 'הרשמה כסוכן' : 'כניסה למערכת'}
             </h2>
             <p>
               {flow === 'email-signup'
                 ? 'צרו חשבון חדש — כך תתחילו'
-                : isAgent
-                ? 'נהל את הנכסים, הלידים והעסקאות שלך'
-                : 'צפה בנכסים שנבחרו עבורך'}
+                : 'נהלו את הנכסים, הלידים והעסקאות שלכם'}
             </p>
           </div>
 
@@ -237,7 +175,7 @@ export default function Login() {
                     <input
                       type="text"
                       className="form-input"
-                      placeholder={isAgent ? 'יוסי כהן' : 'רינה שמעון'}
+                      placeholder="יוסי כהן"
                       value={form.displayName}
                       onChange={(e) => update('displayName', e.target.value)}
                       required
@@ -321,7 +259,7 @@ export default function Login() {
           )}
 
           <div className="login-footer">
-            <span>© 2025 Estia</span>
+            <span>© 2025 Estia · מערכת לסוכני נדל״ן</span>
           </div>
         </div>
       </div>
