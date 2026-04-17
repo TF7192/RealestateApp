@@ -98,8 +98,8 @@ export default function Dashboard() {
       {/* Welcome section */}
       <div className="welcome-section animate-in">
         <div className="welcome-content">
-          <h2>בוקר טוב, יוסי</h2>
-          <p>הנה סיכום יום העבודה שלך</p>
+          <h2>שלום, יוסי</h2>
+          <p>סיכום פעילות יומי</p>
         </div>
         <div className="welcome-actions">
           <Link to="/properties/new" className="btn btn-primary btn-lg">

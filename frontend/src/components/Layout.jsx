@@ -9,7 +9,7 @@ import {
   UserPlus,
   Menu,
   X,
-  ChevronLeft,
+  LogOut,
 } from 'lucide-react';
 import { useState } from 'react';
 import { agentProfile } from '../data/mockData';
@@ -28,7 +28,7 @@ const quickActions = [
   { path: '/leads/new', icon: UserPlus, label: 'ליד חדש' },
 ];
 
-export default function Layout() {
+export default function Layout({ onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
@@ -46,7 +46,7 @@ export default function Layout() {
         </button>
         <div className="mobile-logo">
           <span className="logo-icon">◆</span>
-          <span>נדל״ן Pro</span>
+          <span>Estia</span>
         </div>
         <div style={{ width: 40 }} />
       </header>
@@ -64,8 +64,8 @@ export default function Layout() {
               <span>◆</span>
             </div>
             <div className="logo-text">
-              <h1>נדל״ן Pro</h1>
-              <p>מערכת ניהול נכסים</p>
+              <h1>Estia</h1>
+              <p>ניהול נכסים ולידים</p>
             </div>
           </div>
           <button
@@ -123,6 +123,10 @@ export default function Layout() {
               <span className="agent-agency">{agentProfile.agency}</span>
             </div>
           </div>
+          <button className="sidebar-logout" onClick={onLogout}>
+            <LogOut size={16} />
+            יציאה
+          </button>
         </div>
       </aside>
 

@@ -49,7 +49,7 @@ export default function App() {
   // Agent mode
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route element={<Layout onLogout={handleLogout} />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/properties" element={<Properties />} />
         <Route path="/properties/new" element={<NewProperty />} />

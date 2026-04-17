@@ -46,10 +46,10 @@ export default function Leads() {
       if (lead.city && p.city !== lead.city) return false;
       return true;
     });
-    let text = `שלום ${lead.name}! `;
+    let text = `שלום ${lead.name}, `;
     if (matchingProps.length > 0) {
-      text += `מצאתי עבורך נכסים שעשויים לעניין אותך ב${lead.city}. `;
-      text += `אשמח לתאם ביקור. צור/צרי קשר בכל עת.`;
+      text += `יש נכסים רלוונטיים ב${lead.city}. `;
+      text += `ניתן לתאם ביקור בתיאום מראש.`;
     }
     window.open(
       `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`,

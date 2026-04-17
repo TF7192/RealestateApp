@@ -12,17 +12,19 @@ import {
   Share2,
   ChevronDown,
 } from 'lucide-react';
-import { properties, formatPrice } from '../data/mockData';
+import { properties, formatPrice, getAssetClassLabel } from '../data/mockData';
 import './Properties.css';
 
 export default function Properties() {
   const [filter, setFilter] = useState('all');
+  const [assetClassFilter, setAssetClassFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [view, setView] = useState('grid');
 
   const filtered = properties.filter((p) => {
     if (filter === 'sale' && p.category !== 'sale') return false;
     if (filter === 'rent' && p.category !== 'rent') return false;
+    if (assetClassFilter === 'residential' && p.assetClass !== 'residential') return false;
+    if (assetClassFilter === 'commercial' && p.assetClass !== 'commercial') return false;
     if (search) {
       const s = search.toLowerCase();
       return (
@@ -64,6 +66,21 @@ export default function Properties() {
         <div className="filter-tabs">
           {[
             { key: 'all', label: 'הכל' },
+            { key: 'residential', label: 'מגורים' },
+            { key: 'commercial', label: 'מסחרי' },
+          ].map((f) => (
+            <button
+              key={f.key}
+              className={`filter-tab ${assetClassFilter === f.key ? 'active' : ''}`}
+              onClick={() => setAssetClassFilter(f.key)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="filter-tabs">
+          {[
+            { key: 'all', label: 'הכל' },
             { key: 'sale', label: 'מכירה' },
             { key: 'rent', label: 'השכרה' },
           ].map((f) => (
@@ -94,10 +111,12 @@ export default function Properties() {
               <div className="property-image">
                 <img src={prop.images[0]} alt={prop.street} loading="lazy" />
                 <div className="property-badges">
+                  <span className={`badge ${prop.assetClass === 'commercial' ? 'badge-warning' : 'badge-success'}`}>
+                    {getAssetClassLabel(prop.assetClass)}
+                  </span>
                   <span className={`badge ${prop.category === 'sale' ? 'badge-gold' : 'badge-info'}`}>
                     {prop.category === 'sale' ? 'מכירה' : 'השכרה'}
                   </span>
-                  <span className="badge badge-success">{prop.type}</span>
                 </div>
                 <div className="property-price-overlay">
                   {formatPrice(prop.marketingPrice)}
@@ -111,17 +130,19 @@ export default function Properties() {
                   </span>
                 </div>
                 <div className="property-specs">
-                  <span>
-                    <Bed size={14} />
-                    {prop.rooms} חד׳
-                  </span>
+                  {prop.rooms != null && (
+                    <span>
+                      <Bed size={14} />
+                      {prop.rooms} חד׳
+                    </span>
+                  )}
                   <span>
                     <Maximize size={14} />
                     {prop.sqm} מ״ר
                   </span>
                   <span>
                     <Building2 size={14} />
-                    קומה {prop.floor}
+                    {prop.type}
                   </span>
                 </div>
                 <div className="property-card-footer">

@@ -43,7 +43,7 @@ export default function CustomerPropertyView() {
     );
 
   const handleWhatsApp = () => {
-    const text = `שלום ${agentProfile.name}, אני מעוניין/ת בנכס ב${property.street}, ${property.city}. אשמח לקבל פרטים נוספים.`;
+    const text = `שלום, אני מתעניין/ת בנכס ב${property.street}, ${property.city}. אשמח לפרטים נוספים.`;
     window.open(
       `https://wa.me/${agentProfile.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`,
       '_blank'
@@ -75,7 +75,7 @@ export default function CustomerPropertyView() {
           </Link>
           <div className="cpv-header-logo">
             <span className="logo-icon-sm">◆</span>
-            <span>נדל״ן Pro</span>
+            <span>Estia</span>
           </div>
           <button className="btn btn-ghost btn-sm" onClick={handleShare}>
             <Share2 size={16} />

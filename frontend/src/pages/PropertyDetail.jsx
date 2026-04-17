@@ -27,6 +27,7 @@ import {
   properties,
   formatPrice,
   marketingActionLabels,
+  getAssetClassLabel,
 } from '../data/mockData';
 import './PropertyDetail.css';
 
@@ -54,6 +55,7 @@ export default function PropertyDetail() {
   const pct = Math.round((done / total) * 100);
 
   const customerLink = `${window.location.origin}/p/${property.id}`;
+  const customerPortalLink = `${window.location.origin}/customer?assetClass=${property.assetClass}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(customerLink);
@@ -62,7 +64,7 @@ export default function PropertyDetail() {
   };
 
   const handleWhatsApp = () => {
-    const text = `היי! רציתי לשתף אותך בנכס מדהים:\n${property.type} ב${property.street}, ${property.city}\n${formatPrice(property.marketingPrice)}\n\nלפרטים נוספים:\n${customerLink}`;
+    const text = `${property.type} ב${property.street}, ${property.city}\n${formatPrice(property.marketingPrice)}\n\nלצפייה בפרטי הנכס:\n${customerLink}`;
     window.open(
       `https://wa.me/?text=${encodeURIComponent(text)}`,
       '_blank'
@@ -125,12 +127,13 @@ export default function PropertyDetail() {
           <div className="detail-header">
             <div>
               <div className="detail-badges">
-                <span
-                  className={`badge ${property.category === 'sale' ? 'badge-gold' : 'badge-info'}`}
-                >
+                <span className={`badge ${property.assetClass === 'commercial' ? 'badge-warning' : 'badge-success'}`}>
+                  {getAssetClassLabel(property.assetClass)}
+                </span>
+                <span className={`badge ${property.category === 'sale' ? 'badge-gold' : 'badge-info'}`}>
                   {property.category === 'sale' ? 'מכירה' : 'השכרה'}
                 </span>
-                <span className="badge badge-success">{property.type}</span>
+                <span className="badge badge-gold">{property.type}</span>
               </div>
               <h2 className="detail-title">
                 {property.street}, {property.city}
@@ -169,13 +172,15 @@ export default function PropertyDetail() {
 
           {/* Specs grid */}
           <div className="specs-grid">
-            <div className="spec-item">
-              <Bed size={20} />
-              <div>
-                <span className="spec-value">{property.rooms}</span>
-                <span className="spec-label">חדרים</span>
+            {property.rooms != null && (
+              <div className="spec-item">
+                <Bed size={20} />
+                <div>
+                  <span className="spec-value">{property.rooms}</span>
+                  <span className="spec-label">חדרים</span>
+                </div>
               </div>
-            </div>
+            )}
             <div className="spec-item">
               <Maximize size={20} />
               <div>
@@ -270,6 +275,38 @@ export default function PropertyDetail() {
               <span className="info-value">{property.sector}</span>
             </div>
           </div>
+
+          {/* Commercial-specific details */}
+          {property.assetClass === 'commercial' && (
+            <div className="info-grid">
+              {property.usagePermit && (
+                <div className="info-item">
+                  <span className="info-label">ייעוד / היתר שימוש</span>
+                  <span className="info-value">{property.usagePermit}</span>
+                </div>
+              )}
+              {property.monthlyArnona && (
+                <div className="info-item">
+                  <span className="info-label">ארנונה חודשית</span>
+                  <span className="info-value">₪{property.monthlyArnona.toLocaleString('he-IL')}</span>
+                </div>
+              )}
+              <div className="info-item">
+                <span className="info-label">רמפת פריקה</span>
+                <span className="info-value">{property.loadingArea ? 'יש' : 'אין'}</span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">נגישות לנכים</span>
+                <span className="info-value">{property.handicapAccess ? 'יש' : 'אין'}</span>
+              </div>
+              {property.currentTenant && (
+                <div className="info-item">
+                  <span className="info-label">שוכר נוכחי</span>
+                  <span className="info-value">{property.currentTenant}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {property.notes && (
             <div className="detail-notes">

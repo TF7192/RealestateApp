@@ -48,25 +48,25 @@ export default function Login({ onLogin }) {
             <div className="logo-mark large">
               <span>◆</span>
             </div>
-            <h1>נדל״ן Pro</h1>
-            <p>הפלטפורמה המתקדמת לניהול נדל״ן</p>
+            <h1>Estia</h1>
+            <p>ניהול נכסים, לידים ועסקאות</p>
           </div>
           <div className="login-features">
             <div className="login-feature">
               <div className="feature-dot" />
-              <span>ניהול נכסים ובלעדיות</span>
+              <span>ניהול נכסים ובלעדיויות</span>
             </div>
             <div className="login-feature">
               <div className="feature-dot" />
-              <span>מעקב לידים וקונים</span>
+              <span>מעקב לידים, קונים ועסקאות</span>
             </div>
             <div className="login-feature">
               <div className="feature-dot" />
-              <span>שיווק ושיתוף בקליק</span>
+              <span>שיווק ושיתוף נכסים</span>
             </div>
             <div className="login-feature">
               <div className="feature-dot" />
-              <span>דפי נכס מקצועיים ללקוחות</span>
+              <span>דפי נכס ללקוחות</span>
             </div>
           </div>
           <div className="login-branding-image">
@@ -100,7 +100,7 @@ export default function Login({ onLogin }) {
             <form onSubmit={handleAgentLogin} className="login-form">
               <div className="login-form-header">
                 <h2>כניסת סוכן</h2>
-                <p>התחבר למערכת ניהול הנכסים שלך</p>
+                <p>כניסה למערכת</p>
               </div>
 
               <div className="form-group">

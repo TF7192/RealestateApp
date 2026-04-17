@@ -136,6 +136,119 @@
   color: var(--text-muted);
 }
 
+/* Asset class toggle */
+.cp-asset-class-toggle {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.cp-ac-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: 1px solid var(--border-light);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.cp-ac-btn:hover {
+  border-color: var(--gold-border);
+  color: var(--text-primary);
+}
+
+.cp-ac-btn.active {
+  background: var(--gold-glow);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+/* Location search */
+.cp-location-search {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.cp-location-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cp-location-input svg {
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+.cp-location-input input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+}
+
+.cp-location-input input::placeholder {
+  color: var(--text-muted);
+}
+
+.cp-radius-control {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cp-radius-control .form-label {
+  white-space: nowrap;
+  min-width: 90px;
+}
+
+.cp-radius-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-card);
+  outline: none;
+}
+
+.cp-radius-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--gold);
+  cursor: pointer;
+  box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+/* Distance badge on card */
+.cp-card-distance {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 500;
+}
+
 /* Filters */
 .cp-filters {
   max-width: 1200px;

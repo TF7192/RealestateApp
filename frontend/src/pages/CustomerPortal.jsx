@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search,
   MapPin,
@@ -11,19 +11,34 @@ import {
   SlidersHorizontal,
   X,
   LogOut,
-  ChevronDown,
   Heart,
+  Navigation,
+  Briefcase,
+  Home,
 } from 'lucide-react';
-import { properties, formatPrice, agentProfile } from '../data/mockData';
+import {
+  properties,
+  formatPrice,
+  agentProfile,
+  cityCoords,
+  getDistanceKm,
+  getAssetClassLabel,
+} from '../data/mockData';
 import './CustomerPortal.css';
 
 export default function CustomerPortal({ onLogout }) {
+  const [searchParams] = useSearchParams();
+  const initialAssetClass = searchParams.get('assetClass') || 'all';
+
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState([]);
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationRadius, setLocationRadius] = useState(10); // km
   const [filters, setFilters] = useState({
     city: '',
     category: 'all',
+    assetClass: initialAssetClass,
     minPrice: '',
     maxPrice: '',
     minRooms: '',
@@ -31,21 +46,51 @@ export default function CustomerPortal({ onLogout }) {
   });
 
   const filtered = useMemo(() => {
-    return properties.filter((p) => {
-      if (filters.category === 'sale' && p.category !== 'sale') return false;
-      if (filters.category === 'rent' && p.category !== 'rent') return false;
-      if (filters.city && p.city !== filters.city) return false;
-      if (filters.minPrice && p.marketingPrice < Number(filters.minPrice)) return false;
-      if (filters.maxPrice && p.marketingPrice > Number(filters.maxPrice)) return false;
-      if (filters.minRooms && p.rooms < Number(filters.minRooms)) return false;
-      if (filters.maxRooms && p.rooms > Number(filters.maxRooms)) return false;
-      if (search) {
-        const s = search.toLowerCase();
-        return p.street.includes(s) || p.city.includes(s) || p.type.includes(s);
-      }
-      return true;
-    });
-  }, [search, filters]);
+    // Resolve location coordinates
+    let locationCenter = null;
+    if (locationQuery.trim()) {
+      const match = Object.entries(cityCoords).find(([name]) =>
+        name.includes(locationQuery.trim())
+      );
+      if (match) locationCenter = match[1];
+    }
+
+    return properties
+      .map((p) => {
+        let distance = null;
+        if (locationCenter && p.lat && p.lng) {
+          distance = getDistanceKm(
+            locationCenter.lat,
+            locationCenter.lng,
+            p.lat,
+            p.lng
+          );
+        }
+        return { ...p, _distance: distance };
+      })
+      .filter((p) => {
+        if (filters.assetClass !== 'all' && p.assetClass !== filters.assetClass) return false;
+        if (filters.category === 'sale' && p.category !== 'sale') return false;
+        if (filters.category === 'rent' && p.category !== 'rent') return false;
+        if (filters.city && p.city !== filters.city) return false;
+        if (filters.minPrice && p.marketingPrice < Number(filters.minPrice)) return false;
+        if (filters.maxPrice && p.marketingPrice > Number(filters.maxPrice)) return false;
+        if (filters.minRooms && p.rooms != null && p.rooms < Number(filters.minRooms)) return false;
+        if (filters.maxRooms && p.rooms != null && p.rooms > Number(filters.maxRooms)) return false;
+        // Proximity filter
+        if (locationCenter && p._distance != null && p._distance > locationRadius) return false;
+        if (search) {
+          const s = search.toLowerCase();
+          return p.street.includes(s) || p.city.includes(s) || p.type.includes(s);
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        // Sort by distance if location search is active
+        if (a._distance != null && b._distance != null) return a._distance - b._distance;
+        return 0;
+      });
+  }, [search, filters, locationQuery, locationRadius]);
 
   const cities = [...new Set(properties.map((p) => p.city))];
 
@@ -56,11 +101,25 @@ export default function CustomerPortal({ onLogout }) {
   };
 
   const handleContactWhatsApp = () => {
-    const text = 'שלום, אני מעוניין/ת לקבל מידע נוסף על נכסים.';
+    const text = 'שלום, אני מתעניין/ת בנכסים. אשמח לפרטים.';
     window.open(
       `https://wa.me/${agentProfile.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`,
       '_blank'
     );
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      city: '',
+      category: 'all',
+      assetClass: 'all',
+      minPrice: '',
+      maxPrice: '',
+      minRooms: '',
+      maxRooms: '',
+    });
+    setLocationQuery('');
+    setLocationRadius(10);
   };
 
   return (
@@ -72,7 +131,7 @@ export default function CustomerPortal({ onLogout }) {
         <div className="cp-header-inner">
           <div className="cp-logo">
             <span className="logo-icon-sm">◆</span>
-            <span>נדל״ן Pro</span>
+            <span>Estia</span>
           </div>
           <nav className="cp-nav">
             <a href="#properties" className="cp-nav-link active">
@@ -95,9 +154,9 @@ export default function CustomerPortal({ onLogout }) {
       <section className="cp-hero">
         <div className="cp-hero-bg" />
         <div className="cp-hero-content">
-          <h1>מצא את הנכס המושלם שלך</h1>
+          <h1>נכסים זמינים</h1>
           <p>
-            {agentProfile.name} מ{agentProfile.agency} — נכסים נבחרים במיוחד עבורך
+            {agentProfile.name} | {agentProfile.agency}
           </p>
 
           <div className="cp-search-bar">
@@ -116,6 +175,24 @@ export default function CustomerPortal({ onLogout }) {
               סינון
             </button>
           </div>
+
+          {/* Asset class quick toggle */}
+          <div className="cp-asset-class-toggle">
+            {[
+              { key: 'all', label: 'הכל', icon: null },
+              { key: 'residential', label: 'מגורים', icon: Home },
+              { key: 'commercial', label: 'מסחרי', icon: Briefcase },
+            ].map((item) => (
+              <button
+                key={item.key}
+                className={`cp-ac-btn ${filters.assetClass === item.key ? 'active' : ''}`}
+                onClick={() => setFilters({ ...filters, assetClass: item.key })}
+              >
+                {item.icon && <item.icon size={16} />}
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -129,6 +206,39 @@ export default function CustomerPortal({ onLogout }) {
                 <X size={16} />
               </button>
             </div>
+
+            {/* Location proximity */}
+            <div className="cp-location-search">
+              <div className="cp-location-input">
+                <Navigation size={18} />
+                <input
+                  type="text"
+                  placeholder="הזן מיקום (עיר) לחיפוש לפי קרבה..."
+                  value={locationQuery}
+                  onChange={(e) => setLocationQuery(e.target.value)}
+                  list="city-suggestions"
+                />
+                <datalist id="city-suggestions">
+                  {Object.keys(cityCoords).map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
+              {locationQuery.trim() && (
+                <div className="cp-radius-control">
+                  <label className="form-label">רדיוס: {locationRadius} ק״מ</label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={30}
+                    value={locationRadius}
+                    onChange={(e) => setLocationRadius(Number(e.target.value))}
+                    className="cp-radius-slider"
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="cp-filters-grid">
               <div className="form-group">
                 <label className="form-label">עיר</label>
@@ -144,7 +254,7 @@ export default function CustomerPortal({ onLogout }) {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">סוג</label>
+                <label className="form-label">מכירה / השכרה</label>
                 <select
                   className="form-select"
                   value={filters.category}
@@ -157,56 +267,22 @@ export default function CustomerPortal({ onLogout }) {
               </div>
               <div className="form-group">
                 <label className="form-label">מחיר מינימום</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder="₪"
-                  value={filters.minPrice}
-                  onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-                />
+                <input type="number" className="form-input" placeholder="₪" value={filters.minPrice} onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">מחיר מקסימום</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder="₪"
-                  value={filters.maxPrice}
-                  onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-                />
+                <input type="number" className="form-input" placeholder="₪" value={filters.maxPrice} onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">חדרים מ-</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={filters.minRooms}
-                  onChange={(e) => setFilters({ ...filters, minRooms: e.target.value })}
-                />
+                <input type="number" className="form-input" value={filters.minRooms} onChange={(e) => setFilters({ ...filters, minRooms: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">חדרים עד</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={filters.maxRooms}
-                  onChange={(e) => setFilters({ ...filters, maxRooms: e.target.value })}
-                />
+                <input type="number" className="form-input" value={filters.maxRooms} onChange={(e) => setFilters({ ...filters, maxRooms: e.target.value })} />
               </div>
             </div>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() =>
-                setFilters({
-                  city: '',
-                  category: 'all',
-                  minPrice: '',
-                  maxPrice: '',
-                  minRooms: '',
-                  maxRooms: '',
-                })
-              }
-            >
+            <button className="btn btn-secondary btn-sm" onClick={clearFilters}>
               נקה סינון
             </button>
           </div>
@@ -228,6 +304,9 @@ export default function CustomerPortal({ onLogout }) {
               <div className="cp-card-image">
                 <img src={prop.images[0]} alt={prop.street} loading="lazy" />
                 <div className="cp-card-badges">
+                  <span className={`badge ${prop.assetClass === 'commercial' ? 'badge-warning' : 'badge-success'}`}>
+                    {getAssetClassLabel(prop.assetClass)}
+                  </span>
                   <span className={`badge ${prop.category === 'sale' ? 'badge-gold' : 'badge-info'}`}>
                     {prop.category === 'sale' ? 'מכירה' : 'השכרה'}
                   </span>
@@ -252,10 +331,12 @@ export default function CustomerPortal({ onLogout }) {
                 </h3>
                 <p className="cp-card-type">{prop.type}</p>
                 <div className="cp-card-specs">
-                  <span>
-                    <Bed size={14} />
-                    {prop.rooms} חד׳
-                  </span>
+                  {prop.rooms != null && (
+                    <span>
+                      <Bed size={14} />
+                      {prop.rooms} חד׳
+                    </span>
+                  )}
                   <span>
                     <Maximize size={14} />
                     {prop.sqm} מ״ר
@@ -265,6 +346,12 @@ export default function CustomerPortal({ onLogout }) {
                     קומה {prop.floor}
                   </span>
                 </div>
+                {prop._distance != null && (
+                  <div className="cp-card-distance">
+                    <Navigation size={12} />
+                    {prop._distance.toFixed(1)} ק״מ מהמיקום שנבחר
+                  </div>
+                )}
               </div>
             </Link>
           ))}
@@ -283,8 +370,8 @@ export default function CustomerPortal({ onLogout }) {
       <section className="cp-contact" id="contact">
         <div className="cp-contact-inner">
           <div className="cp-contact-info">
-            <h2>מעוניין/ת לשמוע עוד?</h2>
-            <p>צור/י קשר ואשמח לסייע במציאת הנכס המושלם</p>
+            <h2>יצירת קשר</h2>
+            <p>לתיאום ביקור או לפרטים נוספים</p>
             <div className="cp-agent-card">
               <div className="cp-agent-avatar">
                 {agentProfile.name.charAt(0)}
@@ -297,17 +384,11 @@ export default function CustomerPortal({ onLogout }) {
             </div>
           </div>
           <div className="cp-contact-actions">
-            <a
-              href={`tel:${agentProfile.phone}`}
-              className="btn btn-secondary btn-lg cp-contact-btn"
-            >
+            <a href={`tel:${agentProfile.phone}`} className="btn btn-secondary btn-lg cp-contact-btn">
               <Phone size={20} />
               {agentProfile.phone}
             </a>
-            <button
-              className="btn btn-primary btn-lg cp-contact-btn"
-              onClick={handleContactWhatsApp}
-            >
+            <button className="btn btn-primary btn-lg cp-contact-btn" onClick={handleContactWhatsApp}>
               <MessageCircle size={20} />
               שלח הודעה בוואטסאפ
             </button>
@@ -317,7 +398,7 @@ export default function CustomerPortal({ onLogout }) {
 
       {/* Footer */}
       <footer className="cp-footer">
-        <p>© 2025 נדל״ן Pro — כל הזכויות שמורות</p>
+        <p>© 2025 Estia — כל הזכויות שמורות</p>
       </footer>
 
       {/* Floating WhatsApp */}
