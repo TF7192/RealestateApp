@@ -1,0 +1,109 @@
+.deals-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 16px;
+}
+
+.deal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.deal-card:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-md);
+}
+
+.deal-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 20px 12px;
+}
+
+.deal-property-info h4 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.deal-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.deal-prices {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 12px 20px;
+  margin: 0 20px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+.deal-price-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dp-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dp-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dp-value.highlight {
+  color: var(--gold);
+}
+
+.dp-value.commission {
+  color: var(--success);
+}
+
+.deal-agents {
+  display: flex;
+  gap: 20px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+}
+
+.deal-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.da-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.da-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .deals-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .deal-agents {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

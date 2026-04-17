@@ -1,0 +1,153 @@
+.leads-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.lead-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.lead-card:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-md);
+}
+
+.lead-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.lead-card-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.lead-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.lead-card-info h4 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.lead-card-source {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lead-card-details {
+  padding: 12px 20px;
+}
+
+.lcd-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.lcd-row:last-child {
+  border-bottom: none;
+}
+
+.lcd-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lcd-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.lcd-properties {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lcd-property-link {
+  font-size: 12px;
+  padding: 2px 8px;
+  background: var(--gold-glow);
+  color: var(--gold);
+  border-radius: 10px;
+}
+
+.lead-card-notes {
+  padding: 0 20px 12px;
+}
+
+.lead-card-notes p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  margin: 0;
+}
+
+.lead-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.01);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lead-card-dates {
+  display: flex;
+  gap: 12px;
+}
+
+.lead-card-dates span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.lead-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-count {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-right: 4px;
+}
+
+@media (max-width: 640px) {
+  .leads-grid {
+    grid-template-columns: 1fr;
+  }
+}
