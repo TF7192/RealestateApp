@@ -105,7 +105,18 @@ export default function Customers() {
     }
     const t = searchParams.get('tab');
     if (t === 'active' || t === 'leads') setTab(t);
+    const f = searchParams.get('filter');
+    if (f === 'hot' || f === 'warm' || f === 'cold') setStatusFilter(f.toUpperCase());
   }, [searchParams]);
+
+  // Breadcrumb shown when the user arrived via an incoming filter
+  const incomingFilterLabel = (() => {
+    const f = searchParams.get('filter');
+    if (f === 'hot') return 'לידים חמים';
+    if (f === 'warm') return 'לידים חמימים';
+    if (f === 'cold') return 'לידים קרים';
+    return null;
+  })();
 
   const { leadsGroup, activeGroup } = useMemo(() => {
     const active = [];
@@ -176,7 +187,27 @@ export default function Customers() {
   };
 
   if (loading) {
-    return <div className="customers-loading"><div className="spinner-gold" /></div>;
+    return (
+      <div className="customers-page">
+        <div className="page-header animate-in">
+          <div className="page-header-info">
+            <h2>לקוחות</h2>
+            <p>טוען...</p>
+          </div>
+        </div>
+        <div className="customers-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="customer-card skel-card">
+              <div className="skel skel-circle" />
+              <div className="skel skel-line w-70" />
+              <div className="skel skel-line w-50" />
+              <div className="skel skel-line w-90" />
+              <div className="skel skel-line w-40" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -211,6 +242,21 @@ export default function Customers() {
           </Link>
         </div>
       </div>
+
+      {incomingFilterLabel && statusFilter !== 'all' && (
+        <div className="filter-breadcrumb animate-in">
+          <span>מוצג: {incomingFilterLabel}</span>
+          <button
+            className="fb-clear"
+            onClick={() => {
+              setStatusFilter('all');
+              window.history.replaceState({}, '', '/customers');
+            }}
+          >
+            נקה סינון
+          </button>
+        </div>
+      )}
 
       {/* Top-level tabs: לידים vs לקוחות פעילים */}
       <div className="customers-main-tabs animate-in animate-in-delay-1">

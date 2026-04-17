@@ -18,6 +18,7 @@ import {
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import ConfirmDialog from '../components/ConfirmDialog';
+import WhatsAppSheet from '../components/WhatsAppSheet';
 import {
   getDistanceKm,
   resolveLocation,
@@ -93,6 +94,8 @@ export default function Properties() {
   });
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [waShare, setWaShare] = useState(null); // { text, recipients }
+  const [leadList, setLeadList] = useState([]);
 
   const load = async () => {
     try {
@@ -103,6 +106,10 @@ export default function Properties() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // Load leads once so the WhatsApp sheet can offer matched recipients
+    api.listLeads().then((r) => setLeadList(r.items || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const ac = searchParams.get('assetClass');
@@ -166,7 +173,28 @@ export default function Properties() {
     e.preventDefault();
     e.stopPropagation();
     const text = buildWhatsAppMessage(prop, agentInfo);
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    // Rank leads that match this property first (same city, budget-range, etc.)
+    const scored = leadList.map((l) => {
+      let score = 0;
+      if (l.city && l.city === prop.city) score += 3;
+      if (l.lookingFor === 'RENT' && prop.category === 'RENT') score += 2;
+      if (l.lookingFor === 'BUY' && prop.category === 'SALE') score += 2;
+      if (prop.assetClass === 'COMMERCIAL' && l.interestType === 'COMMERCIAL') score += 2;
+      if (prop.assetClass === 'RESIDENTIAL' && l.interestType === 'PRIVATE') score += 1;
+      if (l.budget && prop.marketingPrice && l.budget >= prop.marketingPrice * 0.7) score += 1;
+      return { l, score };
+    }).sort((a, b) => b.score - a.score);
+    const recipients = scored.map(({ l, score }) => ({
+      id: l.id,
+      name: l.name,
+      phone: l.phone,
+      sub: score >= 3
+        ? 'התאמה גבוהה'
+        : score > 0
+        ? 'התאמה חלקית'
+        : `${l.city || ''}${l.priceRangeLabel ? ` · ${l.priceRangeLabel}` : ''}`,
+    }));
+    setWaShare({ text, recipients, title: `שליחת ${prop.street}, ${prop.city}` });
   };
 
   const handleGenerateLink = () => {
@@ -417,10 +445,55 @@ export default function Properties() {
                     </div>
                     <div className="property-specs">
                       {prop.rooms != null && (
-                        <span><Bed size={14} />{prop.rooms} חד׳</span>
+                        <button
+                          type="button"
+                          className="spec-chip"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setAdvFilters((f) => ({
+                              ...f,
+                              minRooms: String(prop.rooms),
+                              maxRooms: String(prop.rooms),
+                            }));
+                            setShowAdvanced(true);
+                          }}
+                          title="הצג את כל הנכסים עם מספר חדרים זהה"
+                        >
+                          <Bed size={14} />{prop.rooms} חד׳
+                        </button>
                       )}
-                      <span><Maximize size={14} />{prop.sqm} מ״ר</span>
-                      <span><Building2 size={14} />{prop.type}</span>
+                      <button
+                        type="button"
+                        className="spec-chip"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const band = 10;
+                          setAdvFilters((f) => ({
+                            ...f,
+                            minSqm: String(Math.max(0, prop.sqm - band)),
+                            maxSqm: String(prop.sqm + band),
+                          }));
+                          setShowAdvanced(true);
+                        }}
+                        title="הצג נכסים בגודל דומה"
+                      >
+                        <Maximize size={14} />{prop.sqm} מ״ר
+                      </button>
+                      <button
+                        type="button"
+                        className="spec-chip"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setAdvFilters((f) => ({ ...f, city: prop.city }));
+                          setShowAdvanced(true);
+                        }}
+                        title={`הצג נכסים ב${prop.city}`}
+                      >
+                        <Building2 size={14} />{prop.type}
+                      </button>
                     </div>
                     {prop._distance != null && (
                       <div className="property-distance-badge">
@@ -479,6 +552,16 @@ export default function Properties() {
           onConfirm={confirmDelete}
           onClose={() => setToDelete(null)}
           busy={deleting}
+        />
+      )}
+
+      {waShare && (
+        <WhatsAppSheet
+          title={waShare.title}
+          subtitle="ערוך את ההודעה ובחר למי לשלוח"
+          message={waShare.text}
+          recipients={waShare.recipients}
+          onClose={() => setWaShare(null)}
         />
       )}
     </div>

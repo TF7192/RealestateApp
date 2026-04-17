@@ -448,6 +448,29 @@
   border-color: var(--danger);
 }
 
+/* Tappable spec chip on property card */
+.spec-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.spec-chip:hover {
+  background: var(--gold-glow);
+  color: var(--gold);
+  border-color: var(--gold-border);
+}
+
 @media (max-width: 640px) {
   .properties-grid {
     grid-template-columns: 1fr;

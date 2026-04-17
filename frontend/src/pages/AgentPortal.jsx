@@ -268,33 +268,60 @@ export default function AgentPortal() {
         </div>
 
         <div className="ap-grid">
-          {filtered.map((p) => (
-            <Link key={p.id} to={`/p/${p.id}`} className="ap-card">
-              <div className="ap-card-image">
-                <img src={p.images?.[0] || 'https://via.placeholder.com/800x450'} alt={p.street} loading="lazy" />
-                <div className="ap-card-badges">
-                  <span className={`ap-badge ${p.assetClass === 'COMMERCIAL' ? 'commercial' : 'residential'}`}>
-                    {p.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}
-                  </span>
-                  <span className={`ap-badge ${p.category === 'SALE' ? 'sale' : 'rent'}`}>
-                    {p.category === 'SALE' ? 'מכירה' : 'השכרה'}
-                  </span>
-                </div>
-                <div className="ap-card-price">{formatPrice(p.marketingPrice)}</div>
+          {filtered.map((p) => {
+            const interest = () => {
+              const text = [
+                `שלום ${agent.displayName},`,
+                `אני מעוניין/ת בנכס ב${p.street}, ${p.city}.`,
+                `(מחיר: ${formatPrice(p.marketingPrice)})`,
+                'אשמח לפרטים נוספים / תיאום ביקור.',
+                '',
+                `${window.location.origin}/p/${p.id}`,
+              ].join('\n');
+              const digits = (agent.phone || '').replace(/[^0-9]/g, '');
+              const url = digits
+                ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+                : `https://wa.me/?text=${encodeURIComponent(text)}`;
+              window.open(url, '_blank');
+            };
+            return (
+              <div key={p.id} className="ap-card">
+                <Link to={`/p/${p.id}`} className="ap-card-inner">
+                  <div className="ap-card-image">
+                    <img src={p.images?.[0] || 'https://via.placeholder.com/800x450'} alt={p.street} loading="lazy" />
+                    <div className="ap-card-badges">
+                      <span className={`ap-badge ${p.assetClass === 'COMMERCIAL' ? 'commercial' : 'residential'}`}>
+                        {p.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}
+                      </span>
+                      <span className={`ap-badge ${p.category === 'SALE' ? 'sale' : 'rent'}`}>
+                        {p.category === 'SALE' ? 'מכירה' : 'השכרה'}
+                      </span>
+                    </div>
+                    <div className="ap-card-price">{formatPrice(p.marketingPrice)}</div>
+                  </div>
+                  <div className="ap-card-body">
+                    <div className="ap-card-address">
+                      <MapPin size={13} />
+                      {p.street}, {p.city}
+                    </div>
+                    <div className="ap-card-specs">
+                      {p.rooms != null && <span><Bed size={13} />{p.rooms} חד׳</span>}
+                      <span><Maximize size={13} />{p.sqm} מ״ר</span>
+                      <span><Building2 size={13} />{p.type}</span>
+                    </div>
+                  </div>
+                </Link>
+                <button
+                  className="ap-interested-btn"
+                  onClick={interest}
+                  title="שלח הודעה לסוכן על הנכס הזה"
+                >
+                  <MessageCircle size={14} />
+                  אני מעוניין/ת
+                </button>
               </div>
-              <div className="ap-card-body">
-                <div className="ap-card-address">
-                  <MapPin size={13} />
-                  {p.street}, {p.city}
-                </div>
-                <div className="ap-card-specs">
-                  {p.rooms != null && <span><Bed size={13} />{p.rooms} חד׳</span>}
-                  <span><Maximize size={13} />{p.sqm} מ״ר</span>
-                  <span><Building2 size={13} />{p.type}</span>
-                </div>
-              </div>
-            </Link>
-          ))}
+            );
+          })}
         </div>
 
         {filtered.length === 0 && (

@@ -4,6 +4,21 @@
   padding: 80px;
 }
 
+.skel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  min-height: 280px;
+}
+
+.skel-circle { width: 44px; height: 44px; border-radius: 50%; }
+.skel-line { height: 10px; }
+.w-40 { width: 40%; }
+.w-50 { width: 50%; }
+.w-70 { width: 70%; }
+.w-90 { width: 90%; }
+
 .spinner-gold {
   width: 36px;
   height: 36px;
@@ -11,6 +26,33 @@
   border: 3px solid var(--gold-glow);
   border-top-color: var(--gold);
   animation: spin 0.9s linear infinite;
+}
+
+/* Filter breadcrumb — shown when arriving from the dashboard KPI */
+.filter-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--gold-glow);
+  color: var(--gold);
+  border: 1px solid var(--gold-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.fb-clear {
+  border: none;
+  background: transparent;
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
 }
 
 /* Big top-level tabs */

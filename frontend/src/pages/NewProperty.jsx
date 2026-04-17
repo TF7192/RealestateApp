@@ -1,66 +1,95 @@
 import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Upload, FileSignature, X, AlertCircle } from 'lucide-react';
+import {
+  ArrowRight,
+  Save,
+  Upload,
+  X,
+  AlertCircle,
+  CheckCircle2,
+  Building2,
+  Home,
+  Briefcase,
+  User as UserIcon,
+} from 'lucide-react';
 import api from '../lib/api';
+import { useToast } from '../lib/toast';
 import { cityNames, streetNames } from '../data/mockData';
 import './Forms.css';
+import './NewProperty.css';
 
+/**
+ * Two-step new-property wizard:
+ *  Step 1 — 7 essentials, saves and creates the property.
+ *  Step 2 — full marketing package (type, floor, features, photos).
+ *
+ * The property exists after Step 1 so an agent can capture a new listing
+ * mid-call in 30 seconds and keep going later from the detail page.
+ */
 export default function NewProperty() {
   const navigate = useNavigate();
+  const toast = useToast();
+  const fileInput = useRef(null);
+
+  const [step, setStep] = useState(1);
+  const [propertyId, setPropertyId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [photoFiles, setPhotoFiles] = useState([]);
+
   const [form, setForm] = useState({
-    assetClass: 'residential',
-    type: 'דירה',
-    category: 'sale',
+    // Step 1 essentials
+    assetClass: 'RESIDENTIAL',
+    category: 'SALE',
     street: '',
     city: '',
     owner: '',
     ownerPhone: '',
     marketingPrice: '',
     sqm: '',
+
+    // Step 2 fields
+    type: 'דירה',
     rooms: '',
     floor: '',
     totalFloors: '',
-    elevator: false,
+    balconySize: '',
+    buildingAge: '',
     renovated: '',
     vacancyDate: '',
-    parking: false,
-    storage: false,
-    balconySize: '',
-    airDirections: '',
-    ac: false,
-    safeRoom: false,
-    buildingAge: '',
     sector: 'כללי',
-    closingPrice: '',
+    airDirections: '',
     notes: '',
+    closingPrice: '',
+    sqmArnona: '',
     exclusiveStart: '',
     exclusiveEnd: '',
-    sqmArnona: '',
+    elevator: false,
+    parking: false,
+    storage: false,
+    ac: false,
+    safeRoom: false,
   });
 
-  const isCommercial = form.assetClass === 'commercial';
+  const isCommercial = form.assetClass === 'COMMERCIAL';
+  const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
-  const update = (field, value) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
-
-  const handleAssetClassChange = (cls) => {
-    const typeDefault = cls === 'commercial' ? 'משרד' : 'דירה';
-    setForm((prev) => ({ ...prev, assetClass: cls, type: typeDefault }));
+  const setAssetClass = (cls) => {
+    setForm((p) => ({
+      ...p,
+      assetClass: cls,
+      type: cls === 'COMMERCIAL' ? 'משרד' : 'דירה',
+    }));
   };
 
-  const [photoFiles, setPhotoFiles] = useState([]); // {file, url}
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
-  const fileInput = useRef(null);
-
+  // ── Photo helpers ──────────────────────────────────────────────────
   const addFiles = (fileList) => {
     const imgs = Array.from(fileList || [])
       .filter((f) => f.type.startsWith('image/'))
       .map((file) => ({ file, url: URL.createObjectURL(file) }));
     setPhotoFiles((prev) => [...prev, ...imgs]);
   };
-
   const removePhoto = (idx) => {
     setPhotoFiles((prev) => {
       const next = [...prev];
@@ -70,27 +99,19 @@ export default function NewProperty() {
     });
   };
 
-  const onDropFiles = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
+  // ── Step 1 save: creates the property ──────────────────────────────
+  const saveStep1 = async (e) => {
+    e?.preventDefault?.();
     setError(null);
     try {
-      // Validate & map lowercase form → backend enums
-      if (!form.street || !form.city || !form.owner || !form.ownerPhone) {
-        throw new Error('יש למלא שדות חובה: רחוב, עיר, בעל הנכס, טלפון');
-      }
-      if (!form.marketingPrice) throw new Error('יש להזין מחיר שיווק');
-      if (!form.sqm) throw new Error('יש להזין שטח במ״ר');
-
+      if (!form.street || !form.city) throw new Error('חסר רחוב ועיר');
+      if (!form.owner || !form.ownerPhone) throw new Error('חסרים פרטי בעל הנכס');
+      if (!form.marketingPrice) throw new Error('חסר מחיר שיווק');
+      if (!form.sqm) throw new Error('חסר שטח במ״ר');
+      setSubmitting(true);
       const body = {
-        assetClass: isCommercial ? 'COMMERCIAL' : 'RESIDENTIAL',
-        category: form.category === 'rent' ? 'RENT' : 'SALE',
+        assetClass: form.assetClass,
+        category: form.category,
         type: form.type,
         street: form.street,
         city: form.city,
@@ -98,6 +119,28 @@ export default function NewProperty() {
         ownerPhone: form.ownerPhone,
         marketingPrice: Number(form.marketingPrice) || 0,
         sqm: Number(form.sqm) || 0,
+      };
+      const res = await api.createProperty(body);
+      const id = res.property?.id;
+      setPropertyId(id);
+      toast.success('הנכס נשמר · המשך להשלמת הפרטים');
+      setStep(2);
+    } catch (e2) {
+      setError(e2.message || 'שמירה נכשלה');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Step 2 save: patches + uploads photos ──────────────────────────
+  const saveStep2 = async (e) => {
+    e?.preventDefault?.();
+    if (!propertyId) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const patch = {
+        type: form.type,
         rooms: form.rooms !== '' ? Number(form.rooms) : null,
         floor: form.floor !== '' ? Number(form.floor) : null,
         totalFloors: form.totalFloors !== '' ? Number(form.totalFloors) : null,
@@ -108,36 +151,41 @@ export default function NewProperty() {
         sector: form.sector || null,
         airDirections: form.airDirections || null,
         notes: form.notes || null,
+        closingPrice: form.closingPrice !== '' ? Number(form.closingPrice) : null,
+        sqmArnona: form.sqmArnona !== '' ? Number(form.sqmArnona) : null,
+        exclusiveStart: form.exclusiveStart ? new Date(form.exclusiveStart).toISOString() : null,
+        exclusiveEnd: form.exclusiveEnd ? new Date(form.exclusiveEnd).toISOString() : null,
         elevator: form.elevator,
         parking: form.parking,
         storage: form.storage,
         ac: form.ac,
         safeRoom: form.safeRoom,
-        sqmArnona: form.sqmArnona !== '' ? Number(form.sqmArnona) : null,
-        closingPrice: form.closingPrice !== '' ? Number(form.closingPrice) : null,
-        exclusiveStart: form.exclusiveStart ? new Date(form.exclusiveStart).toISOString() : null,
-        exclusiveEnd: form.exclusiveEnd ? new Date(form.exclusiveEnd).toISOString() : null,
       };
-      const res = await api.createProperty(body);
-      const newId = res.property?.id;
-      // Upload images sequentially so they land in order
+      await api.updateProperty(propertyId, patch);
+
+      // Upload photos sequentially
       for (const p of photoFiles) {
         try {
           // eslint-disable-next-line no-await-in-loop
-          await api.uploadPropertyImage(newId, p.file);
-        } catch (_) { /* continue on individual failure */ }
+          await api.uploadPropertyImage(propertyId, p.file);
+        } catch (_) { /* continue on per-file failure */ }
       }
-      // Revoke object URLs
       photoFiles.forEach((p) => URL.revokeObjectURL(p.url));
-      navigate(newId ? `/properties/${newId}` : '/properties');
-    } catch (err) {
-      setError(err.message || 'שמירה נכשלה');
+      toast.success('הנכס נשמר במלואו');
+      navigate(`/properties/${propertyId}`);
+    } catch (e2) {
+      setError(e2.message || 'שמירה נכשלה');
       setSubmitting(false);
     }
   };
 
+  const skipStep2 = () => {
+    toast.info('דילגת על ההשלמה — ניתן להשלים מעמוד הנכס');
+    navigate(propertyId ? `/properties/${propertyId}` : '/properties');
+  };
+
   return (
-    <div className="form-page">
+    <div className="form-page np-wizard">
       <Link to="/properties" className="back-link animate-in">
         <ArrowRight size={16} />
         חזרה לנכסים
@@ -145,188 +193,196 @@ export default function NewProperty() {
 
       <div className="page-header animate-in">
         <div className="page-header-info">
-          <h2>קליטת נכס חדש</h2>
-          <p>הזן את פרטי הנכס לתחילת שיווק</p>
+          <h2>{step === 1 ? 'נכס חדש' : 'השלמת פרטי הנכס'}</h2>
+          <p>
+            {step === 1
+              ? 'מינימום לקליטה מהירה — אפשר להמשיך מאוחר יותר'
+              : `המשך לעבוד על ${form.street}, ${form.city}`}
+          </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="intake-form animate-in animate-in-delay-1">
-        {/* Asset class + type */}
-        <div className="form-section">
-          <h3 className="form-section-title">סיווג הנכס</h3>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">סיווג</label>
-              <div className="toggle-group">
-                <button
-                  type="button"
-                  className={`toggle-btn ${!isCommercial ? 'active' : ''}`}
-                  onClick={() => handleAssetClassChange('residential')}
-                >
-                  מגורים
-                </button>
-                <button
-                  type="button"
-                  className={`toggle-btn ${isCommercial ? 'active' : ''}`}
-                  onClick={() => handleAssetClassChange('commercial')}
-                >
-                  מסחרי
-                </button>
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">סוג</label>
-              <select
-                className="form-select"
-                value={form.type}
-                onChange={(e) => update('type', e.target.value)}
-              >
-                {isCommercial ? (
-                  <>
-                    <option>משרד</option>
-                    <option>חנות</option>
-                    <option>מחסן</option>
-                    <option>מבנה תעשייתי</option>
-                    <option>קליניקה</option>
-                    <option>אולם</option>
-                  </>
-                ) : (
-                  <>
-                    <option>דירה</option>
-                    <option>פנטהאוז</option>
-                    <option>קוטג׳</option>
-                    <option>דו-משפחתי</option>
-                    <option>מגרש</option>
-                    <option>דירת גן</option>
-                  </>
-                )}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">מכירה / השכרה</label>
-              <div className="toggle-group">
-                <button
-                  type="button"
-                  className={`toggle-btn ${form.category === 'sale' ? 'active' : ''}`}
-                  onClick={() => update('category', 'sale')}
-                >
-                  מכירה
-                </button>
-                <button
-                  type="button"
-                  className={`toggle-btn ${form.category === 'rent' ? 'active' : ''}`}
-                  onClick={() => update('category', 'rent')}
-                >
-                  השכרה
-                </button>
-              </div>
-            </div>
+      <div className="np-steps animate-in animate-in-delay-1">
+        <div className={`np-step ${step === 1 ? 'active' : step > 1 ? 'done' : ''}`}>
+          <span className="np-step-no">{step > 1 ? <CheckCircle2 size={14} /> : '1'}</span>
+          <div>
+            <strong>יסודות</strong>
+            <span>7 שדות · שמירה יוצרת את הנכס</span>
           </div>
         </div>
-
-        {/* Location */}
-        <div className="form-section">
-          <h3 className="form-section-title">מיקום</h3>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">רחוב ומספר</label>
-              <input
-                className="form-input"
-                placeholder="התחל להקליד רחוב..."
-                value={form.street}
-                onChange={(e) => update('street', e.target.value)}
-                list="property-street-list"
-                autoComplete="off"
-              />
-              <datalist id="property-street-list">
-                {streetNames.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            </div>
-            <div className="form-group">
-              <label className="form-label">עיר</label>
-              <input
-                className="form-input"
-                placeholder="התחל להקליד — לדוגמה: רא..."
-                value={form.city}
-                onChange={(e) => update('city', e.target.value)}
-                list="property-city-list"
-                autoComplete="off"
-              />
-              <datalist id="property-city-list">
-                {cityNames.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-            </div>
+        <div className="np-step-line" />
+        <div className={`np-step ${step === 2 ? 'active' : ''}`}>
+          <span className="np-step-no">2</span>
+          <div>
+            <strong>חבילת שיווק</strong>
+            <span>מאפיינים, תמונות, בלעדיות · לא חובה עכשיו</span>
           </div>
         </div>
+      </div>
 
-        {/* Owner */}
-        <div className="form-section">
-          <h3 className="form-section-title">בעל הנכס</h3>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">שם בעל הנכס</label>
-              <input className="form-input" placeholder="שם מלא" value={form.owner} onChange={(e) => update('owner', e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">טלפון</label>
-              <input className="form-input" placeholder="050-1234567" value={form.ownerPhone} onChange={(e) => update('ownerPhone', e.target.value)} />
-            </div>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">תחילת בלעדיות</label>
-              <input type="date" className="form-input" value={form.exclusiveStart} onChange={(e) => update('exclusiveStart', e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">סיום בלעדיות</label>
-              <input type="date" className="form-input" value={form.exclusiveEnd} onChange={(e) => update('exclusiveEnd', e.target.value)} />
-            </div>
-          </div>
-          <div className="form-inline-action">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled
-              title="זמין רק לאחר שמירת הנכס — גש לעמוד הנכס כדי לנהל הסכם תיווך"
-            >
-              <FileSignature size={16} />
-              שלח הסכם תיווך לחתימה
-            </button>
-            <span className="inline-action-hint">
-              ניהול ההסכם זמין בכרטיס הלקוח לאחר שמירת הנכס
-            </span>
-          </div>
+      {error && (
+        <div className="np-error animate-in">
+          <AlertCircle size={14} />
+          {error}
         </div>
+      )}
 
-        {/* Property details — RESIDENTIAL */}
-        {!isCommercial && (
+      {step === 1 ? (
+        <form onSubmit={saveStep1} className="intake-form animate-in animate-in-delay-2">
           <div className="form-section">
-            <h3 className="form-section-title">מאפייני דירה</h3>
-            {/* Row 1: pricing + size — fields 4,5,9,10 from doc */}
-            <div className="form-row form-row-4">
+            <h3 className="form-section-title">סיווג ומחיר</h3>
+            <div className="form-row form-row-3">
+              <div className="form-group">
+                <label className="form-label">סוג נכס</label>
+                <div className="toggle-group">
+                  <button
+                    type="button"
+                    className={`toggle-btn ${!isCommercial ? 'active' : ''}`}
+                    onClick={() => setAssetClass('RESIDENTIAL')}
+                  >
+                    <Home size={14} /> מגורים
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${isCommercial ? 'active' : ''}`}
+                    onClick={() => setAssetClass('COMMERCIAL')}
+                  >
+                    <Briefcase size={14} /> מסחרי
+                  </button>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">מכירה / השכרה</label>
+                <div className="toggle-group">
+                  <button
+                    type="button"
+                    className={`toggle-btn ${form.category === 'SALE' ? 'active' : ''}`}
+                    onClick={() => update('category', 'SALE')}
+                  >
+                    מכירה
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${form.category === 'RENT' ? 'active' : ''}`}
+                    onClick={() => update('category', 'RENT')}
+                  >
+                    השכרה
+                  </button>
+                </div>
+              </div>
               <div className="form-group">
                 <label className="form-label">מחיר שיווק</label>
-                <input type="number" className="form-input" placeholder="₪" value={form.marketingPrice} onChange={(e) => update('marketingPrice', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">מחיר סגירה</label>
-                <input type="number" className="form-input" placeholder="₪" value={form.closingPrice} onChange={(e) => update('closingPrice', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">מספר חדרים</label>
-                <input type="number" step="0.5" className="form-input" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">גודל דירה (מ״ר)</label>
-                <input type="number" className="form-input" value={form.sqm} onChange={(e) => update('sqm', e.target.value)} />
+                <input
+                  type="number"
+                  className="form-input"
+                  placeholder="₪"
+                  value={form.marketingPrice}
+                  onChange={(e) => update('marketingPrice', e.target.value)}
+                  required
+                />
               </div>
             </div>
-            {/* Row 2: floor, building, balcony — fields 8,11,19 from doc */}
+          </div>
+
+          <div className="form-section">
+            <h3 className="form-section-title">מיקום ושטח</h3>
+            <div className="form-row form-row-3">
+              <div className="form-group">
+                <label className="form-label">רחוב ומספר</label>
+                <input
+                  className="form-input"
+                  placeholder="לדוגמה: הרצל 15"
+                  value={form.street}
+                  onChange={(e) => update('street', e.target.value)}
+                  list="np-street-list"
+                  required
+                />
+                <datalist id="np-street-list">
+                  {streetNames.map((s) => (<option key={s} value={s} />))}
+                </datalist>
+              </div>
+              <div className="form-group">
+                <label className="form-label">עיר</label>
+                <input
+                  className="form-input"
+                  placeholder="רמלה"
+                  value={form.city}
+                  onChange={(e) => update('city', e.target.value)}
+                  list="np-city-list"
+                  required
+                />
+                <datalist id="np-city-list">
+                  {cityNames.map((c) => (<option key={c} value={c} />))}
+                </datalist>
+              </div>
+              <div className="form-group">
+                <label className="form-label">שטח (מ״ר)</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={form.sqm}
+                  onChange={(e) => update('sqm', e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h3 className="form-section-title">
+              <UserIcon size={14} style={{ verticalAlign: 'middle', marginLeft: 6 }} />
+              בעל הנכס
+            </h3>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">שם מלא</label>
+                <input
+                  className="form-input"
+                  value={form.owner}
+                  onChange={(e) => update('owner', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">טלפון</label>
+                <input
+                  className="form-input"
+                  placeholder="050-1234567"
+                  value={form.ownerPhone}
+                  onChange={(e) => update('ownerPhone', e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
+              <Save size={18} />
+              {submitting ? 'שומר…' : 'שמור והמשך'}
+            </button>
+            <Link to="/properties" className="btn btn-secondary btn-lg">ביטול</Link>
+          </div>
+        </form>
+      ) : (
+        <form onSubmit={saveStep2} className="intake-form animate-in animate-in-delay-2">
+          <div className="form-section">
+            <h3 className="form-section-title">מאפיינים</h3>
             <div className="form-row form-row-4">
+              <div className="form-group">
+                <label className="form-label">סוג</label>
+                <select className="form-select" value={form.type} onChange={(e) => update('type', e.target.value)}>
+                  {isCommercial
+                    ? ['משרד', 'חנות', 'מחסן', 'מבנה תעשייתי', 'קליניקה', 'אולם'].map((t) => <option key={t}>{t}</option>)
+                    : ['דירה', 'פנטהאוז', 'קוטג׳', 'דו-משפחתי', 'מגרש', 'דירת גן'].map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              {!isCommercial && (
+                <div className="form-group">
+                  <label className="form-label">חדרים</label>
+                  <input type="number" step="0.5" className="form-input" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} />
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">קומה</label>
                 <input type="number" className="form-input" value={form.floor} onChange={(e) => update('floor', e.target.value)} />
@@ -335,21 +391,22 @@ export default function NewProperty() {
                 <label className="form-label">מתוך</label>
                 <input type="number" className="form-input" value={form.totalFloors} onChange={(e) => update('totalFloors', e.target.value)} />
               </div>
+            </div>
+            <div className="form-row form-row-4">
+              {!isCommercial && (
+                <div className="form-group">
+                  <label className="form-label">מרפסת (מ״ר)</label>
+                  <input type="number" className="form-input" value={form.balconySize} onChange={(e) => update('balconySize', e.target.value)} />
+                </div>
+              )}
               <div className="form-group">
-                <label className="form-label">גודל מרפסת (מ״ר)</label>
-                <input type="number" className="form-input" value={form.balconySize} onChange={(e) => update('balconySize', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">בניין בן (שנים)</label>
+                <label className="form-label">בניין בן</label>
                 <input type="number" className="form-input" value={form.buildingAge} onChange={(e) => update('buildingAge', e.target.value)} />
               </div>
-            </div>
-            {/* Row 3: condition, vacancy, sector, airDirections — fields 6,7,14,16 from doc */}
-            <div className="form-row form-row-4">
               <div className="form-group">
-                <label className="form-label">עברה שיפוץ?</label>
+                <label className="form-label">מצב</label>
                 <select className="form-select" value={form.renovated} onChange={(e) => update('renovated', e.target.value)}>
-                  <option value="">בחר...</option>
+                  <option value="">בחר…</option>
                   <option>חדש מקבלן</option>
                   <option>משופצת</option>
                   <option>משופצת חלקית</option>
@@ -358,30 +415,25 @@ export default function NewProperty() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">תאריך פינוי</label>
+                <label className="form-label">פינוי</label>
                 <input className="form-input" placeholder="מיידי / 3 חודשים" value={form.vacancyDate} onChange={(e) => update('vacancyDate', e.target.value)} />
               </div>
-              <div className="form-group">
-                <label className="form-label">מגזר</label>
-                <select className="form-select" value={form.sector} onChange={(e) => update('sector', e.target.value)}>
-                  <option>כללי</option>
-                  <option>דתי</option>
-                  <option>חרדי</option>
-                  <option>ערבי</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">כיווני אוויר</label>
-                <input className="form-input" placeholder="דרום-מערב" value={form.airDirections} onChange={(e) => update('airDirections', e.target.value)} />
-              </div>
             </div>
+            {isCommercial && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">מ״ר ארנונה</label>
+                  <input type="number" className="form-input" value={form.sqmArnona} onChange={(e) => update('sqmArnona', e.target.value)} />
+                </div>
+              </div>
+            )}
             <div className="checkbox-grid">
               {[
                 { key: 'elevator', label: 'מעלית' },
                 { key: 'parking', label: 'חניה' },
                 { key: 'storage', label: 'מחסן' },
                 { key: 'ac', label: 'מזגנים' },
-                { key: 'safeRoom', label: 'ממ״ד' },
+                ...(!isCommercial ? [{ key: 'safeRoom', label: 'ממ״ד' }] : []),
               ].map(({ key, label }) => (
                 <label key={key} className="checkbox-item">
                   <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />
@@ -391,164 +443,71 @@ export default function NewProperty() {
               ))}
             </div>
           </div>
-        )}
 
-        {/* Property details — COMMERCIAL */}
-        {/* Same fields from the intake doc, minus rooms/balcony/safeRoom, plus מ"ר ארנונה */}
-        {isCommercial && (
           <div className="form-section">
-            <h3 className="form-section-title">מאפייני נכס מסחרי</h3>
-            <div className="form-row form-row-4">
-              <div className="form-group">
-                <label className="form-label">מחיר שיווק</label>
-                <input type="number" className="form-input" placeholder="₪" value={form.marketingPrice} onChange={(e) => update('marketingPrice', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">גודל נכס (מ״ר)</label>
-                <input type="number" className="form-input" value={form.sqm} onChange={(e) => update('sqm', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">מ״ר ארנונה</label>
-                <input type="number" className="form-input" value={form.sqmArnona} onChange={(e) => update('sqmArnona', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">מחיר סגירה</label>
-                <input type="number" className="form-input" placeholder="₪" value={form.closingPrice} onChange={(e) => update('closingPrice', e.target.value)} />
-              </div>
-            </div>
-            <div className="form-row form-row-4">
-              <div className="form-group">
-                <label className="form-label">קומה</label>
-                <input type="number" className="form-input" value={form.floor} onChange={(e) => update('floor', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">מתוך קומות</label>
-                <input type="number" className="form-input" value={form.totalFloors} onChange={(e) => update('totalFloors', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">בניין בן (שנים)</label>
-                <input type="number" className="form-input" value={form.buildingAge} onChange={(e) => update('buildingAge', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">כיווני אוויר</label>
-                <input className="form-input" placeholder="מערב" value={form.airDirections} onChange={(e) => update('airDirections', e.target.value)} />
-              </div>
-            </div>
+            <h3 className="form-section-title">בלעדיות והערות</h3>
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">עבר שיפוץ?</label>
-                <select className="form-select" value={form.renovated} onChange={(e) => update('renovated', e.target.value)}>
-                  <option value="">בחר...</option>
-                  <option>חדש</option>
-                  <option>משופץ</option>
-                  <option>שמור</option>
-                  <option>סביר</option>
-                  <option>דרוש שיפוץ</option>
-                  <option>מעטפת בלבד</option>
-                </select>
+                <label className="form-label">תחילת בלעדיות</label>
+                <input type="date" className="form-input" value={form.exclusiveStart} onChange={(e) => update('exclusiveStart', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">תאריך פינוי</label>
-                <input className="form-input" placeholder="מיידי / תאריך" value={form.vacancyDate} onChange={(e) => update('vacancyDate', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">מגזר</label>
-                <select className="form-select" value={form.sector} onChange={(e) => update('sector', e.target.value)}>
-                  <option>כללי</option>
-                  <option>דתי</option>
-                  <option>חרדי</option>
-                  <option>ערבי</option>
-                </select>
+                <label className="form-label">סיום בלעדיות</label>
+                <input type="date" className="form-input" value={form.exclusiveEnd} onChange={(e) => update('exclusiveEnd', e.target.value)} />
               </div>
             </div>
-            <div className="checkbox-grid">
-              {[
-                { key: 'elevator', label: 'מעלית' },
-                { key: 'parking', label: 'חניה' },
-                { key: 'storage', label: 'מחסן' },
-                { key: 'ac', label: 'מזגנים' },
-              ].map(({ key, label }) => (
-                <label key={key} className="checkbox-item">
-                  <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />
-                  <span className="checkbox-custom" />
-                  {label}
-                </label>
-              ))}
+            <div className="form-group">
+              <textarea className="form-textarea" rows={3} placeholder="הערות נוספות על הנכס..." value={form.notes} onChange={(e) => update('notes', e.target.value)} />
             </div>
           </div>
-        )}
 
-        {/* Notes */}
-        <div className="form-section">
-          <h3 className="form-section-title">הערות</h3>
-          <div className="form-group">
-            <textarea className="form-textarea" placeholder="הערות נוספות על הנכס..." rows={4} value={form.notes} onChange={(e) => update('notes', e.target.value)} />
-          </div>
-        </div>
-
-        {/* Images */}
-        <div className="form-section">
-          <h3 className="form-section-title">תמונות</h3>
-          <div
-            className={`upload-area ${dragOver ? 'is-over' : ''}`}
-            onClick={() => fileInput.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDropFiles}
-          >
-            <Upload size={32} />
-            <p>גרור תמונות לכאן או לחץ להעלאה</p>
-            <span>JPG, PNG עד 10MB · ניתן לבחור מספר קבצים</span>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/*"
-              multiple
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                addFiles(e.target.files);
-                e.target.value = '';
-              }}
-            />
-          </div>
-          {photoFiles.length > 0 && (
-            <div className="np-photo-strip">
-              {photoFiles.map((p, i) => (
-                <div key={p.url} className={`np-photo ${i === 0 ? 'is-cover' : ''}`}>
-                  <img src={p.url} alt={`תמונה ${i + 1}`} />
-                  <button
-                    type="button"
-                    className="np-photo-remove"
-                    onClick={(e) => { e.stopPropagation(); removePhoto(i); }}
-                    title="הסר"
-                  >
-                    <X size={12} />
-                  </button>
-                  {i === 0 && <span className="np-photo-cover">שער</span>}
-                </div>
-              ))}
+          <div className="form-section">
+            <h3 className="form-section-title">תמונות</h3>
+            <div
+              className={`upload-area ${dragOver ? 'is-over' : ''}`}
+              onClick={() => fileInput.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); }}
+            >
+              <Upload size={28} />
+              <p>גרור תמונות או לחץ להעלאה</p>
+              <span>אפשר להעלות מספר קבצים</span>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
+              />
             </div>
-          )}
-        </div>
-
-        {error && (
-          <div className="np-error">
-            <AlertCircle size={14} />
-            {error}
+            {photoFiles.length > 0 && (
+              <div className="np-photo-strip">
+                {photoFiles.map((p, i) => (
+                  <div key={p.url} className={`np-photo ${i === 0 ? 'is-cover' : ''}`}>
+                    <img src={p.url} alt={`תמונה ${i + 1}`} />
+                    <button type="button" className="np-photo-remove" onClick={() => removePhoto(i)}>
+                      <X size={12} />
+                    </button>
+                    {i === 0 && <span className="np-photo-cover">שער</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Submit */}
-        <div className="form-actions">
-          <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
-            <Save size={18} />
-            {submitting ? 'שומר…' : 'שמור נכס'}
-          </button>
-          <Link to="/properties" className="btn btn-secondary btn-lg">
-            ביטול
-          </Link>
-        </div>
-      </form>
+          <div className="form-actions">
+            <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
+              <Save size={18} />
+              {submitting ? 'שומר…' : 'שמור וסיים'}
+            </button>
+            <button type="button" className="btn btn-ghost btn-lg" onClick={skipStep2}>
+              דלג להמשך מאוחר יותר
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

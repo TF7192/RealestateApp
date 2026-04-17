@@ -13,8 +13,10 @@ import {
   Moon,
   Share2,
   Check,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import './Layout.css';
@@ -33,10 +35,20 @@ const quickActions = [
 
 export default function Layout({ onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('estia-sidebar-collapsed') === '1'; }
+    catch { return false; }
+  });
   const [copiedShare, setCopiedShare] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
+
+  useEffect(() => {
+    try { localStorage.setItem('estia-sidebar-collapsed', collapsed ? '1' : '0'); }
+    catch { /* ignore */ }
+    document.documentElement.dataset.sidebar = collapsed ? 'collapsed' : 'expanded';
+  }, [collapsed]);
 
   const isCustomerPage = location.pathname.startsWith('/p/');
   if (isCustomerPage) return <Outlet />;
@@ -70,7 +82,7 @@ export default function Layout({ onLogout }) {
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
           <Link to="/" className="logo">
             <div className="logo-mark">
@@ -87,6 +99,13 @@ export default function Layout({ onLogout }) {
           >
             <X size={20} />
           </button>
+          <button
+            className="sidebar-collapse btn-ghost"
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? 'הרחב' : 'כווץ'}
+          >
+            {collapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
+          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -97,6 +116,7 @@ export default function Layout({ onLogout }) {
                 key={item.path}
                 to={item.path}
                 end={item.path === '/'}
+                data-label={item.label}
                 className={({ isActive }) =>
                   `nav-item ${isActive ? 'active' : ''}`
                 }

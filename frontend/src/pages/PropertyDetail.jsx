@@ -34,6 +34,7 @@ import { useAuth } from '../lib/auth';
 import MarketingActionDialog from '../components/MarketingActionDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PropertyPhotoManager from '../components/PropertyPhotoManager';
+import WhatsAppSheet from '../components/WhatsAppSheet';
 import { useToast, optimisticUpdate } from '../lib/toast';
 import { relativeTime, absoluteTime } from '../lib/time';
 import './PropertyDetail.css';
@@ -139,6 +140,8 @@ export default function PropertyDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [managingPhotos, setManagingPhotos] = useState(false);
+  const [waShare, setWaShare] = useState(null);
+  const [leadList, setLeadList] = useState([]);
 
   const load = async () => {
     try {
@@ -155,6 +158,10 @@ export default function PropertyDetail() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    api.listLeads().then((r) => setLeadList(r.items || [])).catch(() => {});
+  }, []);
 
   if (loading) {
     return (
@@ -205,7 +212,20 @@ export default function PropertyDetail() {
       phone: user?.phone,
       bio: user?.agentProfile?.bio,
     });
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    const scored = leadList.map((l) => {
+      let score = 0;
+      if (l.city && l.city === property.city) score += 3;
+      if (l.lookingFor === 'RENT' && property.category === 'RENT') score += 2;
+      if (l.lookingFor === 'BUY' && property.category === 'SALE') score += 2;
+      if (property.assetClass === 'COMMERCIAL' && l.interestType === 'COMMERCIAL') score += 2;
+      if (property.assetClass === 'RESIDENTIAL' && l.interestType === 'PRIVATE') score += 1;
+      return { l, score };
+    }).sort((a, b) => b.score - a.score);
+    const recipients = scored.map(({ l, score }) => ({
+      id: l.id, name: l.name, phone: l.phone,
+      sub: score >= 3 ? 'התאמה גבוהה' : score > 0 ? 'התאמה חלקית' : (l.city || ''),
+    }));
+    setWaShare({ text, recipients });
   };
 
   const handleDelete = async () => {
@@ -524,6 +544,16 @@ export default function PropertyDetail() {
           initial={property.imageList || []}
           onClose={() => setManagingPhotos(false)}
           onChange={async () => { await load(); }}
+        />
+      )}
+
+      {waShare && (
+        <WhatsAppSheet
+          title={`שליחת ${property.street}, ${property.city}`}
+          subtitle="ערוך את ההודעה ובחר למי לשלוח"
+          message={waShare.text}
+          recipients={waShare.recipients}
+          onClose={() => setWaShare(null)}
         />
       )}
     </div>

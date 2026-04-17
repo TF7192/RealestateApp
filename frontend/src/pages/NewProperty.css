@@ -1,0 +1,83 @@
+/* Wizard stepper header for NewProperty */
+.np-wizard {
+  max-width: 880px;
+}
+
+.np-steps {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.np-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.np-step.active { color: var(--text-primary); }
+.np-step.done { color: var(--success); }
+
+.np-step-no {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--bg-elevated);
+}
+
+.np-step.active .np-step-no {
+  background: var(--gold);
+  color: var(--bg-primary);
+  border-color: var(--gold);
+}
+
+.np-step.done .np-step-no {
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.np-step > div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.np-step strong {
+  font-family: var(--font-display);
+  font-size: 14px;
+}
+
+.np-step span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.np-step-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  min-width: 30px;
+}
+
+@media (max-width: 640px) {
+  .np-steps { flex-wrap: wrap; }
+  .np-step-line { display: none; }
+}

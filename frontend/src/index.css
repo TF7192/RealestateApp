@@ -98,6 +98,21 @@ html {
   direction: rtl;
 }
 
+/* Unified focus ring — 2px gold, visible on every interactive element */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}
+
 body {
   font-family: var(--font-body);
   background: var(--bg-primary);
@@ -142,6 +157,19 @@ body {
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+/* Skeleton placeholders */
+.skel {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 0%,
+    var(--bg-card-hover) 50%,
+    var(--bg-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 6px;
 }
 
 @keyframes pulse-gold {

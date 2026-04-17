@@ -311,11 +311,40 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  text-decoration: none;
   color: inherit;
   transition: all 0.25s;
   display: flex;
   flex-direction: column;
+}
+
+.ap-card-inner {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  flex: 1;
+}
+
+.ap-interested-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: rgba(37, 211, 102, 0.08);
+  color: #0a7d3f;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ap-interested-btn:hover {
+  background: rgba(37, 211, 102, 0.18);
+  color: #0a6a35;
 }
 
 .ap-card:hover {

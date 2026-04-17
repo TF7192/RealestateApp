@@ -98,6 +98,134 @@
   .deal-form-grid { grid-template-columns: 1fr; }
 }
 
+/* Kanban */
+.deals-kanban {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  min-height: 420px;
+}
+
+.dk-col {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+
+.dk-col.dk-fell_through { opacity: 0.75; }
+
+.dk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.dk-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.dk-count {
+  min-width: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--gold-glow);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dk-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.dk-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.15s;
+}
+
+.dk-card:hover {
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.dk-card h5 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.dk-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.dk-prices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.dk-price-main {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.dk-price-offer {
+  font-size: 11px;
+  color: var(--gold);
+}
+
+.dk-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.dk-actions .btn {
+  flex: 1;
+  justify-content: center;
+  font-size: 11px;
+  padding: 5px 8px;
+}
+
+.dk-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .deals-kanban { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .deals-kanban { grid-template-columns: 1fr; }
+}
+
 .deal-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -153,17 +281,29 @@
 }
 
 .dp-value {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary); /* neutral — "marketing" price */
 }
 
-.dp-value.highlight {
+/* "Offer" uses gold (the active negotiation number) */
+.deal-price-item:nth-child(2) .dp-value {
   color: var(--gold);
+  font-weight: 600;
+}
+
+/* Closed price — green, bold, the one the agent eyes */
+.dp-value.highlight {
+  color: var(--success);
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 15px;
 }
 
 .dp-value.commission {
   color: var(--success);
+  font-weight: 700;
 }
 
 .deal-agents {

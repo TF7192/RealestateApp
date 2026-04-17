@@ -9,6 +9,7 @@ import {
   Handshake,
 } from 'lucide-react';
 import api from '../lib/api';
+import { relativeTime, absoluteTime } from '../lib/time';
 import './Deals.css';
 
 const STATUS_OPTIONS = [
@@ -162,6 +163,12 @@ export default function Deals() {
 
       {loading ? (
         <div className="deals-loading"><div className="spinner-gold" /></div>
+      ) : tab === 'active' ? (
+        <DealsKanban
+          deals={filtered.filter((d) => d.status !== 'SIGNED')}
+          onEdit={(d) => setEditing({ deal: d, mode: 'edit' })}
+          onSign={(d) => setEditing({ deal: d, mode: 'sign' })}
+        />
       ) : (
         <div className="deals-cards animate-in animate-in-delay-2">
           {filtered.map((deal) => (
@@ -182,8 +189,8 @@ export default function Deals() {
                     </span>
                   </div>
                 </div>
-                <span className="deal-date">
-                  {new Date(deal.updateDate).toLocaleDateString('he-IL')}
+                <span className="deal-date" title={absoluteTime(deal.updateDate)}>
+                  {relativeTime(deal.updateDate)}
                 </span>
               </div>
 
@@ -262,6 +269,63 @@ export default function Deals() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function DealsKanban({ deals, onEdit, onSign }) {
+  const columns = [
+    { key: 'NEGOTIATING', label: 'משא ומתן' },
+    { key: 'WAITING_MORTGAGE', label: 'אישור משכנתא' },
+    { key: 'PENDING_CONTRACT', label: 'לקראת חתימה' },
+    { key: 'FELL_THROUGH', label: 'לא יצאו לפועל' },
+  ];
+
+  return (
+    <div className="deals-kanban animate-in animate-in-delay-2">
+      {columns.map((col) => {
+        const colDeals = deals.filter((d) => d.status === col.key);
+        return (
+          <div key={col.key} className={`dk-col dk-${col.key.toLowerCase()}`}>
+            <header className="dk-head">
+              <span className="dk-title">{col.label}</span>
+              <span className="dk-count">{colDeals.length}</span>
+            </header>
+            <div className="dk-body">
+              {colDeals.map((d) => (
+                <div key={d.id} className="dk-card">
+                  <h5>{d.propertyStreet}, {d.city}</h5>
+                  <div className="dk-chips">
+                    <span className={`chip chip-sm ${d.assetClass === 'COMMERCIAL' ? 'chip-warning' : 'chip-success'}`}>
+                      {d.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}
+                    </span>
+                    <span className={`chip chip-sm ${d.category === 'SALE' ? 'chip-gold' : 'chip-info'}`}>
+                      {d.category === 'SALE' ? 'מכירה' : 'השכרה'}
+                    </span>
+                  </div>
+                  <div className="dk-prices">
+                    <span className="dk-price-main">{formatPrice(d.marketingPrice)}</span>
+                    {d.offer != null && (
+                      <span className="dk-price-offer">הצעה: {formatPrice(d.offer)}</span>
+                    )}
+                  </div>
+                  <div className="dk-actions">
+                    <button className="btn btn-ghost btn-sm" onClick={() => onEdit(d)}>
+                      עריכה
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={() => onSign(d)}>
+                      סמן כנחתם
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {colDeals.length === 0 && (
+                <div className="dk-empty">אין עסקאות</div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

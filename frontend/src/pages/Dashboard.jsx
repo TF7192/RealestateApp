@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { properties, leads, deals, formatPrice } from '../data/mockData';
 import { useAuth } from '../lib/auth';
+import ShareCatalogDialog from '../components/ShareCatalogDialog';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -247,70 +248,47 @@ export default function Dashboard() {
 
 function WelcomeSection() {
   const { user } = useAuth();
-  const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const displayName = user?.displayName || 'סוכן';
   const catalogUrl = user?.id
     ? `${window.location.origin}/a/${user.id}`
     : null;
 
-  const handleShareWhatsApp = () => {
-    if (!catalogUrl) return;
-    const lines = [
-      `שלום, זה ${displayName}.`,
-      '',
-      'ריכזתי עבורך את כל הנכסים שלי במקום אחד — אפשר לחפש לפי עיר, מחיר וחדרים:',
-      catalogUrl,
-      '',
-      'אשמח לעמוד לרשותך לתיאום ביקור או לכל שאלה.',
-    ];
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`,
-      '_blank'
-    );
-  };
-
-  const handleCopy = () => {
-    if (!catalogUrl) return;
-    navigator.clipboard.writeText(catalogUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
   return (
-    <div className="welcome-section animate-in">
-      <div className="welcome-content">
-        <h2>שלום, {displayName.split(' ')[0]}</h2>
-        <p>סיכום פעילות יומי</p>
+    <>
+      <div className="welcome-section animate-in">
+        <div className="welcome-content">
+          <h2>שלום, {displayName.split(' ')[0]}</h2>
+          <p>סיכום פעילות יומי</p>
+        </div>
+        <div className="welcome-actions">
+          <button
+            className="btn btn-primary btn-lg"
+            onClick={() => setShareOpen(true)}
+            disabled={!catalogUrl}
+            title="תצוגה מקדימה ושיתוף"
+          >
+            <MessageCircle size={18} />
+            שתף את הנכסים שלי
+          </button>
+          <Link to="/properties/new" className="btn btn-ghost btn-lg">
+            <Plus size={18} />
+            קליטת נכס
+          </Link>
+          <Link to="/customers/new" className="btn btn-ghost btn-lg">
+            <UserPlus size={18} />
+            ליד חדש
+          </Link>
+        </div>
       </div>
-      <div className="welcome-actions">
-        <button
-          className="btn btn-primary btn-lg"
-          onClick={handleShareWhatsApp}
-          disabled={!catalogUrl}
-          title="שתף את הקטלוג שלך בוואטסאפ"
-        >
-          <MessageCircle size={18} />
-          שתף את הנכסים שלי
-        </button>
-        <button
-          className="btn btn-secondary btn-lg"
-          onClick={handleCopy}
-          disabled={!catalogUrl}
-          title={catalogUrl}
-        >
-          {copied ? <Check size={18} /> : <Copy size={18} />}
-          {copied ? 'הקישור הועתק' : 'העתק קישור קטלוג'}
-        </button>
-        <Link to="/properties/new" className="btn btn-ghost btn-lg">
-          <Plus size={18} />
-          קליטת נכס
-        </Link>
-        <Link to="/customers/new" className="btn btn-ghost btn-lg">
-          <UserPlus size={18} />
-          ליד חדש
-        </Link>
-      </div>
-    </div>
+      {shareOpen && catalogUrl && (
+        <ShareCatalogDialog
+          catalogUrl={catalogUrl}
+          agentName={displayName}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
+    </>
   );
 }
