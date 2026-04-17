@@ -753,13 +753,65 @@
 @media (max-width: 640px) {
   .specs-grid {
     grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .spec-item {
+    padding: 10px 12px;
   }
 
   .detail-title {
     font-size: 22px;
+    line-height: 1.25;
   }
 
   .detail-price {
-    font-size: 24px;
+    font-size: 26px;
+  }
+
+  .gallery-main {
+    aspect-ratio: 4 / 3;
+    max-height: none;
+  }
+
+  .detail-top-actions {
+    gap: 8px;
+  }
+
+  .detail-top-manage {
+    gap: 6px;
+  }
+
+  .info-grid {
+    padding: 14px;
+  }
+
+  .detail-share-actions {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+  }
+
+  .detail-share-actions .btn {
+    flex: 1;
+    min-width: 120px;
+    justify-content: center;
+  }
+
+  .gallery-manage-btn {
+    top: 10px;
+    left: 10px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .gallery-thumbs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .gallery-thumb {
+    flex: 0 0 72px;
   }
 }

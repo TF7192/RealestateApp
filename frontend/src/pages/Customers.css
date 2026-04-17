@@ -383,8 +383,41 @@
 
 @media (max-width: 540px) {
   .hide-sm { display: none; }
-  .customers-main-tabs { grid-template-columns: 1fr; }
-  .customers-grid { grid-template-columns: 1fr; }
+  .customers-main-tabs { grid-template-columns: 1fr; gap: 8px; }
+  .cmt-tab { padding: 14px 16px; }
+  .customers-grid { grid-template-columns: 1fr; gap: 12px; }
+
+  /* Tighter filter strip + horizontal scroll for filter-tabs */
+  .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .filter-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .customer-card {
+    min-height: auto;
+  }
+
+  .customer-card-body {
+    padding: 10px 16px;
+  }
+
+  .customer-card-header {
+    padding: 12px 16px;
+  }
+
+  .customer-card-footer {
+    padding: 10px 12px;
+  }
+
+  /* Smaller chips on tiny screens */
+  .customer-actions .btn { font-size: 11px; }
 }
 
 .customers-empty {

@@ -7,8 +7,14 @@
   align-items: flex-start;
   justify-content: center;
   padding: 80px 20px 20px;
+  padding-top: calc(60px + env(safe-area-inset-top));
   z-index: 2500;
   animation: cmdp-fade 0.18s ease-out;
+}
+
+@media (max-width: 640px) {
+  .cmdp-backdrop { padding: calc(16px + env(safe-area-inset-top)) 12px 12px; }
+  .cmdp-modal { max-height: 88vh; }
 }
 
 @keyframes cmdp-fade { from { opacity: 0; } to { opacity: 1; } }

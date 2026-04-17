@@ -222,8 +222,31 @@
   .deals-kanban { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 560px) {
-  .deals-kanban { grid-template-columns: 1fr; }
+@media (max-width: 720px) {
+  /* Horizontal swipe kanban on phones — each column is a near-full-width panel */
+  .deals-kanban {
+    display: flex;
+    grid-template-columns: unset;
+    gap: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 6px;
+  }
+
+  .dk-col {
+    flex: 0 0 82%;
+    scroll-snap-align: start;
+    max-height: none;
+  }
+
+  .dk-body {
+    max-height: 60vh;
+  }
+
+  .deals-totals {
+    width: 100%;
+  }
 }
 
 .deal-card {

@@ -99,14 +99,16 @@ export default function Layout({ onLogout }) {
           >
             <X size={20} />
           </button>
-          <button
-            className="sidebar-collapse btn-ghost"
-            onClick={() => setCollapsed((c) => !c)}
-            title={collapsed ? 'הרחב' : 'כווץ'}
-          >
-            {collapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
-          </button>
         </div>
+
+        <button
+          className="sidebar-collapse-rail"
+          onClick={() => setCollapsed((c) => !c)}
+          title={collapsed ? 'הרחב סרגל' : 'כווץ סרגל'}
+          aria-label={collapsed ? 'הרחב סרגל' : 'כווץ סרגל'}
+        >
+          {collapsed ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
+        </button>
 
         <nav className="sidebar-nav">
           <div className="nav-section">

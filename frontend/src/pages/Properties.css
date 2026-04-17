@@ -448,6 +448,33 @@
   border-color: var(--danger);
 }
 
+/* Mobile tweaks */
+@media (max-width: 720px) {
+  .properties-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .filters-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .property-card-link .property-image {
+    aspect-ratio: 16 / 9;
+  }
+
+  .property-del-btn {
+    opacity: 1; /* always visible on mobile */
+  }
+
+  /* Expand advanced-filter panel to full width on phone */
+  .agent-filters-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+}
+
 /* Tappable spec chip on property card */
 .spec-chip {
   display: inline-flex;
