@@ -1,6 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { z } from 'zod';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import crypto from 'node:crypto';
 import { requireUser } from '../middleware/auth.js';
 
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
@@ -48,6 +51,32 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
       include: { agentProfile: true, customerProfile: true },
     });
     return { user: user && toPublic(user) };
+  });
+
+  // Avatar upload — stores image under /uploads/avatars/{userId}/{uuid}.{ext}
+  // and updates the user.avatarUrl. Public read path is /uploads/avatars/...
+  app.post('/avatar', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const uid = requireUser(req).id;
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: { message: 'No file' } });
+    if (!file.mimetype.startsWith('image/')) {
+      return reply.code(400).send({ error: { message: 'Only image files allowed' } });
+    }
+    const uploadsDir = path.resolve(process.env.UPLOADS_DIR || './uploads');
+    const subDir = path.join(uploadsDir, 'avatars', uid);
+    await fs.mkdir(subDir, { recursive: true });
+    const ext = path.extname(file.filename) || '.png';
+    const name = `${crypto.randomUUID()}${ext}`;
+    const filePath = path.join(subDir, name);
+    await fs.writeFile(filePath, await file.toBuffer());
+    const rel = path.relative(uploadsDir, filePath).replaceAll(path.sep, '/');
+    const url = `/uploads/${rel}`;
+    await prisma.user.update({ where: { id: uid }, data: { avatarUrl: url } });
+    const user = await prisma.user.findUnique({
+      where: { id: uid },
+      include: { agentProfile: true, customerProfile: true },
+    });
+    return { user: user && toPublic(user), url };
   });
 };
 

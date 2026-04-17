@@ -17,6 +17,8 @@ import {
   Trash2,
   HelpCircle,
   Sparkles,
+  LayoutGrid,
+  List as ListIcon,
 } from 'lucide-react';
 import api from '../lib/api';
 import AgreementDialog from '../components/AgreementDialog';
@@ -66,7 +68,16 @@ export default function Customers() {
   const [editDialog, setEditDialog] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [view, setView] = useState(() => {
+    try { return localStorage.getItem('estia-customers-view') || 'cards'; }
+    catch { return 'cards'; }
+  });
   const cardRefs = useRef({});
+
+  const changeView = (v) => {
+    setView(v);
+    try { localStorage.setItem('estia-customers-view', v); } catch { /* ignore */ }
+  };
 
   const loadLeads = async () => {
     const r = await api.listLeads();
@@ -158,6 +169,24 @@ export default function Customers() {
           <p>{filtered.length} מתוך {leads.length} לקוחות</p>
         </div>
         <div className="page-header-actions">
+          <div className="view-toggle" role="group" aria-label="תצוגה">
+            <button
+              className={`view-toggle-btn ${view === 'cards' ? 'active' : ''}`}
+              onClick={() => changeView('cards')}
+              title="תצוגת כרטיסים"
+            >
+              <LayoutGrid size={14} />
+              כרטיסים
+            </button>
+            <button
+              className={`view-toggle-btn ${view === 'list' ? 'active' : ''}`}
+              onClick={() => changeView('list')}
+              title="תצוגת רשימה"
+            >
+              <ListIcon size={14} />
+              רשימה
+            </button>
+          </div>
           <Link to="/customers/new" className="btn btn-primary">
             <UserPlus size={18} />
             ליד חדש
@@ -254,6 +283,18 @@ export default function Customers() {
         )}
       </div>
 
+      {view === 'list' ? (
+        <CustomerList
+          leads={filtered}
+          highlightId={highlightId}
+          cardRefs={cardRefs}
+          onStatusChange={handleStatusChange}
+          onEdit={setEditDialog}
+          onDelete={setDeleteTarget}
+          onAgreement={openAgreementDialog}
+          onWhatsApp={handleWhatsApp}
+        />
+      ) : (
       <div className="customers-grid animate-in animate-in-delay-3">
         {filtered.map((lead) => {
           const active = isActiveClient(lead);
@@ -405,6 +446,7 @@ export default function Customers() {
           </div>
         )}
       </div>
+      )}
 
       {agreementDialog && (
         <AgreementDialog
@@ -434,6 +476,108 @@ export default function Customers() {
           onClose={() => setDeleteTarget(null)}
           busy={deleting}
         />
+      )}
+    </div>
+  );
+}
+
+// Compact row-based list view. One lead per row, all essential fields visible,
+// quick actions on the left edge. Optimized for scanning many leads at once.
+function CustomerList({
+  leads,
+  highlightId,
+  cardRefs,
+  onStatusChange,
+  onEdit,
+  onDelete,
+  onAgreement,
+  onWhatsApp,
+}) {
+  return (
+    <div className="customer-list animate-in animate-in-delay-3">
+      <div className="customer-list-head">
+        <span>שם</span>
+        <span>סטטוס</span>
+        <span>סוג</span>
+        <span>עיר</span>
+        <span>חדרים</span>
+        <span>תקציב</span>
+        <span>הסכם תיווך</span>
+        <span>קשר אחרון</span>
+        <span className="cl-actions-head">פעולות</span>
+      </div>
+      {leads.map((lead) => {
+        const active = isActiveClient(lead);
+        const hasSignedFile = (lead.agreements || []).some((a) => a.status === 'SIGNED' && a.fileId);
+        return (
+          <div
+            key={lead.id}
+            ref={(el) => { if (el) cardRefs.current[lead.id] = el; }}
+            className={`customer-list-row ${highlightId === lead.id ? 'highlight' : ''} ${active ? 'is-active' : ''}`}
+          >
+            <span className="cl-name">
+              <span className="cl-avatar">{lead.name.charAt(0)}</span>
+              <span className="cl-name-text">
+                <strong>{lead.name}</strong>
+                <small>{lead.source || '—'}</small>
+              </span>
+            </span>
+            <span>
+              <StatusPicker lead={lead} onChange={onStatusChange} />
+            </span>
+            <span className="cl-type">
+              <span className="cl-chip">
+                {lead.interestType === 'COMMERCIAL' ? 'מסחרי' : 'פרטי'}
+              </span>
+              <span className={`cl-chip ${lead.lookingFor === 'RENT' ? 'rent' : 'buy'}`}>
+                {lead.lookingFor === 'RENT' ? 'שכירות' : 'קנייה'}
+              </span>
+            </span>
+            <span className="cl-muted">{lead.city || '—'}</span>
+            <span className="cl-muted">{lead.rooms || '—'}</span>
+            <span className="cl-muted">{lead.priceRangeLabel || '—'}</span>
+            <span className="cl-agreement">
+              {lead.brokerageSignedAt ? (
+                <>
+                  <span>{new Date(lead.brokerageSignedAt).toLocaleDateString('he-IL')}</span>
+                  {lead.brokerageExpiresAt && (
+                    <small>→ {new Date(lead.brokerageExpiresAt).toLocaleDateString('he-IL')}</small>
+                  )}
+                  {hasSignedFile && <span className="cl-signed-dot" title="קובץ חתום" />}
+                </>
+              ) : (
+                <span className="cl-muted">—</span>
+              )}
+            </span>
+            <span className="cl-muted">
+              {lead.lastContact
+                ? new Date(lead.lastContact).toLocaleDateString('he-IL')
+                : '—'}
+            </span>
+            <span className="cl-actions">
+              <a href={`tel:${lead.phone}`} className="cl-btn" title={lead.phone}>
+                <Phone size={13} />
+              </a>
+              <button className="cl-btn" title="וואטסאפ" onClick={() => onWhatsApp(lead)}>
+                <MessageCircle size={13} />
+              </button>
+              <button className="cl-btn" title="הסכם תיווך" onClick={() => onAgreement(lead)}>
+                <FileSignature size={13} />
+              </button>
+              <button className="cl-btn" title="עריכה" onClick={() => onEdit(lead)}>
+                <Edit3 size={13} />
+              </button>
+              <button className="cl-btn danger" title="מחיקה" onClick={() => onDelete(lead)}>
+                <Trash2 size={13} />
+              </button>
+            </span>
+          </div>
+        );
+      })}
+      {leads.length === 0 && (
+        <div className="customers-empty">
+          <p>אין לקוחות בסינון הנוכחי</p>
+        </div>
       )}
     </div>
   );

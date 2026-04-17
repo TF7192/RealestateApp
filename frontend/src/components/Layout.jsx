@@ -143,17 +143,21 @@ export default function Layout({ onLogout }) {
             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
             <span>{theme === 'light' ? 'מצב כהה' : 'מצב בהיר'}</span>
           </button>
-          <div className="agent-card">
-            <div className="agent-avatar">
-              {(user?.displayName || 'E').charAt(0)}
-            </div>
+          <NavLink to="/profile" className="agent-card agent-card-link" onClick={() => setSidebarOpen(false)}>
+            {user?.avatarUrl ? (
+              <img className="agent-avatar" src={user.avatarUrl} alt={user.displayName || 'סוכן'} />
+            ) : (
+              <div className="agent-avatar">
+                {(user?.displayName || 'E').charAt(0)}
+              </div>
+            )}
             <div className="agent-info">
               <span className="agent-name">{user?.displayName || 'סוכן'}</span>
               <span className="agent-agency">
-                {user?.agentProfile?.agency || 'Estia'}
+                {user?.agentProfile?.agency || 'ערוך את הפרופיל שלך'}
               </span>
             </div>
-          </div>
+          </NavLink>
           <button className="sidebar-logout" onClick={onLogout}>
             <LogOut size={16} />
             יציאה

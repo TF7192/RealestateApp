@@ -141,6 +141,18 @@
   border-radius: var(--radius-sm);
   background: var(--bg-card);
   border: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s;
+}
+
+.agent-card-link:hover {
+  border-color: var(--gold-border);
+  background: var(--gold-glow);
+}
+
+img.agent-avatar {
+  object-fit: cover;
 }
 
 /* Theme toggle in sidebar footer */

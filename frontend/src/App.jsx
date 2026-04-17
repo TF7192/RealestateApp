@@ -11,6 +11,7 @@ import Deals from './pages/Deals';
 import Login from './pages/Login';
 import AgentPortal from './pages/AgentPortal';
 import CustomerPropertyView from './pages/CustomerPropertyView';
+import Profile from './pages/Profile';
 import { AuthProvider, useAuth } from './lib/auth';
 
 // Mobile-optimized shell
@@ -110,6 +111,7 @@ function DesktopAppRoutes({ user, logout }) {
         <Route path="/properties/:id" element={<PropertyDetail />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/customers/new" element={<NewLead />} />
+        <Route path="/profile" element={<Profile />} />
         {/* Legacy URLs — redirect */}
         <Route path="/leads" element={<Navigate to="/customers" replace />} />
         <Route path="/leads/new" element={<Navigate to="/customers/new" replace />} />

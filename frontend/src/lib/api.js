@@ -42,6 +42,11 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/me'),
   updateMe: (body) => request('/me', { method: 'PATCH', body }),
+  uploadAvatar: (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return request('/me/avatar', { method: 'POST', body: fd });
+  },
 
   // Resources
   listProperties: (params = {}) => {
