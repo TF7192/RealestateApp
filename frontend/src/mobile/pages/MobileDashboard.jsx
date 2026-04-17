@@ -68,7 +68,7 @@ export default function MobileDashboard() {
         <>
           <div className="m-section-header" style={{ padding: 0, marginInline: 0 }}>
             <h2 className="m-section-title">שיחות פתוחות</h2>
-            <Link className="m-section-link" to="/leads?filter=hot">
+            <Link className="m-section-link" to="/customers?filter=hot">
               הצג הכל <ChevronLeft size={14} style={{ verticalAlign: 'middle' }} />
             </Link>
           </div>

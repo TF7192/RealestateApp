@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   MapPin,
@@ -16,16 +16,57 @@ import {
   ChevronRight,
   ArrowRight,
   Share2,
+  ExternalLink,
 } from 'lucide-react';
-import { properties, formatPrice, agentProfile } from '../data/mockData';
+import api from '../lib/api';
 import './CustomerPropertyView.css';
+
+function formatPrice(price) {
+  if (!price) return '—';
+  if (price < 10000) return `₪${price.toLocaleString('he-IL')}/חודש`;
+  return `₪${price.toLocaleString('he-IL')}`;
+}
 
 export default function CustomerPropertyView() {
   const { id } = useParams();
-  const property = properties.find((p) => p.id === Number(id));
+  const [property, setProperty] = useState(null);
+  const [agent, setAgent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
 
-  if (!property) {
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await api.getProperty(id);
+        if (cancelled) return;
+        setProperty(res.property);
+        if (res.property?.agentId) {
+          try {
+            const a = await api.getAgentPublic(res.property.agentId);
+            if (!cancelled) setAgent(a.agent);
+          } catch { /* ignore — fall back to default branding */ }
+        }
+      } catch (e) {
+        if (!cancelled) setError(e.message || 'שגיאה');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="cpv-loading">
+        <div className="ap-loading-spinner" />
+      </div>
+    );
+  }
+
+  if (error || !property) {
     return (
       <div className="cpv-not-found">
         <Building2 size={56} />
@@ -35,17 +76,23 @@ export default function CustomerPropertyView() {
     );
   }
 
-  const nextImage = () =>
-    setCurrentImage((c) => (c + 1) % property.images.length);
-  const prevImage = () =>
-    setCurrentImage(
-      (c) => (c - 1 + property.images.length) % property.images.length
-    );
+  const images = property.images?.length ? property.images : [
+    'https://via.placeholder.com/1200x675?text=Estia',
+  ];
+
+  const nextImage = () => setCurrentImage((c) => (c + 1) % images.length);
+  const prevImage = () => setCurrentImage((c) => (c - 1 + images.length) % images.length);
+
+  const agentName = agent?.displayName || 'סוכן';
+  const agentPhone = agent?.phone || '';
+  const agentPhoneDigits = agentPhone.replace(/[^0-9]/g, '');
+  const agentBackLink = agent?.id ? `/a/${agent.id}` : null;
 
   const handleWhatsApp = () => {
     const text = `שלום, אני מתעניין/ת בנכס ב${property.street}, ${property.city}. אשמח לפרטים נוספים.`;
+    const target = agentPhoneDigits || '';
     window.open(
-      `https://wa.me/${agentProfile.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`,
+      `https://wa.me/${target}?text=${encodeURIComponent(text)}`,
       '_blank'
     );
   };
@@ -54,7 +101,7 @@ export default function CustomerPropertyView() {
     if (navigator.share) {
       navigator.share({
         title: `${property.type} ב${property.street}, ${property.city}`,
-        text: `${property.type} ${property.rooms} חדרים ב${property.city} - ${formatPrice(property.marketingPrice)}`,
+        text: `${property.type} ${property.rooms || ''} ב${property.city} - ${formatPrice(property.marketingPrice)}`,
         url: window.location.href,
       });
     } else {
@@ -62,18 +109,25 @@ export default function CustomerPropertyView() {
     }
   };
 
+  const mapsQuery = encodeURIComponent(`${property.street}, ${property.city}`);
+  const mapsEmbed = `https://www.google.com/maps?q=${mapsQuery}&output=embed`;
+  const mapsOpen = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+
   return (
     <div className="cpv-page">
       <div className="noise-overlay" />
 
-      {/* Header */}
       <header className="cpv-header">
         <div className="cpv-header-inner">
-          <Link to="/customer" className="cpv-back">
-            <ArrowRight size={18} />
-            חזרה לנכסים
-          </Link>
-          <Link to="/customer" className="cpv-header-logo">
+          {agentBackLink ? (
+            <Link to={agentBackLink} className="cpv-back">
+              <ArrowRight size={18} />
+              חזרה לנכסי {agent.displayName}
+            </Link>
+          ) : (
+            <span className="cpv-back" />
+          )}
+          <Link to={agentBackLink || '/'} className="cpv-header-logo">
             <span className="logo-icon-sm">◆</span>
             <span>Estia</span>
           </Link>
@@ -84,11 +138,10 @@ export default function CustomerPropertyView() {
         </div>
       </header>
 
-      {/* Gallery */}
       <div className="cpv-gallery">
         <div className="cpv-gallery-main">
-          <img src={property.images[currentImage]} alt={property.street} />
-          {property.images.length > 1 && (
+          <img src={images[currentImage]} alt={property.street} />
+          {images.length > 1 && (
             <>
               <button className="gallery-nav prev" onClick={prevImage}>
                 <ChevronRight size={20} />
@@ -97,14 +150,14 @@ export default function CustomerPropertyView() {
                 <ChevronLeft size={20} />
               </button>
               <div className="gallery-counter">
-                {currentImage + 1} / {property.images.length}
+                {currentImage + 1} / {images.length}
               </div>
             </>
           )}
         </div>
-        {property.images.length > 1 && (
+        {images.length > 1 && (
           <div className="cpv-thumbs">
-            {property.images.map((img, i) => (
+            {images.map((img, i) => (
               <button
                 key={i}
                 className={`gallery-thumb ${i === currentImage ? 'active' : ''}`}
@@ -117,14 +170,12 @@ export default function CustomerPropertyView() {
         )}
       </div>
 
-      {/* Content */}
       <div className="cpv-content">
         <div className="cpv-main">
-          {/* Title and price */}
           <div className="cpv-title-section">
             <div className="cpv-badges">
-              <span className={`badge ${property.category === 'sale' ? 'badge-gold' : 'badge-info'}`}>
-                {property.category === 'sale' ? 'למכירה' : 'להשכרה'}
+              <span className={`badge ${property.category === 'SALE' ? 'badge-gold' : 'badge-info'}`}>
+                {property.category === 'SALE' ? 'למכירה' : 'להשכרה'}
               </span>
               <span className="badge badge-success">{property.type}</span>
             </div>
@@ -137,7 +188,6 @@ export default function CustomerPropertyView() {
             </div>
           </div>
 
-          {/* Specs */}
           <div className="cpv-specs">
             {property.rooms != null && (
               <div className="cpv-spec">
@@ -182,7 +232,6 @@ export default function CustomerPropertyView() {
             )}
           </div>
 
-          {/* Features — show relevant ones based on asset class */}
           <div className="cpv-features">
             <h3>מאפייני הנכס</h3>
             <div className="cpv-features-grid">
@@ -190,7 +239,7 @@ export default function CustomerPropertyView() {
                 { icon: ParkingCircle, label: 'חניה', value: property.parking },
                 { icon: Warehouse, label: 'מחסן', value: property.storage },
                 { icon: Snowflake, label: 'מזגנים', value: property.ac },
-                ...(property.assetClass === 'residential'
+                ...(property.assetClass === 'RESIDENTIAL'
                   ? [{ icon: Shield, label: 'ממ״ד', value: property.safeRoom }]
                   : []),
               ].map((feat) => (
@@ -208,13 +257,12 @@ export default function CustomerPropertyView() {
             </div>
           </div>
 
-          {/* Details — fields from the intake doc, for all asset types */}
           <div className="cpv-details">
             <h3>פרטים נוספים</h3>
             <div className="cpv-details-grid">
               <div>
-                <span className="cpv-detail-label">עבר שיפוץ</span>
-                <span className="cpv-detail-value">{property.renovated}</span>
+                <span className="cpv-detail-label">מצב</span>
+                <span className="cpv-detail-value">{property.renovated || '—'}</span>
               </div>
               {property.airDirections && (
                 <div>
@@ -233,19 +281,54 @@ export default function CustomerPropertyView() {
                 <span className="cpv-detail-value">
                   {property.buildingAge === 0
                     ? 'חדש'
-                    : `${property.buildingAge} שנים`}
+                    : property.buildingAge != null
+                    ? `${property.buildingAge} שנים`
+                    : '—'}
                 </span>
               </div>
-              <div>
-                <span className="cpv-detail-label">תאריך פינוי</span>
-                <span className="cpv-detail-value">{property.vacancyDate}</span>
-              </div>
-              {property.assetClass === 'residential' && (
+              {property.vacancyDate && (
+                <div>
+                  <span className="cpv-detail-label">תאריך פינוי</span>
+                  <span className="cpv-detail-value">{property.vacancyDate}</span>
+                </div>
+              )}
+              {property.assetClass === 'RESIDENTIAL' && property.sector && (
                 <div>
                   <span className="cpv-detail-label">מגזר</span>
                   <span className="cpv-detail-value">{property.sector}</span>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Google Maps — same as the agent view */}
+          <div className="cpv-map-card">
+            <div className="cpv-map-header">
+              <h3>
+                <MapPin size={18} />
+                מיקום הנכס
+              </h3>
+              <a
+                href={mapsOpen}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-ghost btn-sm"
+              >
+                <ExternalLink size={14} />
+                פתח בגוגל מפות
+              </a>
+            </div>
+            <div className="cpv-map-frame">
+              <iframe
+                title="מיקום הנכס"
+                src={mapsEmbed}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            </div>
+            <div className="cpv-map-address">
+              {property.street}, {property.city}
             </div>
           </div>
 
@@ -257,17 +340,18 @@ export default function CustomerPropertyView() {
           )}
         </div>
 
-        {/* Sticky contact sidebar */}
         <aside className="cpv-sidebar">
           <div className="cpv-contact-card">
             <div className="cpv-agent-info">
-              <div className="cpv-agent-avatar">
-                {agentProfile.name.charAt(0)}
-              </div>
+              {agent?.avatarUrl ? (
+                <img className="cpv-agent-avatar" src={agent.avatarUrl} alt={agentName} />
+              ) : (
+                <div className="cpv-agent-avatar placeholder">{agentName.charAt(0)}</div>
+              )}
               <div>
-                <h4>{agentProfile.name}</h4>
-                <span>{agentProfile.title}</span>
-                <span>{agentProfile.agency}</span>
+                <h4>{agentName}</h4>
+                <span>{agent?.title || 'סוכן נדל״ן'}</span>
+                <span>{agent?.agency || ''}</span>
               </div>
             </div>
             <div className="cpv-contact-buttons">
@@ -278,24 +362,27 @@ export default function CustomerPropertyView() {
                 <MessageCircle size={20} />
                 שלח הודעה בוואטסאפ
               </button>
-              <a
-                href={`tel:${agentProfile.phone}`}
-                className="btn btn-secondary btn-lg cpv-contact-btn"
-              >
-                <Phone size={20} />
-                {agentProfile.phone}
-              </a>
+              {agentPhone && (
+                <a
+                  href={`tel:${agentPhone}`}
+                  className="btn btn-secondary btn-lg cpv-contact-btn"
+                >
+                  <Phone size={20} />
+                  {agentPhone}
+                </a>
+              )}
             </div>
           </div>
         </aside>
       </div>
 
-      {/* Mobile contact bar */}
       <div className="cpv-mobile-bar">
-        <a href={`tel:${agentProfile.phone}`} className="btn btn-secondary">
-          <Phone size={18} />
-          התקשר
-        </a>
+        {agentPhone && (
+          <a href={`tel:${agentPhone}`} className="btn btn-secondary">
+            <Phone size={18} />
+            התקשר
+          </a>
+        )}
         <button className="btn btn-primary" onClick={handleWhatsApp}>
           <MessageCircle size={18} />
           וואטסאפ

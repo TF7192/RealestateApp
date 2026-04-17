@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2,
@@ -11,8 +12,12 @@ import {
   Clock,
   Flame,
   Eye,
+  MessageCircle,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { properties, leads, deals, formatPrice } from '../data/mockData';
+import { useAuth } from '../lib/auth';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -62,7 +67,7 @@ export default function Dashboard() {
       sub: `מתוך ${leads.length} לידים`,
       color: 'var(--danger)',
       bg: 'var(--danger-bg)',
-      to: '/leads?filter=hot',
+      to: '/customers?filter=hot',
     },
     {
       icon: Handshake,
@@ -113,23 +118,7 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      {/* Welcome section */}
-      <div className="welcome-section animate-in">
-        <div className="welcome-content">
-          <h2>שלום, יוסי</h2>
-          <p>סיכום פעילות יומי</p>
-        </div>
-        <div className="welcome-actions">
-          <Link to="/properties/new" className="btn btn-primary btn-lg">
-            <Plus size={18} />
-            קליטת נכס
-          </Link>
-          <Link to="/leads/new" className="btn btn-secondary btn-lg">
-            <UserPlus size={18} />
-            ליד חדש
-          </Link>
-        </div>
-      </div>
+      <WelcomeSection />
 
       {/* Stats grid — whole card is clickable */}
       <div className="stats-grid">
@@ -225,7 +214,7 @@ export default function Dashboard() {
         <div className="card dashboard-card animate-in animate-in-delay-5">
           <div className="card-header">
             <h3>לידים חמים</h3>
-            <Link to="/leads" className="btn btn-ghost btn-sm">
+            <Link to="/customers" className="btn btn-ghost btn-sm">
               הכל
               <ArrowUpLeft size={14} />
             </Link>
@@ -234,7 +223,7 @@ export default function Dashboard() {
             {hotLeads.map((lead) => (
               <Link
                 key={lead.id}
-                to={`/leads?selected=${lead.id}`}
+                to={`/customers?selected=${lead.id}`}
                 className="hot-lead-item"
               >
                 <div className="lead-avatar hot">
@@ -251,6 +240,76 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WelcomeSection() {
+  const { user } = useAuth();
+  const [copied, setCopied] = useState(false);
+
+  const displayName = user?.displayName || 'סוכן';
+  const catalogUrl = user?.id
+    ? `${window.location.origin}/a/${user.id}`
+    : null;
+
+  const handleShareWhatsApp = () => {
+    if (!catalogUrl) return;
+    const lines = [
+      `שלום, זה ${displayName}.`,
+      '',
+      'ריכזתי עבורך את כל הנכסים שלי במקום אחד — אפשר לחפש לפי עיר, מחיר וחדרים:',
+      catalogUrl,
+      '',
+      'אשמח לעמוד לרשותך לתיאום ביקור או לכל שאלה.',
+    ];
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`,
+      '_blank'
+    );
+  };
+
+  const handleCopy = () => {
+    if (!catalogUrl) return;
+    navigator.clipboard.writeText(catalogUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <div className="welcome-section animate-in">
+      <div className="welcome-content">
+        <h2>שלום, {displayName.split(' ')[0]}</h2>
+        <p>סיכום פעילות יומי</p>
+      </div>
+      <div className="welcome-actions">
+        <button
+          className="btn btn-primary btn-lg"
+          onClick={handleShareWhatsApp}
+          disabled={!catalogUrl}
+          title="שתף את הקטלוג שלך בוואטסאפ"
+        >
+          <MessageCircle size={18} />
+          שתף את הנכסים שלי
+        </button>
+        <button
+          className="btn btn-secondary btn-lg"
+          onClick={handleCopy}
+          disabled={!catalogUrl}
+          title={catalogUrl}
+        >
+          {copied ? <Check size={18} /> : <Copy size={18} />}
+          {copied ? 'הקישור הועתק' : 'העתק קישור קטלוג'}
+        </button>
+        <Link to="/properties/new" className="btn btn-ghost btn-lg">
+          <Plus size={18} />
+          קליטת נכס
+        </Link>
+        <Link to="/customers/new" className="btn btn-ghost btn-lg">
+          <UserPlus size={18} />
+          ליד חדש
+        </Link>
       </div>
     </div>
   );

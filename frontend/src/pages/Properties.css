@@ -417,6 +417,37 @@
   background: rgba(37, 211, 102, 0.22);
 }
 
+/* Floating delete button on card */
+.property-del-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0;
+  z-index: 2;
+}
+
+.property-card { position: relative; }
+
+.property-card:hover .property-del-btn {
+  opacity: 1;
+}
+
+.property-del-btn:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
 @media (max-width: 640px) {
   .properties-grid {
     grid-template-columns: 1fr;

@@ -19,6 +19,8 @@ const listQuery = z.object({
   status: z.enum(['ACTIVE', 'PAUSED', 'SOLD', 'RENTED', 'ARCHIVED']).optional(),
   city: z.string().optional(),
   search: z.string().optional(),
+  agentId: z.string().optional(),
+  mine: z.string().optional(),
 });
 
 const propertyInput = z.object({
@@ -67,6 +69,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     if (q.category) where.category = q.category;
     if (q.status) where.status = q.status;
     if (q.city) where.city = q.city;
+    if (q.agentId) where.agentId = q.agentId;
+    // `mine=1` returns only the current agent's properties (requires auth)
+    if (q.mine === '1' || q.mine === 'true') {
+      const user = (req as any)[Symbol.for('estia.user')];
+      if (!user) return { items: [] };
+      where.agentId = user.id;
+    }
     if (q.search) {
       where.OR = [
         { street: { contains: q.search, mode: 'insensitive' } },
@@ -147,6 +156,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     actionKey: z.string().min(1).max(60),
     done: z.boolean(),
     notes: z.string().max(500).nullable().optional(),
+    link: z.string().max(500).nullable().optional(),
   });
 
   app.put('/:id/marketing-actions', { onRequest: [app.requireAgent] }, async (req, reply) => {
@@ -164,11 +174,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         done: body.done,
         doneAt: body.done ? new Date() : null,
         notes: body.notes ?? undefined,
+        link: body.link ?? undefined,
       },
       update: {
         done: body.done,
         doneAt: body.done ? new Date() : null,
         notes: body.notes ?? undefined,
+        link: body.link ?? undefined,
       },
     });
     return { action };
@@ -209,11 +221,24 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
 
 function serialize(prop: any) {
   const actionsMap: Record<string, boolean> = {};
-  for (const key of DEFAULT_ACTION_KEYS) actionsMap[key] = false;
-  for (const a of prop.marketingActions || []) actionsMap[a.actionKey] = a.done;
+  const actionsDetail: Record<string, any> = {};
+  for (const key of DEFAULT_ACTION_KEYS) {
+    actionsMap[key] = false;
+    actionsDetail[key] = { done: false, notes: null, link: null, doneAt: null };
+  }
+  for (const a of prop.marketingActions || []) {
+    actionsMap[a.actionKey] = a.done;
+    actionsDetail[a.actionKey] = {
+      done: a.done,
+      notes: a.notes,
+      link: a.link,
+      doneAt: a.doneAt,
+    };
+  }
   return {
     ...prop,
     images: (prop.images || []).map((i: any) => i.url),
     marketingActions: actionsMap,
+    marketingActionsDetail: actionsDetail,
   };
 }

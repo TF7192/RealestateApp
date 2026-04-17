@@ -5,12 +5,11 @@ import Dashboard from './pages/Dashboard';
 import Properties from './pages/Properties';
 import PropertyDetail from './pages/PropertyDetail';
 import NewProperty from './pages/NewProperty';
-import Leads from './pages/Leads';
 import NewLead from './pages/NewLead';
-import Buyers from './pages/Buyers';
+import Customers from './pages/Customers';
 import Deals from './pages/Deals';
 import Login from './pages/Login';
-import CustomerPortal from './pages/CustomerPortal';
+import AgentPortal from './pages/AgentPortal';
 import CustomerPropertyView from './pages/CustomerPropertyView';
 import { AuthProvider, useAuth } from './lib/auth';
 
@@ -21,7 +20,6 @@ import MobileProperties from './mobile/pages/MobileProperties';
 import MobilePropertyDetail from './mobile/pages/MobilePropertyDetail';
 import MobileLeads from './mobile/pages/MobileLeads';
 import MobileDeals from './mobile/pages/MobileDeals';
-import MobileBuyers from './mobile/pages/MobileBuyers';
 import MobileLogin from './mobile/pages/MobileLogin';
 import MobileNewLead from './mobile/pages/MobileNewLead';
 import MobileNewProperty from './mobile/pages/MobileNewProperty';
@@ -59,23 +57,17 @@ function AppRoutes() {
 }
 
 function MobileAppRoutes({ user, logout }) {
+  // Public routes always available
   if (!user) {
     return (
       <Routes>
         <Route path="/p/:id" element={<MobilePropertyDetail />} />
+        <Route path="/a/:agentId" element={<AgentPortal />} />
         <Route path="*" element={<MobileLogin />} />
       </Routes>
     );
   }
-  if (user.role === 'CUSTOMER') {
-    return (
-      <Routes>
-        <Route path="/customer" element={<CustomerPortal onLogout={logout} />} />
-        <Route path="/p/:id" element={<MobilePropertyDetail />} />
-        <Route path="*" element={<Navigate to="/customer" replace />} />
-      </Routes>
-    );
-  }
+  // Only agents can log in — any non-agent drops to public
   return (
     <Routes>
       <Route element={<MobileLayout onLogout={logout} />}>
@@ -83,13 +75,17 @@ function MobileAppRoutes({ user, logout }) {
         <Route path="/properties" element={<MobileProperties />} />
         <Route path="/properties/new" element={<MobileNewProperty />} />
         <Route path="/properties/:id" element={<MobilePropertyDetail />} />
-        <Route path="/leads" element={<MobileLeads />} />
-        <Route path="/leads/new" element={<MobileNewLead />} />
-        <Route path="/buyers" element={<MobileBuyers />} />
+        <Route path="/customers" element={<MobileLeads />} />
+        <Route path="/customers/new" element={<MobileNewLead />} />
+        {/* Legacy URLs */}
+        <Route path="/leads" element={<Navigate to="/customers" replace />} />
+        <Route path="/leads/new" element={<Navigate to="/customers/new" replace />} />
+        <Route path="/buyers" element={<Navigate to="/customers?tab=active" replace />} />
         <Route path="/deals" element={<MobileDeals />} />
         <Route path="/settings" element={<MobileSettings />} />
       </Route>
       <Route path="/p/:id" element={<MobilePropertyDetail />} />
+      <Route path="/a/:agentId" element={<AgentPortal />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -100,17 +96,8 @@ function DesktopAppRoutes({ user, logout }) {
     return (
       <Routes>
         <Route path="/p/:id" element={<CustomerPropertyView />} />
-        <Route path="/share" element={<CustomerPortal onLogout={() => {}} isPublic />} />
+        <Route path="/a/:agentId" element={<AgentPortal />} />
         <Route path="*" element={<Login />} />
-      </Routes>
-    );
-  }
-  if (user.role === 'CUSTOMER') {
-    return (
-      <Routes>
-        <Route path="/customer" element={<CustomerPortal onLogout={logout} />} />
-        <Route path="/p/:id" element={<CustomerPropertyView />} />
-        <Route path="*" element={<Navigate to="/customer" replace />} />
       </Routes>
     );
   }
@@ -121,12 +108,16 @@ function DesktopAppRoutes({ user, logout }) {
         <Route path="/properties" element={<Properties />} />
         <Route path="/properties/new" element={<NewProperty />} />
         <Route path="/properties/:id" element={<PropertyDetail />} />
-        <Route path="/leads" element={<Leads />} />
-        <Route path="/leads/new" element={<NewLead />} />
-        <Route path="/buyers" element={<Buyers />} />
+        <Route path="/customers" element={<Customers />} />
+        <Route path="/customers/new" element={<NewLead />} />
+        {/* Legacy URLs — redirect */}
+        <Route path="/leads" element={<Navigate to="/customers" replace />} />
+        <Route path="/leads/new" element={<Navigate to="/customers/new" replace />} />
+        <Route path="/buyers" element={<Navigate to="/customers?tab=active" replace />} />
         <Route path="/deals" element={<Deals />} />
       </Route>
       <Route path="/p/:id" element={<CustomerPropertyView />} />
+      <Route path="/a/:agentId" element={<AgentPortal />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

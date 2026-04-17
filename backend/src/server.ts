@@ -17,6 +17,7 @@ import { registerAgreementRoutes } from './routes/agreements.js';
 import { registerLookupRoutes } from './routes/lookups.js';
 import { registerReportRoutes } from './routes/reports.js';
 import { registerMeRoutes } from './routes/me.js';
+import { registerAgentRoutes } from './routes/agents.js';
 import { authPlugin } from './middleware/auth.js';
 
 const PORT = Number(process.env.PORT || 4000);
@@ -88,6 +89,7 @@ async function build() {
   await app.register(registerAgreementRoutes, { prefix: '/api/agreements' });
   await app.register(registerLookupRoutes, { prefix: '/api/lookups' });
   await app.register(registerReportRoutes, { prefix: '/api/reports' });
+  await app.register(registerAgentRoutes, { prefix: '/api/agents' });
 
   app.setErrorHandler((err, req, reply) => {
     req.log.error({ err }, 'request failed');

@@ -1,0 +1,484 @@
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import {
+  UserPlus,
+  Search,
+  Phone,
+  MessageCircle,
+  Flame,
+  Thermometer,
+  Snowflake,
+  Calendar,
+  FileSignature,
+  FileCheck2,
+  ShoppingCart,
+  KeyRound,
+  Edit3,
+  Trash2,
+  HelpCircle,
+  Sparkles,
+} from 'lucide-react';
+import api from '../lib/api';
+import AgreementDialog from '../components/AgreementDialog';
+import ConfirmDialog from '../components/ConfirmDialog';
+import CustomerEditDialog from '../components/CustomerEditDialog';
+import './Customers.css';
+
+// Heuristic "active" client = brokerage agreement signed and not yet expired.
+function isActiveClient(lead) {
+  if (!lead.brokerageSignedAt) return false;
+  if (!lead.brokerageExpiresAt) return true;
+  return new Date(lead.brokerageExpiresAt) > new Date();
+}
+
+function statusIcon(status) {
+  switch (status) {
+    case 'HOT': return <Flame size={13} />;
+    case 'WARM': return <Thermometer size={13} />;
+    case 'COLD': return <Snowflake size={13} />;
+    default: return null;
+  }
+}
+
+function statusBadgeClass(status) {
+  return {
+    HOT: 'badge-danger',
+    WARM: 'badge-warning',
+    COLD: 'badge-info',
+  }[status] || 'badge-gold';
+}
+
+function statusLabel(status) {
+  return { HOT: 'חם', WARM: 'חמים', COLD: 'קר' }[status] || status;
+}
+
+export default function Customers() {
+  const [searchParams] = useSearchParams();
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('leads'); // 'leads' | 'active'
+  const [lookingForFilter, setLookingForFilter] = useState('all'); // all | BUY | RENT
+  const [interestFilter, setInterestFilter] = useState('all'); // all | PRIVATE | COMMERCIAL
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [highlightId, setHighlightId] = useState(null);
+  const [agreementDialog, setAgreementDialog] = useState(null);
+  const [editDialog, setEditDialog] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const cardRefs = useRef({});
+
+  const loadLeads = async () => {
+    const r = await api.listLeads();
+    setLeads(r.items || []);
+  };
+
+  useEffect(() => {
+    loadLeads().finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const sel = searchParams.get('selected');
+    if (sel) {
+      setHighlightId(sel);
+      const t = setTimeout(() => {
+        const el = cardRefs.current[sel];
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 250);
+      return () => clearTimeout(t);
+    }
+    const t = searchParams.get('tab');
+    if (t === 'active' || t === 'leads') setTab(t);
+  }, [searchParams]);
+
+  const { leadsGroup, activeGroup } = useMemo(() => {
+    const active = [];
+    const pending = [];
+    for (const l of leads) (isActiveClient(l) ? active : pending).push(l);
+    return { leadsGroup: pending, activeGroup: active };
+  }, [leads]);
+
+  const filtered = useMemo(() => {
+    const base = tab === 'leads' ? leadsGroup : activeGroup;
+    return base.filter((l) => {
+      if (lookingForFilter !== 'all' && l.lookingFor !== lookingForFilter) return false;
+      if (interestFilter !== 'all' && l.interestType !== interestFilter) return false;
+      if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+      if (!search) return true;
+      const s = search.toLowerCase();
+      return (
+        l.name?.toLowerCase().includes(s) ||
+        l.city?.toLowerCase().includes(s) ||
+        l.phone?.includes(s)
+      );
+    });
+  }, [tab, leadsGroup, activeGroup, lookingForFilter, interestFilter, statusFilter, search]);
+
+  const handleWhatsApp = (lead) => {
+    const text = `שלום ${lead.name},`;
+    const digits = (lead.phone || '').replace(/[^0-9]/g, '');
+    window.open(
+      `https://wa.me/${digits}?text=${encodeURIComponent(text)}`,
+      '_blank'
+    );
+  };
+
+  const openAgreementDialog = (lead) => setAgreementDialog({ lead });
+
+  const onAgreementChange = async () => {
+    setAgreementDialog(null);
+    await loadLeads();
+  };
+
+  const handleStatusChange = async (lead, newStatus) => {
+    await api.updateLead(lead.id, { status: newStatus });
+    await loadLeads();
+  };
+
+  const confirmDeleteLead = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.deleteLead(deleteTarget.id);
+      setDeleteTarget(null);
+      await loadLeads();
+    } catch (_) { /* ignore */ }
+    setDeleting(false);
+  };
+
+  if (loading) {
+    return <div className="customers-loading"><div className="spinner-gold" /></div>;
+  }
+
+  return (
+    <div className="customers-page">
+      <div className="page-header animate-in">
+        <div className="page-header-info">
+          <h2>לקוחות</h2>
+          <p>{filtered.length} מתוך {leads.length} לקוחות</p>
+        </div>
+        <div className="page-header-actions">
+          <Link to="/customers/new" className="btn btn-primary">
+            <UserPlus size={18} />
+            ליד חדש
+          </Link>
+        </div>
+      </div>
+
+      {/* Top-level tabs: לידים vs לקוחות פעילים */}
+      <div className="customers-main-tabs animate-in animate-in-delay-1">
+        <button
+          className={`cmt-tab ${tab === 'leads' ? 'active' : ''}`}
+          onClick={() => setTab('leads')}
+        >
+          <div className="cmt-tab-title">
+            <ShoppingCart size={16} />
+            פניות חדשות
+          </div>
+          <div className="cmt-tab-sub">
+            לפני חתימה על הסכם תיווך · {leadsGroup.length}
+          </div>
+        </button>
+        <button
+          className={`cmt-tab ${tab === 'active' ? 'active' : ''}`}
+          onClick={() => setTab('active')}
+        >
+          <div className="cmt-tab-title">
+            <KeyRound size={16} />
+            לקוחות פעילים
+          </div>
+          <div className="cmt-tab-sub">
+            עם הסכם תיווך בתוקף · {activeGroup.length}
+          </div>
+        </button>
+      </div>
+
+      {/* Filter strip */}
+      <div className="filters-bar animate-in animate-in-delay-2">
+        <div className="search-box">
+          <Search size={18} />
+          <input
+            type="text"
+            placeholder="חיפוש לפי שם, עיר, טלפון..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="filter-tabs">
+          {[
+            { key: 'all', label: 'הכל' },
+            { key: 'BUY', label: 'קונים' },
+            { key: 'RENT', label: 'שוכרים' },
+          ].map((f) => (
+            <button
+              key={f.key}
+              className={`filter-tab ${lookingForFilter === f.key ? 'active' : ''}`}
+              onClick={() => setLookingForFilter(f.key)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="filter-tabs">
+          {[
+            { key: 'all', label: 'כל הסוגים' },
+            { key: 'PRIVATE', label: 'פרטי' },
+            { key: 'COMMERCIAL', label: 'מסחרי' },
+          ].map((f) => (
+            <button
+              key={f.key}
+              className={`filter-tab ${interestFilter === f.key ? 'active' : ''}`}
+              onClick={() => setInterestFilter(f.key)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {tab === 'leads' && (
+          <div className="filter-tabs">
+            {[
+              { key: 'all', label: 'הכל' },
+              { key: 'HOT', label: 'חם' },
+              { key: 'WARM', label: 'חמים' },
+              { key: 'COLD', label: 'קר' },
+            ].map((f) => (
+              <button
+                key={f.key}
+                className={`filter-tab ${statusFilter === f.key ? 'active' : ''}`}
+                onClick={() => setStatusFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="customers-grid animate-in animate-in-delay-3">
+        {filtered.map((lead) => {
+          const active = isActiveClient(lead);
+          const hasSignedFile = (lead.agreements || []).some((a) => a.status === 'SIGNED' && a.fileId);
+          return (
+            <div
+              key={lead.id}
+              ref={(el) => { if (el) cardRefs.current[lead.id] = el; }}
+              className={`customer-card ${highlightId === lead.id ? 'highlight' : ''} ${active ? 'active-client' : ''}`}
+            >
+              <div className="customer-card-header">
+                <div className="customer-avatar">
+                  {lead.name.charAt(0)}
+                </div>
+                <div className="customer-info">
+                  <h4>{lead.name}</h4>
+                  <span className="customer-source">
+                    {lead.source || '—'}
+                  </span>
+                </div>
+                <div className="customer-badges">
+                  <StatusPicker lead={lead} onChange={handleStatusChange} />
+                  {active && (
+                    <span className="badge badge-success">
+                      <KeyRound size={12} />
+                      לקוח פעיל
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="customer-card-body">
+                <div className="cc-row">
+                  <span className="cc-label">מחפש</span>
+                  <span className="cc-value">
+                    {lead.lookingFor === 'RENT' ? 'לשכור' : 'לקנות'} · {lead.interestType === 'COMMERCIAL' ? 'מסחרי' : 'פרטי'}
+                  </span>
+                </div>
+                <div className="cc-row">
+                  <span className="cc-label">עיר</span>
+                  <span className="cc-value">{lead.city || '—'}</span>
+                </div>
+                <div className="cc-row">
+                  <span className="cc-label">חדרים</span>
+                  <span className="cc-value">{lead.rooms || '—'}</span>
+                </div>
+                <div className="cc-row">
+                  <span className="cc-label">תקציב</span>
+                  <span className="cc-value">{lead.priceRangeLabel || '—'}</span>
+                </div>
+                {lead.sector && lead.sector !== 'כללי' && (
+                  <div className="cc-row">
+                    <span className="cc-label">מגזר</span>
+                    <span className="cc-value">{lead.sector}</span>
+                  </div>
+                )}
+                {lead.schoolProximity && (
+                  <div className="cc-row">
+                    <span className="cc-label">קירבה לבית ספר</span>
+                    <span className="cc-value">{lead.schoolProximity}</span>
+                  </div>
+                )}
+                <div className="cc-row">
+                  <span className="cc-label">אישור עקרוני</span>
+                  <span className="cc-value">
+                    {lead.preApproval
+                      ? <span className="cc-pos">יש</span>
+                      : <span className="cc-muted">אין</span>}
+                  </span>
+                </div>
+                {(lead.brokerageSignedAt || lead.brokerageExpiresAt) && (
+                  <div className="cc-row cc-agreement-row">
+                    <span className="cc-label">הסכם תיווך</span>
+                    <span className="cc-value">
+                      {lead.brokerageSignedAt
+                        ? new Date(lead.brokerageSignedAt).toLocaleDateString('he-IL')
+                        : '—'}
+                      {lead.brokerageExpiresAt && (
+                        <> → {new Date(lead.brokerageExpiresAt).toLocaleDateString('he-IL')}</>
+                      )}
+                      {hasSignedFile && (
+                        <span className="cc-signed-chip">
+                          <FileCheck2 size={12} />
+                          חתום
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {lead.notes && (
+                <div className="customer-notes">
+                  <p>{lead.notes}</p>
+                </div>
+              )}
+
+              <div className="customer-card-footer">
+                <div className="customer-dates">
+                  {lead.lastContact && (
+                    <span>
+                      <Calendar size={12} />
+                      {new Date(lead.lastContact).toLocaleDateString('he-IL')}
+                    </span>
+                  )}
+                </div>
+                <div className="customer-actions">
+                  <a href={`tel:${lead.phone}`} className="btn btn-ghost btn-sm" title={lead.phone}>
+                    <Phone size={14} />
+                    <span className="hide-sm">{lead.phone}</span>
+                  </a>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => handleWhatsApp(lead)}
+                    title="שלח בוואטסאפ"
+                  >
+                    <MessageCircle size={14} />
+                  </button>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => openAgreementDialog(lead)}
+                    title="ניהול הסכם תיווך"
+                  >
+                    <FileSignature size={14} />
+                    הסכם תיווך
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setEditDialog(lead)}
+                    title="עריכה"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm danger-hover"
+                    onClick={() => setDeleteTarget(lead)}
+                    title="מחיקה"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="customers-empty">
+            <p>אין לקוחות בסינון הנוכחי</p>
+          </div>
+        )}
+      </div>
+
+      {agreementDialog && (
+        <AgreementDialog
+          lead={agreementDialog.lead}
+          onClose={() => setAgreementDialog(null)}
+          onChange={onAgreementChange}
+        />
+      )}
+
+      {editDialog && (
+        <CustomerEditDialog
+          lead={editDialog}
+          onClose={() => setEditDialog(null)}
+          onSaved={async () => {
+            setEditDialog(null);
+            await loadLeads();
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="מחיקת לקוח"
+          message={`למחוק את "${deleteTarget.name}"? הפעולה אינה הפיכה.`}
+          confirmLabel="מחק"
+          onConfirm={confirmDeleteLead}
+          onClose={() => setDeleteTarget(null)}
+          busy={deleting}
+        />
+      )}
+    </div>
+  );
+}
+
+// Inline dropdown to pick HOT/WARM/COLD manually, with auto-suggestion badge.
+function StatusPicker({ lead, onChange }) {
+  const [open, setOpen] = useState(false);
+  const isAutoMatch = lead.suggestedStatus && lead.status === lead.suggestedStatus;
+
+  return (
+    <div className="status-picker">
+      <button
+        className={`badge ${statusBadgeClass(lead.status)} status-badge-btn`}
+        onClick={() => setOpen((v) => !v)}
+        title={lead.statusExplanation || 'שנה סטטוס'}
+      >
+        {statusIcon(lead.status)}
+        {statusLabel(lead.status)}
+        {lead.suggestedStatus && !isAutoMatch && (
+          <Sparkles size={11} className="sp-auto-hint" title="הצעה אוטומטית שונה מהסטטוס הנוכחי" />
+        )}
+      </button>
+      {open && (
+        <div className="status-menu" onMouseLeave={() => setOpen(false)}>
+          <div className="status-menu-hint">
+            <HelpCircle size={12} />
+            <span>{lead.statusExplanation || 'בחר סטטוס לליד'}</span>
+          </div>
+          {['HOT', 'WARM', 'COLD'].map((s) => (
+            <button
+              key={s}
+              className={`status-menu-item ${lead.status === s ? 'active' : ''}`}
+              onClick={async () => {
+                setOpen(false);
+                if (s !== lead.status) await onChange(lead, s);
+              }}
+            >
+              {statusIcon(s)}
+              <span>{statusLabel(s)}</span>
+              {lead.suggestedStatus === s && <span className="sp-auto">הצעה אוטומטית</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

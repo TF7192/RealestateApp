@@ -1,5 +1,58 @@
 :root {
-  /* Color System - Luxury Dark Real Estate */
+  /* Shape & typography — shared across themes */
+  --gold: #b48b4c;
+  --gold-light: #c9a36c;
+  --gold-dim: #8a6932;
+  --gold-glow: rgba(180, 139, 76, 0.14);
+  --gold-border: rgba(180, 139, 76, 0.28);
+
+  --success: #15803d;
+  --success-bg: rgba(21, 128, 61, 0.1);
+  --warning: #b45309;
+  --warning-bg: rgba(180, 83, 9, 0.1);
+  --danger: #b91c1c;
+  --danger-bg: rgba(185, 28, 28, 0.1);
+  --info: #2563eb;
+  --info-bg: rgba(37, 99, 235, 0.1);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --font-display: 'Frank Ruhl Libre', serif;
+  --font-body: 'Heebo', sans-serif;
+
+  --sidebar-width: 260px;
+  --header-height: 72px;
+}
+
+/* ── Light theme (default) ──────────────────────────────────── */
+:root,
+[data-theme='light'] {
+  --bg-primary: #f7f3ec;
+  --bg-secondary: #efe9df;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fbf7f0;
+  --bg-elevated: #f1ebe0;
+  --bg-input: #ffffff;
+
+  --text-primary: #1e1a14;
+  --text-secondary: #54503e;
+  --text-muted: #8b8574;
+  --text-accent: var(--gold);
+
+  --border: rgba(30, 26, 20, 0.08);
+  --border-light: rgba(30, 26, 20, 0.14);
+
+  --shadow-sm: 0 1px 3px rgba(30, 26, 20, 0.06), 0 1px 2px rgba(30, 26, 20, 0.04);
+  --shadow-md: 0 4px 16px rgba(30, 26, 20, 0.08), 0 2px 4px rgba(30, 26, 20, 0.05);
+  --shadow-lg: 0 10px 40px rgba(30, 26, 20, 0.10), 0 4px 12px rgba(30, 26, 20, 0.06);
+  --shadow-gold: 0 4px 20px rgba(180, 139, 76, 0.18);
+}
+
+/* ── Dark theme ─────────────────────────────────────────────── */
+[data-theme='dark'] {
   --bg-primary: #0d0f14;
   --bg-secondary: #141720;
   --bg-card: #1a1d28;
@@ -16,7 +69,6 @@
   --text-primary: #f0ece4;
   --text-secondary: #9a9aab;
   --text-muted: #5e5e72;
-  --text-accent: var(--gold);
 
   --border: rgba(255, 255, 255, 0.06);
   --border-light: rgba(255, 255, 255, 0.1);
@@ -34,17 +86,6 @@
   --shadow-md: 0 4px 20px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
   --shadow-gold: 0 4px 20px rgba(201, 169, 110, 0.15);
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-
-  --font-display: 'Frank Ruhl Libre', serif;
-  --font-body: 'Heebo', sans-serif;
-
-  --sidebar-width: 260px;
-  --header-height: 72px;
 }
 
 *, *::before, *::after {

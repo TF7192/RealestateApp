@@ -3,43 +3,56 @@ import {
   LayoutDashboard,
   Building2,
   Users,
-  Target,
   Handshake,
   Plus,
   UserPlus,
   Menu,
   X,
   LogOut,
+  Sun,
+  Moon,
+  Share2,
+  Check,
 } from 'lucide-react';
 import { useState } from 'react';
-import { agentProfile } from '../data/mockData';
+import { useAuth } from '../lib/auth';
+import { useTheme } from '../lib/theme';
 import './Layout.css';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'לוח בקרה' },
   { path: '/properties', icon: Building2, label: 'נכסים' },
-  { path: '/leads', icon: Target, label: 'לידים' },
-  { path: '/buyers', icon: Users, label: 'קונים / שוכרים' },
+  { path: '/customers', icon: Users, label: 'לקוחות' },
   { path: '/deals', icon: Handshake, label: 'עסקאות' },
 ];
 
 const quickActions = [
   { path: '/properties/new', icon: Plus, label: 'נכס חדש' },
-  { path: '/leads/new', icon: UserPlus, label: 'ליד חדש' },
+  { path: '/customers/new', icon: UserPlus, label: 'ליד חדש' },
 ];
 
 export default function Layout({ onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const isCustomerPage = location.pathname.startsWith('/p/');
   if (isCustomerPage) return <Outlet />;
+
+  const handleShareCatalog = () => {
+    if (!user?.id) return;
+    const url = `${window.location.origin}/a/${user.id}`;
+    navigator.clipboard.writeText(url);
+    setCopiedShare(true);
+    setTimeout(() => setCopiedShare(false), 2500);
+  };
 
   return (
     <div className="layout">
       <div className="noise-overlay" />
 
-      {/* Mobile header */}
       <header className="mobile-header">
         <button className="btn-ghost" onClick={() => setSidebarOpen(true)}>
           <Menu size={24} />
@@ -48,15 +61,15 @@ export default function Layout({ onLogout }) {
           <span className="logo-icon">◆</span>
           <span>Estia</span>
         </Link>
-        <div style={{ width: 40 }} />
+        <button className="btn-ghost" onClick={toggleTheme} title="מעבר בין מצב בהיר/כהה">
+          {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+        </button>
       </header>
 
-      {/* Sidebar overlay */}
       {sidebarOpen && (
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <Link to="/" className="logo">
@@ -110,17 +123,35 @@ export default function Layout({ onLogout }) {
                 <span>{item.label}</span>
               </NavLink>
             ))}
+            <button
+              className="nav-item nav-action share-link-btn"
+              onClick={handleShareCatalog}
+              title="העתק קישור שיתוף לקטלוג האישי"
+            >
+              {copiedShare ? <Check size={18} /> : <Share2 size={18} />}
+              <span>{copiedShare ? 'הקישור הועתק' : 'שיתוף הקטלוג שלי'}</span>
+            </button>
           </div>
         </nav>
 
         <div className="sidebar-footer">
+          <button
+            className="sidebar-theme-toggle"
+            onClick={toggleTheme}
+            title={theme === 'light' ? 'מעבר למצב כהה' : 'מעבר למצב בהיר'}
+          >
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+            <span>{theme === 'light' ? 'מצב כהה' : 'מצב בהיר'}</span>
+          </button>
           <div className="agent-card">
             <div className="agent-avatar">
-              {agentProfile.name.charAt(0)}
+              {(user?.displayName || 'E').charAt(0)}
             </div>
             <div className="agent-info">
-              <span className="agent-name">{agentProfile.name}</span>
-              <span className="agent-agency">{agentProfile.agency}</span>
+              <span className="agent-name">{user?.displayName || 'סוכן'}</span>
+              <span className="agent-agency">
+                {user?.agentProfile?.agency || 'Estia'}
+              </span>
             </div>
           </div>
           <button className="sidebar-logout" onClick={onLogout}>
@@ -130,7 +161,6 @@ export default function Layout({ onLogout }) {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="main-content">
         <Outlet />
       </main>

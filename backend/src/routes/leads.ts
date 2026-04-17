@@ -31,6 +31,45 @@ const leadInput = z.object({
   lastContact: z.string().nullable().optional(),
 });
 
+// Suggest HOT/WARM/COLD status from activity signals.
+// HOT:  last contact ≤ 7 days AND (has viewings OR pre-approval)
+// WARM: last contact ≤ 30 days OR has a recent viewing
+// COLD: otherwise
+function suggestStatus(lead: any): 'HOT' | 'WARM' | 'COLD' {
+  const now = Date.now();
+  const lastContact = lead.lastContact ? new Date(lead.lastContact).getTime() : null;
+  const recentContactDays = lastContact ? Math.floor((now - lastContact) / (1000 * 60 * 60 * 24)) : null;
+  const recentViewings = (lead.viewings || []).filter(
+    (v: any) => new Date(v.viewedAt).getTime() > now - 30 * 24 * 60 * 60 * 1000
+  ).length;
+
+  if (recentContactDays != null && recentContactDays <= 7 && (recentViewings > 0 || lead.preApproval)) {
+    return 'HOT';
+  }
+  if ((recentContactDays != null && recentContactDays <= 30) || recentViewings > 0) {
+    return 'WARM';
+  }
+  return 'COLD';
+}
+
+function explainStatus(lead: any, suggested: string): string {
+  const now = Date.now();
+  const lastContact = lead.lastContact ? new Date(lead.lastContact).getTime() : null;
+  const days = lastContact ? Math.floor((now - lastContact) / (1000 * 60 * 60 * 24)) : null;
+  const viewings = (lead.viewings || []).length;
+  const parts: string[] = [];
+  if (days == null) parts.push('אין קשר מתועד');
+  else parts.push(`קשר אחרון לפני ${days} ימים`);
+  if (viewings > 0) parts.push(`${viewings} ביקורים`);
+  if (lead.preApproval) parts.push('יש אישור עקרוני');
+  const ruleExplain = suggested === 'HOT'
+    ? 'חם: יצרת קשר לאחרונה ויש פעילות או אישור עקרוני'
+    : suggested === 'WARM'
+    ? 'חמים: יצרת קשר ב-30 הימים האחרונים או שהלקוח ראה נכס'
+    : 'קר: לא היה קשר או פעילות לאחרונה';
+  return `${ruleExplain}. נתונים: ${parts.join(' · ')}`;
+}
+
 export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const q = req.query as any;
@@ -51,7 +90,16 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       include: { viewings: true, agreements: true },
       orderBy: { createdAt: 'desc' },
     });
-    return { items };
+    // Decorate with computed heat suggestion + explanation
+    const withSuggest = items.map((l: any) => {
+      const suggestedStatus = suggestStatus(l);
+      return {
+        ...l,
+        suggestedStatus,
+        statusExplanation: explainStatus(l, suggestedStatus),
+      };
+    });
+    return { items: withSuggest };
   });
 
   app.get('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
