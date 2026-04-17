@@ -1,0 +1,134 @@
+import type { FastifyPluginAsync } from 'fastify';
+import argon2 from 'argon2';
+import { z } from 'zod';
+import { prisma } from '../lib/prisma.js';
+
+const COOKIE_NAME = 'estia_token';
+const COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  path: '/',
+  secure: process.env.NODE_ENV === 'production',
+  maxAge: 60 * 60 * 24 * 30,
+};
+
+const signupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(200),
+  role: z.enum(['AGENT', 'CUSTOMER']),
+  displayName: z.string().min(1).max(120),
+  phone: z.string().min(5).max(40).optional(),
+});
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+const googleMockSchema = z.object({
+  role: z.enum(['AGENT', 'CUSTOMER']),
+  email: z.string().email().optional(),
+  displayName: z.string().optional(),
+});
+
+export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
+  app.post('/signup', async (req, reply) => {
+    const body = signupSchema.parse(req.body);
+    const existing = await prisma.user.findUnique({ where: { email: body.email } });
+    if (existing) {
+      return reply.code(409).send({ error: { message: 'Email already registered' } });
+    }
+    const passwordHash = await argon2.hash(body.password);
+    const user = await prisma.user.create({
+      data: {
+        email: body.email,
+        passwordHash,
+        role: body.role,
+        displayName: body.displayName,
+        phone: body.phone,
+        provider: 'EMAIL',
+        agentProfile: body.role === 'AGENT' ? { create: {} } : undefined,
+        customerProfile: body.role === 'CUSTOMER' ? { create: {} } : undefined,
+      },
+    });
+    const token = app.jwt.sign(
+      { sub: user.id, role: user.role, email: user.email },
+      { expiresIn: '30d' }
+    );
+    reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
+    return {
+      user: publicUser(user),
+      token,
+    };
+  });
+
+  app.post('/login', async (req, reply) => {
+    const body = loginSchema.parse(req.body);
+    const user = await prisma.user.findUnique({ where: { email: body.email } });
+    if (!user || !user.passwordHash) {
+      return reply.code(401).send({ error: { message: 'Invalid credentials' } });
+    }
+    const ok = await argon2.verify(user.passwordHash, body.password);
+    if (!ok) {
+      return reply.code(401).send({ error: { message: 'Invalid credentials' } });
+    }
+    const token = app.jwt.sign(
+      { sub: user.id, role: user.role, email: user.email },
+      { expiresIn: '30d' }
+    );
+    reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
+    return { user: publicUser(user), token };
+  });
+
+  // Mock Google OAuth — the frontend already has a "Login with Google" button
+  // that posts the user role. In production this would verify a real ID token.
+  app.post('/google/mock', async (req, reply) => {
+    const body = googleMockSchema.parse(req.body ?? {});
+    const email = body.email || (body.role === 'AGENT' ? 'agent.demo@estia.app' : 'customer.demo@estia.app');
+    const displayName = body.displayName || (body.role === 'AGENT' ? 'יוסי כהן' : 'רינה שמעון');
+
+    let user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          role: body.role,
+          displayName,
+          provider: 'GOOGLE',
+          googleId: `mock-${body.role.toLowerCase()}`,
+          agentProfile: body.role === 'AGENT' ? { create: {} } : undefined,
+          customerProfile: body.role === 'CUSTOMER' ? { create: {} } : undefined,
+        },
+      });
+    }
+    const token = app.jwt.sign(
+      { sub: user.id, role: user.role, email: user.email },
+      { expiresIn: '30d' }
+    );
+    reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
+    return { user: publicUser(user), token };
+  });
+
+  app.post('/logout', async (_req, reply) => {
+    reply.clearCookie(COOKIE_NAME, { path: '/' });
+    return { ok: true };
+  });
+};
+
+function publicUser(u: {
+  id: string;
+  email: string;
+  role: string;
+  displayName: string;
+  phone: string | null;
+  avatarUrl: string | null;
+}) {
+  return {
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    displayName: u.displayName,
+    phone: u.phone,
+    avatarUrl: u.avatarUrl,
+  };
+}

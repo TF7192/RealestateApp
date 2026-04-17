@@ -1,2 +1,28 @@
 node_modules
 .vite
+dist
+.env
+.env.*
+!.env.example
+
+# Local Claude working files
+.claude/worktrees/
+
+# Uploaded files (e.g. signed agreements)
+backend/uploads/
+
+# DB volumes
+data/postgres
+data/redis
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+*.tsbuildinfo
+
+# Capacitor native shells (maintained on mobile branch only)
+frontend/android/
+frontend/ios/
+frontend/ESTIA_MOBILE.md

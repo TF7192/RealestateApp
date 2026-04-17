@@ -1,33 +1,49 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search,
   Phone,
   MessageCircle,
-  DollarSign,
   CheckCircle,
   XCircle,
-  Calendar,
+  FileSignature,
+  FileCheck2,
 } from 'lucide-react';
 import { leads, properties } from '../data/mockData';
 import './Buyers.css';
 
 export default function Buyers() {
   const [search, setSearch] = useState('');
+  // 'buy' | 'rent' | 'all'
+  const [lookingForFilter, setLookingForFilter] = useState('all');
+  // 'פרטי' | 'מסחרי' | 'all'
+  const [interestFilter, setInterestFilter] = useState('all');
 
-  const buyers = leads.filter((l) => l.interestType === 'פרטי');
-  const filtered = buyers.filter((b) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return b.name.includes(s) || b.city.includes(s) || b.phone.includes(s);
-  });
+  const filtered = useMemo(() => {
+    return leads.filter((l) => {
+      if (lookingForFilter !== 'all' && l.lookingFor !== lookingForFilter) return false;
+      if (interestFilter !== 'all' && l.interestType !== interestFilter) return false;
+      if (!search) return true;
+      const s = search.toLowerCase();
+      return l.name.includes(s) || l.city.includes(s) || l.phone.includes(s);
+    });
+  }, [search, lookingForFilter, interestFilter]);
+
+  const countBy = (pred) => leads.filter(pred).length;
+
+  const handleSendForSignature = (buyer) => {
+    alert(
+      `נשלח להסכם תיווך דיגיטלי אל ${buyer.name} (${buyer.phone}).\n` +
+        'לאחר החתימה הקובץ יצורף אוטומטית לכרטיס הלקוח.'
+    );
+  };
 
   return (
     <div className="buyers-page">
       <div className="page-header animate-in">
         <div className="page-header-info">
-          <h2>קונים פוטנציאלים</h2>
-          <p>{buyers.length} קונים במערכת</p>
+          <h2>קונים / שוכרים</h2>
+          <p>{filtered.length} מתוך {leads.length} לקוחות במערכת</p>
         </div>
       </div>
 
@@ -41,6 +57,42 @@ export default function Buyers() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        {/* Buy vs Rent */}
+        <div className="filter-tabs">
+          {[
+            { key: 'all', label: 'הכל', count: leads.length },
+            { key: 'buy', label: 'קונים', count: countBy((l) => l.lookingFor === 'buy') },
+            { key: 'rent', label: 'שוכרים', count: countBy((l) => l.lookingFor === 'rent') },
+          ].map((f) => (
+            <button
+              key={f.key}
+              className={`filter-tab ${lookingForFilter === f.key ? 'active' : ''}`}
+              onClick={() => setLookingForFilter(f.key)}
+            >
+              {f.label}
+              <span className="filter-count">{f.count}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Private vs Commercial */}
+        <div className="filter-tabs">
+          {[
+            { key: 'all', label: 'הכל', count: leads.length },
+            { key: 'פרטי', label: 'פרטי', count: countBy((l) => l.interestType === 'פרטי') },
+            { key: 'מסחרי', label: 'מסחרי', count: countBy((l) => l.interestType === 'מסחרי') },
+          ].map((f) => (
+            <button
+              key={f.key}
+              className={`filter-tab ${interestFilter === f.key ? 'active' : ''}`}
+              onClick={() => setInterestFilter(f.key)}
+            >
+              {f.label}
+              <span className="filter-count">{f.count}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="table-container animate-in animate-in-delay-2">
@@ -48,14 +100,16 @@ export default function Buyers() {
           <thead>
             <tr>
               <th>שם לקוח</th>
+              <th>סוג</th>
               <th>טלפון</th>
               <th>תקציב</th>
               <th>אישור עקרוני</th>
               <th>עיר</th>
               <th>חדרים</th>
+              <th>חתימת הסכם</th>
+              <th>סיום הסכם</th>
+              <th>קובץ חתום</th>
               <th>נכסים שנצפו</th>
-              <th>קשר אחרון</th>
-              <th>הערות</th>
               <th>פעולות</th>
             </tr>
           </thead>
@@ -69,6 +123,14 @@ export default function Buyers() {
                     </div>
                     <span>{buyer.name}</span>
                   </div>
+                </td>
+                <td>
+                  <span className="type-pill">
+                    {buyer.interestType}
+                  </span>
+                  <span className={`type-pill ${buyer.lookingFor === 'rent' ? 'rent' : 'buy'}`}>
+                    {buyer.lookingFor === 'rent' ? 'שכירות' : 'קנייה'}
+                  </span>
                 </td>
                 <td>
                   <a href={`tel:${buyer.phone}`} className="phone-link">
@@ -91,6 +153,18 @@ export default function Buyers() {
                 </td>
                 <td>{buyer.city}</td>
                 <td>{buyer.rooms || '—'}</td>
+                <td>{buyer.brokerageSignedAt || '—'}</td>
+                <td>{buyer.brokerageExpiresAt || '—'}</td>
+                <td>
+                  {buyer.signedAgreementFile ? (
+                    <span className="file-chip">
+                      <FileCheck2 size={13} />
+                      {buyer.signedAgreementFile}
+                    </span>
+                  ) : (
+                    <span className="file-missing">—</span>
+                  )}
+                </td>
                 <td>
                   <div className="viewed-properties">
                     {buyer.propertiesViewed.length > 0
@@ -108,10 +182,6 @@ export default function Buyers() {
                         })
                       : '—'}
                   </div>
-                </td>
-                <td>{buyer.lastContact}</td>
-                <td>
-                  <span className="notes-cell">{buyer.notes || '—'}</span>
                 </td>
                 <td>
                   <div className="action-buttons">
@@ -134,10 +204,24 @@ export default function Buyers() {
                     >
                       <MessageCircle size={14} />
                     </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      title="שלח הסכם תיווך לחתימה דיגיטלית"
+                      onClick={() => handleSendForSignature(buyer)}
+                    >
+                      <FileSignature size={14} />
+                    </button>
                   </div>
                 </td>
               </tr>
             ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={12} className="empty-row">
+                  לא נמצאו לקוחות בסינון הנוכחי
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

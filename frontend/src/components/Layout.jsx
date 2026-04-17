@@ -19,7 +19,7 @@ const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'לוח בקרה' },
   { path: '/properties', icon: Building2, label: 'נכסים' },
   { path: '/leads', icon: Target, label: 'לידים' },
-  { path: '/buyers', icon: Users, label: 'קונים' },
+  { path: '/buyers', icon: Users, label: 'קונים / שוכרים' },
   { path: '/deals', icon: Handshake, label: 'עסקאות' },
 ];
 

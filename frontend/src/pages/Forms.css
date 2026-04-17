@@ -141,6 +141,23 @@
   color: var(--text-muted);
 }
 
+/* Inline action inside a form section (e.g. "send for signature") */
+.form-inline-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+
+.inline-action-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
+}
+
 /* Form actions */
 .form-actions {
   display: flex;

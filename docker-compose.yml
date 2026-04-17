@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-estia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-estia-dev-pw}
+      POSTGRES_DB: ${POSTGRES_DB:-estia}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-estia} -d ${POSTGRES_DB:-estia}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-estia}:${POSTGRES_PASSWORD:-estia-dev-pw}@postgres:5432/${POSTGRES_DB:-estia}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:6001}
+      UPLOADS_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Exposed for admin / health-check access. Browser traffic flows via the
+    # nginx container on ${FRONTEND_PORT} (which proxies /api through the
+    # internal Docker network), so this is localhost-bound in production.
+    ports:
+      - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT:-6002}:4000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-6001}:80"
+
+volumes:
+  postgres_data:
+  uploads_data:

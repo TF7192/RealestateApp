@@ -317,6 +317,111 @@
   margin-top: 4px;
 }
 
+/* Google Maps card */
+.detail-map-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.detail-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-map-header h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.detail-map-header h4 svg {
+  color: var(--gold);
+}
+
+.detail-map-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/8;
+  background: var(--bg-elevated);
+}
+
+.detail-map-frame iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  filter: contrast(1.05) saturate(0.95);
+}
+
+.detail-map-address {
+  padding: 10px 18px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+/* Owner action button under owner card */
+.owner-action-btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+/* Weekly report card */
+.report-card .report-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.report-quick-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.report-quick-stats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.rq-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.rq-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.report-send-btn {
+  width: 100%;
+  justify-content: center;
+}
+
 /* Marketing checklist */
 .marketing-header {
   display: flex;
@@ -327,6 +432,62 @@
 
 .marketing-header h4 {
   margin: 0;
+}
+
+.marketing-reminder {
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reminder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.reminder-row svg {
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+.reminder-label {
+  flex: 1;
+}
+
+.reminder-select {
+  padding: 4px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 12px;
+}
+
+.reminder-overdue {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--warning);
+  background: var(--warning-bg);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
+
+.marketing-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
 }
 
 .marketing-checklist {
@@ -344,6 +505,28 @@
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
   cursor: default;
+  text-align: right;
+}
+
+.checklist-item.interactive {
+  cursor: pointer;
+  background: none;
+  border-top: none;
+  border-right: none;
+  border-left: none;
+  padding: 8px 4px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+  font-family: var(--font-body);
+}
+
+.checklist-item.interactive:hover {
+  background: rgba(201, 169, 110, 0.04);
+  color: var(--text-primary);
+}
+
+.checklist-item.interactive.is-done {
+  color: var(--text-primary);
 }
 
 .checklist-item:last-child {

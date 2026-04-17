@@ -1,0 +1,360 @@
+// Estia real-estate CRM — database schema
+// Designed to hold everything from the Hebrew docs + PRD + the frontend mock data.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  AGENT
+  CUSTOMER
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
+enum AssetClass {
+  RESIDENTIAL
+  COMMERCIAL
+}
+
+enum PropertyCategory {
+  SALE
+  RENT
+}
+
+enum PropertyStatus {
+  ACTIVE
+  PAUSED
+  SOLD
+  RENTED
+  ARCHIVED
+}
+
+enum LeadStatus {
+  HOT
+  WARM
+  COLD
+}
+
+enum LeadInterestType {
+  PRIVATE
+  COMMERCIAL
+}
+
+enum LeadLookingFor {
+  BUY
+  RENT
+}
+
+enum DealStatus {
+  NEGOTIATING
+  WAITING_MORTGAGE
+  PENDING_CONTRACT
+  SIGNED
+  FELL_THROUGH
+}
+
+enum MarketingReminderFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+// ─── Users ─────────────────────────────────────────────────────────────────
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String?
+  role         UserRole
+  provider     AuthProvider @default(EMAIL)
+  googleId     String?      @unique
+  displayName  String
+  phone        String?
+  avatarUrl    String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Agent-specific profile
+  agentProfile AgentProfile?
+
+  // Customer-specific profile (one-to-one with a Lead row once imported)
+  customerProfile CustomerProfile?
+
+  // Audit trail
+  sessions   Session[]
+  properties Property[]    @relation("AgentProperties")
+  leads      Lead[]        @relation("AgentLeads")
+  deals      Deal[]        @relation("AgentDeals")
+  files      UploadedFile[]
+
+  @@index([role])
+}
+
+model AgentProfile {
+  userId  String  @id
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agency  String?
+  title   String?
+  license String?
+  bio     String?
+}
+
+model CustomerProfile {
+  userId String  @id
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Connects a customer-login to their lead record if one exists
+  leadId String? @unique
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─── Domain ────────────────────────────────────────────────────────────────
+model Property {
+  id               String           @id @default(cuid())
+  agentId          String
+  agent            User             @relation("AgentProperties", fields: [agentId], references: [id])
+  assetClass       AssetClass
+  category         PropertyCategory
+  status           PropertyStatus   @default(ACTIVE)
+  type             String           // דירה, משרד, חנות, etc.
+  street           String
+  city             String
+  lat              Float?
+  lng              Float?
+  owner            String
+  ownerPhone       String
+  ownerEmail       String?
+  exclusiveStart   DateTime?
+  exclusiveEnd     DateTime?
+  marketingPrice   Int
+  closingPrice     Int?
+  offer            Int?
+  sqm              Int
+  sqmArnona        Int?
+  rooms            Float?
+  floor            Int?
+  totalFloors      Int?
+  elevator         Boolean          @default(false)
+  renovated        String?
+  vacancyDate      String?
+  parking          Boolean          @default(false)
+  storage          Boolean          @default(false)
+  balconySize      Int              @default(0)
+  airDirections    String?
+  ac               Boolean          @default(false)
+  safeRoom         Boolean          @default(false)
+  buildingAge      Int?
+  sector           String?
+  notes            String?
+  lastContact      DateTime?
+  lastContactNotes String?
+  marketingReminderFrequency MarketingReminderFrequency @default(WEEKLY)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  images           PropertyImage[]
+  marketingActions MarketingAction[]
+  viewings         PropertyViewing[]
+  inquiries        PropertyInquiry[]
+  deal             Deal?
+  agreements       Agreement[]
+
+  @@index([agentId])
+  @@index([city])
+  @@index([assetClass, category, status])
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  url        String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([propertyId])
+}
+
+model MarketingAction {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  actionKey  String   // e.g. "tabuExtract", "photography"…
+  done       Boolean  @default(false)
+  doneAt     DateTime?
+  notes      String?
+
+  @@unique([propertyId, actionKey])
+  @@index([propertyId])
+}
+
+model PropertyViewing {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  leadId     String?
+  lead       Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  viewedAt   DateTime @default(now())
+  source     String?
+  notes      String?
+
+  @@index([propertyId])
+  @@index([leadId])
+}
+
+model PropertyInquiry {
+  id           String   @id @default(cuid())
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  contactName  String
+  contactPhone String?
+  contactEmail String?
+  message      String?
+  createdAt    DateTime @default(now())
+
+  @@index([propertyId])
+}
+
+model Lead {
+  id                  String           @id @default(cuid())
+  agentId             String
+  agent               User             @relation("AgentLeads", fields: [agentId], references: [id])
+  name                String
+  phone               String
+  email               String?
+  interestType        LeadInterestType @default(PRIVATE)
+  lookingFor          LeadLookingFor   @default(BUY)
+  city                String?
+  street              String?
+  rooms               String?
+  priceRangeLabel     String?
+  budget              Int?
+  preApproval         Boolean          @default(false)
+  sector              String?
+  balconyRequired     Boolean          @default(false)
+  parkingRequired     Boolean          @default(false)
+  elevatorRequired    Boolean          @default(false)
+  safeRoomRequired    Boolean          @default(false)
+  acRequired          Boolean          @default(false)
+  storageRequired     Boolean          @default(false)
+  schoolProximity     String?
+  source              String?
+  status              LeadStatus       @default(WARM)
+  notes               String?
+  brokerageSignedAt   DateTime?
+  brokerageExpiresAt  DateTime?
+  lastContact         DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  viewings        PropertyViewing[]
+  customerProfile CustomerProfile?
+  agreements      Agreement[]
+
+  @@index([agentId])
+  @@index([status])
+  @@index([city])
+}
+
+model Deal {
+  id             String     @id @default(cuid())
+  agentId        String
+  agent          User       @relation("AgentDeals", fields: [agentId], references: [id])
+  propertyId     String?    @unique
+  property       Property?  @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  propertyStreet String
+  city           String
+  assetClass     AssetClass
+  category       PropertyCategory
+  status         DealStatus @default(NEGOTIATING)
+  marketingPrice Int
+  offer          Int?
+  closedPrice    Int?
+  commission     Int?
+  buyerAgent     String?
+  sellerAgent    String?
+  lawyer         String?
+  updateDate     DateTime   @default(now())
+  signedAt       DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([agentId])
+  @@index([status])
+}
+
+model Agreement {
+  id         String   @id @default(cuid())
+  leadId     String?
+  lead       Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  signerName String
+  signerPhone String?
+  signerEmail String?
+  fileId     String?
+  file       UploadedFile? @relation(fields: [fileId], references: [id])
+  sentAt     DateTime @default(now())
+  signedAt   DateTime?
+  status     String   @default("SENT") // SENT | SIGNED | EXPIRED | CANCELLED
+  note       String?
+
+  @@index([leadId])
+  @@index([propertyId])
+}
+
+model UploadedFile {
+  id         String   @id @default(cuid())
+  ownerId    String
+  owner      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  kind       String   // "property_image" | "signed_agreement" | "other"
+  originalName String
+  mimeType   String
+  sizeBytes  Int
+  path       String   // relative path on disk inside /uploads
+  createdAt  DateTime @default(now())
+
+  agreements Agreement[]
+
+  @@index([ownerId])
+  @@index([kind])
+}
+
+model CityLookup {
+  name    String  @id
+  lat     Float
+  lng     Float
+}
+
+model StreetLookup {
+  id      String @id @default(cuid())
+  name    String
+  city    String
+  lat     Float
+  lng     Float
+
+  @@unique([name, city])
+  @@index([city])
+}

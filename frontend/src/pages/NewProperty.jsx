@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Upload } from 'lucide-react';
+import { ArrowRight, Save, Upload, FileSignature } from 'lucide-react';
+import { cityNames, streetNames } from '../data/mockData';
 import './Forms.css';
 
 export default function NewProperty() {
@@ -147,19 +148,33 @@ export default function NewProperty() {
               <label className="form-label">רחוב ומספר</label>
               <input
                 className="form-input"
-                placeholder="לדוגמה: הרצל 15"
+                placeholder="התחל להקליד רחוב..."
                 value={form.street}
                 onChange={(e) => update('street', e.target.value)}
+                list="property-street-list"
+                autoComplete="off"
               />
+              <datalist id="property-street-list">
+                {streetNames.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </div>
             <div className="form-group">
               <label className="form-label">עיר</label>
               <input
                 className="form-input"
-                placeholder="לדוגמה: רמלה"
+                placeholder="התחל להקליד — לדוגמה: רא..."
                 value={form.city}
                 onChange={(e) => update('city', e.target.value)}
+                list="property-city-list"
+                autoComplete="off"
               />
+              <datalist id="property-city-list">
+                {cityNames.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
           </div>
         </div>
@@ -186,6 +201,28 @@ export default function NewProperty() {
               <label className="form-label">סיום בלעדיות</label>
               <input type="date" className="form-input" value={form.exclusiveEnd} onChange={(e) => update('exclusiveEnd', e.target.value)} />
             </div>
+          </div>
+          <div className="form-inline-action">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                if (!form.owner || !form.ownerPhone) {
+                  alert('יש למלא שם בעל הנכס וטלפון לפני שליחה לחתימה');
+                  return;
+                }
+                alert(
+                  `נשלח הסכם תיווך לחתימה דיגיטלית אל ${form.owner} (${form.ownerPhone}).\n` +
+                    'לאחר חתימה הקובץ יצורף אוטומטית לכרטיס הלקוח.'
+                );
+              }}
+            >
+              <FileSignature size={16} />
+              שלח הסכם תיווך לחתימה דיגיטלית
+            </button>
+            <span className="inline-action-hint">
+              הקובץ החתום יישמר תחת כרטיס הלקוח באופן אוטומטי
+            </span>
           </div>
         </div>
 

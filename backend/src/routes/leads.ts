@@ -1,0 +1,112 @@
+import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { prisma } from '../lib/prisma.js';
+import { requireUser } from '../middleware/auth.js';
+
+const leadInput = z.object({
+  name: z.string().min(1).max(120),
+  phone: z.string().min(3).max(40),
+  email: z.string().email().nullable().optional(),
+  interestType: z.enum(['PRIVATE', 'COMMERCIAL']),
+  lookingFor: z.enum(['BUY', 'RENT']),
+  city: z.string().max(80).nullable().optional(),
+  street: z.string().max(120).nullable().optional(),
+  rooms: z.string().max(20).nullable().optional(),
+  priceRangeLabel: z.string().max(120).nullable().optional(),
+  budget: z.number().int().nonnegative().nullable().optional(),
+  preApproval: z.boolean().optional(),
+  sector: z.string().max(60).nullable().optional(),
+  balconyRequired: z.boolean().optional(),
+  parkingRequired: z.boolean().optional(),
+  elevatorRequired: z.boolean().optional(),
+  safeRoomRequired: z.boolean().optional(),
+  acRequired: z.boolean().optional(),
+  storageRequired: z.boolean().optional(),
+  schoolProximity: z.string().max(60).nullable().optional(),
+  source: z.string().max(60).nullable().optional(),
+  status: z.enum(['HOT', 'WARM', 'COLD']).optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  brokerageSignedAt: z.string().nullable().optional(),
+  brokerageExpiresAt: z.string().nullable().optional(),
+  lastContact: z.string().nullable().optional(),
+});
+
+export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
+  app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
+    const q = req.query as any;
+    const where: any = { agentId: requireUser(req).id };
+    if (q.status) where.status = q.status;
+    if (q.lookingFor) where.lookingFor = q.lookingFor;
+    if (q.interestType) where.interestType = q.interestType;
+    if (q.search) {
+      const s = String(q.search);
+      where.OR = [
+        { name: { contains: s, mode: 'insensitive' } },
+        { phone: { contains: s } },
+        { city: { contains: s, mode: 'insensitive' } },
+      ];
+    }
+    const items = await prisma.lead.findMany({
+      where,
+      include: { viewings: true, agreements: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return { items };
+  });
+
+  app.get('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const lead = await prisma.lead.findUnique({
+      where: { id },
+      include: { viewings: true, agreements: true },
+    });
+    if (!lead || lead.agentId !== requireUser(req).id) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    return { lead };
+  });
+
+  app.post('/', { onRequest: [app.requireAgent] }, async (req) => {
+    const body = leadInput.parse(req.body);
+    const created = await prisma.lead.create({
+      data: {
+        agentId: requireUser(req).id,
+        ...normalize(body),
+      },
+    });
+    return { lead: created };
+  });
+
+  app.patch('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = leadInput.partial().parse(req.body);
+    const existing = await prisma.lead.findUnique({ where: { id } });
+    if (!existing || existing.agentId !== requireUser(req).id) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    const updated = await prisma.lead.update({
+      where: { id },
+      data: normalize(body),
+    });
+    return { lead: updated };
+  });
+
+  app.delete('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const existing = await prisma.lead.findUnique({ where: { id } });
+    if (!existing || existing.agentId !== requireUser(req).id) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    await prisma.lead.delete({ where: { id } });
+    return { ok: true };
+  });
+};
+
+function normalize(body: Partial<z.infer<typeof leadInput>>) {
+  const data: any = { ...body };
+  for (const k of ['brokerageSignedAt', 'brokerageExpiresAt', 'lastContact'] as const) {
+    if (data[k]) data[k] = new Date(data[k]);
+    if (data[k] === null) data[k] = null;
+  }
+  return data;
+}
