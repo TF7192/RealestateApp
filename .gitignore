@@ -21,3 +21,8 @@ data/redis
 # Logs
 *.log
 *.tsbuildinfo
+
+# Capacitor native shells (maintained on mobile branch only)
+frontend/android/
+frontend/ios/
+frontend/ESTIA_MOBILE.md
