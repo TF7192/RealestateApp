@@ -39,19 +39,47 @@ export function subscribeTourKill(listener) {
 // Synchronous kill — called on the Skip/Done click. Returns
 // immediately; server write runs in the background with keepalive so
 // it completes even if the tab unloads.
+//
+// No early-return guard: if the tour is somehow still in the DOM, a
+// second click on "דלג על הסיור" must still yank it. Idempotent writes
+// make that safe.
 export function killAllTours() {
-  if (killed) return;
   killed = true;
   try {
     localStorage.setItem(STORAGE_KEY, '1');
     localStorage.setItem(LEGACY_DISMISS, '1');
   } catch { /* storage disabled */ }
 
-  // Visual escape hatch — hide any Joyride DOM still in the tree.
+  // Visual escape hatch #1 — class hook for the CSS in tour-tooltip.css.
   try { document.body.classList.add('tour-dead'); } catch { /* ignore */ }
 
+  // Visual escape hatch #2 — rip every Joyride-owned node out of the
+  // document on the SAME tick as the click. React will still unmount
+  // OnboardingTour on the next render (via the listener notification
+  // below), but we don't want the user to see a single flicker while
+  // React catches up.
+  //
+  // In react-joyride v3, the portal is an element with id
+  // "react-joyride-portal" and every child uses the "react-joyride__*"
+  // class prefix. Cover both plus the floater library's classes so
+  // floater wrappers never linger either.
+  try {
+    const sel = [
+      '#react-joyride-portal',
+      '.react-joyride__overlay',
+      '.react-joyride__spotlight',
+      '.react-joyride__floater',
+      '.react-joyride__tooltip',
+      '.react-joyride__beacon',
+      '.__floater',
+      '[data-floater-placement]',
+    ].join(',');
+    document.querySelectorAll(sel).forEach((n) => { try { n.remove(); } catch { /* ignore */ } });
+  } catch { /* ignore */ }
+
   // Notify every subscribed tour component. They'll re-render null
-  // on the very next tick.
+  // on the very next tick — this is what prevents Joyride from
+  // re-creating its portal after the nuclear DOM removal above.
   listeners.forEach((fn) => { try { fn(); } catch { /* ignore */ } });
 
   // Server write — belt-and-braces: fire BOTH sendBeacon (guaranteed
@@ -59,8 +87,6 @@ export function killAllTours() {
   // keepalive fetch. Either one lands → server flag flips to true.
   try {
     if (navigator.sendBeacon) {
-      // Empty blob is the trick to force a POST without content-type
-      // issues on older Safari.
       navigator.sendBeacon('/api/me/tutorial/complete', new Blob([], { type: 'application/json' }));
     }
   } catch { /* ignore */ }

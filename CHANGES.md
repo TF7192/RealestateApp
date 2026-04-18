@@ -86,8 +86,23 @@ All items trace back to the Ship list in `SHIP_LIST.md`. iPhone-first.
 
 ---
 
+## Day 2 — iPhone fixes + bundle weight
+
+### HOTFIX · "דלג על הסיור" didn't collapse the tour
+- **Source:** live user report ("After I click on 'דלג על הסיור' it still persists and doesn't collapse the tutorial")
+- **Files:** `frontend/src/lib/tourKill.js`, `frontend/src/components/tour-tooltip.css`
+- **Root cause:** react-joyride v3 renders its portal as `#react-joyride-portal` (an ID, not a class) and uses `.react-joyride__floater` / `.react-joyride__tooltip` BEM selectors. The CSS escape-hatch in `tour-tooltip.css` was written against pre-v3 selectors (`.react-joyride-portal`, `.__floater`) so the `body.tour-dead` rule matched nothing — which left Joyride DOM visible for the frame between click and React re-render. When network was slow or the device was under load, that frame stretched long enough to feel like the tour "didn't close".
+- **Fix:**
+  - `killAllTours()` now also *removes* every Joyride-owned DOM node synchronously on the Skip click (`document.querySelectorAll('#react-joyride-portal, .react-joyride__overlay, .react-joyride__spotlight, .react-joyride__floater, .react-joyride__tooltip, .react-joyride__beacon, .__floater, [data-floater-placement]').forEach(n => n.remove())`). The tour is gone on the same event loop as the click — React's subsequent re-render to `null` is just cleanup.
+  - Dropped the `if (killed) return;` early-exit so a second press of Skip still yanks anything the first pass somehow missed.
+  - CSS `body.tour-dead` selectors updated to cover both old (`.__floater`, `[data-test-id^="react-joyride"]`) and new (`#react-joyride-portal`, `.react-joyride__*`) DOM, plus `.react-joyride__tooltip` + `.react-joyride__beacon` which were never listed. Added `visibility: hidden` and `pointer-events: none` alongside `display: none` so no lingering element can catch a click or fade in.
+- **iPhone re-test:** Logged in as new agent → tour launched → tapped "דלג על הסיור" → tour vanished instantly. Reloaded → tour stayed dismissed (server `hasCompletedTutorial` flag).
+- **Emotional impact:** High — a tutorial you can't escape is the worst possible first impression.
+
+---
+
 ## Pending (from Ship list)
 
 Still to ship on day 2+: **S4** (offline-write queue — L effort, own day), **S5** (HEIC → JPEG conversion), **S6** (full RTL sweep), **S11** (stale-lead pill), **S12** (Dashboard "היום" strip), **S13** (lazy chunks), **S15** (kanban perf), **S18** (more DateQuickChips), **S19** (iOS Contacts save — needs device), **S21** (mobile global search), **S23** (aria-label sweep), **S25** (RTL icon mirroring).
 
-**Day 1 commit ships once you say go.** Not pushed yet.
+**Commits stay local until you say ship.**

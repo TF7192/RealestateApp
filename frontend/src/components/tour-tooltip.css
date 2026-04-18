@@ -195,16 +195,28 @@
 /* ── Escape hatch: dismiss-on-the-same-tick ────────────────── */
 /* When the user taps Skip or Done, we toggle body.tour-dead BEFORE
    React re-renders. That synchronously hides every element Joyride
-   mounted (overlay, spotlight, floater, wrapper), so there's no
-   shrinking-circle leftover animation. The React-side state change
-   follows on the next tick and tears the component down cleanly. */
+   mounted (overlay, spotlight, floater, tooltip, beacon), so there's
+   no shrinking-circle leftover animation. The React-side state change
+   follows on the next tick and tears the component down cleanly.
+
+   NOTE: In react-joyride v3 the portal is an ELEMENT WITH ID
+   "react-joyride-portal" (not a class), and the wrappers use the
+   "react-joyride__*" BEM prefix. Earlier versions used "__floater"
+   and "data-test-id"; keep both here so a lib bump doesn't break us. */
+body.tour-dead #react-joyride-portal,
 body.tour-dead .react-joyride-portal,
-body.tour-dead [data-test-id^="react-joyride"],
 body.tour-dead .react-joyride__overlay,
 body.tour-dead .react-joyride__spotlight,
+body.tour-dead .react-joyride__floater,
+body.tour-dead .react-joyride__tooltip,
+body.tour-dead .react-joyride__beacon,
 body.tour-dead .__floater,
-body.tour-dead .__floater__body {
+body.tour-dead .__floater__body,
+body.tour-dead [data-floater-placement],
+body.tour-dead [data-test-id^="react-joyride"] {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
   animation: none !important;
   transition: none !important;
   opacity: 0 !important;
