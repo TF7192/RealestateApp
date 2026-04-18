@@ -727,3 +727,30 @@ html, body {
   max-width: 1600px;
   margin-inline: auto;
 }
+
+/* T6: content-visibility on list cards lets the browser skip rendering
+   offscreen items. Big win when flipping between tabs on long lists —
+   only the ~20 visible cards get painted instead of every one. */
+@media (min-width: 821px) {
+  .customer-card,
+  .owner-card,
+  .property-card {
+    content-visibility: auto;
+    contain-intrinsic-size: 240px; /* keeps scrollbar stable */
+  }
+}
+
+/* Respect prefers-reduced-motion throughout — kill nav/tab transitions
+   for users who asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .nav-item,
+  .filter-tab,
+  .pps-backdrop,
+  .pps-panel,
+  .agreement-backdrop,
+  .agreement-modal,
+  .animate-in {
+    animation: none !important;
+    transition: none !important;
+  }
+}

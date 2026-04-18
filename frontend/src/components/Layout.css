@@ -204,7 +204,10 @@
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  /* Transition only color/background — NOT 'all'. 'all' was hooking
+     layout-affecting props (padding, font-weight) and causing per-frame
+     layout thrash on every nav click. */
+  transition: background-color 0.14s ease, color 0.14s ease;
   margin-bottom: 2px;
 }
 

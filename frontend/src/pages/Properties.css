@@ -63,7 +63,9 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  /* Only transition color/background — not 'all'. Layout-affecting
+     transitions (padding/border) were causing tab-click jank. */
+  transition: background-color 0.14s ease, color 0.14s ease;
 }
 
 .filter-tab:hover {
