@@ -28,16 +28,16 @@ export default function Login() {
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
-  const handleGoogle = async () => {
-    setError('');
+  const handleGoogle = () => {
+    // Real Google OAuth: redirect to the backend, which bounces to
+    // accounts.google.com and back to /api/auth/google/callback. The
+    // backend sets the httpOnly estia_token cookie and redirects to the
+    // page the user was on. (The old `loginWithGoogle(role)` path still
+    // exists in lib/auth.jsx as the demo-account fallback for local dev
+    // but is no longer wired to any button.)
     setSubmitting(true);
-    try {
-      await loginWithGoogle(role);
-    } catch (e) {
-      setError(e.message || 'התחברות נכשלה');
-    } finally {
-      setSubmitting(false);
-    }
+    const redirect = window.location.pathname + window.location.search;
+    window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirect)}`;
   };
 
   const handleSubmit = async (e) => {

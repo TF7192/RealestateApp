@@ -1,36 +1,29 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useLocation, Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   MapPin,
-  Bed,
-  Maximize,
   Building2,
-  ParkingCircle,
-  Warehouse,
-  Wind,
-  Snowflake,
-  Shield,
   Phone,
   CheckCircle2,
   Circle,
   ExternalLink,
-  Copy,
-  ChevronLeft,
-  ChevronRight,
-  User,
-  FileText,
-  Edit3,
-  Trash2,
-  Link2,
   X,
   Images,
   Film,
   ArrowLeftRight,
+  Edit3,
+  Trash2,
+  Link2,
   Navigation,
-  Check,
   Share2,
   Clock,
+  User,
+  FileText,
+  ChevronLeft,
+  Megaphone,
+  Sparkles,
+  Pencil,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -43,11 +36,15 @@ import TransferPropertyDialog from '../components/TransferPropertyDialog';
 import LeadPickerSheet from '../components/LeadPickerSheet';
 import StickyActionBar from '../components/StickyActionBar';
 import WhatsAppIcon from '../components/WhatsAppIcon';
+import PropertyHero from '../components/PropertyHero';
+import PropertyKpiTile from '../components/PropertyKpiTile';
+import PropertyPanelSheet from '../components/PropertyPanelSheet';
 import { useCopyFeedback, useViewportMobile, useViewportDesktop } from '../hooks/mobile';
 import { openWhatsApp, shareWithPhotos } from '../native/share';
 import { telUrl, wazeUrl, waUrl } from '../lib/waLink';
 import { shareSheet } from '../native/share';
 import { leadMatchesProperty } from './Properties';
+import { relativeDate } from '../lib/relativeDate';
 import {
   buildVariables as tplBuildVars,
   renderTemplate as tplRender,
@@ -101,6 +98,9 @@ const MARKETING_GROUPS = [
   },
 ];
 
+// Channels that get a quick "✓ / ◯" preview on the marketing card
+const MARKETING_HIGHLIGHTS = ['facebook', 'yad2', 'madlan', 'iList'];
+
 function formatPrice(price) {
   if (!price) return '—';
   if (price < 10000) return `₪${price.toLocaleString('he-IL')}/חודש`;
@@ -144,22 +144,18 @@ function buildFullWhatsAppMessage(prop, agent) {
   return lines.join('\n');
 }
 
-const TAB_KEYS = ['details', 'marketing', 'photos', 'history'];
-
 export default function PropertyDetail() {
   const { id } = useParams();
-  const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
   const isMobile = useViewportMobile(820);
-  const isDesktop = useViewportDesktop(1100); // P1-D1 — 2-column rail at >=1100px
+  const isDesktop = useViewportDesktop(1100);
   const { copied, copy } = useCopyFeedback();
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
-  const [reminder, setReminder] = useState('WEEKLY');
   const [actionDialog, setActionDialog] = useState(null);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -171,33 +167,11 @@ export default function PropertyDetail() {
   const [templates, setTemplates] = useState(null);
   const [leads, setLeads] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerLeadsOverride, setPickerLeadsOverride] = useState(null); // P3-M9
+  const [pickerLeadsOverride, setPickerLeadsOverride] = useState(null);
   const [lightboxIdx, setLightboxIdx] = useState(null);
-  const [dragOver, setDragOver] = useState(false); // P2-D5 — drag-to-upload
-  const stripRef = useRef(null);
-
-  // P2-M14 — tab state, persisted via URL hash on mobile
-  const initialTab = (() => {
-    const h = (location.hash || '').replace('#', '');
-    return TAB_KEYS.includes(h) ? h : 'details';
-  })();
-  const [activeTab, setActiveTab] = useState(initialTab);
-
-  useEffect(() => {
-    const onHash = () => {
-      const h = (window.location.hash || '').replace('#', '');
-      if (TAB_KEYS.includes(h)) setActiveTab(h);
-    };
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, []);
-
-  const switchTab = (t) => {
-    setActiveTab(t);
-    try {
-      window.history.replaceState(null, '', `#${t}`);
-    } catch { /* ignore */ }
-  };
+  const [dragOver, setDragOver] = useState(false);
+  // Active sliding panel: 'marketing' | 'owner' | 'photos' | 'exclusivity' | 'notes' | 'map' | null
+  const [panel, setPanel] = useState(null);
 
   useEffect(() => {
     api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
@@ -208,9 +182,6 @@ export default function PropertyDetail() {
     try {
       const res = await api.getProperty(id);
       setProperty(res.property);
-      if (res.property?.marketingReminderFrequency) {
-        setReminder(res.property.marketingReminderFrequency);
-      }
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -220,7 +191,7 @@ export default function PropertyDetail() {
 
   useEffect(() => { load(); }, [id]);
 
-  // P2-D6 — Clipboard image paste: while on this page, pasted images upload to the property.
+  // Clipboard image paste: while on this page, pasted images upload.
   useEffect(() => {
     const onPaste = async (e) => {
       if (!property) return;
@@ -249,7 +220,7 @@ export default function PropertyDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [property?.id]);
 
-  // P2-D15 — Keyboard nav for gallery: ArrowLeft/Right cycles, F = fullscreen, Esc = close.
+  // Keyboard nav for gallery: ArrowLeft/Right cycles, F = fullscreen, Esc = close.
   useEffect(() => {
     const onKey = (e) => {
       const tag = (document.activeElement?.tagName || '').toLowerCase();
@@ -302,9 +273,6 @@ export default function PropertyDetail() {
   const mapsEmbed = `https://www.google.com/maps?q=${mapsQuery}&output=embed`;
   const mapsOpen = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
-  // Prefer SEO-friendly slug URL when both agent + property slugs exist.
-  // The legacy /p/:id link is kept as a fallback so older share links keep
-  // working (the route resolves either shape).
   const customerLink = property.slug && user?.slug
     ? `${window.location.origin}/agents/${encodeURI(user.slug)}/${encodeURI(property.slug)}`
     : `${window.location.origin}/p/${property.id}`;
@@ -324,10 +292,6 @@ export default function PropertyDetail() {
     });
   };
 
-  // P3-M9 — Smart matching:
-  //  · 1 match  → open WhatsApp with that lead's phone directly (skip picker)
-  //  · 2-5 matches → open picker filtered to only those leads
-  //  · 0 (or > 5) → open the full picker
   const handleWhatsApp = () => {
     const matches = (leads || []).filter((l) => leadMatchesProperty(l, property));
     if (matches.length === 1) {
@@ -349,7 +313,6 @@ export default function PropertyDetail() {
     setPickerOpen(false);
     setPickerLeadsOverride(null);
     const text = editedText || buildMessage();
-    // "Share with photos" path — iOS native share sheet, photos attached
     if (opts?.withPhotos) {
       await shareWithPhotos({
         photos: opts.photos,
@@ -359,11 +322,9 @@ export default function PropertyDetail() {
       });
       return;
     }
-    // Native deep link on iOS, wa.me in browser on web
     await openWhatsApp({ phone: lead?.phone, text });
   };
 
-  // P1-M13 — Native share
   const handleShare = async () => {
     await shareSheet({
       title: property.street,
@@ -384,613 +345,642 @@ export default function PropertyDetail() {
     }
   };
 
-  const nextImage = () => {
-    const next = (currentImage + 1) % images.length;
-    setCurrentImage(next);
-    if (stripRef.current) {
-      const w = stripRef.current.clientWidth;
-      stripRef.current.scrollTo({ left: -(next * w), behavior: 'smooth' });
+  const nextImage = () => setCurrentImage((i) => (i + 1) % images.length);
+  const prevImage = () => setCurrentImage((i) => (i - 1 + images.length) % images.length);
+
+  const handleGalleryDragOver = (e) => {
+    if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return;
+    e.preventDefault();
+    if (!dragOver) setDragOver(true);
+  };
+  const handleGalleryDragLeave = (e) => {
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setDragOver(false);
+  };
+  const handleGalleryDrop = async (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = Array.from(e.dataTransfer?.files || []).filter((f) => f.type.startsWith('image/'));
+    if (!files.length) return;
+    let uploaded = 0;
+    for (const file of files) {
+      try {
+        await api.uploadPropertyImage(property.id, file);
+        uploaded += 1;
+      } catch (err) {
+        toast?.error?.(err?.message || 'העלאת התמונה נכשלה');
+      }
+    }
+    if (uploaded > 0) {
+      toast?.success?.(`${uploaded} תמונות הועלו`);
+      await load();
     }
   };
-  const prevImage = () => {
-    const next = (currentImage - 1 + images.length) % images.length;
-    setCurrentImage(next);
-    if (stripRef.current) {
-      const w = stripRef.current.clientWidth;
-      stripRef.current.scrollTo({ left: -(next * w), behavior: 'smooth' });
+
+  // ── Marketing toggle handler (re-used inside the marketing panel) ──
+  const toggleMarketingAction = async (key) => {
+    const detail = actionsDetail[key] || { done: false };
+    const nextDone = !detail.done;
+    const next = {
+      ...property,
+      marketingActions: { ...actionsMap, [key]: nextDone },
+      marketingActionsDetail: {
+        ...actionsDetail,
+        [key]: { ...detail, done: nextDone, doneAt: nextDone ? new Date().toISOString() : null },
+      },
+    };
+    setProperty(next);
+    try {
+      await api.toggleMarketingAction(property.id, {
+        actionKey: key,
+        done: nextDone,
+        notes: detail.notes || null,
+        link: detail.link || null,
+      });
+      toast.success(nextDone
+        ? `${MARKETING_LABELS[key]} · סומן כהושלם`
+        : `${MARKETING_LABELS[key]} · סימון הוסר`);
+    } catch (e) {
+      setProperty(property);
+      toast.error(e?.message || 'שגיאה — השינוי בוטל');
     }
   };
-  const handleStripScroll = () => {
-    const el = stripRef.current;
-    if (!el) return;
-    const w = el.clientWidth;
-    // RTL: scrollLeft is zero or negative; use abs.
-    const idx = Math.round(Math.abs(el.scrollLeft) / w);
-    if (idx !== currentImage && idx < images.length) setCurrentImage(idx);
-  };
 
-  // P2-M14 — section visibility: on desktop everything is shown; on mobile only the active tab.
-  const showDetails   = !isMobile || activeTab === 'details';
-  const showMarketing = !isMobile || activeTab === 'marketing';
-  const showPhotos    = !isMobile || activeTab === 'photos';
-  const showHistory   = !isMobile || activeTab === 'history';
+  // ── Owner data (linked or inline) ──
+  const linkedOwner = property.propertyOwner || null;
+  const ownerName  = linkedOwner?.name  || property.owner || '';
+  const ownerPhone = linkedOwner?.phone || property.ownerPhone || '';
+  const ownerEmail = linkedOwner?.email || null;
+  const ownerInitial = (ownerName || '?').charAt(0);
 
-  // P1-D1 — exclusivity countdown helper (days until end)
+  // ── Exclusivity countdown ──
+  const exclusivityRel = property.exclusiveEnd ? relativeDate(property.exclusiveEnd) : null;
   const exclusivityDaysLeft = (() => {
     if (!property.exclusiveEnd) return null;
     const ms = new Date(property.exclusiveEnd).getTime() - Date.now();
     if (Number.isNaN(ms)) return null;
     return Math.ceil(ms / 86400000);
   })();
+  const hasExclusivity = !!(property.exclusiveStart || property.exclusiveEnd);
 
-  // Reusable marketing-actions card (rendered in sidebar by default; in left column on desktop ≥1100px)
-  const marketingActionsCard = showMarketing ? (
-    <div className="card sidebar-card animate-in animate-in-delay-4">
-      <div className="marketing-header">
-        <h4>פעולות שיווק</h4>
-        <span className="badge badge-gold">{done}/{total}</span>
-      </div>
-      <div className="progress-bar" style={{ marginBottom: 16 }}>
-        <div className="progress-fill" style={{ width: `${pct}%` }} />
-      </div>
-      <p className="marketing-hint">סמן כהושלם בלחיצה · פרטים נוספים בכפתור הצד</p>
+  // ── Days on market ──
+  const daysListed = (() => {
+    const ts = property.createdAt ? new Date(property.createdAt).getTime() : null;
+    if (!ts || !Number.isFinite(ts)) return null;
+    return Math.max(0, Math.floor((Date.now() - ts) / 86400000));
+  })();
 
-      {MARKETING_GROUPS.map((group) => {
-        const gTotal = group.keys.length;
-        const groupDone = group.keys.filter((k) => actionsMap[k]).length;
-        return (
-          <MarketingGroup
-            key={group.key}
-            id={group.key}
-            label={group.label}
-            done={groupDone}
-            total={gTotal}
-          >
-            <div className="marketing-checklist">
-              {group.keys.map((key) => {
-                const label = MARKETING_LABELS[key];
-                const detail = actionsDetail[key] || { done: false };
-                const handleToggle = async () => {
-                  const nextDone = !detail.done;
-                  const next = {
-                    ...property,
-                    marketingActions: { ...actionsMap, [key]: nextDone },
-                    marketingActionsDetail: {
-                      ...actionsDetail,
-                      [key]: { ...detail, done: nextDone, doneAt: nextDone ? new Date().toISOString() : null },
-                    },
-                  };
-                  setProperty(next);
-                  try {
-                    await api.toggleMarketingAction(property.id, {
-                      actionKey: key,
-                      done: nextDone,
-                      notes: detail.notes || null,
-                      link: detail.link || null,
-                    });
-                    toast.success(nextDone ? `${label} · סומן כהושלם` : `${label} · סימון הוסר`);
-                  } catch (e) {
-                    setProperty(property);
-                    toast.error(e?.message || 'שגיאה — השינוי בוטל');
-                  }
-                };
-                return (
-                  <div key={key} className={`checklist-item interactive ${detail.done ? 'is-done' : ''}`}>
-                    <button
-                      type="button"
-                      className="checklist-toggle"
-                      onClick={handleToggle}
-                    >
-                      {detail.done ? (
-                        <CheckCircle2 size={18} className="check-done" />
-                      ) : (
-                        <Circle size={18} className="check-pending" />
-                      )}
-                      <span className={detail.done ? 'done' : ''}>{label}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="checklist-detail-btn"
-                      onClick={() => setActionDialog({ key, detail })}
-                      title="פרטים / העלאה / קישור"
-                      aria-label={`פרטי ${label}`}
-                    >
-                      {detail.link
-                        ? <Link2 size={13} />
-                        : detail.notes
-                        ? <FileText size={13} />
-                        : <FileText size={13} style={{ opacity: 0.4 }} />}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </MarketingGroup>
-        );
-      })}
-    </div>
-  ) : null;
+  // ── KPI data ──
+  const visitsCount = Number(property._count?.visits ?? property.visitsCount ?? 0);
+  const inquiriesCount = Number(property._count?.inquiries ?? property.inquiriesCount ?? 0);
+
+  // ── Notes summary chips: build a compact list of features ──
+  const featureChips = [];
+  if (property.airDirections) featureChips.push(`כיווני אוויר: ${property.airDirections}`);
+  if (property.renovated) featureChips.push(`מצב: ${property.renovated}`);
+  if (property.elevator) featureChips.push('מעלית');
+  if (property.parking) featureChips.push('חניה');
+  if (property.safeRoom) featureChips.push('ממ״ד');
+  if (property.storage) featureChips.push('מחסן');
+  if (property.ac) featureChips.push('מזגן');
+  if (property.balconySize > 0) featureChips.push(`מרפסת ${property.balconySize} מ״ר`);
 
   return (
-    <div className="property-detail">
-      <div className="detail-top-actions">
-        <Link to="/properties" className="back-link animate-in">
+    <div className="property-detail pd-dashboard">
+      {/* Top toolbar */}
+      <div className="pd-topbar">
+        <Link to="/properties" className="pd-back animate-in">
           <ArrowRight size={16} />
-          חזרה לנכסים
+          <span>חזרה לנכסים</span>
         </Link>
-        {!isDesktop && (
-          <div className="detail-top-manage">
-            <button className="btn btn-secondary btn-sm" onClick={() => setTransferOpen(true)}>
-              <ArrowLeftRight size={14} />
-              העבר נכס
-            </button>
-            <button className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>
-              <Edit3 size={14} />
-              עריכה
-            </button>
-            <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
-              <Trash2 size={14} />
-              מחיקה
-            </button>
-          </div>
-        )}
+        <div className="pd-top-actions">
+          <button className="btn btn-secondary btn-sm" onClick={() => setTransferOpen(true)}>
+            <ArrowLeftRight size={14} />
+            <span>העבר</span>
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>
+            <Edit3 size={14} />
+            <span>עריכה</span>
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={handleShare}>
+            <Share2 size={14} />
+            <span>שתף</span>
+          </button>
+          <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
+            <Trash2 size={14} />
+            <span>מחיקה</span>
+          </button>
+        </div>
       </div>
 
-      {/* P2-M14 — compact mobile header above tabs (title + price always visible) */}
-      {isMobile && (
-        <div className="pd-mobile-head animate-in">
-          <div className="detail-badges">
-            <span className={`badge ${property.assetClass === 'COMMERCIAL' ? 'badge-warning' : 'badge-success'}`}>
-              {property.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}
-            </span>
-            <span className={`badge ${property.category === 'SALE' ? 'badge-gold' : 'badge-info'}`}>
-              {property.category === 'SALE' ? 'מכירה' : 'השכרה'}
-            </span>
-            <span className="badge badge-gold">{property.type}</span>
-          </div>
-          <h2 className="detail-title">{property.street}, {property.city}</h2>
-          <div className="detail-price">{formatPrice(property.marketingPrice)}</div>
-        </div>
-      )}
+      {/* Hero — gallery + price/title/CTAs */}
+      <PropertyHero
+        property={property}
+        images={images}
+        currentImage={currentImage}
+        onPrev={prevImage}
+        onNext={nextImage}
+        onSelectImage={setCurrentImage}
+        onOpenLightbox={(i) => setLightboxIdx(i)}
+        onManagePhotos={() => setManagingPhotos(true)}
+        onManageVideos={() => setManagingVideos(true)}
+        onWhatsApp={handleWhatsApp}
+        onCopyLink={(link) => copy(link)}
+        copied={copied}
+        wazeHref={wazeUrl(`${property.street} ${property.city}`)}
+        customerLink={customerLink}
+        isMobile={isMobile}
+        formatPrice={formatPrice}
+        dragOver={dragOver}
+        onDragOver={handleGalleryDragOver}
+        onDragLeave={handleGalleryDragLeave}
+        onDrop={handleGalleryDrop}
+      />
 
-      {/* P2-M14 — mobile tab bar */}
-      {isMobile && (
-        <div className="pd-tabs" role="tablist" aria-label="פרטי נכס">
-          {[
-            { key: 'details',   label: 'פרטים' },
-            { key: 'marketing', label: 'שיווק' },
-            { key: 'photos',    label: 'תמונות' },
-            { key: 'history',   label: 'היסטוריה' },
-          ].map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === t.key}
-              className={`pd-tab ${activeTab === t.key ? 'active' : ''}`}
-              onClick={() => switchTab(t.key)}
-            >
-              {t.label}
+      {/* KPI strip */}
+      <div className="pd-kpis animate-in animate-in-delay-2">
+        <PropertyKpiTile
+          value={`${pct}%`}
+          label="שיווק"
+          sublabel={`${done}/${total}`}
+          onClick={() => setPanel('marketing')}
+        />
+        <PropertyKpiTile
+          value={visitsCount}
+          label="ביקורים"
+          tone={visitsCount > 0 ? 'gold' : 'neutral'}
+        />
+        <PropertyKpiTile
+          value={inquiriesCount}
+          label="פניות"
+          tone={inquiriesCount > 0 ? 'gold' : 'neutral'}
+        />
+        <PropertyKpiTile
+          value={daysListed != null ? daysListed : '—'}
+          label="ימים בשוק"
+          tone="neutral"
+        />
+      </div>
+
+      {/* Dashboard cards grid */}
+      <div className="pd-grid">
+
+        {/* Marketing — primary card with gold trim */}
+        <DashCard
+          variant="primary"
+          delay={1}
+          icon={<Megaphone size={16} />}
+          title="שיווק"
+          action={(
+            <button className="dc-cta" onClick={() => setPanel('marketing')}>
+              נהל כל ה-{total} פעולות
+              <ChevronLeft size={14} />
             </button>
-          ))}
-        </div>
-      )}
-
-      {/* Gallery */}
-      {showPhotos && (
-      <div
-        className={`detail-gallery animate-in animate-in-delay-1 ${dragOver ? 'pd-drag-over' : ''}`}
-        onDragOver={(e) => {
-          if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return;
-          e.preventDefault();
-          if (!dragOver) setDragOver(true);
-        }}
-        onDragLeave={(e) => {
-          // only clear when leaving the gallery boundary, not children
-          if (e.currentTarget.contains(e.relatedTarget)) return;
-          setDragOver(false);
-        }}
-        onDrop={async (e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const files = Array.from(e.dataTransfer?.files || []).filter((f) => f.type.startsWith('image/'));
-          if (!files.length) return;
-          let uploaded = 0;
-          for (const file of files) {
-            try {
-              await api.uploadPropertyImage(property.id, file);
-              uploaded += 1;
-            } catch (err) {
-              toast?.error?.(err?.message || 'העלאת התמונה נכשלה');
-            }
-          }
-          if (uploaded > 0) {
-            toast?.success?.(`${uploaded} תמונות הועלו`);
-            await load();
-          }
-        }}
-      >
-        {dragOver && (
-          <div className="pd-drop-overlay" aria-hidden="true">
-            <Images size={28} />
-            <span>שחרר כאן להעלאה</span>
-          </div>
-        )}
-        <div className="gallery-main">
-          <div
-            ref={stripRef}
-            className="gallery-strip"
-            onScroll={handleStripScroll}
-          >
-            {images.map((img, i) => (
-              <button
-                key={i}
-                type="button"
-                className="gallery-slide"
-                onClick={() => setLightboxIdx(i)}
-                aria-label={`פתח תמונה ${i + 1}`}
-              >
-                <img src={img} alt={`${property.street} — ${i + 1}`} loading="lazy" />
-              </button>
-            ))}
-          </div>
-          {images.length > 1 && (
-            <>
-              <button className="gallery-nav prev" onClick={prevImage} aria-label="תמונה קודמת">
-                <ChevronRight size={20} />
-              </button>
-              <button className="gallery-nav next" onClick={nextImage} aria-label="תמונה הבאה">
-                <ChevronLeft size={20} />
-              </button>
-            </>
           )}
-          <div className="gallery-counter">
-            {currentImage + 1} / {images.length}
+        >
+          <div className="dc-progress-row">
+            <div className="dc-progress-bar">
+              <div className="dc-progress-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="dc-progress-num">{pct}%</span>
           </div>
-          <button
-            className="gallery-manage-btn"
-            onClick={() => setManagingPhotos(true)}
-            title="ניהול תמונות — הוספה, מחיקה וסידור"
-          >
-            <Images size={14} />
-            ניהול תמונות
-          </button>
-          <button
-            className="gallery-manage-btn gallery-manage-btn-alt"
-            onClick={() => setManagingVideos(true)}
-            title="ניהול סרטונים"
-          >
-            <Film size={14} />
-            ניהול סרטונים {property.videos?.length ? `(${property.videos.length})` : ''}
-          </button>
-        </div>
-        {images.length > 1 && (
-          <div className="gallery-dots" aria-hidden="true">
-            {images.map((_, i) => (
-              <span
-                key={i}
-                className={`gallery-dot ${i === currentImage ? 'active' : ''}`}
-              />
-            ))}
+          <div className="dc-channel-grid">
+            {MARKETING_HIGHLIGHTS.map((k) => {
+              const on = !!actionsMap[k];
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => toggleMarketingAction(k)}
+                  className={`dc-channel ${on ? 'is-on' : ''}`}
+                  title={MARKETING_LABELS[k]}
+                >
+                  {on
+                    ? <CheckCircle2 size={14} className="dc-channel-icon on" />
+                    : <Circle size={14} className="dc-channel-icon" />}
+                  <span>{MARKETING_LABELS[k]}</span>
+                </button>
+              );
+            })}
           </div>
-        )}
-        {images.length > 1 && (
-          <div className="gallery-thumbs">
-            {images.map((img, i) => (
-              <button
-                key={i}
-                className={`gallery-thumb ${i === currentImage ? 'active' : ''}`}
-                onClick={() => {
-                  setCurrentImage(i);
-                  if (stripRef.current) {
-                    const w = stripRef.current.clientWidth;
-                    stripRef.current.scrollTo({ left: -(i * w), behavior: 'smooth' });
-                  }
-                }}
-              >
-                <img src={img} alt="" />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      )}
+        </DashCard>
 
-      <div className="detail-content">
-        <div className="detail-main animate-in animate-in-delay-2">
-          {/* Header — desktop only (mobile uses pd-mobile-head + tabs). */}
-          {!isMobile && (
-            <div className="detail-header">
-              <div>
-                <div className="detail-badges">
-                  <span className={`badge ${property.assetClass === 'COMMERCIAL' ? 'badge-warning' : 'badge-success'}`}>
-                    {property.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}
-                  </span>
-                  <span className={`badge ${property.category === 'SALE' ? 'badge-gold' : 'badge-info'}`}>
-                    {property.category === 'SALE' ? 'מכירה' : 'השכרה'}
-                  </span>
-                  <span className="badge badge-gold">{property.type}</span>
+        {/* Owner */}
+        <DashCard
+          delay={2}
+          icon={<User size={16} />}
+          title="בעל הנכס"
+          action={(
+            <button className="dc-cta" onClick={() => setPanel('owner')}>
+              {linkedOwner?.id ? 'פתח כרטיס' : 'פרטים'}
+              <ChevronLeft size={14} />
+            </button>
+          )}
+        >
+          {ownerName ? (
+            <>
+              <div className="dc-owner">
+                <div className="dc-owner-avatar">{ownerInitial}</div>
+                <div className="dc-owner-id">
+                  {linkedOwner?.id ? (
+                    <Link to={`/owners/${linkedOwner.id}`} className="dc-owner-name dc-owner-link">
+                      {ownerName}
+                    </Link>
+                  ) : (
+                    <span className="dc-owner-name">{ownerName}</span>
+                  )}
+                  {ownerPhone && (
+                    <a href={telUrl(ownerPhone)} className="dc-owner-meta">
+                      <Phone size={12} />
+                      {ownerPhone}
+                    </a>
+                  )}
                 </div>
-                <h2 className="detail-title">
-                  {property.street}, {property.city}
-                </h2>
-                <div className="detail-price">{formatPrice(property.marketingPrice)}</div>
               </div>
-              {!isDesktop && (
-                <div className="detail-share-actions">
-                  <button className="btn btn-primary" onClick={handleWhatsApp} aria-label={`WhatsApp ${property.street}`}>
-                    <WhatsAppIcon size={18} />
-                    שלח בוואטסאפ
-                  </button>
-                  <button
-                    className={`btn btn-secondary ${copied ? 'copy-flash' : ''}`}
-                    onClick={() => copy(customerLink)}
-                    aria-label={`Copy link ${property.street}`}
+              {ownerPhone && (
+                <div className="dc-owner-actions">
+                  <a
+                    href={telUrl(ownerPhone)}
+                    className="dc-mini dc-mini-secondary"
+                    aria-label={`Call ${ownerName}`}
                   >
-                    {copied ? <Check size={16} /> : <Copy size={16} />}
-                    {copied ? 'הועתק' : 'העתק קישור'}
-                  </button>
-                  <Link to={`/p/${property.id}`} target="_blank" className="btn btn-ghost" aria-label={`View as customer ${property.street}`}>
-                    <ExternalLink size={16} />
-                    צפה כלקוח
-                  </Link>
+                    <Phone size={13} />
+                    <span>התקשר</span>
+                  </a>
+                  <a
+                    href={waUrl(ownerPhone, '')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="dc-mini dc-mini-wa"
+                    aria-label={`WhatsApp ${ownerName}`}
+                  >
+                    <WhatsAppIcon size={13} />
+                    <span>וואטסאפ</span>
+                  </a>
                 </div>
+              )}
+            </>
+          ) : (
+            <p className="dc-empty">לא מוגדר בעל נכס</p>
+          )}
+        </DashCard>
+
+        {/* Photos preview */}
+        <DashCard
+          delay={3}
+          icon={<Images size={16} />}
+          title={`תמונות (${property.images?.length || 0})`}
+          action={(
+            <button className="dc-cta" onClick={() => setManagingPhotos(true)}>
+              ניהול
+              <ChevronLeft size={14} />
+            </button>
+          )}
+        >
+          {property.images?.length > 0 ? (
+            <div className="dc-thumbs">
+              {property.images.slice(0, 4).map((img, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="dc-thumb"
+                  onClick={() => setLightboxIdx(i)}
+                  aria-label={`פתח תמונה ${i + 1}`}
+                >
+                  <img src={img} alt="" loading="lazy" />
+                  {i === 3 && property.images.length > 4 && (
+                    <span className="dc-thumb-more">+{property.images.length - 4}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="dc-empty">אין עדיין תמונות. גרור או הדבק להעלאה מהירה.</p>
+          )}
+          <p className="dc-hint">גרור או הדבק תמונות לעדכון</p>
+        </DashCard>
+
+        {/* Exclusivity */}
+        <DashCard
+          delay={4}
+          icon={<Clock size={16} />}
+          title="בלעדיות"
+          action={(
+            <button className="dc-cta" onClick={() => setPanel('exclusivity')}>
+              {hasExclusivity ? 'פרטים' : 'הגדר'}
+              <ChevronLeft size={14} />
+            </button>
+          )}
+        >
+          {hasExclusivity ? (
+            <div className="dc-excl">
+              {property.exclusiveEnd && (
+                <div className="dc-excl-line">
+                  <span className="dc-excl-label">סיום</span>
+                  <span className="dc-excl-value">
+                    {new Date(property.exclusiveEnd).toLocaleDateString('he-IL')}
+                  </span>
+                </div>
+              )}
+              {exclusivityRel && (
+                <div className={`dc-excl-pill dc-excl-pill-${
+                  exclusivityDaysLeft != null && exclusivityDaysLeft < 0 ? 'expired'
+                  : exclusivityDaysLeft != null && exclusivityDaysLeft <= 14 ? 'soon'
+                  : 'normal'
+                }`}>
+                  {exclusivityRel.label}
+                </div>
+              )}
+              <div className="dc-excl-status">
+                סטטוס: <strong>{property.status === 'PAUSED' ? 'מושהה' : property.status === 'ARCHIVED' ? 'בארכיון' : 'פעיל'}</strong>
+              </div>
+            </div>
+          ) : (
+            <p className="dc-empty">לא הוגדרה תקופת בלעדיות</p>
+          )}
+        </DashCard>
+
+        {/* Notes / features */}
+        <DashCard
+          delay={5}
+          icon={<Sparkles size={16} />}
+          title="הערות ומאפיינים"
+          action={(
+            <button className="dc-cta" onClick={() => setPanel('notes')}>
+              <Pencil size={13} />
+              ערוך
+            </button>
+          )}
+        >
+          {featureChips.length > 0 && (
+            <div className="dc-feature-chips">
+              {featureChips.slice(0, 6).map((c) => (
+                <span key={c} className="dc-feature-chip">{c}</span>
+              ))}
+              {featureChips.length > 6 && (
+                <span className="dc-feature-chip dc-feature-chip-more">+{featureChips.length - 6}</span>
               )}
             </div>
           )}
+          {property.notes ? (
+            <p className="dc-notes-preview">{property.notes}</p>
+          ) : featureChips.length === 0 ? (
+            <p className="dc-empty">אין הערות עדיין</p>
+          ) : null}
+        </DashCard>
 
-          {showDetails && (
-          <div className="specs-grid">
-            {property.rooms != null && (
-              <Spec icon={Bed} value={property.rooms} label="חדרים" />
-            )}
-            <Spec icon={Maximize} value={`${property.sqm} מ״ר`} label="שטח" />
-            <Spec icon={Building2} value={`${property.floor}/${property.totalFloors}`} label="קומה" />
-            {property.balconySize > 0 && (
-              <Spec icon={Wind} value={`${property.balconySize} מ״ר`} label="מרפסת" />
-            )}
-            <Spec icon={ParkingCircle} value={property.parking ? 'יש' : 'אין'} label="חניה" />
-            <Spec icon={Warehouse} value={property.storage ? 'יש' : 'אין'} label="מחסן" />
-            <Spec icon={Snowflake} value={property.ac ? 'יש' : 'אין'} label="מזגן" />
-            <Spec icon={Shield} value={property.safeRoom ? 'יש' : 'אין'} label="ממ״ד" />
+        {/* Map */}
+        <DashCard
+          delay={5}
+          icon={<MapPin size={16} />}
+          title="מיקום"
+          action={(
+            <a
+              href={mapsOpen}
+              target="_blank"
+              rel="noreferrer"
+              className="dc-cta"
+            >
+              <ExternalLink size={13} />
+              פתח במפות
+            </a>
+          )}
+        >
+          <div className="dc-map-mini">
+            <iframe
+              title="מיקום הנכס"
+              src={mapsEmbed}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
-          )}
+          <div className="dc-map-addr">{property.street}, {property.city}</div>
+        </DashCard>
 
-          {showDetails && (
-          <div className="detail-map-card">
-            <div className="detail-map-header">
-              <h4><MapPin size={18} />מיקום הנכס</h4>
-              <a href={mapsOpen} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">
-                <ExternalLink size={14} />
-                פתח בגוגל מפות
-              </a>
-            </div>
-            <div className="detail-map-frame">
-              <iframe
-                title="מיקום הנכס"
-                src={mapsEmbed}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                allowFullScreen
-              />
-            </div>
-            <div className="detail-map-address">{property.street}, {property.city}</div>
-          </div>
-          )}
+      </div>
 
-          {showPhotos && property.videos?.length > 0 && (
-            <div className="detail-videos">
-              <div className="detail-videos-head">
-                <h4><Film size={16} /> סרטונים ({property.videos.length})</h4>
+      {/* ── Slide-in panels ── */}
+      {panel === 'marketing' && (
+        <PropertyPanelSheet
+          title="פעולות שיווק"
+          subtitle={`${done} מתוך ${total} הושלמו · ${pct}%`}
+          width="lg"
+          onClose={() => setPanel(null)}
+        >
+          <div className="pd-panel-marketing">
+            <div className="dc-progress-row dc-progress-row-lg">
+              <div className="dc-progress-bar">
+                <div className="dc-progress-fill" style={{ width: `${pct}%` }} />
               </div>
-              <div className="detail-videos-grid">
-                {property.videos.map((v) => (
-                  <VideoTile key={v.id} video={v} />
-                ))}
-              </div>
+              <span className="dc-progress-num">{pct}%</span>
             </div>
-          )}
-
-          {showDetails && property.notes && (
-            <div className="detail-notes">
-              <h4>הערות</h4>
-              <p>{property.notes}</p>
-            </div>
-          )}
-
-          {/* P1-D1 — on desktop the marketing-actions card lives in the left column */}
-          {isDesktop && marketingActionsCard}
-
-          {/* P2-M14 — empty history tab */}
-          {isMobile && showHistory && (
-            <div className="empty-state pd-history-empty">
-              <Clock size={42} />
-              <h3>עוד אין היסטוריה</h3>
-              <p>פעילות, העברות והערות עדכון יוצגו כאן.</p>
-            </div>
-          )}
-        </div>
-
-        <div className={`detail-sidebar ${isDesktop ? 'pd-rail-desktop' : ''}`}>
-          {showDetails && (() => {
-            // Prefer the linked Owner record; fall back to inline name/phone.
-            const linkedOwner = property.propertyOwner || null;
-            const ownerName = linkedOwner?.name || property.owner || '';
-            const ownerPhone = linkedOwner?.phone || property.ownerPhone || '';
-            const ownerEmail = linkedOwner?.email || null;
-            const initial = (ownerName || '?').charAt(0);
-            return (
-              <div className="card sidebar-card animate-in animate-in-delay-3">
-                <h4><User size={18} />בעל הנכס</h4>
-                <div className="owner-detail">
-                  <div className="owner-detail-avatar">{initial}</div>
-                  <div>
-                    {linkedOwner?.id ? (
-                      <Link to={`/owners/${linkedOwner.id}`} className="owner-detail-name owner-detail-link">
-                        {ownerName}
-                      </Link>
-                    ) : (
-                      <span className="owner-detail-name">{ownerName}</span>
-                    )}
-                    {ownerPhone && (
-                      <a href={telUrl(ownerPhone)} className="owner-phone" aria-label={`Call ${ownerName}`}>
-                        <Phone size={14} />
-                        {ownerPhone}
-                      </a>
-                    )}
-                    {ownerEmail && (
-                      <a href={`mailto:${ownerEmail}`} className="owner-phone" aria-label={`Email ${ownerName}`}>
-                        {ownerEmail}
-                      </a>
-                    )}
+            {MARKETING_GROUPS.map((group) => {
+              const gTotal = group.keys.length;
+              const groupDone = group.keys.filter((k) => actionsMap[k]).length;
+              return (
+                <MarketingGroup
+                  key={group.key}
+                  id={group.key}
+                  label={group.label}
+                  done={groupDone}
+                  total={gTotal}
+                >
+                  <div className="marketing-checklist">
+                    {group.keys.map((key) => {
+                      const label = MARKETING_LABELS[key];
+                      const detail = actionsDetail[key] || { done: false };
+                      return (
+                        <div key={key} className={`checklist-item interactive ${detail.done ? 'is-done' : ''}`}>
+                          <button
+                            type="button"
+                            className="checklist-toggle"
+                            onClick={() => toggleMarketingAction(key)}
+                          >
+                            {detail.done ? (
+                              <CheckCircle2 size={18} className="check-done" />
+                            ) : (
+                              <Circle size={18} className="check-pending" />
+                            )}
+                            <span className={detail.done ? 'done' : ''}>{label}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="checklist-detail-btn"
+                            onClick={() => setActionDialog({ key, detail })}
+                            title="פרטים / העלאה / קישור"
+                            aria-label={`פרטי ${label}`}
+                          >
+                            {detail.link
+                              ? <Link2 size={13} />
+                              : detail.notes
+                              ? <FileText size={13} />
+                              : <FileText size={13} style={{ opacity: 0.4 }} />}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
+                </MarketingGroup>
+              );
+            })}
+          </div>
+        </PropertyPanelSheet>
+      )}
+
+      {panel === 'owner' && (
+        <PropertyPanelSheet
+          title="בעל הנכס"
+          subtitle={ownerName || 'לא מוגדר'}
+          onClose={() => setPanel(null)}
+        >
+          {ownerName ? (
+            <div className="pd-panel-owner">
+              <div className="dc-owner">
+                <div className="dc-owner-avatar dc-owner-avatar-lg">{ownerInitial}</div>
+                <div className="dc-owner-id">
+                  <span className="dc-owner-name">{ownerName}</span>
+                  {ownerPhone && (
+                    <a href={telUrl(ownerPhone)} className="dc-owner-meta">
+                      <Phone size={13} />
+                      {ownerPhone}
+                    </a>
+                  )}
+                  {ownerEmail && (
+                    <a href={`mailto:${ownerEmail}`} className="dc-owner-meta">
+                      {ownerEmail}
+                    </a>
+                  )}
                 </div>
-                {/* P1-D1 — desktop rail: tel + WhatsApp anchors right under the owner */}
-                {isDesktop && ownerPhone && (
-                  <div className="pd-rail-owner-actions">
-                    <a
-                      href={telUrl(ownerPhone)}
-                      className="btn btn-secondary btn-sm"
-                      aria-label={`Call ${ownerName}`}
-                    >
-                      <Phone size={14} />
-                      התקשר
+              </div>
+              <div className="pd-panel-actions">
+                {ownerPhone && (
+                  <>
+                    <a href={telUrl(ownerPhone)} className="btn btn-secondary">
+                      <Phone size={14} />התקשר
                     </a>
                     <a
                       href={waUrl(ownerPhone, '')}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn-secondary btn-sm"
-                      aria-label={`WhatsApp ${ownerName}`}
+                      className="btn btn-primary"
                     >
-                      <WhatsAppIcon size={14} />
-                      וואטסאפ
+                      <WhatsAppIcon size={14} />WhatsApp
                     </a>
-                    {linkedOwner?.id && (
-                      <Link to={`/owners/${linkedOwner.id}`} className="btn btn-ghost btn-sm">
-                        <User size={14} />
-                        פתח כרטיס
-                      </Link>
-                    )}
-                  </div>
+                  </>
                 )}
+                {linkedOwner?.id && (
+                  <Link to={`/owners/${linkedOwner.id}`} className="btn btn-secondary">
+                    <User size={14} />פתח כרטיס מלא
+                  </Link>
+                )}
+                <button className="btn btn-secondary" onClick={() => { setPanel(null); setEditing(true); }}>
+                  <Edit3 size={14} />ערוך פרטי בעלים
+                </button>
               </div>
-            );
-          })()}
-
-          {/* P2-M14 — exclusivity dates live in marketing tab on mobile.
-              P1-D1 — on desktop, also show a live countdown to the end date. */}
-          {(showMarketing || isDesktop) && (property.exclusiveStart || property.exclusiveEnd) && (
-            <div className="card sidebar-card animate-in">
-              <h4><Clock size={18} />בלעדיות</h4>
-              <div className="owner-dates">
-                {property.exclusiveStart && (
-                  <div>
-                    <span className="date-label">תחילת בלעדיות</span>
-                    <span className="date-value">
-                      {new Date(property.exclusiveStart).toLocaleDateString('he-IL')}
-                    </span>
-                  </div>
-                )}
-                {property.exclusiveEnd && (
-                  <div>
-                    <span className="date-label">סיום בלעדיות</span>
-                    <span className="date-value">
-                      {new Date(property.exclusiveEnd).toLocaleDateString('he-IL')}
-                    </span>
-                  </div>
-                )}
-              </div>
-              {exclusivityDaysLeft != null && (
-                <div className={`pd-exclusive-countdown ${exclusivityDaysLeft < 0 ? 'is-expired' : exclusivityDaysLeft <= 14 ? 'is-soon' : ''}`}>
-                  {exclusivityDaysLeft < 0
-                    ? `הסתיים לפני ${Math.abs(exclusivityDaysLeft)} ימים`
-                    : exclusivityDaysLeft === 0
-                    ? 'מסתיים היום'
-                    : `נותרו ${exclusivityDaysLeft} ימים`}
-                </div>
-              )}
+            </div>
+          ) : (
+            <div className="pd-panel-empty">
+              <User size={32} />
+              <p>אין בעל נכס מקושר.</p>
+              <button className="btn btn-primary" onClick={() => { setPanel(null); setEditing(true); }}>
+                הוסף פרטי בעלים
+              </button>
             </div>
           )}
+        </PropertyPanelSheet>
+      )}
 
-          {/* P2-M14 — marketing-price reminder inside marketing tab on mobile */}
-          {showMarketing && isMobile && (
-            <div className="card sidebar-card pd-marketing-price-card">
-              <h4>מחיר שיווק</h4>
-              <div className="detail-price">{formatPrice(property.marketingPrice)}</div>
-            </div>
-          )}
-
-          {/* P1-D1 — Desktop rail: view as customer, share actions, manage buttons */}
-          {isDesktop && (
-            <>
-              <div className="card sidebar-card pd-rail-actions">
-                <Link
-                  to={`/p/${property.id}`}
-                  target="_blank"
-                  className="btn btn-primary"
-                  aria-label={`View as customer ${property.street}`}
-                >
-                  <ExternalLink size={16} />
-                  צפה כלקוח
-                </Link>
+      {panel === 'exclusivity' && (
+        <PropertyPanelSheet
+          title="בלעדיות"
+          subtitle={hasExclusivity ? 'פרטי תקופת הבלעדיות' : 'הגדר טווח תאריכים'}
+          onClose={() => setPanel(null)}
+        >
+          <div className="pd-panel-excl">
+            {property.exclusiveStart && (
+              <div className="pd-panel-row">
+                <span className="pd-panel-label">תחילת בלעדיות</span>
+                <span className="pd-panel-value">
+                  {new Date(property.exclusiveStart).toLocaleDateString('he-IL')}
+                </span>
               </div>
-
-              <div className="card sidebar-card pd-rail-share">
-                <h4><Share2 size={16} />שיתוף</h4>
-                <div className="pd-rail-share-grid">
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleWhatsApp}
-                    aria-label={`WhatsApp ${property.street}`}
-                  >
-                    <WhatsAppIcon size={16} />
-                    שלח בוואטסאפ
-                  </button>
-                  <button
-                    className={`btn btn-secondary ${copied ? 'copy-flash' : ''}`}
-                    onClick={() => copy(customerLink)}
-                    aria-label={`Copy link ${property.street}`}
-                  >
-                    {copied ? <Check size={16} /> : <Copy size={16} />}
-                    {copied ? 'הועתק' : 'העתק קישור'}
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={handleShare}
-                    aria-label={`Share ${property.street}`}
-                  >
-                    <Share2 size={16} />
-                    שתף
-                  </button>
-                </div>
+            )}
+            {property.exclusiveEnd && (
+              <div className="pd-panel-row">
+                <span className="pd-panel-label">סיום בלעדיות</span>
+                <span className="pd-panel-value">
+                  {new Date(property.exclusiveEnd).toLocaleDateString('he-IL')}
+                </span>
               </div>
-
-              <div className="card sidebar-card pd-rail-manage">
-                <h4>ניהול נכס</h4>
-                <div className="pd-rail-manage-grid">
-                  <button className="btn btn-secondary" onClick={() => setEditing(true)}>
-                    <Edit3 size={14} />
-                    עריכה
-                  </button>
-                  <button className="btn btn-secondary" onClick={() => setTransferOpen(true)}>
-                    <ArrowLeftRight size={14} />
-                    העבר נכס
-                  </button>
-                  <button className="btn btn-danger" onClick={() => setConfirmDelete(true)}>
-                    <Trash2 size={14} />
-                    מחיקה
-                  </button>
-                </div>
+            )}
+            {exclusivityRel && (
+              <div className={`pd-panel-pill pd-panel-pill-${
+                exclusivityDaysLeft != null && exclusivityDaysLeft < 0 ? 'expired'
+                : exclusivityDaysLeft != null && exclusivityDaysLeft <= 14 ? 'soon'
+                : 'normal'
+              }`}>
+                {exclusivityRel.label}
               </div>
-            </>
-          )}
+            )}
+            <button className="btn btn-primary" onClick={() => { setPanel(null); setEditing(true); }}>
+              <Edit3 size={14} />ערוך תקופת בלעדיות
+            </button>
+            {!hasExclusivity && (
+              <p className="dc-empty">לא הוגדרה תקופת בלעדיות. לחץ "ערוך" להוספה.</p>
+            )}
+          </div>
+        </PropertyPanelSheet>
+      )}
 
-          {/* Marketing actions — sidebar on mobile/tablet; on desktop ≥1100 it lives in the left column */}
-          {!isDesktop && marketingActionsCard}
+      {panel === 'notes' && (
+        <PropertyPanelSheet
+          title="הערות ומאפיינים"
+          subtitle="כל הפרטים והמאפיינים של הנכס"
+          width="lg"
+          onClose={() => setPanel(null)}
+        >
+          <div className="pd-panel-notes">
+            {featureChips.length > 0 && (
+              <div className="dc-feature-chips dc-feature-chips-lg">
+                {featureChips.map((c) => (
+                  <span key={c} className="dc-feature-chip">{c}</span>
+                ))}
+              </div>
+            )}
+            {property.notes ? (
+              <div className="pd-panel-notes-body">
+                <h5>טקסט חופשי</h5>
+                <p>{property.notes}</p>
+              </div>
+            ) : (
+              <p className="dc-empty">לא הוזנו הערות.</p>
+            )}
+            <button className="btn btn-primary" onClick={() => { setPanel(null); setEditing(true); }}>
+              <Edit3 size={14} />ערוך הערות ומאפיינים
+            </button>
+          </div>
+        </PropertyPanelSheet>
+      )}
+
+      {/* Videos preview if there are videos — shown below the grid */}
+      {property.videos?.length > 0 && (
+        <div className="pd-videos animate-in animate-in-delay-5">
+          <div className="pd-videos-head">
+            <h4><Film size={16} /> סרטונים ({property.videos.length})</h4>
+            <button className="btn btn-ghost btn-sm" onClick={() => setManagingVideos(true)}>
+              <Edit3 size={13} />
+              ניהול
+            </button>
+          </div>
+          <div className="pd-videos-grid">
+            {property.videos.map((v) => (
+              <VideoTile key={v.id} video={v} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
+      {/* ── Dialogs ── */}
       {actionDialog && (
         <MarketingActionDialog
           propertyId={property.id}
@@ -1093,6 +1083,7 @@ export default function PropertyDetail() {
         </div>
       )}
 
+      {/* Mobile: keep the sticky bottom action bar */}
       <StickyActionBar className="sab-icons" visible>
         <a
           href={wazeUrl(`${property.street} ${property.city}`)}
@@ -1121,7 +1112,6 @@ export default function PropertyDetail() {
           <WhatsAppIcon size={18} />
           <span>שלח ללקוח</span>
         </button>
-        {/* P1-M13 — native share */}
         <button
           type="button"
           className="btn btn-secondary"
@@ -1136,15 +1126,21 @@ export default function PropertyDetail() {
   );
 }
 
-function Spec({ icon: Icon, value, label }) {
+/* ──────────────────────────────────────────────────────────────
+ * DashCard — card shell with title, action button and body.
+ * ────────────────────────────────────────────────────────────── */
+function DashCard({ icon, title, action, children, variant = 'default', delay = 1 }) {
   return (
-    <div className="spec-item">
-      <Icon size={20} />
-      <div>
-        <span className="spec-value">{value}</span>
-        <span className="spec-label">{label}</span>
-      </div>
-    </div>
+    <section className={`dc dc-${variant} animate-in animate-in-delay-${delay}`}>
+      <header className="dc-header">
+        <h3 className="dc-title">
+          {icon && <span className="dc-icon">{icon}</span>}
+          <span>{title}</span>
+        </h3>
+        {action}
+      </header>
+      <div className="dc-body">{children}</div>
+    </section>
   );
 }
 
@@ -1332,7 +1328,6 @@ export function VideoTile({ video }) {
       </div>
     );
   }
-  // Fallback — show as a link
   return (
     <a className="video-tile link-fallback" href={video.url} target="_blank" rel="noreferrer">
       <span>▶ צפה בסרטון</span>
