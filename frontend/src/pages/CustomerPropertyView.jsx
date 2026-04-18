@@ -179,6 +179,27 @@ export default function CustomerPropertyView() {
     [property]
   );
 
+  // Task 5 · preload the next + previous image whenever the current index
+  // changes. Customers tapping the arrow used to trigger a fresh fetch on
+  // every click — a 500ms+ blank window on LTE. By kicking off the HTTP
+  // request the instant the neighbour becomes reachable (i.e. as soon as
+  // the agent / customer lands on the current one), the browser's cache is
+  // already warm by the time they tap. `Image()` avoids DOM overhead — the
+  // browser fetches + decodes in the background and we throw away the
+  // reference. Safe in SSR: guarded by typeof Image.
+  useEffect(() => {
+    if (typeof Image === 'undefined') return;
+    if (images.length < 2) return;
+    const next = images[(currentImage + 1) % images.length];
+    const prev = images[(currentImage - 1 + images.length) % images.length];
+    [next, prev].forEach((src) => {
+      if (!src) return;
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = src;
+    });
+  }, [currentImage, images]);
+
   if (loading) {
     return (
       <div className="cpv-page cpv-loading-page">
@@ -321,6 +342,7 @@ export default function CustomerPropertyView() {
               alt={`${property.street}, ${property.city}`}
               loading="eager"
               fetchpriority="high"
+              decoding="async"
             />
           </button>
         ) : (
@@ -560,7 +582,12 @@ export default function CustomerPropertyView() {
           >
             ✕
           </button>
-          <img src={coverImage} alt="" onClick={(e) => e.stopPropagation()} />
+          <img
+            src={coverImage}
+            alt=""
+            decoding="async"
+            onClick={(e) => e.stopPropagation()}
+          />
           {images.length > 1 && (
             <>
               <button
