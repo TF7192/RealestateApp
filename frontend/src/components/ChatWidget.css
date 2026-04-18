@@ -18,6 +18,19 @@
   box-shadow: 0 8px 24px rgba(30, 26, 20, 0.14);
   transition: color 0.15s, border-color 0.15s, transform 0.1s, background 0.15s;
 }
+
+/* On mobile the sidebar isn't visible and the MobileTabBar lives at
+   the bottom — put the chat button at the top-right instead (visual
+   right in RTL = inset-inline-start), where the user asked for it
+   and where it doesn't collide with the tab bar. */
+@media (max-width: 820px) {
+  .chatw-btn {
+    top: calc(12px + env(safe-area-inset-top));
+    bottom: auto;
+    inset-inline-end: auto;
+    inset-inline-start: 14px;
+  }
+}
 .chatw-btn:hover  { color: var(--gold); border-color: var(--gold-border); background: var(--gold-glow); }
 .chatw-btn:active { transform: scale(0.94); }
 .chatw-btn.has-dot { color: var(--gold); border-color: var(--gold-border); }
@@ -67,7 +80,16 @@
     inset-inline-end: 12px;
     inset-inline-start: 12px;
     width: auto;
-    bottom: calc(78px + env(safe-area-inset-bottom));
+    /* Mobile button is at the top — open the panel just below it. */
+    top: calc(68px + env(safe-area-inset-top));
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    height: auto;
+    max-height: none;
+    animation: chatw-rise-top 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes chatw-rise-top {
+    from { transform: translateY(-14px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
   }
 }
 

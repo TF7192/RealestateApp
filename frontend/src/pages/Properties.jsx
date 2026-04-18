@@ -407,6 +407,11 @@ export default function Properties() {
   const overflowActions = overflowFor
     ? [
         {
+          label: 'חיפוש נכסים דומים',
+          icon: MoreHorizontal,
+          onClick: () => setSimilarFor(overflowFor),
+        },
+        {
           label: 'שיתוף',
           icon: Share2,
           onClick: () => handleShareProp(overflowFor),
@@ -761,9 +766,13 @@ export default function Properties() {
                       >
                         <MoreHorizontal size={16} />
                       </button>
-
+                      {/* The 'חפש דומים' pill was overlapping the thumb
+                          photo and clipping the title at 375px — its
+                          action is now inside the ⋯ overflow sheet
+                          ('חיפוש נכסים דומים'). Still rendered on
+                          desktop via the CSS below. */}
                       <button
-                        className="pc-similar-btn"
+                        className="pc-similar-btn pc-similar-btn-desktop"
                         onClick={(e) => openSimilar(e, prop)}
                         aria-label={`חיפוש נכסים דומים ל-${prop.street}`}
                       >

@@ -19,6 +19,7 @@ import {
   ArrowLeftRight,
   FileText,
   Shield,
+  HelpCircle,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
@@ -29,6 +30,31 @@ import MobileMoreSheet from './MobileMoreSheet';
 // Mirrors backend ADMIN_EMAILS default — anyone in this list sees the
 // admin chat link in the sidebar and the admin page loads for them.
 const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
+
+// Maps the current React-Router pathname to the PageTour `pageKey`
+// so the sidebar `?` button can replay the right tour on demand.
+function pageTourKeyFor(pathname) {
+  if (!pathname) return null;
+  if (pathname.startsWith('/properties/new'))         return 'new-property';
+  if (/^\/properties\/[^/]+\/edit$/.test(pathname))   return 'new-property';
+  if (/^\/properties\/[^/]+$/.test(pathname))         return 'property-detail';
+  if (pathname.startsWith('/properties'))             return 'properties';
+  if (pathname.startsWith('/owners'))                 return 'owners';
+  if (pathname.startsWith('/customers'))              return 'customers';
+  if (pathname.startsWith('/templates'))              return 'templates';
+  if (pathname.startsWith('/transfers'))              return 'transfers';
+  return 'properties'; // default fallback — Properties is the "home" page for agents
+}
+
+function replayCurrentPageTour(pathname) {
+  const key = pageTourKeyFor(pathname);
+  if (!key) return;
+  try {
+    localStorage.removeItem('estia-tour-dismissed');
+    localStorage.removeItem(`estia-page-tour:${key}`);
+  } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent('estia-tour:replay', { detail: { pageKey: key } }));
+}
 import haptics from '../lib/haptics';
 import './Layout.css';
 
@@ -181,6 +207,15 @@ export default function Layout({ onLogout }) {
         )}
         <div className="mh-side mh-trailing">
           <button
+            type="button"
+            className="btn-ghost mh-help-btn"
+            onClick={() => { haptics.tap(); replayCurrentPageTour(location.pathname); }}
+            aria-label="הצג הסבר לעמוד הזה"
+            title="הצג הסבר לעמוד הזה"
+          >
+            <HelpCircle size={18} />
+          </button>
+          <button
             className="btn-ghost mh-profile-btn"
             onClick={() => { haptics.tap(); setMoreOpen(true); }}
             aria-label="חשבון"
@@ -209,6 +244,15 @@ export default function Layout({ onLogout }) {
               <p>ניהול נכסים ולידים</p>
             </div>
           </Link>
+          <button
+            type="button"
+            className="sidebar-help-btn"
+            onClick={() => replayCurrentPageTour(location.pathname)}
+            title="הצג הסבר לעמוד הזה"
+            aria-label="הצג הסבר לעמוד הזה"
+          >
+            <HelpCircle size={18} />
+          </button>
           <button
             className="sidebar-close btn-ghost"
             onClick={() => setSidebarOpen(false)}
