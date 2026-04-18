@@ -85,6 +85,7 @@ function AppRoutes() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/properties" element={<Properties />} />
           <Route path="/properties/new" element={<NewProperty />} />
+          <Route path="/properties/:id/edit" element={<NewProperty />} />
           <Route path="/properties/:id" element={<PropertyDetail />} />
           <Route path="/owners" element={<Owners />} />
           <Route path="/owners/:id" element={<OwnerDetail />} />

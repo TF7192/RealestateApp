@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowRight,
   Save,
@@ -72,20 +72,30 @@ const INITIAL_FORM = {
 };
 
 /**
- * Two-step new-property wizard:
- *  Step 1 — 7 essentials, saves and creates the property.
+ * Two-step property wizard — serves BOTH create and edit.
+ *
+ *  Step 1 — 7 essentials (in create mode, saves = creates; in edit mode,
+ *           saves = updates and keeps the same id).
  *  Step 2 — full marketing package (type, floor, features, photos).
  *
- * The property exists after Step 1 so an agent can capture a new listing
- * mid-call in 30 seconds and keep going later from the detail page.
+ * Mode is selected by route:
+ *   /properties/new         → create
+ *   /properties/:id/edit    → edit (form prefilled from the API)
+ *
+ * Edit mode disables the draft-autosave + restore banner (edits are
+ * intentional, not recovered). Both modes share layout, validation,
+ * SmartFields, animations, sticky action bar — so the edit screen is
+ * the full-power form the agent is already trained to use.
  */
 export default function NewProperty() {
   const navigate = useNavigate();
   const toast = useToast();
   const fileInput = useRef(null);
+  const { id: editId } = useParams();
+  const isEdit = !!editId;
 
   const [step, setStep] = useState(1);
-  const [propertyId, setPropertyId] = useState(null);
+  const [propertyId, setPropertyId] = useState(isEdit ? editId : null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
@@ -93,19 +103,86 @@ export default function NewProperty() {
   const [geoLoading, setGeoLoading] = useState(false);
   const [draftBanner, setDraftBanner] = useState(null); // {form, step}
   const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(isEdit);
+  const [existingMeta, setExistingMeta] = useState(null); // { street, city, imageCount }
 
   const [form, setForm] = useState(INITIAL_FORM);
 
   // ── Draft autosave + restore banner ────────────────────────────────
-  const { clear: clearDraft } = useDraftAutosave(DRAFT_KEY, { form, step });
+  // In edit mode we explicitly skip autosave: the draft recovery UX
+  // would be confusing when the form is already backed by a real
+  // persisted property.
+  const { clear: clearDraft } = useDraftAutosave(
+    DRAFT_KEY,
+    isEdit ? null : { form, step }
+  );
 
   useEffect(() => {
+    if (isEdit) return;
     const draft = readDraft(DRAFT_KEY);
     if (draft && draft.form && (draft.form.street || draft.form.city || draft.form.owner)) {
       setDraftBanner(draft);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isEdit]);
+
+  // ── Edit mode: hydrate form from the persisted property ────────────
+  useEffect(() => {
+    if (!isEdit) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.getProperty(editId);
+        if (cancelled) return;
+        const p = res?.property || res;
+        if (!p || !p.id) throw new Error('נכס לא נמצא');
+        const dateOnly = (v) => (v ? String(v).slice(0, 10) : '');
+        setForm({
+          assetClass: p.assetClass || 'RESIDENTIAL',
+          category: p.category || 'SALE',
+          street: p.street || '',
+          city: p.city || '',
+          owner: p.owner || '',
+          ownerPhone: p.ownerPhone || '',
+          ownerEmail: p.ownerEmail || '',
+          propertyOwnerId: p.propertyOwnerId || null,
+          pickedOwner: null,
+          marketingPrice: p.marketingPrice ?? null,
+          sqm: p.sqm ?? null,
+          type: p.type || 'דירה',
+          rooms: p.rooms == null ? '' : p.rooms,
+          floor: p.floor ?? null,
+          totalFloors: p.totalFloors ?? null,
+          balconySize: p.balconySize ?? null,
+          buildingAge: p.buildingAge ?? null,
+          renovated: p.renovated || '',
+          vacancyDate: dateOnly(p.vacancyDate),
+          sector: p.sector || 'כללי',
+          airDirections: p.airDirections || '',
+          notes: p.notes || '',
+          closingPrice: p.closingPrice ?? null,
+          sqmArnona: p.sqmArnona ?? null,
+          exclusiveStart: dateOnly(p.exclusiveStart),
+          exclusiveEnd: dateOnly(p.exclusiveEnd),
+          elevator: !!p.elevator,
+          parking: !!p.parking,
+          storage: !!p.storage,
+          ac: !!p.ac,
+          safeRoom: !!p.safeRoom,
+        });
+        setExistingMeta({
+          street: p.street,
+          city: p.city,
+          imageCount: (p.imageList || []).length,
+        });
+      } catch (e) {
+        if (!cancelled) setError(e.message || 'טעינה נכשלה');
+      } finally {
+        if (!cancelled) setLoadingExisting(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isEdit, editId]);
 
   const restoreDraft = () => {
     if (draftBanner?.form) {
@@ -223,11 +300,17 @@ export default function NewProperty() {
         body.ownerPhone = form.ownerPhone;
         if (form.ownerEmail) body.ownerEmail = form.ownerEmail;
       }
-      const res = await api.createProperty(body);
-      const id = res.property?.id;
-      setPropertyId(id);
-      toast.success('הנכס נשמר · המשך להשלמת הפרטים');
-      setStep(2);
+      if (isEdit) {
+        await api.updateProperty(editId, body);
+        toast.success('פרטי היסוד עודכנו · המשך למאפיינים');
+        setStep(2);
+      } else {
+        const res = await api.createProperty(body);
+        const id = res.property?.id;
+        setPropertyId(id);
+        toast.success('הנכס נשמר · המשך להשלמת הפרטים');
+        setStep(2);
+      }
     } catch (e2) {
       setError(e2.message || 'שמירה נכשלה');
     } finally {
@@ -274,8 +357,8 @@ export default function NewProperty() {
         } catch (_) { /* continue on per-file failure */ }
       }
       photoFiles.forEach((p) => URL.revokeObjectURL(p.url));
-      clearDraft();
-      toast.success('הנכס נשמר במלואו');
+      if (!isEdit) clearDraft();
+      toast.success(isEdit ? 'הנכס עודכן' : 'הנכס נשמר במלואו');
       navigate(`/properties/${propertyId}`);
     } catch (e2) {
       setError(e2.message || 'שמירה נכשלה');
@@ -284,30 +367,59 @@ export default function NewProperty() {
   };
 
   const skipStep2 = () => {
-    clearDraft();
-    toast.info('דילגת על ההשלמה — ניתן להשלים מעמוד הנכס');
+    if (!isEdit) clearDraft();
+    if (isEdit) toast.info('חזרה לכרטיס הנכס — השינויים שבשלב 1 כבר נשמרו');
+    else toast.info('דילגת על ההשלמה — ניתן להשלים מעמוד הנכס');
     navigate(propertyId ? `/properties/${propertyId}` : '/properties');
   };
 
+  if (isEdit && loadingExisting) {
+    return (
+      <div className="form-page np-wizard">
+        <div className="page-header animate-in">
+          <div className="page-header-info">
+            <h2>טוען נכס…</h2>
+            <p>רגע, מביאים את הפרטים המעודכנים</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const backTarget = isEdit ? `/properties/${editId}` : '/properties';
+  const backLabel = isEdit ? 'חזרה לכרטיס' : 'חזרה לנכסים';
+  const headerTitle = isEdit
+    ? (step === 1 ? 'עריכת נכס' : 'עריכה — חבילת שיווק')
+    : (step === 1 ? 'נכס חדש' : 'השלמת פרטי הנכס');
+  const headerSub = isEdit
+    ? `${existingMeta?.street || form.street}${existingMeta?.city || form.city ? ', ' : ''}${existingMeta?.city || form.city}`
+    : (step === 1
+        ? 'מינימום לקליטה מהירה — אפשר להמשיך מאוחר יותר'
+        : `המשך לעבוד על ${form.street}, ${form.city}`);
+
+  // In edit mode the property already exists, so the user can hop between
+  // the two steps freely. In create mode, step 2 is gated behind step 1
+  // actually persisting.
+  const goToStep = (n) => {
+    if (n === step) return;
+    if (isEdit || propertyId) setStep(n);
+  };
+
   return (
-    <div className="form-page np-wizard has-sticky-bar">
-      <Link to="/properties" className="back-link animate-in">
+    <div className={`form-page np-wizard has-sticky-bar ${isEdit ? 'np-is-edit' : ''}`}>
+      <Link to={backTarget} className="back-link animate-in">
         <ArrowRight size={16} />
-        חזרה לנכסים
+        {backLabel}
       </Link>
 
       <div className="page-header animate-in">
         <div className="page-header-info">
-          <h2>{step === 1 ? 'נכס חדש' : 'השלמת פרטי הנכס'}</h2>
-          <p>
-            {step === 1
-              ? 'מינימום לקליטה מהירה — אפשר להמשיך מאוחר יותר'
-              : `המשך לעבוד על ${form.street}, ${form.city}`}
-          </p>
+          <h2>{headerTitle}</h2>
+          <p>{headerSub}</p>
         </div>
       </div>
 
-      {draftBanner && (
+      {draftBanner && !isEdit && (
         <div className="draft-banner animate-in" role="status">
           <span>נמצאה טיוטה שנשמרה</span>
           <div className="draft-banner-actions">
@@ -318,21 +430,33 @@ export default function NewProperty() {
       )}
 
       <div className="np-steps animate-in animate-in-delay-1">
-        <div className={`np-step ${step === 1 ? 'active' : step > 1 ? 'done' : ''}`}>
+        <button
+          type="button"
+          className={`np-step np-step-btn ${step === 1 ? 'active' : step > 1 ? 'done' : ''}`}
+          onClick={() => goToStep(1)}
+          aria-current={step === 1 ? 'step' : undefined}
+          disabled={!isEdit && !propertyId && step === 1}
+        >
           <span className="np-step-no">{step > 1 ? <CheckCircle2 size={14} /> : '1'}</span>
           <div>
             <strong>יסודות</strong>
-            <span>7 שדות · שמירה יוצרת את הנכס</span>
+            <span>{isEdit ? 'כתובת, מחיר, בעל הנכס' : '7 שדות · שמירה יוצרת את הנכס'}</span>
           </div>
-        </div>
+        </button>
         <div className="np-step-line" />
-        <div className={`np-step ${step === 2 ? 'active' : ''}`}>
+        <button
+          type="button"
+          className={`np-step np-step-btn ${step === 2 ? 'active' : ''}`}
+          onClick={() => goToStep(2)}
+          aria-current={step === 2 ? 'step' : undefined}
+          disabled={!isEdit && !propertyId}
+        >
           <span className="np-step-no">2</span>
           <div>
             <strong>חבילת שיווק</strong>
-            <span>מאפיינים, תמונות, בלעדיות · לא חובה עכשיו</span>
+            <span>{isEdit ? 'מאפיינים, תמונות, בלעדיות' : 'מאפיינים, תמונות, בלעדיות · לא חובה עכשיו'}</span>
           </div>
-        </div>
+        </button>
       </div>
 
       {error && (
@@ -540,9 +664,9 @@ export default function NewProperty() {
           <div className="form-actions form-actions-desktop">
             <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
               <Save size={18} />
-              {submitting ? 'שומר…' : 'שמור והמשך'}
+              {submitting ? 'שומר…' : isEdit ? 'עדכן והמשך' : 'שמור והמשך'}
             </button>
-            <Link to="/properties" className="btn btn-secondary btn-lg">ביטול</Link>
+            <Link to={backTarget} className="btn btn-secondary btn-lg">ביטול</Link>
           </div>
         </form>
       ) : (
@@ -692,6 +816,14 @@ export default function NewProperty() {
 
           <div className="form-section">
             <h3 className="form-section-title">תמונות</h3>
+            {isEdit && (
+              <p className="np-edit-photo-hint">
+                <span>
+                  <strong>{existingMeta?.imageCount || 0}</strong> תמונות קיימות.
+                  כל תמונה שתעלה כאן תתווסף לגלריה — לסידור או מחיקה של תמונות קיימות השתמש בכרטיס התמונות בעמוד הנכס.
+                </span>
+              </p>
+            )}
             <div
               className={`upload-area ${dragOver ? 'is-over' : ''}`}
               onClick={() => fileInput.current?.click()}
@@ -730,10 +862,10 @@ export default function NewProperty() {
           <div className="form-actions form-actions-desktop">
             <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
               <Save size={18} />
-              {submitting ? 'שומר…' : 'שמור וסיים'}
+              {submitting ? 'שומר…' : isEdit ? 'שמור שינויים' : 'שמור וסיים'}
             </button>
             <button type="button" className="btn btn-ghost btn-lg" onClick={skipStep2}>
-              דלג להמשך מאוחר יותר
+              {isEdit ? 'חזור לכרטיס' : 'דלג להמשך מאוחר יותר'}
             </button>
           </div>
         </form>
@@ -750,9 +882,9 @@ export default function NewProperty() {
               disabled={submitting}
             >
               <Save size={18} />
-              {submitting ? 'שומר…' : 'שמור והמשך'}
+              {submitting ? 'שומר…' : isEdit ? 'עדכן והמשך' : 'שמור והמשך'}
             </button>
-            <Link to="/properties" className="btn btn-secondary btn-lg">ביטול</Link>
+            <Link to={backTarget} className="btn btn-secondary btn-lg">ביטול</Link>
           </>
         ) : (
           <>
@@ -763,10 +895,10 @@ export default function NewProperty() {
               disabled={submitting}
             >
               <Save size={18} />
-              {submitting ? 'שומר…' : 'שמור וסיים'}
+              {submitting ? 'שומר…' : isEdit ? 'שמור שינויים' : 'שמור וסיים'}
             </button>
             <button type="button" className="btn btn-ghost btn-lg" onClick={skipStep2}>
-              דלג
+              {isEdit ? 'חזור' : 'דלג'}
             </button>
           </>
         )}

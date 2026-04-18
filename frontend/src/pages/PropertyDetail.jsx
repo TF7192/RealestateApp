@@ -158,7 +158,6 @@ export default function PropertyDetail() {
   const [err, setErr] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
   const [actionDialog, setActionDialog] = useState(null);
-  const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [managingPhotos, setManagingPhotos] = useState(false);
@@ -464,7 +463,7 @@ export default function PropertyDetail() {
             <ArrowLeftRight size={14} />
             <span>העבר</span>
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/properties/${id}/edit`)}>
             <Edit3 size={14} />
             <span>עריכה</span>
           </button>
@@ -898,7 +897,7 @@ export default function PropertyDetail() {
                     <User size={14} />פתח כרטיס מלא
                   </Link>
                 )}
-                <button className="btn btn-secondary" onClick={() => { setPanel(null); setEditing(true); }}>
+                <button className="btn btn-secondary" onClick={() => { setPanel(null); navigate(`/properties/${id}/edit`); }}>
                   <Edit3 size={14} />ערוך פרטי בעל הנכס
                 </button>
               </div>
@@ -907,7 +906,7 @@ export default function PropertyDetail() {
             <div className="pd-panel-empty">
               <User size={32} />
               <p>אין בעל נכס מקושר.</p>
-              <button className="btn btn-primary" onClick={() => { setPanel(null); setEditing(true); }}>
+              <button className="btn btn-primary" onClick={() => { setPanel(null); navigate(`/properties/${id}/edit`); }}>
                 הוסף פרטי בעל הנכס
               </button>
             </div>
@@ -947,7 +946,7 @@ export default function PropertyDetail() {
                 {exclusivityRel.label}
               </div>
             )}
-            <button className="btn btn-primary" onClick={() => { setPanel(null); setEditing(true); }}>
+            <button className="btn btn-primary" onClick={() => { setPanel(null); navigate(`/properties/${id}/edit`); }}>
               <Edit3 size={14} />ערוך תקופת בלעדיות
             </button>
             {!hasExclusivity && (
@@ -980,7 +979,7 @@ export default function PropertyDetail() {
             ) : (
               <p className="dc-empty">לא הוזנו הערות.</p>
             )}
-            <button className="btn btn-primary" onClick={() => { setPanel(null); setEditing(true); }}>
+            <button className="btn btn-primary" onClick={() => { setPanel(null); navigate(`/properties/${id}/edit`); }}>
               <Edit3 size={14} />ערוך הערות ומאפיינים
             </button>
           </div>
@@ -1014,17 +1013,6 @@ export default function PropertyDetail() {
           onClose={() => setActionDialog(null)}
           onSaved={async () => {
             setActionDialog(null);
-            await load();
-          }}
-        />
-      )}
-
-      {editing && (
-        <PropertyEditDialog
-          property={property}
-          onClose={() => setEditing(false)}
-          onSaved={async () => {
-            setEditing(false);
             await load();
           }}
         />
@@ -1166,159 +1154,6 @@ function DashCard({ icon, title, action, children, variant = 'default', delay = 
       </header>
       <div className="dc-body">{children}</div>
     </section>
-  );
-}
-
-function PropertyEditDialog({ property, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    type: property.type || '',
-    street: property.street || '',
-    city: property.city || '',
-    owner: property.owner || '',
-    ownerPhone: property.ownerPhone || '',
-    marketingPrice: property.marketingPrice ?? '',
-    closingPrice: property.closingPrice ?? '',
-    sqm: property.sqm ?? '',
-    rooms: property.rooms ?? '',
-    floor: property.floor ?? '',
-    totalFloors: property.totalFloors ?? '',
-    balconySize: property.balconySize ?? '',
-    buildingAge: property.buildingAge ?? '',
-    renovated: property.renovated || '',
-    vacancyDate: property.vacancyDate || '',
-    sector: property.sector || 'כללי',
-    airDirections: property.airDirections || '',
-    notes: property.notes || '',
-    elevator: !!property.elevator,
-    parking: !!property.parking,
-    storage: !!property.storage,
-    ac: !!property.ac,
-    safeRoom: !!property.safeRoom,
-    status: property.status || 'ACTIVE',
-  });
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
-  const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-
-  const save = async () => {
-    setBusy(true);
-    setErr(null);
-    try {
-      const body = {
-        type: form.type,
-        street: form.street,
-        city: form.city,
-        owner: form.owner,
-        ownerPhone: form.ownerPhone,
-        marketingPrice: Number(form.marketingPrice) || 0,
-        closingPrice: form.closingPrice !== '' ? Number(form.closingPrice) : null,
-        sqm: Number(form.sqm) || 0,
-        rooms: form.rooms !== '' ? Number(form.rooms) : null,
-        floor: form.floor !== '' ? Number(form.floor) : null,
-        totalFloors: form.totalFloors !== '' ? Number(form.totalFloors) : null,
-        balconySize: Number(form.balconySize) || 0,
-        buildingAge: form.buildingAge !== '' ? Number(form.buildingAge) : null,
-        renovated: form.renovated || null,
-        vacancyDate: form.vacancyDate || null,
-        sector: form.sector || null,
-        airDirections: form.airDirections || null,
-        notes: form.notes || null,
-        elevator: form.elevator,
-        parking: form.parking,
-        storage: form.storage,
-        ac: form.ac,
-        safeRoom: form.safeRoom,
-        status: form.status,
-      };
-      await api.updateProperty(property.id, body);
-      onSaved();
-    } catch (e) {
-      setErr(e.message || 'עדכון נכשל');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="agreement-backdrop" onClick={onClose}>
-      <div className="agreement-modal" onClick={(e) => e.stopPropagation()}>
-        <header className="agreement-header">
-          <div>
-            <h3>עריכת נכס</h3>
-            <p>{property.street}, {property.city}</p>
-          </div>
-          <button className="btn-ghost" onClick={onClose}><X size={18} /></button>
-        </header>
-        <div className="agreement-body">
-          {err && <div className="agreement-error">{err}</div>}
-          <div className="deal-form-grid">
-            <Field label="סוג"><input className="form-input" value={form.type} onChange={(e) => update('type', e.target.value)} /></Field>
-            <Field label="סטטוס">
-              <select className="form-select" value={form.status} onChange={(e) => update('status', e.target.value)}>
-                <option value="ACTIVE">פעיל</option>
-                <option value="PAUSED">מושהה</option>
-                <option value="SOLD">נמכר</option>
-                <option value="RENTED">הושכר</option>
-                <option value="ARCHIVED">בארכיון</option>
-              </select>
-            </Field>
-            <Field label="רחוב ומספר"><input className="form-input" value={form.street} onChange={(e) => update('street', e.target.value)} /></Field>
-            <Field label="עיר"><input className="form-input" value={form.city} onChange={(e) => update('city', e.target.value)} /></Field>
-            <Field label="בעל הנכס"><input className="form-input" value={form.owner} onChange={(e) => update('owner', e.target.value)} /></Field>
-            <Field label="טלפון בעל הנכס"><input className="form-input" value={form.ownerPhone} onChange={(e) => update('ownerPhone', e.target.value)} /></Field>
-            <Field label="מחיר שיווק"><input type="number" className="form-input" value={form.marketingPrice} onChange={(e) => update('marketingPrice', e.target.value)} /></Field>
-            <Field label="מחיר סגירה"><input type="number" className="form-input" value={form.closingPrice} onChange={(e) => update('closingPrice', e.target.value)} /></Field>
-            <Field label="מ״ר"><input type="number" className="form-input" value={form.sqm} onChange={(e) => update('sqm', e.target.value)} /></Field>
-            <Field label="חדרים"><input type="number" step="0.5" className="form-input" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} /></Field>
-            <Field label="קומה"><input type="number" className="form-input" value={form.floor} onChange={(e) => update('floor', e.target.value)} /></Field>
-            <Field label="סה״כ קומות"><input type="number" className="form-input" value={form.totalFloors} onChange={(e) => update('totalFloors', e.target.value)} /></Field>
-            <Field label="גודל מרפסת"><input type="number" className="form-input" value={form.balconySize} onChange={(e) => update('balconySize', e.target.value)} /></Field>
-            <Field label="בניין בן"><input type="number" className="form-input" value={form.buildingAge} onChange={(e) => update('buildingAge', e.target.value)} /></Field>
-            <Field label="מצב הנכס"><input className="form-input" value={form.renovated} onChange={(e) => update('renovated', e.target.value)} /></Field>
-            <Field label="תאריך פינוי"><input className="form-input" value={form.vacancyDate} onChange={(e) => update('vacancyDate', e.target.value)} /></Field>
-            <Field label="כיווני אוויר"><input className="form-input" value={form.airDirections} onChange={(e) => update('airDirections', e.target.value)} /></Field>
-            <Field label="מגזר">
-              <select className="form-select" value={form.sector} onChange={(e) => update('sector', e.target.value)}>
-                <option>כללי</option><option>דתי</option><option>חרדי</option><option>ערבי</option>
-              </select>
-            </Field>
-            <Field label="הערות" wide>
-              <textarea className="form-textarea" rows={3} value={form.notes} onChange={(e) => update('notes', e.target.value)} />
-            </Field>
-          </div>
-          <div className="checkbox-grid" style={{ marginTop: 8 }}>
-            {[
-              { key: 'elevator', label: 'מעלית' },
-              { key: 'parking', label: 'חניה' },
-              { key: 'storage', label: 'מחסן' },
-              { key: 'ac', label: 'מזגנים' },
-              { key: 'safeRoom', label: 'ממ״ד' },
-            ].map(({ key, label }) => (
-              <label key={key} className="checkbox-item">
-                <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />
-                <span className="checkbox-custom" />
-                {label}
-              </label>
-            ))}
-          </div>
-          <div className="deal-form-actions">
-            <button className="btn btn-primary" onClick={save} disabled={busy}>
-              {busy ? 'שומר…' : 'שמור שינויים'}
-            </button>
-            <button className="btn btn-secondary" onClick={onClose}>ביטול</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children, wide }) {
-  return (
-    <div className={`form-group ${wide ? 'form-group-wide' : ''}`}>
-      <label className="form-label">{label}</label>
-      {children}
-    </div>
   );
 }
 

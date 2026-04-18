@@ -77,9 +77,58 @@
   min-width: 30px;
 }
 
+/* Steps are clickable in edit mode (and once step-1 has persisted in
+   create mode). Reset native <button> chrome so they read like text. */
+.np-step-btn {
+  background: transparent;
+  border: none;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+.np-step-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.np-step-btn:not(:disabled):hover {
+  background: var(--bg-elevated);
+}
+.np-step-btn:not(:disabled):hover .np-step-no {
+  transform: scale(1.04);
+}
+.np-step-btn .np-step-no {
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+}
+.np-step-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
 @media (max-width: 640px) {
   .np-steps { flex-wrap: wrap; }
   .np-step-line { display: none; }
+}
+
+/* Edit-mode banner inside the photos card — explains that these
+   uploads are additive and that reordering/deleting lives on the
+   property detail page. */
+.np-edit-photo-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--gold-glow);
+  color: var(--text-secondary);
+  border: 1px dashed var(--gold-border);
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.np-edit-photo-hint strong {
+  color: var(--gold);
+  font-weight: 700;
 }
 
 /* Geolocation button next to address inputs */
