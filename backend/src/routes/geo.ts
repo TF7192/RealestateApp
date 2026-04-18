@@ -101,12 +101,25 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
    */
   const SearchQ = z.object({
     q:     z.string().trim().min(1).max(200),
-    lang:  z.string().trim().max(5).optional(),
+    lang:  z.string().trim().max(8).optional(),
     limit: z.coerce.number().int().min(1).max(15).optional(),
     // Optional: already-chosen city — we append it to the query to nudge
     // suggestions toward the right locality.
     city:  z.string().trim().max(80).optional(),
   });
+
+  // Photon only supports these display languages. Asking for "he" returns
+  // HTTP 400. OSM already carries native-script `name` fields for Israeli
+  // streets, so falling back to `default` renders them in Hebrew anyway —
+  // the `lang` param really just controls secondary translations we don't
+  // use. Normalise any client-supplied value into one of the supported
+  // codes so a stale client can't take out the endpoint.
+  const PHOTON_SUPPORTED_LANGS = new Set(['default', 'de', 'en', 'fr']);
+  const normalizePhotonLang = (lang?: string): string => {
+    if (!lang) return 'default';
+    const lower = lang.toLowerCase();
+    return PHOTON_SUPPORTED_LANGS.has(lower) ? lower : 'default';
+  };
 
   // Same rolling throttle bucket; Photon hosted doesn't publish a hard
   // rate limit but courtesy-throttling keeps us honest.
@@ -118,7 +131,11 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
     if (!parsed.success) {
       return reply.code(400).send({ error: { message: 'q required' } });
     }
-    const { q, lang = 'he', limit = 8, city } = parsed.data;
+    const { q, limit = 8, city } = parsed.data;
+    // Always map to one of Photon's supported language codes; requesting
+    // `he` returns HTTP 400. OSM returns Hebrew name tags regardless, so
+    // mapping to `default` preserves Hebrew rendering for Israeli results.
+    const lang = normalizePhotonLang(parsed.data.lang);
 
     const now = Date.now();
     const wait = Math.max(0, lastSearchAt + searchMinGapMs - now);
