@@ -39,6 +39,8 @@ export const api = {
   signup: (body) => request('/auth/signup', { method: 'POST', body }),
   login: (body) => request('/auth/login', { method: 'POST', body }),
   googleMock: (body) => request('/auth/google/mock', { method: 'POST', body }),
+  googleNativeExchange: (code) =>
+    request('/auth/google/native-exchange', { method: 'POST', body: { code } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/me'),
   updateMe: (body) => request('/me', { method: 'PATCH', body }),

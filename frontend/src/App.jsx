@@ -28,15 +28,19 @@ import { identify, resetIdentity } from './lib/analytics';
 
 import { useEffect } from 'react';
 import { initStatusBar } from './native';
+import { isNative } from './native/platform';
+import { api } from './lib/api';
+import { useNavigate } from 'react-router-dom';
 import './App.css';
 
 /**
  * Single app shell — the same pages run on mobile and desktop.
  */
 function AppRoutes() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, refresh } = useAuth();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const navigate = useNavigate();
 
   useScrollRestore();
   useDocumentTitle();
@@ -54,6 +58,38 @@ function AppRoutes() {
   }, [user?.id]);
 
   useEffect(() => { initStatusBar(); }, []);
+
+  // Native OAuth finish: SFSafariViewController redirects to
+  // com.estia.agent://auth?code=<one-time code>. iOS opens the app and
+  // Capacitor fires appUrlOpen. We trade the code for a session cookie,
+  // close the Safari sheet, and refetch /me.
+  useEffect(() => {
+    if (!isNative()) return;
+    let sub;
+    (async () => {
+      const [{ App: CapApp }, { Browser }] = await Promise.all([
+        import('@capacitor/app'),
+        import('@capacitor/browser'),
+      ]);
+      sub = await CapApp.addListener('appUrlOpen', async (event) => {
+        const raw = event?.url || '';
+        if (!raw.toLowerCase().startsWith('com.estia.agent://auth')) return;
+        try {
+          const u = new URL(raw);
+          const code = u.searchParams.get('code');
+          if (!code) return;
+          await api.googleNativeExchange(code);
+          await Browser.close().catch(() => {});
+          await refresh();
+          navigate('/', { replace: true });
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('[oauth] native exchange failed', e);
+        }
+      });
+    })();
+    return () => { try { sub?.remove?.(); } catch { /* ignore */ } };
+  }, [refresh, navigate]);
 
   if (loading) {
     return (

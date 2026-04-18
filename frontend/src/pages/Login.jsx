@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { LogIn, Building2, Mail, Lock, ArrowLeft, UserPlus } from 'lucide-react';
 import { useAuth } from '../lib/auth';
+import { isNative } from '../native/platform';
+import { Browser } from '@capacitor/browser';
 import './Login.css';
 
 const AGENT_IMG = 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=900&q=80';
@@ -28,13 +30,34 @@ export default function Login() {
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
-  const handleGoogle = () => {
-    // Navigation to /api/auth/google is synchronous; the page unmounts
-    // before any "loading" state matters. We intentionally do NOT gate
-    // this button on `submitting` — on iOS the WKWebView can refuse a
-    // cross-origin hop (when Capacitor's allowNavigation doesn't cover
-    // the target) and the page stays mounted, leaving the button stuck
-    // disabled. Keeping it always clickable means a second tap retries.
+  const handleGoogle = async () => {
+    // Two different OAuth flows depending on the runtime:
+    //
+    // • Web: just navigate the WebView (or browser tab) to the start URL.
+    //   Same-origin with the app bundle, cookie is set by the callback,
+    //   everything works.
+    //
+    // • Native (Capacitor iOS/Android): the WKWebView can't run Google's
+    //   consent screen — Google's "use secure browsers" policy blocks
+    //   every embedded WebView by fingerprint, regardless of UA. So we
+    //   launch SFSafariViewController via @capacitor/browser, pass
+    //   ?native=1 so the backend redirects to our com.estia.agent://
+    //   deep link with a one-time code, and an appUrlOpen listener in
+    //   App.jsx catches that, calls /native-exchange, and the Set-Cookie
+    //   response lands in the app's WebView.
+    if (isNative()) {
+      // Always resolve against the production origin — on native there
+      // is no window.location meaningful for this hop; the app bundle
+      // loads from estia.tripzio.xyz and that's where /api lives.
+      const origin = window.location.origin.startsWith('http')
+        ? window.location.origin
+        : 'https://estia.tripzio.xyz';
+      await Browser.open({
+        url: `${origin}/api/auth/google?native=1`,
+        presentationStyle: 'popover',
+      });
+      return;
+    }
     const redirect = window.location.pathname + window.location.search;
     window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirect)}`;
   };

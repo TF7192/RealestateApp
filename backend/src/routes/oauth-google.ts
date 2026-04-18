@@ -29,6 +29,35 @@ const AUTH_URL  = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
 
+// Custom URL scheme the iOS app registers in Info.plist — used to bounce
+// the OAuth result back into the app from SFSafariViewController.
+const NATIVE_SCHEME = 'com.estia.agent';
+
+// In-memory one-time code store for the native exchange step. We keep
+// tokens short-lived (2 minutes) and single-use to minimize blast radius.
+// An in-process Map is acceptable because the native flow is:
+//    1. open Safari → 2. user signs in → 3. Safari redirects to
+//    com.estia.agent://auth?code=X → 4. app POSTs /native-exchange
+// all within seconds on the same backend process. If we ever scale
+// horizontally, move this to Redis or a short-lived DB row.
+type PendingExchange = { userId: string; expires: number };
+const pendingCodes = new Map<string, PendingExchange>();
+function issueNativeCode(userId: string): string {
+  // Purge expired entries opportunistically (cheap, bounded map size).
+  const now = Date.now();
+  for (const [k, v] of pendingCodes) if (v.expires < now) pendingCodes.delete(k);
+  const code = crypto.randomBytes(24).toString('base64url');
+  pendingCodes.set(code, { userId, expires: now + 120_000 });
+  return code;
+}
+function consumeNativeCode(code: string): string | null {
+  const entry = pendingCodes.get(code);
+  if (!entry) return null;
+  pendingCodes.delete(code);
+  if (entry.expires < Date.now()) return null;
+  return entry.userId;
+}
+
 function isConfigured(): boolean {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
@@ -56,8 +85,14 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
     }
     const state = crypto.randomBytes(24).toString('base64url');
     // Optional: allow a ?redirect=/some/path to bounce user back to a page
-    const rt = typeof req.query === 'object' && req.query && (req.query as any).redirect;
-    const payload = JSON.stringify({ s: state, r: typeof rt === 'string' ? rt : '/' });
+    const q = (req.query || {}) as Record<string, unknown>;
+    const rt = q.redirect;
+    const native = q.native === '1' || q.native === 'true';
+    const payload = JSON.stringify({
+      s: state,
+      r: typeof rt === 'string' ? rt : '/',
+      n: native ? 1 : 0,
+    });
     const encoded = Buffer.from(payload).toString('base64url');
 
     reply.setCookie(STATE_COOKIE, state, {
@@ -93,7 +128,7 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       return reply.redirect('/?auth=google_missing_state');
     }
 
-    let decoded: { s: string; r: string };
+    let decoded: { s: string; r: string; n?: number };
     try {
       decoded = JSON.parse(Buffer.from(encodedState, 'base64url').toString('utf8'));
     } catch {
@@ -102,6 +137,7 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
     if (decoded.s !== savedState) {
       return reply.redirect('/?auth=google_state_mismatch');
     }
+    const isNative = decoded.n === 1;
 
     // Exchange authorization code for an access token + id_token
     let tokens: any;
@@ -180,7 +216,21 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    // Issue the same JWT cookie the /login route uses
+    phIdentify(user.id, { email: user.email, role: user.role, display_name: user.displayName });
+    phTrack('login_completed', user.id, { role: user.role, provider: 'GOOGLE' });
+
+    if (isNative) {
+      // Native (iPhone app) flow: don't set a cookie here — we're running
+      // in SFSafariViewController, whose cookie jar is isolated from the
+      // app's WKWebView. Instead, mint a single-use exchange code and
+      // hand it off via the app's custom URL scheme; the app will then
+      // POST to /native-exchange from its own WebView, where the Set-Cookie
+      // response _will_ stick.
+      const oneTime = issueNativeCode(user.id);
+      return reply.redirect(`${NATIVE_SCHEME}://auth?code=${encodeURIComponent(oneTime)}`);
+    }
+
+    // Web flow (same origin as the WebView): set the JWT cookie directly.
     const token = app.jwt.sign(
       { sub: user.id, role: user.role, email: user.email },
       { expiresIn: '30d' }
@@ -192,11 +242,42 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 * 30,
     });
-    phIdentify(user.id, { email: user.email, role: user.role, display_name: user.displayName });
-    phTrack('login_completed', user.id, { role: user.role, provider: 'GOOGLE' });
-
     // Bounce back to the place the user came from (default: dashboard)
     const target = decoded.r && decoded.r.startsWith('/') ? decoded.r : '/';
     return reply.redirect(target);
+  });
+
+  // ── Step 3 (native only): app trades the one-time code for a session.
+  //
+  //   Called by the Capacitor app from its own WKWebView after catching
+  //   the com.estia.agent:// deep link. The response Set-Cookie lands in
+  //   the WebView's cookie jar, so the user is logged in right after.
+  app.post('/google/native-exchange', async (req, reply) => {
+    const { code } = (req.body || {}) as { code?: string };
+    if (!code) return reply.code(400).send({ error: { message: 'missing code' } });
+    const userId = consumeNativeCode(code);
+    if (!userId) return reply.code(400).send({ error: { message: 'invalid or expired code' } });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return reply.code(400).send({ error: { message: 'user not found' } });
+    const token = app.jwt.sign(
+      { sub: user.id, role: user.role, email: user.email },
+      { expiresIn: '30d' }
+    );
+    reply.setCookie(COOKIE_NAME, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 30,
+    });
+    return reply.send({
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        displayName: user.displayName,
+      },
+    });
   });
 };
