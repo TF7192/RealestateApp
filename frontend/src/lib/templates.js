@@ -3,6 +3,8 @@
 // Storage format uses {{var}} tokens internally for backwards compatibility,
 // but users never see them — the editor renders Hebrew chips.
 
+import { formatFloor } from './formatFloor';
+
 export const TEMPLATE_KINDS = [
   { key: 'BUY_PRIVATE',     label: 'דירה למכירה',         subtitle: 'מגורים · מכירה' },
   { key: 'RENT_PRIVATE',    label: 'דירה להשכרה',         subtitle: 'מגורים · השכרה' },
@@ -300,8 +302,11 @@ export function buildVariables(property, agent, opts = {}) {
     rooms:         property.rooms != null ? String(property.rooms) : '',
     sqm:           property.sqm != null ? String(property.sqm) : '',
     sqmArnona:     property.sqmArnona != null ? String(property.sqmArnona) : '',
-    floor:         property.floor != null ? String(property.floor) : '',
-    totalFloors:   property.totalFloors != null ? String(property.totalFloors) : '',
+    // Task 2 — floor 0 must render as "קרקע" everywhere, including templates
+    // the agent sends to customers over WhatsApp. Use the shared helper so
+    // behaviour stays in lockstep with the UI.
+    floor:         formatFloor(property.floor),
+    totalFloors:   formatFloor(property.totalFloors),
     balconySize:   property.balconySize != null ? String(property.balconySize) : '',
     buildingAge:   property.buildingAge != null ? String(property.buildingAge) : '',
     price:         formatPrice(property.marketingPrice),

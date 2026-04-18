@@ -6,6 +6,7 @@ import {
   Calendar, User, Clock, Edit3, Check, CheckCircle2,
 } from 'lucide-react';
 import { properties, formatPrice, marketingActionLabels, getAssetClassLabel, agentProfile } from '../../data/mockData';
+import { formatFloor } from '../../lib/formatFloor';
 import { haptics, openExternal, shareSheet } from '../../native';
 import { telUrl, whatsappUrl, wazeUrl, publicPropertyUrl } from '../../native/actions';
 import { useToast } from '../components/Toast';
@@ -17,7 +18,7 @@ function buildWaMessage(prop) {
     `שטח: ${prop.sqm} מ״ר`,
   ];
   if (prop.rooms != null) lines.push(`חדרים: ${prop.rooms}`);
-  lines.push(`קומה: ${prop.floor}/${prop.totalFloors}`);
+  if (prop.floor != null) lines.push(`קומה: ${formatFloor(prop.floor, prop.totalFloors)}`);
   if (prop.balconySize > 0) lines.push(`מרפסת: ${prop.balconySize} מ״ר`);
   lines.push(`חניה: ${prop.parking ? 'יש' : 'אין'}  ·  מחסן: ${prop.storage ? 'יש' : 'אין'}`);
   lines.push(`מזגנים: ${prop.ac ? 'יש' : 'אין'}  ·  ממ״ד: ${prop.safeRoom ? 'יש' : 'אין'}`);
@@ -159,7 +160,9 @@ export default function MobilePropertyDetail() {
         <div className="m-chip-row" style={{ marginTop: 14 }}>
           {prop.rooms != null && <span className="m-chip ghost"><Bed size={14} />{prop.rooms} חד׳</span>}
           <span className="m-chip ghost"><Maximize size={14} />{prop.sqm} מ״ר</span>
-          <span className="m-chip ghost"><Building size={14} />קומה {prop.floor}/{prop.totalFloors}</span>
+          {prop.floor != null && (
+            <span className="m-chip ghost"><Building size={14} />קומה {formatFloor(prop.floor, prop.totalFloors)}</span>
+          )}
           <span className="m-chip ghost">{prop.renovated}</span>
           <span className="m-chip ghost">
             {prop.buildingAge === 0 ? 'חדש' : `בניין בן ${prop.buildingAge}`}

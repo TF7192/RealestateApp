@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, UserPlus, MessageCircle, Check, AlertCircle, Send, Search } from 'lucide-react';
 import api from '../lib/api';
+import { formatFloor } from '../lib/formatFloor';
 import { openWhatsApp } from '../native/share';
 import { useToast, optimisticUpdate } from '../lib/toast';
 import {
@@ -249,7 +250,7 @@ function buildPropertyBrief(p) {
   lines.push(`💰 מחיר: ${price(p.marketingPrice)}`);
   lines.push(`📐 שטח: ${p.sqm} מ״ר`);
   if (p.rooms != null) lines.push(`🛏️ חדרים: ${p.rooms}`);
-  if (p.floor != null) lines.push(`🏢 קומה: ${p.floor}/${p.totalFloors ?? '?'}`);
+  if (p.floor != null) lines.push(`🏢 קומה: ${formatFloor(p.floor, p.totalFloors)}`);
   if (p.balconySize > 0) lines.push(`🌤️ מרפסת: ${p.balconySize} מ״ר`);
   lines.push(`🏷️ סיווג: ${assetLabel}`);
   const features = [];

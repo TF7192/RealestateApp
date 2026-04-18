@@ -11,6 +11,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import WhatsAppIcon from './WhatsAppIcon';
+import { formatFloor } from '../lib/formatFloor';
 import './PropertyHero.css';
 
 /**
@@ -71,7 +72,7 @@ export default function PropertyHero({
   const summaryParts = [];
   if (property.rooms != null) summaryParts.push(`${property.rooms} חד׳`);
   if (property.sqm) summaryParts.push(`${property.sqm} מ״ר`);
-  if (property.floor != null) summaryParts.push(`קומה ${property.floor}${property.totalFloors ? `/${property.totalFloors}` : ''}`);
+  if (property.floor != null) summaryParts.push(`קומה ${formatFloor(property.floor, property.totalFloors)}`);
 
   return (
     <section className="ph-hero animate-in animate-in-delay-1">

@@ -8,6 +8,7 @@ import {
   properties, formatPrice, getAssetClassLabel,
   getDistanceKm, resolveLocation, allLocationNames, agentProfile,
 } from '../../data/mockData';
+import { formatFloor } from '../../lib/formatFloor';
 import SwipeCard from '../components/SwipeCard';
 import BottomSheet from '../components/BottomSheet';
 import { haptics, openExternal, shareSheet, requestCurrentPosition } from '../../native';
@@ -21,7 +22,7 @@ function buildWaMessage(prop) {
     `שטח: ${prop.sqm} מ״ר`,
   ];
   if (prop.rooms != null) lines.push(`חדרים: ${prop.rooms}`);
-  lines.push(`קומה: ${prop.floor}/${prop.totalFloors}`);
+  if (prop.floor != null) lines.push(`קומה: ${formatFloor(prop.floor, prop.totalFloors)}`);
   if (prop.balconySize > 0) lines.push(`מרפסת: ${prop.balconySize} מ״ר`);
   lines.push(`חניה: ${prop.parking ? 'יש' : 'אין'}  ·  מחסן: ${prop.storage ? 'יש' : 'אין'}`);
   lines.push(`מזגנים: ${prop.ac ? 'יש' : 'אין'}  ·  ממ״ד: ${prop.safeRoom ? 'יש' : 'אין'}`);
@@ -373,7 +374,7 @@ function PropertyRow({ prop, toast, navigate }) {
           <div className="m-prop-specs">
             {prop.rooms != null && <span><Bed size={11} />{prop.rooms} חד׳</span>}
             <span><Maximize size={11} />{prop.sqm} מ״ר</span>
-            <span>קומה {prop.floor}</span>
+            {prop.floor != null && <span>קומה {formatFloor(prop.floor)}</span>}
           </div>
         </div>
       </div>

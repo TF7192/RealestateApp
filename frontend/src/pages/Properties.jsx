@@ -19,6 +19,7 @@ import {
   Phone,
 } from 'lucide-react';
 import api from '../lib/api';
+import { formatFloor } from '../lib/formatFloor';
 import { useAuth } from '../lib/auth';
 import ConfirmDialog from '../components/ConfirmDialog';
 import WhatsAppSheet from '../components/WhatsAppSheet';
@@ -61,7 +62,7 @@ function buildWhatsAppMessage(prop, agent) {
   lines.push(`מחיר: ${formatPrice(prop.marketingPrice)}`);
   lines.push(`שטח: ${prop.sqm} מ״ר`);
   if (prop.rooms != null) lines.push(`חדרים: ${prop.rooms}`);
-  lines.push(`קומה: ${prop.floor}/${prop.totalFloors}`);
+  if (prop.floor != null) lines.push(`קומה: ${formatFloor(prop.floor, prop.totalFloors)}`);
   if (prop.balconySize > 0) lines.push(`מרפסת: ${prop.balconySize} מ״ר`);
   lines.push(`חניה: ${prop.parking ? 'יש' : 'אין'}`);
   lines.push(`מחסן: ${prop.storage ? 'יש' : 'אין'}`);

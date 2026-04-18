@@ -24,6 +24,7 @@ import {
   getDistanceKm,
   getAssetClassLabel,
 } from '../data/mockData';
+import { formatFloor } from '../lib/formatFloor';
 import './CustomerPortal.css';
 
 export default function CustomerPortal({ onLogout, isPublic }) {
@@ -472,10 +473,12 @@ export default function CustomerPortal({ onLogout, isPublic }) {
                     <Maximize size={14} />
                     {prop.sqm} מ״ר
                   </span>
-                  <span>
-                    <Building2 size={14} />
-                    קומה {prop.floor}
-                  </span>
+                  {prop.floor != null && (
+                    <span>
+                      <Building2 size={14} />
+                      קומה {formatFloor(prop.floor)}
+                    </span>
+                  )}
                 </div>
                 {prop._distance != null && (
                   <div className="cp-card-distance">

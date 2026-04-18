@@ -27,6 +27,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import api from '../lib/api';
+import { formatFloor, formatFloorOutOf } from '../lib/formatFloor';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import { useViewportMobile } from '../hooks/mobile';
 import './CustomerPropertyView.css';
@@ -79,7 +80,7 @@ function usePropertyMeta(property, agent) {
     const desc = [
       property.rooms ? `${property.rooms} חדרים` : null,
       property.sqm ? `${property.sqm} מ״ר` : null,
-      property.floor != null ? `קומה ${property.floor}` : null,
+      property.floor != null ? `קומה ${formatFloor(property.floor)}` : null,
       agent?.displayName ? `· ${agent.displayName}` : null,
     ].filter(Boolean).join(' · ');
     const img = (property.images && property.images[0]) || '';
@@ -265,7 +266,7 @@ export default function CustomerPropertyView() {
     property.sqmArnona       && { label: 'שטח ארנונה', value: `${property.sqmArnona} מ״ר` },
     isCommercial && property.sqmGross && { label: 'שטח ברוטו', value: `${property.sqmGross} מ״ר` },
     isCommercial && property.sqmNet   && { label: 'שטח נטו',   value: `${property.sqmNet} מ״ר` },
-    property.floor != null && { label: 'קומה', value: property.totalFloors ? `${property.floor} מתוך ${property.totalFloors}` : `${property.floor}` },
+    property.floor != null && { label: 'קומה', value: formatFloorOutOf(property.floor, property.totalFloors) },
     property.renovated  && { label: 'מצב הנכס',   value: property.renovated },
     isCommercial && property.buildState && { label: 'מצב בנייה', value: property.buildState },
     property.balconySize > 0 && { label: 'מרפסת', value: `${property.balconySize} מ״ר` },
@@ -398,7 +399,7 @@ export default function CustomerPropertyView() {
             {property.floor != null && (
               <div className="cpv-headline-cell">
                 <Building2 size={18} />
-                <strong>{property.floor}{property.totalFloors ? `/${property.totalFloors}` : ''}</strong>
+                <strong>{formatFloor(property.floor, property.totalFloors)}</strong>
                 <span>קומה</span>
               </div>
             )}
