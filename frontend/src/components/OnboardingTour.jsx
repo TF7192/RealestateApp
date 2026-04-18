@@ -237,7 +237,7 @@ export function TourTooltip({
             skipProps?.onClick?.(e);
           }}
         >
-          דלג על כל הסיורים ואל תחזור להציג
+          דלג על הסיור
         </button>
       </div>
     </div>
