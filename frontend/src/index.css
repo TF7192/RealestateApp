@@ -302,6 +302,31 @@ input, textarea, select {
   scroll-margin-bottom: calc(var(--kb-h) + 80px);
 }
 
+/* S1 — Kill iOS Safari's focus auto-zoom.
+ *
+ * iOS Safari auto-zooms the viewport when a focused input's rendered
+ * font-size is < 16px. Once zoomed, the user has to pinch out to
+ * continue, which is jarring and the single biggest iPhone-form
+ * complaint.
+ *
+ * Some of our individual input classes set mobile-specific sizes in
+ * their own media queries (Forms.css → 16px; SmartFields → 17px); this
+ * rule is a belt-and-braces safety net for everything we don't reach
+ * from component CSS — dialog inputs, TransferPropertyDialog search,
+ * LeadPickerSheet search, MarketingActionDialog link/notes fields,
+ * any future raw <input> that lands without a class.
+ *
+ * Scoped to the narrow interactive-form inputs; intentionally skips
+ * hidden inputs and checkboxes/radios since they don't focus-zoom.
+ */
+@media (max-width: 900px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* Form-action bars are inline on mobile; nothing needed here any more */
 
 /* Skeleton placeholders */
