@@ -88,6 +88,30 @@ All items trace back to the Ship list in `SHIP_LIST.md`. iPhone-first.
 
 ## Day 2 — iPhone fixes + bundle weight
 
+---
+
+## Day 3 — emotional wins + flow
+
+### S11 · Stale-lead pill on customer cards
+- **Source:** SHIP_LIST S11 + empathy log ("I've gone quiet on leads and don't notice until the week is over")
+- **Files:** `frontend/src/pages/Customers.jsx`, `frontend/src/pages/Customers.css`
+- **Change:** `stalePillDays(lead)` helper returns the day count when a HOT/WARM lead has had no contact in ≥10 days (COLD already has its own "X ימים ללא קשר" suffix, so we skip it to avoid double-signaling). Pill renders on all three list paths:
+  - Mobile card name-row: amber pill next to status reason / preapproval — tap bumps lastContact to now (fix affordance, not just a warning).
+  - Desktop v2 card right rail: same, scaled up.
+  - Desktop table + mobile list row: the existing "last contact" cell paints amber so the row gets a passive glance-cue without adding a chip to an already-dense row.
+- **iPhone re-test:** Seeded 3 HOT leads with lastContact 12-18 days ago; all rendered the pill. Tap → "קשר אחרון עודכן" toast → pill vanished.
+- **Emotional impact:** High — agents consistently describe "going quiet on a warm lead" as their most recurring regret.
+
+### S12 · Dashboard "היום" strip
+- **Source:** SHIP_LIST S12 + "morning-coffee workflow" from Phase 0
+- **Files:** `frontend/src/pages/Dashboard.jsx`, `frontend/src/pages/Dashboard.css`, `frontend/src/pages/Customers.jsx`, `frontend/src/pages/Properties.jsx`
+- **Change:**
+  - New `TodayStrip` component renders between Welcome and KpiScroller. Three tiles, in priority order: hot leads untouched ≥1d (danger tone), stale leads ≥10d (warn), unmarketed properties (gold). Tile only renders if its underlying count > 0; the whole strip hides on a quiet day so there's no "0 לידים ממתינים!" cheerleader copy.
+  - Tiles link directly to filtered views: `/customers?filter=hot`, `/customers?filter=inactive10`, `/properties?filter=unmarketed`. Wired the two new filters into the target pages so the deep-links actually narrow the list.
+  - Mobile: the rail becomes a scroll-snapping horizontal lane at ≤820px with a peek of the next tile, so the strip stays one-glance even at 375px.
+- **iPhone re-test:** Dashboard at 375px shows three tiles scroll-snapping horizontally; tapping "X לידים חמים ממתינים" navigates to `/customers?filter=hot` with status badge correctly set to HOT.
+- **Emotional impact:** High — the morning-coffee workflow now has a specific artifact to answer "what do I need to do today?".
+
 ### S18 · DateQuickChips now covers backdated fields
 - **Source:** BUG-018 + empathy log ("recording a signing after the fact took 6–8 taps through the iOS date picker")
 - **Files:** `frontend/src/components/MobilePickers.jsx`, `frontend/src/components/MobilePickers.css`, `frontend/src/pages/Deals.jsx`

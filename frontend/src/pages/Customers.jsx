@@ -87,6 +87,21 @@ function statusReason(lead) {
   return { emoji: '🟡', label: 'חמים', suffix: lastContactLabel || 'חדש' };
 }
 
+// S11: return the number of days since last contact IF it's stale enough to
+// warrant a pill, and the lead isn't already flagged COLD (which has its own
+// "X ימים ללא קשר" suffix in statusReason and would double-signal).
+// 10 days is the threshold the empathy log's stale-lead workflow settled on:
+// short enough that HOT leads don't go silent on real estate's fast clock,
+// long enough that an agent who reached out last Tuesday doesn't get nagged.
+const STALE_THRESHOLD_DAYS = 10;
+function stalePillDays(lead) {
+  const status = lead.status || 'WARM';
+  if (status === 'COLD') return null;
+  if (!lead.lastContact) return null;
+  const days = Math.round((Date.now() - new Date(lead.lastContact).getTime()) / 86400000);
+  return days >= STALE_THRESHOLD_DAYS ? days : null;
+}
+
 export default function Customers() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -100,6 +115,10 @@ export default function Customers() {
   const [lookingForFilter, setLookingForFilter] = useState('all'); // all | BUY | RENT
   const [interestFilter, setInterestFilter] = useState('all'); // all | PRIVATE | COMMERCIAL
   const [statusFilter, setStatusFilter] = useState('all');
+  // S12: `inactive` lets the Dashboard Today strip deep-link straight into a
+  // stale-lead view. Value is the day threshold (10 from today-strip,
+  // 30 from the legacy signals card) or null for "no inactive filter".
+  const [inactiveFilter, setInactiveFilter] = useState(null);
   const [search, setSearch] = useState('');
   const [highlightId, setHighlightId] = useState(null);
   const [editDialog, setEditDialog] = useState(null);
@@ -178,6 +197,11 @@ export default function Customers() {
     }
     const f = searchParams.get('filter');
     if (f === 'hot' || f === 'warm' || f === 'cold') setStatusFilter(f.toUpperCase());
+    if (f && /^inactive(\d+)$/.test(f)) {
+      setInactiveFilter(Number(f.match(/^inactive(\d+)$/)[1]));
+    } else if (!f) {
+      setInactiveFilter(null);
+    }
   }, [searchParams]);
 
   // Breadcrumb shown when the user arrived via an incoming filter
@@ -186,14 +210,25 @@ export default function Customers() {
     if (f === 'hot') return 'לידים חמים';
     if (f === 'warm') return 'לידים חמימים';
     if (f === 'cold') return 'לידים קרים';
+    if (f && /^inactive(\d+)$/.test(f)) return `לידים ללא קשר ${f.match(/^inactive(\d+)$/)[1]}+ ימים`;
     return null;
   })();
 
   const filtered = useMemo(() => {
+    const now = Date.now();
+    const DAY = 86400000;
     return leads.filter((l) => {
       if (lookingForFilter !== 'all' && l.lookingFor !== lookingForFilter) return false;
       if (interestFilter !== 'all' && l.interestType !== interestFilter) return false;
       if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+      if (inactiveFilter != null) {
+        // COLD is the "already parked" state; the inactive view is for
+        // leads that should still be live, so exclude COLD here.
+        if (l.status === 'COLD') return false;
+        if (!l.lastContact) return false;
+        const days = (now - new Date(l.lastContact).getTime()) / DAY;
+        if (days < inactiveFilter) return false;
+      }
       if (!search) return true;
       const s = search.toLowerCase();
       return (
@@ -202,7 +237,7 @@ export default function Customers() {
         l.phone?.includes(s)
       );
     });
-  }, [leads, lookingForFilter, interestFilter, statusFilter, search]);
+  }, [leads, lookingForFilter, interestFilter, statusFilter, inactiveFilter, search]);
 
   const handleWhatsApp = (lead) => {
     primeContactBump(lead.id);
@@ -226,12 +261,14 @@ export default function Customers() {
   const activeFilterCount =
     (lookingForFilter !== 'all' ? 1 : 0) +
     (interestFilter !== 'all' ? 1 : 0) +
-    (statusFilter !== 'all' ? 1 : 0);
+    (statusFilter !== 'all' ? 1 : 0) +
+    (inactiveFilter != null ? 1 : 0);
 
   const clearFilters = () => {
     setLookingForFilter('all');
     setInterestFilter('all');
     setStatusFilter('all');
+    setInactiveFilter(null);
   };
 
   const patchLead = async (leadId, patch, { label, success } = {}) => {
@@ -538,6 +575,28 @@ export default function Customers() {
                                 <CheckCircle2 size={10} />
                               </span>
                             )}
+                            {(() => {
+                              // S11: stale-lead pill — HOT/WARM leads that
+                              // haven't been contacted in ≥10 days. A tap
+                              // bumps lastContact to now (same action as the
+                              // footer "קשר אחרון" button), so the pill is a
+                              // fix affordance, not just a warning.
+                              const stale = stalePillDays(lead);
+                              if (!stale) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  className="ccm-stale-pill"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: 'קשר אחרון עודכן' });
+                                  }}
+                                  title="לחץ לעדכון קשר אחרון לעכשיו"
+                                >
+                                  {stale} ימים ללא קשר
+                                </button>
+                              );
+                            })()}
                             {matchCountMobile > 0 && (
                               <Link
                                 to={`/properties${lead.city ? `?city=${encodeURIComponent(lead.city)}` : ''}`}
@@ -796,6 +855,20 @@ export default function Customers() {
                       אישור עקרוני
                     </span>
                   )}
+                  {(() => {
+                    const stale = stalePillDays(lead);
+                    if (!stale) return null;
+                    return (
+                      <button
+                        type="button"
+                        className="cc-v2-stale-pill"
+                        onClick={() => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: 'קשר אחרון עודכן' })}
+                        title="לחץ לעדכון קשר אחרון לעכשיו"
+                      >
+                        {stale} ימים ללא קשר
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1087,7 +1160,7 @@ function CustomerList({
                     <StatusPicker lead={lead} onChange={onStatusChange} />
                   </td>
                   <td
-                    className="cl-td cl-td-num cl-muted"
+                    className={`cl-td cl-td-num cl-muted ${stalePillDays(lead) ? 'cl-td-stale' : ''}`}
                     title={lead.lastContact ? absoluteTime(lead.lastContact) : ''}
                   >
                     {lastRel ? lastRel.label : '—'}
@@ -1165,7 +1238,10 @@ function CustomerList({
             <span className="cl-muted">{lead.city || '—'}</span>
             <span className="cl-muted">{lead.rooms || '—'}</span>
             <span className="cl-muted">{lead.priceRangeLabel || '—'}</span>
-            <span className="cl-muted" title={lead.lastContact ? absoluteTime(lead.lastContact) : ''}>
+            <span
+              className={`cl-muted ${stalePillDays(lead) ? 'cl-stale' : ''}`}
+              title={lead.lastContact ? absoluteTime(lead.lastContact) : ''}
+            >
               {lead.lastContact ? relativeTime(lead.lastContact) : '—'}
             </span>
             <span className="cl-actions">

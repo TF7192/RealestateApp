@@ -204,6 +204,11 @@ export default function Properties() {
     return () => { document.body.style.overscrollBehaviorY = prev; };
   }, [items.length]);
 
+  // S12: Dashboard "היום" strip deep-links here with ?filter=unmarketed to
+  // show only properties where no marketing action has been ticked yet. Stored
+  // as its own flag so the existing SALE/RENT `filter` doesn't conflict.
+  const [unmarketedOnly, setUnmarketedOnly] = useState(false);
+
   useEffect(() => {
     const ac = searchParams.get('assetClass');
     if (ac === 'residential') setAssetClassFilter('RESIDENTIAL');
@@ -211,6 +216,7 @@ export default function Properties() {
     const cat = searchParams.get('category');
     if (cat === 'sale') setFilter('SALE');
     if (cat === 'rent') setFilter('RENT');
+    setUnmarketedOnly(searchParams.get('filter') === 'unmarketed');
   }, [searchParams]);
 
   const locationCenter = useMemo(() => resolveLocation(locationQuery), [locationQuery]);
@@ -236,6 +242,11 @@ export default function Properties() {
         if (advFilters.maxRooms && p.rooms != null && p.rooms > Number(advFilters.maxRooms)) return false;
         if (advFilters.minSqm && p.sqm < Number(advFilters.minSqm)) return false;
         if (advFilters.maxSqm && p.sqm > Number(advFilters.maxSqm)) return false;
+        if (unmarketedOnly) {
+          const acts = Object.values(p.marketingActions || {});
+          const anyDone = acts.some((v) => !!v);
+          if (anyDone) return false;
+        }
         if (locationCenter && p._distance != null && p._distance > locationRadius) return false;
         if (search) {
           const s = search.toLowerCase();
@@ -252,7 +263,7 @@ export default function Properties() {
         if (a._distance != null && b._distance != null) return a._distance - b._distance;
         return 0;
       });
-  }, [items, filter, assetClassFilter, advFilters, search, locationCenter, locationRadius]);
+  }, [items, filter, assetClassFilter, advFilters, search, locationCenter, locationRadius, unmarketedOnly]);
 
   const cities = [...new Set(items.map((p) => p.city))];
 

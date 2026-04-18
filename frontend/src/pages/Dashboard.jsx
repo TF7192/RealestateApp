@@ -14,6 +14,9 @@ import {
   FileText,
   Clock3,
   UserCircle,
+  Sun,
+  PhoneCall,
+  Sparkles,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -200,6 +203,8 @@ export default function Dashboard() {
     <PullRefresh onRefresh={load}>
       <div className="dashboard">
         <WelcomeSection />
+
+        <TodayStrip leads={leads} properties={properties} />
 
         <KpiScroller stats={stats} />
 
@@ -422,6 +427,105 @@ function KpiScroller({ stats }) {
         ))}
       </div>
     </>
+  );
+}
+
+// S12 · TodayStrip — the "morning-coffee" summary that answers
+// "what do I need to do today?" in one glance. Deliberately calm: no
+// counts-in-red, no exclamation marks, no call-to-action verbs. Each
+// item is a one-tap link into the filtered page so the agent can act
+// without reading long copy.
+//
+// Only renders tiles that have content — the strip disappears entirely
+// on a quiet day rather than showing "0 things to do!" cheerleader copy.
+function TodayStrip({ leads = [], properties = [] }) {
+  const now = Date.now();
+  const DAY = 86400000;
+
+  // Stale leads (HOT/WARM only, ≥10 days) — same threshold as the
+  // customer-list pill (S11) so the numbers line up.
+  const staleLeads = leads.filter((l) => {
+    if (!l.lastContact) return false;
+    if (l.status === 'COLD') return false;
+    return (now - new Date(l.lastContact).getTime()) / DAY >= 10;
+  });
+
+  // Hot leads untouched for even a day. "Hot" means the agent said so —
+  // letting a hot lead sit overnight is the expensive miss.
+  const hotSilent = leads.filter((l) => {
+    if (l.status !== 'HOT') return false;
+    if (!l.lastContact) return true;
+    return (now - new Date(l.lastContact).getTime()) / DAY >= 1;
+  });
+
+  // Properties with no marketing actions ticked yet — likely new intakes
+  // where the agent hasn't started promotion.
+  const unmarketed = properties.filter((p) => {
+    const acts = Object.values(p.marketingActions || {});
+    if (!acts.length) return true;
+    return acts.every((v) => !v);
+  });
+
+  const tiles = [];
+  if (hotSilent.length > 0) {
+    tiles.push({
+      key: 'hot',
+      to: '/customers?filter=hot',
+      icon: PhoneCall,
+      title: `${hotSilent.length} לידים חמים ממתינים`,
+      sub: 'עוד לא נוצר קשר היום',
+      tone: 'danger',
+    });
+  }
+  if (staleLeads.length > 0) {
+    tiles.push({
+      key: 'stale',
+      to: '/customers?filter=inactive10',
+      icon: Clock3,
+      title: `${staleLeads.length} לידים ללא קשר 10+ ימים`,
+      sub: 'שווה לחזור אליהם',
+      tone: 'warn',
+    });
+  }
+  if (unmarketed.length > 0) {
+    tiles.push({
+      key: 'promo',
+      to: '/properties?filter=unmarketed',
+      icon: Sparkles,
+      title: `${unmarketed.length} נכסים ללא שיווק`,
+      sub: 'התחל עם פעולה אחת',
+      tone: 'gold',
+    });
+  }
+
+  if (tiles.length === 0) return null;
+
+  return (
+    <section className="today-strip animate-in animate-in-delay-1" aria-label="סדר היום">
+      <header className="today-strip-head">
+        <Sun size={14} aria-hidden="true" />
+        <h3>היום</h3>
+      </header>
+      <div className="today-strip-rail">
+        {tiles.map((t) => {
+          const Icon = t.icon;
+          return (
+            <Link
+              key={t.key}
+              to={t.to}
+              className={`today-tile today-tile-${t.tone}`}
+              onClick={() => haptics.tap()}
+            >
+              <span className="today-tile-icon"><Icon size={16} /></span>
+              <span className="today-tile-meta">
+                <strong>{t.title}</strong>
+                <small>{t.sub}</small>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
