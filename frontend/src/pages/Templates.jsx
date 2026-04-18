@@ -35,6 +35,8 @@ import {
   renderTemplate,
 } from '../lib/templates';
 import ChipEditor from '../components/ChipEditor';
+import Portal from '../components/Portal';
+import { Maximize2 } from 'lucide-react';
 import './Templates.css';
 
 const KIND_ICON = {
@@ -68,6 +70,7 @@ export default function Templates() {
   const [previewPropId, setPreviewPropId] = useState(null);
   const [mobileMode, setMobileMode] = useState('edit'); // 'edit' | 'preview'
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const editorRef = useRef(null);
 
   // ── Load templates + properties ───────────────────────────────
@@ -335,16 +338,27 @@ export default function Templates() {
                     <span className="tpl-badge tpl-badge-default">ברירת מחדל</span>
                   )}
                 </div>
-                <button
-                  type="button"
-                  className="tpl-linkbtn"
-                  onClick={handleReset}
-                  disabled={saving}
-                  title="החזר לברירת מחדל"
-                >
-                  <RotateCcw size={12} />
-                  איפוס
-                </button>
+                <div className="tpl-editor-head-actions">
+                  <button
+                    type="button"
+                    className="tpl-linkbtn only-mobile"
+                    onClick={() => setFullscreenOpen(true)}
+                    title="ערוך במסך מלא"
+                  >
+                    <Maximize2 size={12} />
+                    מסך מלא
+                  </button>
+                  <button
+                    type="button"
+                    className="tpl-linkbtn"
+                    onClick={handleReset}
+                    disabled={saving}
+                    title="החזר לברירת מחדל"
+                  >
+                    <RotateCcw size={12} />
+                    איפוס
+                  </button>
+                </div>
               </div>
 
               <ChipEditor
@@ -521,7 +535,88 @@ export default function Templates() {
           }}
         />
       )}
+
+      {/* ── T4: iPhone-only full-screen template editor ─────────── */}
+      {fullscreenOpen && (
+        <FullscreenTemplateEditor
+          kindLabel={currentMeta?.label || ''}
+          value={draft}
+          onChange={updateDraft}
+          variables={variables}
+          onClose={() => setFullscreenOpen(false)}
+          onInsertVariable={(k) => insertVariable(k)}
+        />
+      )}
     </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+ * FullscreenTemplateEditor — iPhone-only modal that gives the
+ * agent real breathing room while editing a template. The page's
+ * inline ChipEditor still exists for quick tweaks; this view is
+ * for longer rewrites where the ~150px inline area wasn't enough.
+ *
+ * Design choices:
+ *  - 100dvh height so the iOS toolbar/keyboard subtracts correctly
+ *  - textarea font-size 17px (iOS won't auto-zoom)
+ *  - keyboard-aware bottom padding via the existing --kb-h var
+ *  - sticky top bar with Done (top-end in RTL → visual left)
+ *  - variable chips parked under the editor so the thumb doesn't
+ *    have to leave the keyboard area to insert a field
+ * ──────────────────────────────────────────────────────────── */
+function FullscreenTemplateEditor({ kindLabel, value, onChange, variables, onClose, onInsertVariable }) {
+  const editorRef = useRef(null);
+  const insertAndStay = (k) => {
+    onInsertVariable(k);
+    // Refocus the ChipEditor contentEditable so the keyboard doesn't drop
+    requestAnimationFrame(() => editorRef.current?.focus?.());
+  };
+  return (
+    <Portal>
+      <div className="tpl-fs" role="dialog" aria-modal="true" aria-label={`עריכת תבנית ${kindLabel}`}>
+        <header className="tpl-fs-top">
+          <button type="button" className="tpl-fs-done" onClick={onClose}>
+            <Check size={16} /> סיים
+          </button>
+          <div className="tpl-fs-title">
+            <Pencil size={13} />
+            <span>{kindLabel || 'תבנית'}</span>
+          </div>
+          <span className="tpl-fs-spacer" aria-hidden />
+        </header>
+
+        <div className="tpl-fs-body">
+          <ChipEditor
+            ref={editorRef}
+            value={value}
+            onChange={onChange}
+            labelOf={LABEL_OF}
+            variableValues={variables}
+            placeholder="הקלד את נוסח ההודעה כאן. בחר שדה מהרשימה למטה כדי להכניס גלולה זהובה."
+          />
+        </div>
+
+        <div className="tpl-fs-vars" role="group" aria-label="הוסף שדה">
+          {VAR_GROUPS.flatMap((g) => g.keys).map((k) => {
+            const ph = PLACEHOLDERS.find((p) => p.key === k);
+            if (!ph) return null;
+            return (
+              <button
+                key={k}
+                type="button"
+                className="tpl-fs-var"
+                // Keep editor focus so the caret + selection survive the tap
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => insertAndStay(k)}
+              >
+                {ph.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </Portal>
   );
 }
 
