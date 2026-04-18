@@ -138,7 +138,7 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
             </button>
             <button className="mms-row" onClick={() => go('/owners')}>
               <span className="mms-row-icon"><UserCircle size={18} /></span>
-              <span className="mms-row-text"><strong>בעלי נכסים</strong><small>ניהול בעלים, פרטי קשר וקישור לנכסים</small></span>
+              <span className="mms-row-text"><strong>בעלי נכסים</strong><small>ניהול בעלי הנכסים שלך</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/transfers')}>

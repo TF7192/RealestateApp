@@ -228,7 +228,7 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 14px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   background: var(--bg-elevated);
   border: 1px dashed var(--border);
   border-radius: 12px;
@@ -237,8 +237,8 @@
 .np-owner-quickpick-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
+  gap: 6px;
+  padding: 6px 12px;
   border: none;
   background: transparent;
   color: var(--gold);
@@ -279,3 +279,45 @@
   padding: 0;
 }
 .np-owner-unlink-link:hover { opacity: 0.7; }
+
+/* Hide the divider label on desktop — only meaningful in the stacked mobile layout */
+.np-mobile-only { display: none; }
+
+/* ── Mobile: stack the quickpick & give it more air ──────────── */
+@media (max-width: 640px) {
+  .np-owner-quickpick {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px;
+    margin-bottom: 18px;
+  }
+
+  .np-owner-quickpick-btn {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    background: var(--gold-glow);
+    border: 1px solid var(--gold-border);
+    font-size: 14px;
+  }
+
+  .np-owner-linked-badge {
+    margin-inline-start: 0;
+    align-self: center;
+  }
+
+  .np-owner-divider {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+  }
+
+  .np-mobile-only { display: block; }
+}

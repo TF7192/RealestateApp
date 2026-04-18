@@ -467,13 +467,13 @@ export default function NewProperty() {
                 className="np-owner-quickpick-btn"
                 onClick={() => setOwnerPickerOpen(true)}
               >
-                <UserCheck size={12} />
-                כבר במערכת? בחר בעל קיים
+                <UserCheck size={14} />
+                כבר במערכת? בחר בעל נכס קיים
               </button>
               {form.propertyOwnerId && (
-                <span className="np-owner-linked-badge" title="מקושר לכרטיס בעל קיים">
+                <span className="np-owner-linked-badge" title="מקושר לכרטיס בעל נכס קיים">
                   <CheckCircle2 size={12} />
-                  בעל מקושר
+                  בעל נכס מקושר
                   <button
                     type="button"
                     className="np-owner-unlink-link"
@@ -485,6 +485,7 @@ export default function NewProperty() {
                   </button>
                 </span>
               )}
+              <span className="np-owner-divider np-mobile-only">או מלא פרטים חדשים למטה</span>
             </div>
 
             <div className="form-row">

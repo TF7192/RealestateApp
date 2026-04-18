@@ -602,9 +602,30 @@ export default function PropertyDetail() {
                     </a>
                   )}
                 </div>
+                {ownerPhone && (
+                  <div className="dc-owner-round-actions" aria-hidden="false">
+                    <a
+                      href={telUrl(ownerPhone)}
+                      className="dc-owner-round dc-owner-round-call"
+                      aria-label={`התקשר ל${ownerName}`}
+                      title={`התקשר ל${ownerName}`}
+                    >
+                      <Phone size={18} />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => openWhatsApp({ phone: ownerPhone, text: `שלום ${ownerName}` })}
+                      className="dc-owner-round dc-owner-round-wa"
+                      aria-label={`וואטסאפ ל${ownerName}`}
+                      title={`וואטסאפ ל${ownerName}`}
+                    >
+                      <WhatsAppIcon size={20} />
+                    </button>
+                  </div>
+                )}
               </div>
               {ownerPhone && (
-                <div className="dc-owner-actions">
+                <div className="dc-owner-actions dc-owner-actions-desktop">
                   <a
                     href={telUrl(ownerPhone)}
                     className="dc-mini dc-mini-secondary"
@@ -613,16 +634,15 @@ export default function PropertyDetail() {
                     <Phone size={13} />
                     <span>התקשר</span>
                   </a>
-                  <a
-                    href={waUrl(ownerPhone, '')}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => openWhatsApp({ phone: ownerPhone, text: `שלום ${ownerName}` })}
                     className="dc-mini dc-mini-wa"
                     aria-label={`WhatsApp ${ownerName}`}
                   >
                     <WhatsAppIcon size={13} />
                     <span>וואטסאפ</span>
-                  </a>
+                  </button>
                 </div>
               )}
             </>
@@ -864,14 +884,13 @@ export default function PropertyDetail() {
                     <a href={telUrl(ownerPhone)} className="btn btn-secondary">
                       <Phone size={14} />התקשר
                     </a>
-                    <a
-                      href={waUrl(ownerPhone, '')}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => openWhatsApp({ phone: ownerPhone, text: `שלום ${ownerName}` })}
                       className="btn btn-primary"
                     >
-                      <WhatsAppIcon size={14} />WhatsApp
-                    </a>
+                      <WhatsAppIcon size={14} />וואטסאפ
+                    </button>
                   </>
                 )}
                 {linkedOwner?.id && (
@@ -880,7 +899,7 @@ export default function PropertyDetail() {
                   </Link>
                 )}
                 <button className="btn btn-secondary" onClick={() => { setPanel(null); setEditing(true); }}>
-                  <Edit3 size={14} />ערוך פרטי בעלים
+                  <Edit3 size={14} />ערוך פרטי בעל הנכס
                 </button>
               </div>
             </div>
@@ -889,7 +908,7 @@ export default function PropertyDetail() {
               <User size={32} />
               <p>אין בעל נכס מקושר.</p>
               <button className="btn btn-primary" onClick={() => { setPanel(null); setEditing(true); }}>
-                הוסף פרטי בעלים
+                הוסף פרטי בעל הנכס
               </button>
             </div>
           )}
@@ -1246,7 +1265,7 @@ function PropertyEditDialog({ property, onClose, onSaved }) {
             <Field label="רחוב ומספר"><input className="form-input" value={form.street} onChange={(e) => update('street', e.target.value)} /></Field>
             <Field label="עיר"><input className="form-input" value={form.city} onChange={(e) => update('city', e.target.value)} /></Field>
             <Field label="בעל הנכס"><input className="form-input" value={form.owner} onChange={(e) => update('owner', e.target.value)} /></Field>
-            <Field label="טלפון בעלים"><input className="form-input" value={form.ownerPhone} onChange={(e) => update('ownerPhone', e.target.value)} /></Field>
+            <Field label="טלפון בעל הנכס"><input className="form-input" value={form.ownerPhone} onChange={(e) => update('ownerPhone', e.target.value)} /></Field>
             <Field label="מחיר שיווק"><input type="number" className="form-input" value={form.marketingPrice} onChange={(e) => update('marketingPrice', e.target.value)} /></Field>
             <Field label="מחיר סגירה"><input type="number" className="form-input" value={form.closingPrice} onChange={(e) => update('closingPrice', e.target.value)} /></Field>
             <Field label="מ״ר"><input type="number" className="form-input" value={form.sqm} onChange={(e) => update('sqm', e.target.value)} /></Field>

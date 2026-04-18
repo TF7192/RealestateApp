@@ -102,13 +102,13 @@ export default function OwnerPicker({ open, onClose, onPick }) {
           onClick={onClose}
           onKeyDown={handleEsc}
           role="dialog"
-          aria-label="בחר בעל נכס"
+          aria-label="בחר בעל נכסים"
         >
           <div className={sheetClass} onClick={(e) => e.stopPropagation()}>
             {isMobile && <div className="owner-picker-handle" aria-hidden="true" />}
 
             <header className="owner-picker-head">
-              <h3>בחר בעל נכס</h3>
+              <h3>בחר בעל נכסים</h3>
               <button className="owner-picker-close btn-ghost" onClick={onClose} aria-label="סגור">
                 <X size={18} />
               </button>
@@ -121,8 +121,8 @@ export default function OwnerPicker({ open, onClose, onPick }) {
             >
               <span className="owner-picker-new-icon"><UserPlus size={16} /></span>
               <span className="owner-picker-new-text">
-                <strong>בעל חדש</strong>
-                <small>צור והוסף בעל נכס במהירות</small>
+                <strong>בעל נכס חדש</strong>
+                <small>צור והוסף בעל נכסים במהירות</small>
               </span>
             </button>
 
@@ -131,7 +131,7 @@ export default function OwnerPicker({ open, onClose, onPick }) {
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="חיפוש לפי שם או טלפון…"
+                placeholder="חפש לפי שם או טלפון"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
@@ -151,7 +151,7 @@ export default function OwnerPicker({ open, onClose, onPick }) {
               {loading && <div className="owner-picker-empty">טוען…</div>}
               {!loading && results.length === 0 && (
                 <div className="owner-picker-empty">
-                  {q ? 'לא נמצאו בעלים לחיפוש' : 'עוד אין בעלים במערכת'}
+                  {q ? 'לא נמצאו בעלי נכסים לחיפוש' : 'עוד אין בעלי נכסים במערכת'}
                 </div>
               )}
               {!loading && results.map((o) => (

@@ -13,6 +13,7 @@ import {
   MessageCircle,
   FileText,
   Clock3,
+  UserCircle,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -36,18 +37,20 @@ export default function Dashboard() {
 
   const load = async () => {
     try {
-      const [summary, props, leads] = await Promise.all([
+      const [summary, props, leads, owners] = await Promise.all([
         api.dashboard(),
         api.listProperties({ mine: '1' }),
         api.listLeads(),
+        api.listOwners().catch(() => ({ items: [] })),
       ]);
       setData({
         summary,
         properties: props.items || [],
         leads: leads.items || [],
+        owners: owners.items || [],
       });
     } catch {
-      setData({ summary: null, properties: [], leads: [] });
+      setData({ summary: null, properties: [], leads: [], owners: [] });
     } finally {
       setLoading(false);
     }
@@ -57,19 +60,21 @@ export default function Dashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const [summary, props, leads] = await Promise.all([
+        const [summary, props, leads, owners] = await Promise.all([
           api.dashboard(),
           api.listProperties({ mine: '1' }),
           api.listLeads(),
+          api.listOwners().catch(() => ({ items: [] })),
         ]);
         if (cancelled) return;
         setData({
           summary,
           properties: props.items || [],
           leads: leads.items || [],
+          owners: owners.items || [],
         });
       } catch {
-        if (!cancelled) setData({ summary: null, properties: [], leads: [] });
+        if (!cancelled) setData({ summary: null, properties: [], leads: [], owners: [] });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -83,7 +88,7 @@ export default function Dashboard() {
         <div className="dashboard">
           <WelcomeSection />
           <div className="stats-grid">
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="stat-card skel" style={{ height: 72 }} />
             ))}
           </div>
@@ -95,12 +100,15 @@ export default function Dashboard() {
   const summary = data?.summary || {};
   const properties = data?.properties || [];
   const leads = data?.leads || [];
+  const owners = data?.owners || [];
 
   // Real counts, never mock
   const res = summary.properties?.residential || { total: 0, sale: 0, rent: 0 };
   const com = summary.properties?.commercial  || { total: 0, sale: 0, rent: 0 };
   const leadStats = summary.leads || { total: 0, hot: 0, warm: 0, cold: 0 };
   const dealStats = summary.deals || { total: 0, active: 0, signed: 0, totalCommission: 0 };
+  const ownersTotal = owners.length;
+  const ownersActive = owners.filter((o) => (o.propertyCount || 0) > 0).length;
 
   const hotLeads = leads.filter((l) => l.status === 'HOT').slice(0, 6);
 
@@ -157,6 +165,15 @@ export default function Dashboard() {
       color: 'var(--info)',
       bg: 'var(--info-bg)',
       to: '/deals?tab=signed',
+    },
+    {
+      icon: UserCircle,
+      label: 'בעלי נכסים',
+      value: ownersTotal,
+      sub: `${ownersActive} עם נכסים פעילים`,
+      color: 'var(--gold)',
+      bg: 'var(--gold-glow)',
+      to: '/owners',
     },
   ];
 

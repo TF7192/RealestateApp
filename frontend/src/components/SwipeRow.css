@@ -55,3 +55,8 @@
 .swrow-act-green   { background: linear-gradient(135deg, #25d366 0%, #128c7e 100%); }
 .swrow-act-red     { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); }
 .swrow-act-blue    { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+.swrow-act-gold-border {
+  background: var(--bg-card);
+  color: var(--gold);
+  border: 1.5px solid var(--gold-border);
+}

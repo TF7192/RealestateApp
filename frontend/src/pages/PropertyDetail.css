@@ -337,6 +337,7 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 
 .dc-owner-name {
@@ -406,6 +407,50 @@
 .dc-mini-wa:hover {
   filter: brightness(1.05);
   border-color: transparent;
+}
+
+/* Mobile: 48×48 round tap-target icon buttons next to the name.
+   Hidden on desktop (the .dc-mini 2-col grid below handles that). */
+.dc-owner-round-actions {
+  display: none;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+
+.dc-owner-round {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.dc-owner-round:active { transform: scale(0.94); }
+
+.dc-owner-round-call {
+  color: var(--gold);
+  border-color: var(--gold-border);
+}
+
+.dc-owner-round-wa {
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  color: #fff;
+  border-color: transparent;
+}
+
+.dc-owner-round-wa:hover { filter: brightness(1.05); }
+
+@media (max-width: 820px) {
+  .dc-owner-round-actions { display: inline-flex; }
+  .dc-owner-actions-desktop { display: none; }
 }
 
 /* ── Photos card body ──────────────────────────────────────── */

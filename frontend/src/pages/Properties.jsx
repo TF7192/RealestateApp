@@ -476,7 +476,7 @@ export default function Properties() {
             <Search size={18} />
             <input
               type="text"
-              placeholder="חיפוש לפי כתובת, עיר, בעלים..."
+              placeholder="חיפוש לפי כתובת, עיר או בעל נכס..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

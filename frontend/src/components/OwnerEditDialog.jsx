@@ -7,7 +7,7 @@ import './OwnerEditDialog.css';
 
 const RELATIONSHIP_OPTIONS = [
   'בעל יחיד',
-  'בעלים משותפים',
+  'שותפות בעלים',
   'ירושה',
   'נאמנות',
   'בא כוח',
@@ -127,7 +127,7 @@ export default function OwnerEditDialog({ owner, onClose, onSaved }) {
                   rows={3}
                   value={form.notes}
                   onChange={(e) => update('notes', e.target.value)}
-                  placeholder="פרטים נוספים על הבעלים…"
+                  placeholder="פרטים נוספים על בעל הנכס…"
                 />
               </div>
             </div>
@@ -136,7 +136,7 @@ export default function OwnerEditDialog({ owner, onClose, onSaved }) {
           <footer className="owner-dialog-actions">
             <button className="btn btn-primary" onClick={save} disabled={busy}>
               <Save size={14} />
-              {busy ? 'שומר…' : isEdit ? 'שמור שינויים' : 'צור בעל'}
+              {busy ? 'שומר…' : isEdit ? 'שמור שינויים' : 'צור בעל נכס'}
             </button>
             <button className="btn btn-secondary" onClick={onClose} disabled={busy}>
               ביטול

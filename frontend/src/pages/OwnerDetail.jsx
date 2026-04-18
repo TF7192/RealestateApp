@@ -4,25 +4,29 @@ import {
   ArrowRight,
   Phone,
   Mail,
-  Edit3,
+  MessageSquare,
   Trash2,
   Save,
   AlertCircle,
   Building2,
   UserCircle,
-  X,
 } from 'lucide-react';
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import ConfirmDialog from '../components/ConfirmDialog';
+import StickyActionBar from '../components/StickyActionBar';
 import { PhoneField, SelectField } from '../components/SmartFields';
 import { useToast } from '../lib/toast';
-import { telUrl, waUrl } from '../lib/waLink';
+import { useViewportMobile } from '../hooks/mobile';
+import { telUrl } from '../lib/waLink';
+import { openWhatsApp } from '../native/share';
+import { relativeDate } from '../lib/relativeDate';
+import haptics from '../lib/haptics';
 import './OwnerDetail.css';
 
 const RELATIONSHIP_OPTIONS = [
   'בעל יחיד',
-  'בעלים משותפים',
+  'שותפות בעלים',
   'ירושה',
   'נאמנות',
   'בא כוח',
@@ -40,6 +44,7 @@ export default function OwnerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const isMobile = useViewportMobile(820);
   const [owner, setOwner] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -102,10 +107,13 @@ export default function OwnerDetail() {
   }
 
   const properties = owner.properties || [];
+  const initial = (owner.name || '?').charAt(0);
+  const createdRel = owner.createdAt ? relativeDate(owner.createdAt) : null;
 
   return (
-    <div className="owner-detail-page app-wide-cap">
-      <div className="od-toolbar">
+    <div className={`owner-detail-page app-wide-cap ${isMobile ? 'od-mobile has-sticky-bar' : ''}`}>
+      {/* Desktop-only breadcrumb toolbar */}
+      <div className="od-toolbar od-toolbar-desktop">
         <div className="od-crumb">
           <Link to="/owners" className="od-crumb-link">
             <ArrowRight size={16} />
@@ -126,15 +134,22 @@ export default function OwnerDetail() {
                 התקשר
               </a>
               <a
-                href={waUrl(owner.phone, '')}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`sms:${owner.phone}`}
+                className="btn btn-secondary btn-sm"
+                title="SMS"
+              >
+                <MessageSquare size={14} />
+                SMS
+              </a>
+              <button
+                type="button"
+                onClick={() => openWhatsApp({ phone: owner.phone, text: `שלום ${owner.name}` })}
                 className="btn btn-secondary btn-sm"
                 title="וואטסאפ"
               >
                 <WhatsAppIcon size={14} className="wa-green" />
                 וואטסאפ
-              </a>
+              </button>
             </>
           )}
           {owner.email && (
@@ -150,16 +165,76 @@ export default function OwnerDetail() {
         </div>
       </div>
 
+      {/* Mobile-only compact header card */}
+      {isMobile && (
+        <div className="od-mobile-header">
+          <div className="od-mh-avatar" aria-hidden="true">{initial}</div>
+          <div className="od-mh-body">
+            <strong className="od-mh-name">{owner.name}</strong>
+            <span className="od-mh-sub">
+              <Building2 size={11} />
+              {owner.propertyCount ?? properties.length} נכסים
+              {createdRel && <span className="od-mh-dot">·</span>}
+              {createdRel && <span className="od-mh-created">נוסף {createdRel.label}</span>}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="od-mh-del"
+            onClick={() => setConfirmDelete(true)}
+            aria-label="מחק בעל נכס"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      )}
+
       <div className="od-grid">
-        <OwnerEditForm owner={owner} onSaved={onSaved} toast={toast} />
+        <OwnerEditForm owner={owner} onSaved={onSaved} toast={toast} isMobile={isMobile} />
         <OwnerPropertiesPanel properties={properties} />
       </div>
+
+      {/* Sticky bottom action bar — mobile only */}
+      {isMobile && owner.phone && (
+        <StickyActionBar className="sab-icons" visible>
+          <a
+            href={telUrl(owner.phone)}
+            className="btn btn-secondary"
+            aria-label={`התקשר ל${owner.name}`}
+            onClick={() => haptics.tap()}
+          >
+            <Phone size={18} />
+            <span>התקשר</span>
+          </a>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              haptics.tap();
+              openWhatsApp({ phone: owner.phone, text: `שלום ${owner.name}` });
+            }}
+            aria-label={`וואטסאפ ל${owner.name}`}
+          >
+            <WhatsAppIcon size={18} />
+            <span>וואטסאפ</span>
+          </button>
+          <a
+            href={`sms:${owner.phone}`}
+            className="btn btn-secondary"
+            aria-label={`SMS ל${owner.name}`}
+            onClick={() => haptics.tap()}
+          >
+            <MessageSquare size={18} />
+            <span>SMS</span>
+          </a>
+        </StickyActionBar>
+      )}
 
       {confirmDelete && (
         <ConfirmDialog
           title="מחיקת בעל נכס"
-          message={`למחוק את "${owner.name}"? הפעולה אינה הפיכה. הנכסים של בעלים זה לא ימחקו, אך הקישור ייעלם.`}
-          confirmLabel="מחק בעל"
+          message={`למחוק את "${owner.name}"? הפעולה אינה הפיכה. הנכסים של בעל נכס זה לא ימחקו, אך הקישור ייעלם.`}
+          confirmLabel="מחק בעל נכס"
           onConfirm={onDelete}
           onClose={() => setConfirmDelete(false)}
           busy={deleting}
@@ -169,7 +244,7 @@ export default function OwnerDetail() {
   );
 }
 
-function OwnerEditForm({ owner, onSaved, toast }) {
+function OwnerEditForm({ owner, onSaved, toast, isMobile }) {
   const [form, setForm] = useState({
     name: owner.name || '',
     phone: owner.phone || '',
@@ -260,7 +335,7 @@ function OwnerEditForm({ owner, onSaved, toast }) {
               rows={4}
               value={form.notes}
               onChange={(e) => update('notes', e.target.value)}
-              placeholder="פרטים נוספים על הבעלים…"
+              placeholder="פרטים נוספים על בעל הנכס…"
             />
           </div>
         </div>
