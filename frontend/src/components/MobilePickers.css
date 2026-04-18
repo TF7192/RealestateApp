@@ -72,6 +72,16 @@
   color: #fff;
 }
 
+/* S18 — highlight the chip whose ISO date matches the current value so the
+   agent can see at a glance which option is live. Same filled treatment as
+   :active so the chosen chip reads as "pressed". */
+.mpk-datechip.sel {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+  font-weight: 700;
+}
+
 .mpk-datechip svg { opacity: 0.8; }
 
 /* ────────────────────────── Suggest sheet (city / street) ────────────────────────── */

@@ -45,39 +45,59 @@ export function RoomsChips({ value, onChange, allowPlus = true, label }) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// DateQuickChips — "היום", "+6 חודשים" next to a date input
+// DateQuickChips — "היום", "+6 חודשים" next to a date input.
+//
+// S18: supports backdating chips (-1d, -7d) too, because agents often record
+// events retroactively: "we signed the contract yesterday / last week" is
+// more common than "we signed today" by the time they sit down to update
+// the CRM. Picking from a chip is two taps vs. ~seven taps through the
+// native date picker.
 // ────────────────────────────────────────────────────────────────
+const CHIP_LABELS = {
+  today: 'היום',
+  '-1d':  'אתמול',
+  '-7d':  'לפני שבוע',
+  '+3m':  '+3 חודשים',
+  '+6m':  '+6 חודשים',
+  '+12m': '+שנה',
+};
+
+function chipToDate(chip) {
+  const d = new Date();
+  switch (chip) {
+    case 'today': break;
+    case '-1d':   d.setDate(d.getDate() - 1); break;
+    case '-7d':   d.setDate(d.getDate() - 7); break;
+    case '+3m':   d.setMonth(d.getMonth() + 3); break;
+    case '+6m':   d.setMonth(d.getMonth() + 6); break;
+    case '+12m':  d.setFullYear(d.getFullYear() + 1); break;
+    default: break;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
 export function DateQuickChips({ value, onChange, chips = ['today', '+6m'] }) {
-  const set = (chip) => {
-    const d = new Date();
-    if (chip === 'today')   { /* no-op */ }
-    if (chip === '+3m')     d.setMonth(d.getMonth() + 3);
-    if (chip === '+6m')     d.setMonth(d.getMonth() + 6);
-    if (chip === '+12m')    d.setFullYear(d.getFullYear() + 1);
-    onChange?.(d.toISOString().slice(0, 10));
-  };
+  // Mark the chip that matches today's value so the agent can see what
+  // they've picked at a glance. Comparing ISO yyyy-mm-dd strings is safe.
+  const set = (chip) => onChange?.(chipToDate(chip));
   return (
     <div className="mpk-datechips">
-      {chips.includes('today') && (
-        <button type="button" className="mpk-datechip" onClick={() => set('today')}>
-          <Calendar size={12} /> היום
-        </button>
-      )}
-      {chips.includes('+3m') && (
-        <button type="button" className="mpk-datechip" onClick={() => set('+3m')}>
-          +3 חודשים
-        </button>
-      )}
-      {chips.includes('+6m') && (
-        <button type="button" className="mpk-datechip" onClick={() => set('+6m')}>
-          +6 חודשים
-        </button>
-      )}
-      {chips.includes('+12m') && (
-        <button type="button" className="mpk-datechip" onClick={() => set('+12m')}>
-          +שנה
-        </button>
-      )}
+      {chips.map((chip) => {
+        const label = CHIP_LABELS[chip];
+        if (!label) return null;
+        const isSel = value && value === chipToDate(chip);
+        return (
+          <button
+            key={chip}
+            type="button"
+            className={`mpk-datechip ${isSel ? 'sel' : ''}`}
+            onClick={() => set(chip)}
+          >
+            {chip === 'today' && <Calendar size={12} />}
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }

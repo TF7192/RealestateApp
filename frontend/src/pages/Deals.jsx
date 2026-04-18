@@ -11,6 +11,7 @@ import {
 import api from '../lib/api';
 import { absoluteTime } from '../lib/time';
 import { relativeDate } from '../lib/relativeDate';
+import { DateQuickChips } from '../components/MobilePickers';
 import './Deals.css';
 
 const STATUS_OPTIONS = [
@@ -428,6 +429,11 @@ function DealEditModal({ deal, mode, onClose, onSaved }) {
                   className="form-input"
                   value={form.signedAt}
                   onChange={(e) => update('signedAt', e.target.value)}
+                />
+                <DateQuickChips
+                  value={form.signedAt}
+                  onChange={(v) => update('signedAt', v)}
+                  chips={['today', '-1d', '-7d']}
                 />
               </div>
             )}

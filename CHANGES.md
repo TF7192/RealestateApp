@@ -88,6 +88,16 @@ All items trace back to the Ship list in `SHIP_LIST.md`. iPhone-first.
 
 ## Day 2 — iPhone fixes + bundle weight
 
+### S18 · DateQuickChips now covers backdated fields
+- **Source:** BUG-018 + empathy log ("recording a signing after the fact took 6–8 taps through the iOS date picker")
+- **Files:** `frontend/src/components/MobilePickers.jsx`, `frontend/src/components/MobilePickers.css`, `frontend/src/pages/Deals.jsx`
+- **Change:**
+  - `DateQuickChips` learned three new options: `-1d` (אתמול) and `-7d` (לפני שבוע) for backdating, plus a `sel` state that visually highlights the chip whose resolved date equals the current value — agents can see at a glance what's picked instead of re-reading the ISO date.
+  - Chip rendering is now table-driven (`CHIP_LABELS`, `chipToDate`) so adding another chip later (e.g. `+1w`) is a one-line addition.
+  - Wired into the Deals "תאריך חתימה" field (only rendered when status = SIGNED). Agents typically record contract signings 1–7 days after they actually happened; one tap on "אתמול" or "לפני שבוע" replaces the seven-tap dance through iOS's native `<input type="date">` picker.
+- **iPhone re-test:** Updated a deal to SIGNED with signedAt = yesterday: 1 tap vs. 7 previously. `sel` highlight shows the right chip filled-gold.
+- **Time saved:** ~5s per deal-closure × ~2 closures/week/agent = **~10s/week/agent**. Small absolute number but high frequency during a hot week.
+
 ### S15 · Deals kanban scrolls smoothly on iPhone with many cards
 - **Source:** BUG-023 (frame drops on kanban scroll with >20 deals per column)
 - **Files:** `frontend/src/pages/Deals.css`
