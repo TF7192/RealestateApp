@@ -1,123 +1,211 @@
-/* Custom tour tooltip — Joyride's tooltipComponent injects this.
+/* Custom tour tooltip (TourTooltip in OnboardingTour.jsx) + the
+ * "kill every Joyride element on the same tick" escape hatch.
  *
- * Careful: we ONLY style the tooltip DOM (which we own). We do NOT
- * touch .react-joyride__overlay or .react-joyride__spotlight — those
- * are the SVG mask that creates the cut-out, and overriding them
- * blacks out the whole viewport.
+ * We never touch .react-joyride__overlay or .react-joyride__spotlight
+ * CSS backgrounds / box-shadows — those create the cut-out mask and
+ * overriding them blacks out the viewport. Instead, on dismiss we add
+ * a body class and set display:none on every Joyride-owned wrapper so
+ * nothing can linger as a fade-out animation.
  */
 
+/* ── Tooltip card ───────────────────────────────────────────── */
 .tour-tooltip {
   position: relative;
   direction: rtl;
   text-align: right;
-  background: #ffffff;
-  color: #1e1a14;
-  border: 1px solid rgba(201, 169, 110, 0.25);
-  border-radius: 16px;
-  padding: 52px 22px 18px;  /* top room for the skip pill */
-  width: 380px;
+  background: linear-gradient(180deg,
+    var(--bg-card) 0%,
+    color-mix(in srgb, var(--bg-card) 96%, var(--gold-glow) 4%) 100%);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px 24px 18px;
+  width: 400px;
   max-width: calc(100vw - 32px);
-  box-shadow: 0 24px 60px rgba(30, 26, 20, 0.22);
-  font-family: 'Heebo', system-ui, sans-serif;
+  box-shadow:
+    0 28px 80px rgba(30, 26, 20, 0.18),
+    0 0 0 1px color-mix(in srgb, var(--gold) 14%, transparent) inset;
+  font-family: var(--font-body);
 }
 
-.tour-skip-btn {
+/* Gold accent strip at the top — a subtle editorial cue that matches
+   the app's palette without shouting. */
+.tour-tooltip::before {
+  content: '';
   position: absolute;
-  top: 12px;
-  inset-inline-end: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 14px;
-  border-radius: 999px;
-  background: #faf7f0;
-  border: 1px solid #e4dfd4;
-  color: #6b6458;
-  font-family: 'Heebo', sans-serif;
-  font-size: 12px;
+  top: 0;
+  inset-inline-start: 24px;
+  inset-inline-end: 24px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--gold) 50%,
+    transparent 100%);
+  opacity: 0.7;
+}
+
+.tour-tooltip-eyebrow {
+  font-family: var(--font-body);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
   font-weight: 700;
-  cursor: pointer;
-  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
-  z-index: 2;
+  margin-bottom: 10px;
+  display: inline-block;
 }
-.tour-skip-btn:hover {
-  color: #1e1a14;
-  border-color: #c9a96e;
-  background: #fff8e8;
-}
-.tour-skip-btn:active { transform: scale(0.97); }
 
 .tour-tooltip-title {
-  font-family: 'Frank Ruhl Libre', 'Heebo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.25;
-  color: #1e1a14;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
   margin: 0 0 6px;
 }
 
 .tour-tooltip-content {
+  font-family: var(--font-body);
   font-size: 14px;
-  line-height: 1.65;
-  color: #1e1a14;
+  line-height: 1.7;
+  color: var(--text-secondary);
   padding: 6px 0 0;
   white-space: pre-wrap;
 }
 
+/* ── Footer: progress + actions + skip link ─────────────────── */
 .tour-tooltip-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.tour-tooltip-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 18px;
 }
 
 .tour-progress {
-  font-size: 12px;
-  color: #8a7a5c;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tour-progress-bar {
+  width: 48px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+  position: relative;
+}
+.tour-progress-bar-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--gold);
+  border-radius: 2px;
+  transform-origin: right;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .tour-tooltip-actions {
   display: inline-flex;
-  gap: 8px;
+  gap: 6px;
+  align-items: center;
 }
 
 .tour-btn {
   border: none;
-  padding: 9px 18px;
+  padding: 10px 18px;
   border-radius: 999px;
-  font-family: 'Frank Ruhl Libre', 'Heebo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
-  font-size: 14px;
+  font-size: 13.5px;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: filter 0.12s ease, transform 0.1s ease;
+  transition: filter 0.14s ease, transform 0.1s ease, background 0.14s ease, color 0.14s ease;
 }
 .tour-btn:active { transform: scale(0.97); }
 
 .tour-btn-primary {
-  background: #c9a96e;
+  background: var(--gold);
   color: #1a1409;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--gold) 35%, transparent);
 }
-.tour-btn-primary:hover { filter: brightness(1.05); }
+.tour-btn-primary:hover { filter: brightness(1.04); }
 
 .tour-btn-ghost {
   background: transparent;
-  color: #6b6458;
-  padding: 9px 12px;
+  color: var(--text-secondary);
+  padding: 10px 12px;
+  font-weight: 600;
 }
-.tour-btn-ghost:hover { color: #1e1a14; }
+.tour-btn-ghost:hover { color: var(--text-primary); background: var(--bg-elevated); }
+
+/* The prominent skip link — full-width, centered, clear Hebrew copy.
+   No X icon (the user reported the × was the cause of the shrinking
+   dark-circle artifact), just text. */
+.tour-skip-link {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+  text-align: center;
+}
+.tour-skip-link:hover {
+  color: var(--text-primary);
+  border-color: var(--gold-border);
+  background: var(--gold-glow);
+}
+.tour-skip-link:active { transform: scale(0.98); }
 
 @media (max-width: 480px) {
   .tour-tooltip {
-    padding: 52px 16px 16px;
+    padding: 20px 18px 16px;
     width: auto;
+    border-radius: 16px;
   }
-  .tour-skip-btn {
-    font-size: 11px;
-    padding: 6px 10px;
-  }
+  .tour-tooltip-title { font-size: 18px; }
+  .tour-tooltip-content { font-size: 13.5px; }
+  .tour-btn { padding: 10px 14px; font-size: 13px; }
   .tour-tooltip-actions { flex: 1; justify-content: flex-end; }
+}
+
+/* ── Escape hatch: dismiss-on-the-same-tick ────────────────── */
+/* When the user taps Skip or Done, we toggle body.tour-dead BEFORE
+   React re-renders. That synchronously hides every element Joyride
+   mounted (overlay, spotlight, floater, wrapper), so there's no
+   shrinking-circle leftover animation. The React-side state change
+   follows on the next tick and tears the component down cleanly. */
+body.tour-dead .react-joyride-portal,
+body.tour-dead [data-test-id^="react-joyride"],
+body.tour-dead .react-joyride__overlay,
+body.tour-dead .react-joyride__spotlight,
+body.tour-dead .__floater,
+body.tour-dead .__floater__body {
+  display: none !important;
+  animation: none !important;
+  transition: none !important;
+  opacity: 0 !important;
 }

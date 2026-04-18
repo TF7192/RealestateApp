@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
-import { X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
 import './tour-tooltip.css';
+
+// Synchronously hide every element Joyride mounts, BEFORE React re-
+// renders. Without this the spotlight + floater play their fade-out
+// animation for ~300ms, which the user was seeing as a shrinking
+// dark circle.
+export function forceUnmountTour() {
+  try { document.body.classList.add('tour-dead'); } catch { /* ignore */ }
+}
+function releaseTourDead() {
+  try { document.body.classList.remove('tour-dead'); } catch { /* ignore */ }
+}
 
 /**
  * First-login tour for agents.
@@ -102,15 +112,22 @@ export default function OnboardingTour() {
   }, [isMobile]);
 
   const finish = async () => {
-    // Kill Joyride's DOM on the same tick so there's no lingering
-    // spotlight shrink animation (the "black circle" the user was
-    // seeing after pressing ×).
+    // Kill Joyride's DOM synchronously — body.tour-dead hides every
+    // element Joyride mounted before the next paint, so there's no
+    // shrinking spotlight animation on the way out. React state
+    // change follows and tears the component down on the next tick.
+    forceUnmountTour();
     setDead(true);
     setRun(false);
     dismissAllTours();
     try { await api.completeTutorial(); } catch { /* ignore */ }
     refresh?.();
   };
+
+  // When the component unmounts (either via dead or because the user
+  // is leaving the page), release the class so future mounts aren't
+  // suppressed.
+  useEffect(() => () => releaseTourDead(), []);
 
   const handleCallback = ({ status, action }) => {
     if (
@@ -160,7 +177,6 @@ export default function OnboardingTour() {
 //   3. Hebrew-first layout with proper RTL gaps and padding.
 // eslint-disable-next-line react/prop-types
 export function TourTooltip({
-  // passed by Joyride at render time
   continuous,
   index,
   step,
@@ -171,35 +187,58 @@ export function TourTooltip({
   size,
   isLastStep,
 }) {
+  const pct = size > 1 ? ((index + 1) / size) * 100 : 100;
   return (
-    <div {...tooltipProps} className="tour-tooltip">
-      <button
-        type="button"
-        {...skipProps}
-        className="tour-skip-btn"
-        aria-label="דלג על כל הסיורים לתמיד"
-        title="דלג על כל הסיורים לתמיד"
-      >
-        <X size={14} /> דלג על כל הסיורים
-      </button>
+    <div {...tooltipProps} className="tour-tooltip" role="dialog" aria-modal="true">
+      <span className="tour-tooltip-eyebrow">Estia · סיור מודרך</span>
       {step.title && <div className="tour-tooltip-title">{step.title}</div>}
       <div className="tour-tooltip-content">{step.content}</div>
+
       <div className="tour-tooltip-footer">
-        <div className="tour-progress">
-          {size > 1 ? `${index + 1}/${size}` : ''}
+        <div className="tour-tooltip-row">
+          <div className="tour-progress" aria-hidden={size <= 1}>
+            {size > 1 && (
+              <>
+                <span>{index + 1} / {size}</span>
+                <span className="tour-progress-bar">
+                  <span
+                    className="tour-progress-bar-fill"
+                    style={{ transform: `scaleX(${pct / 100})` }}
+                  />
+                </span>
+              </>
+            )}
+          </div>
+          <div className="tour-tooltip-actions">
+            {index > 0 && (
+              <button type="button" {...backProps} className="tour-btn tour-btn-ghost">
+                הקודם
+              </button>
+            )}
+            {continuous && (
+              <button type="button" {...primaryProps} className="tour-btn tour-btn-primary">
+                {isLastStep ? 'סיימתי' : 'הבא'}
+              </button>
+            )}
+          </div>
         </div>
-        <div className="tour-tooltip-actions">
-          {index > 0 && (
-            <button type="button" {...backProps} className="tour-btn tour-btn-ghost">
-              הקודם
-            </button>
-          )}
-          {continuous && (
-            <button type="button" {...primaryProps} className="tour-btn tour-btn-primary">
-              {isLastStep ? 'סיימתי' : 'הבא'}
-            </button>
-          )}
-        </div>
+
+        {/* Always-visible, full-width dismiss link. Text only — no X
+            icon (the × glyph was the user's reported black-circle
+            trigger) — and a big target so it's never missed. */}
+        <button
+          type="button"
+          {...skipProps}
+          className="tour-skip-link"
+          onClick={(e) => {
+            // Synchronously hide Joyride's DOM BEFORE Joyride's own
+            // callback fires, so there's no fade-out artifact.
+            forceUnmountTour();
+            skipProps?.onClick?.(e);
+          }}
+        >
+          דלג על כל הסיורים ואל תחזור להציג
+        </button>
       </div>
     </div>
   );
