@@ -3,6 +3,12 @@
   --gold: #b48b4c;
   --gold-light: #c9a36c;
   --gold-dim: #8a6932;
+  /* S24: WCAG-AA-passing body-text gold. --gold on white is ~3.33:1
+     (fails 4.5:1 for body text). Use --gold-readable for any small
+     Hebrew body copy — tour metadata, chip labels, small badges. The
+     display `--gold` stays for accents, headings, and the big CTA
+     where 3:1 (large-text threshold) is fine. */
+  --gold-readable: #7a5c2c;
   --gold-glow: rgba(180, 139, 76, 0.14);
   --gold-border: rgba(180, 139, 76, 0.28);
 

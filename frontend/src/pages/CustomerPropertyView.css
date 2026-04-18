@@ -338,12 +338,16 @@
 /* ── Headline stats (just under the hero) ─────────────────────── */
 .cpv-headline {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  /* S10: minmax(0, 1fr) minimum track size so Hebrew labels longer than
+     the 80px floor can still shrink to fit the row at 320–375px widths
+     without pushing past the container. */
+  grid-template-columns: repeat(auto-fit, minmax(min(80px, 100%), 1fr));
   gap: 1px;
   background: var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--border);
+  min-width: 0;
 }
 .cpv-headline-cell {
   background: var(--bg-card);
@@ -357,6 +361,7 @@
   font-size: 11px;
   letter-spacing: 0.04em;
   text-align: center;
+  min-width: 0;
 }
 .cpv-headline-cell svg { color: var(--gold); }
 .cpv-headline-cell strong {

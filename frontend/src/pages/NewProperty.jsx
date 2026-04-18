@@ -22,6 +22,7 @@ import StickyActionBar from '../components/StickyActionBar';
 import OwnerPicker from '../components/OwnerPicker';
 import { RoomsChips, DateQuickChips, SuggestPicker } from '../components/MobilePickers';
 import { useDraftAutosave, readDraft } from '../hooks/mobile';
+import { relLabel } from '../lib/relativeDate';
 import {
   inputPropsForName,
   inputPropsForAddress,
@@ -153,9 +154,13 @@ export default function NewProperty() {
 
   useEffect(() => {
     if (isEdit) return;
+    // S16: readDraft now returns { value, savedAt }. `value` is the old
+    // { form, step } payload. Keep the check on value.form.street so we
+    // don't surface empty drafts; stash savedAt for the banner.
     const draft = readDraft(DRAFT_KEY);
-    if (draft && draft.form && (draft.form.street || draft.form.city || draft.form.owner)) {
-      setDraftBanner(draft);
+    const inner = draft?.value;
+    if (inner && inner.form && (inner.form.street || inner.form.city || inner.form.owner)) {
+      setDraftBanner({ ...inner, savedAt: draft.savedAt });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit]);
@@ -564,7 +569,12 @@ export default function NewProperty() {
 
       {draftBanner && !isEdit && (
         <div className="draft-banner animate-in" role="status">
-          <span>נמצאה טיוטה שנשמרה</span>
+          <span>
+            נמצאה טיוטה שנשמרה
+            {draftBanner.savedAt && (
+              <span className="draft-banner-age"> · {relLabel(draftBanner.savedAt)}</span>
+            )}
+          </span>
           <div className="draft-banner-actions">
             <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>שחזר</button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft}>מחק</button>

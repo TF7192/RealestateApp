@@ -6,6 +6,7 @@ import { useToast } from '../lib/toast';
 import StickyActionBar from '../components/StickyActionBar';
 import { RoomsChips, SuggestPicker } from '../components/MobilePickers';
 import { useDraftAutosave, readDraft, useClipboardPhone } from '../hooks/mobile';
+import { relLabel } from '../lib/relativeDate';
 import {
   inputPropsForName,
   inputPropsForCity,
@@ -53,16 +54,21 @@ export default function NewLead() {
   const { clear: clearDraft } = useDraftAutosave(DRAFT_KEY, form);
 
   // ── Draft restore banner on mount ──────────────────────────────────
+  // S16: readDraft now returns { value, savedAt }. `value` is the old
+  // flat form object; savedAt is a timestamp the banner shows as
+  // "נשמר לפני X".
   useEffect(() => {
     const draft = readDraft(DRAFT_KEY);
-    if (draft && (draft.name || draft.phone || draft.city)) {
-      setDraftBanner(draft);
+    const inner = draft?.value;
+    if (inner && (inner.name || inner.phone || inner.city)) {
+      setDraftBanner({ ...inner, __savedAt: draft.savedAt });
     }
   }, []);
 
   const restoreDraft = () => {
     if (draftBanner) {
-      setForm({ ...INITIAL_FORM, ...draftBanner });
+      const { __savedAt, ...formData } = draftBanner;
+      setForm({ ...INITIAL_FORM, ...formData });
       setDraftBanner(null);
       toast.info('הטיוטה שוחזרה');
     }
@@ -126,7 +132,12 @@ export default function NewLead() {
 
       {draftBanner && (
         <div className="draft-banner animate-in" role="status">
-          <span>נמצאה טיוטה שנשמרה</span>
+          <span>
+            נמצאה טיוטה שנשמרה
+            {draftBanner.__savedAt && (
+              <span className="draft-banner-age"> · {relLabel(draftBanner.__savedAt)}</span>
+            )}
+          </span>
           <div className="draft-banner-actions">
             <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>שחזר</button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft}>מחק</button>

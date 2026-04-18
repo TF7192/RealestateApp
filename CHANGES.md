@@ -1,186 +1,93 @@
-# CHANGES — UI/UX Fixes + New Features
+# Estia — Changes Shipped (Phase 2)
 
-Covers tasks T1–T11 from the full-stack implementation request.
-
-All commits on `main`, each prefixed with its task number. Migrations run automatically on deploy via the CI/CD workflow's `prisma migrate deploy` step.
+All items trace back to the Ship list in `SHIP_LIST.md`. iPhone-first.
 
 ---
 
-## T1 — iPhone: asset header buttons no longer crowd the rail
-**Commit:** `T1: stop overflow/similar buttons from crowding the asset rail`
+## Day 1 — iPhone plumbing
 
-The overflow (⋯) button and the "חפש דומים" pill were pinned with `left: 4px` / `left: 36px` — the **same visual side** as the call/WA/nav rail in RTL, so the two overlapped at the rail's top corner.
+### S1 · Kill iOS auto-zoom on form focus
+- **Source:** BUG-004
+- **Files:** `frontend/src/index.css`
+- **Change:** Added `@media (max-width: 900px)` rule forcing `font-size: 16px` on every `input` / `textarea` / `select` (excluding checkbox/radio/hidden/range/color). Belt-and-braces for dialog inputs, LeadPickerSheet search, TransferPropertyDialog search, MarketingActionDialog notes that weren't covered by Forms.css / SmartFields' own mobile overrides.
+- **iPhone re-test:** Tapped every form input type on Chrome iPhone 15 emulation; viewport no longer zooms on focus.
+- **Time saved:** ~3s × ~30 focuses/day = **~90s/day/agent**
 
-Fix in `frontend/src/pages/Properties.css` — switched both to logical positioning (`inset-inline-start`) so they attach to the card's logical start (visual right in RTL, opposite the rail). Tap target bumped to 36×36, frosted-glass backdrop so the controls read cleanly when they sit over the thumb corner.
+### S2 · `100dvh` fallback on Login / AgentPortal / CustomerPortal
+- **Source:** BUG-005
+- **Files:** `frontend/src/pages/Login.css`, `pages/AgentPortal.css`, `pages/CustomerPortal.css`
+- **Change:** Each page-level rule now carries `min-height: 100vh` + `min-height: 100dvh` in sequence. Modern iOS reads dvh (updates with URL bar); old browsers keep the vh fallback.
+- **iPhone re-test:** Scrolled Login + CustomerPortal on Chrome iPhone 15; URL bar hide/reveal no longer jumps the layout.
+- **Time saved:** 0; removes the "brand looks unstable" first impression for customers opening WA links.
 
-## T2 — "ללא הגבלה" overflow on the add-lead price range
-**Commit:** `T2: stop PriceRange overflow on 375px iPhones`
+### S3 · Gallery arrows on CustomerPropertyView — verified already 44×44
+- **Source:** BUG-006 (audit agent stale read)
+- **Files:** none changed
+- **Note:** `.cpv-nav` is already 44×44 in `CustomerPropertyView.css:256–274`. Closed as already-good.
 
-Grid cells defaulted to `min-content`, so the Hebrew placeholder "ללא הגבלה" could push the row wider than its container on 375px screens.
+### S7 · ChipEditor chip row keyboard-safe on iPhone
+- **Source:** BUG-030
+- **Files:** `frontend/src/pages/Templates.css`
+- **Change:** `.tpl-fs-vars` now `position: sticky; bottom: 0` with `padding-bottom: calc(12px + env(safe-area-inset-bottom) + var(--kb-h, 0px))`. Chip rail sits above the keyboard instead of under it.
+- **iPhone re-test:** Opened fullscreen template editor, focused textarea; Hebrew keyboard opens, chip rail tracks above it. Saves ~8s/template edit of fumbling.
 
-Fix in `frontend/src/components/SmartFields.css` (`.sf-range` / `.sf-range-pair` / `.sf-range-cell`) — `minmax(0, 1fr)` + `min-width: 0` + `overflow: hidden` on the cells so the grid shrinks to the parent's available width.
+### S8 · `focusin` listener — verified synchronous at module top
+- **Source:** BUG-016 (audit false positive)
+- **Files:** none changed
+- **Note:** `main.jsx` binds the focusin listener at top-level synchronously. No delayed-mount issue. Closed.
 
-## T3 — No bounce on an assets list with a single item
-**Commit:** `T3: no overscroll bounce on Properties when list has ≤1 asset`
+### S9 · Preserve SmartField edits on step tab switch
+- **Source:** BUG-013
+- **Files:** `frontend/src/pages/NewProperty.jsx`
+- **Change:** `goToStep` now `document.activeElement.blur()` + one `requestAnimationFrame` tick before reading form state for the PATCH. Last keystroke no longer lost on rapid tab-jump in edit mode.
+- **Re-test:** Typed "שרה" in לקוח name field, tapped step-2 tab mid-"ה"; server received "שרה" correctly.
 
-Toggle `document.body.style.overscrollBehaviorY = 'none'` while the Properties page has ≤1 asset, restore on unmount. PullRefresh is JS-driven, so it still works.
+### S10 · `min-width: 0` on cpv-headline (grid-shrinkable pattern)
+- **Source:** BUG-019
+- **Files:** `frontend/src/pages/CustomerPropertyView.css`
+- **Change:** `.cpv-headline` now uses `repeat(auto-fit, minmax(min(80px, 100%), 1fr))` with `min-width: 0` on cells. Prevents the class of "grid cell can't shrink below min-content" bug that caused the original PriceRange overflow.
+- **Re-test:** Rendered with 4-room / 180 מ״ר / קומה 7/9 / גיל הבניין חדש at 320px wide — row fits cleanly.
+- **Note:** `pd-kpis` and `dc-channel-grid` were already correct; no change needed.
 
-## T4 — iPhone full-screen template editor
-**Commit:** `T4: iPhone-only full-screen template editor`
+### S14 · Image dimensions — verified already-sized
+- **Source:** BUG-015
+- **Files:** none changed
+- **Note:** Every avatar (`mh-avatar`, `agent-avatar`, `mms-avatar`, `cpv-avatar`, `ap-agent-avatar`) has fixed CSS `width`/`height`. Every gallery thumbnail is inside a container with `aspect-ratio`. No CLS risk from `<img>` loads. Closed.
 
-Editing long templates in the ~150px inline ChipEditor on iPhone was cramped. New "מסך מלא" link in the editor header (mobile only) opens a Portal modal with:
+### S16 · Draft banner shows "נשמר לפני X"
+- **Source:** BUG-031
+- **Files:** `frontend/src/hooks/mobile.js`, `pages/NewProperty.jsx`, `pages/NewLead.jsx`, `pages/Forms.css`
+- **Change:** `useDraftAutosave` now persists `{ value, savedAt }` in sessionStorage. `readDraft` returns the same shape (with backwards-compat for legacy raw-object drafts). `NewProperty` + `NewLead` banners append `{relLabel(savedAt)}` ("נשמר לפני 3 דקות") so the agent knows how fresh the draft is before restoring.
+- **Re-test:** Left a partial property for 15 min, came back — banner reads "נמצאה טיוטה שנשמרה · לפני 15 דקות".
 
-- `100dvh` container so iOS subtracts toolbar + keyboard correctly
-- 17px font (iOS won't auto-zoom on focus)
-- `60dvh` min-height editor area
-- Field chips pinned above the keyboard
-- Safe-area insets for notch + home indicator
-- `onMouseDown preventDefault` on chips preserves caret + selection
+### S17 · InlineText no longer silently commits on blur
+- **Source:** BUG-020
+- **Files:** `frontend/src/components/InlineText.jsx`
+- **Change:** `onBlur` now *reverts* the draft instead of committing. User must press Enter (single-line) or Cmd/Ctrl+Enter (multiline) to save. Esc still cancels as before. Accidental tap-outside no longer writes partial state to the server.
+- **Re-test:** Started editing a customer's עיר inline, tapped outside — value returned to original. Pressed Enter — saved.
 
-## T5 — Share to Instagram Story (iPhone)
-**Commit:** `T5: 'Share to Instagram Story' on iPhone`
+### S20 · Keyboard-aware bottom padding on sticky-action-bar pages
+- **Source:** BUG-011 generalized
+- **Files:** `frontend/src/pages/Forms.css`
+- **Change:** `.intake-form` scroll-padding-bottom and `.form-page.has-sticky-bar` padding-bottom now include `var(--kb-h, 0px)`. Focused inputs on NewProperty / NewLead / OwnerDetail always land above the keyboard+sticky-bar stack.
+- **Re-test:** Focused on בעל הנכס field at bottom of NewProperty at 375px with keyboard open — field is visible, sticky bar above keyboard.
 
-New `frontend/src/native/storyComposer.js` renders the property's cover photo + caption into a 1080×1920 PNG via Canvas — backdrop photo, gold hairline card, right-aligned Hebrew text, Estia watermark. Font-steps down if the caption is too tall.
+### S22 · Toast stack capped at 3
+- **Source:** BUG-027
+- **Files:** `frontend/src/lib/toast.jsx`
+- **Change:** `push()` now evicts overflow toasts + clears their timers. Rapid-fire API errors no longer block the screen with 5–7 stacked toasts.
+- **Re-test:** Simulated 6 consecutive error pushes — only 3 most-recent rendered; older auto-cleared.
 
-`native/share.js` adds `shareToInstagramStory()`: compose → write to Filesystem cache → `Share.share` with the file. User picks Instagram from the sheet and lands in Story composer with the image attached. Web fallback downloads the PNG. Install-less iOS fallback saves to camera roll + toast.
-
-PropertyDetail shows a new Instagram-gradient "סטורי" button, **native only**. Web hides it.
-
-**Why not `instagram-stories://share` directly:** Instagram's typed-pasteboard handoff requires a native UIPasteboard plugin (Capacitor's Clipboard plugin only does text). The `Share.share` route works today with zero native additions.
-
-## T6 — Faster tab/nav switching on desktop
-**Commit:** `T6: smoother tab/nav switching on desktop`
-
-- Scoped `.nav-item` + `.filter-tab` transitions to `background-color` / `color` only. The previous `transition: all 0.2s` was running layout on padding/border/font-weight every hover.
-- Added `content-visibility: auto` on `.customer-card` / `.owner-card` / `.property-card` (desktop only) so the browser skips rendering offscreen cards — tab clicks repaint ~20 visible ones instead of every card.
-- Respects `prefers-reduced-motion`: nav/tab/panel transitions are fully disabled for that preference.
-
-## T7 — PropertyPanelSheet no longer hidden behind the sidebar
-**Commit:** `T7: PropertyPanelSheet no longer sits under the sidebar`
-
-Root cause: `.pps-backdrop` was z-index **80**, below `.sidebar`'s **100**. The panel docked to the visual right — same edge as the sidebar — so the sidebar painted on top.
-
-Fix in `frontend/src/components/PropertyPanelSheet.css` — z-index lifted to 1100 (above sidebar on every viewport). Redesigned per instruction: desktop centers the panel in the content area with a blurred backdrop + rounded card + rise animation. Mobile stays as a bottom sheet.
-
-## T8 — Customer-facing page redesign
-**Commit:** `T8: customer-facing page redesign — editorial, premium, full-data`
-
-Full rebuild of `/agents/:slug/:propertySlug` (+ legacy `/p/:id`):
-
-- Hero: 16:10 cover with overlaid gradient, chips (למכירה/השכרה, type, neighborhood), title, price
-- Headline stats (חדרים, מ״ר, קומה, גיל הבניין)
-- "מה כלול" shows only present amenities — no binary ✓/✗
-- "פרטי הנכס" surfaces the new schema fields: שכונה, שטח בטאבו, ארנונה, ועד בית, commercial gross/net + buildState + workstations, parking/storage breakdowns
-- Map card adds Waze alongside Google Maps
-- Desktop: sticky contact card with WA + tel CTAs + price reminder
-- Mobile: fixed bottom bar, safe-area insets, `100dvh` page
-- Image lightbox with keyboard nav
-- Shimmer skeleton instead of spinner
-- `useEffect` writes OG + Twitter meta tags for WhatsApp/Twitter link previews
-- CSS rewrite on the existing token system (one design language with the agent console)
-
-Known follow-ups: blurhash placeholders (needs server-side encode), Lighthouse measurement after deploy.
-
-## T9 — iPhone UX audit + polish pass
-
-### Audit summary (screen by screen)
-
-| Screen | Findings | Severity | Status |
-|---|---|---|---|
-| Login | Already uses safe-area insets + dvh in `login-page`; tap targets OK | — | ✅ no action |
-| Dashboard | 6 KPI tiles + recent lists; empty-card flicker fixed in earlier commit (`useDelayedFlag(220)`) | — | ✅ no action |
-| Properties list | Header button crowding (T1), single-item bounce (T3) | Med | ✅ fixed |
-| Property detail | Card header crowding (earlier commit), panel-sheet z-index (T7), added IG-story share (T5) | Med | ✅ fixed |
-| NewProperty / edit | Price-range overflow fixed separately for lead form; edit-save bug fixed (edit-mode sends full field union) | High | ✅ fixed in earlier session |
-| Owners | Skeleton flicker fixed (`useDelayedFlag`); list is dense 64px row w/ swipe actions | — | ✅ no action |
-| Customers | Skeleton flicker fixed; inline edit works w/ keyboard | — | ✅ no action |
-| Templates | Cramped on iPhone | High | ✅ fixed (T4 full-screen editor) |
-| Transfers | Skeleton flicker fixed; cards render fine at 375px | — | ✅ no action |
-| Customer portal / Agent portal | Both get `100dvh` via the @supports rule | Low | ✅ fixed |
-| iOS safe-area | Spot-check — all fixed bottom bars and modals use `env(safe-area-inset-bottom)` | — | ✅ ok |
-| `100vh` jumps on iOS toolbar | Multiple screens used `min-height: 100vh` which jumps when Safari's toolbar animates | Med | ✅ fixed — progressive `@supports (height: 100dvh)` override in `index.css` |
-| Reduced motion | Nav/tab/panel/fadeIn all respect `prefers-reduced-motion` via index.css | — | ✅ ok |
-
-**Commit:** `T9: 100dvh progressive enhancement for key screens` (included in the T9 audit-doc commit)
-
-No screen-specific regressions found that aren't already covered by T1–T8 plus the earlier-session fixes.
-
-## T10 — First-login onboarding tour
-**Commit:** `T10: first-login onboarding tour for agents (react-joyride)`
-
-Backend (additive migration `20260418200000_add_tutorial_fields`):
-- `User.hasCompletedTutorial BOOLEAN DEFAULT false`
-- `User.firstLoginPlatform TEXT NULL`
-- `GET /api/me` sets `firstLoginPlatform` on first call with `X-Estia-Platform` header
-- `POST /api/me/tutorial/complete` flips the flag (idempotent)
-
-Frontend:
-- `api.js` forwards `X-Estia-Platform` (web | ios | android) on every call
-- `components/OnboardingTour.jsx` — react-joyride wrapper, agent-only, runs only if `hasCompletedTutorial === false` AND `platform === firstLoginPlatform`
-- 7 steps: welcome → Properties → Owners → Customers → Templates → Transfers → done. Hebrew locale (דלג / הבא / הקודם / סיימתי)
-- Skip and Finish both POST `/tutorial/complete` so the tour never re-appears
-- `Layout.jsx` sidebar NavLinks get `data-tour` anchors
-
-## T11 — In-app chat + admin panel
-**Commit:** `T11: in-app chat (users ↔ developer) + /admin/chats panel`
-
-Data model (migration `20260418210000_add_chat`):
-- `Conversation` (userId unique, status OPEN|ARCHIVED, lastMessageAt)
-- `Message` (conversationId, senderId, senderRole, body, createdAt, readAt)
-- Indexes: `Message(conversationId, createdAt)`, `Conversation(status, lastMessageAt)`
-
-Backend (`backend/src/routes/chat.ts`):
-- Admin identity via `ADMIN_EMAILS` env allowlist (default: `talfuks1234@gmail.com`)
-- User REST:
-  - `GET /api/chat/me` — get-or-create + last 200 messages
-  - `POST /api/chat/me/messages` — send; 30 msg/min rate limit
-  - `POST /api/chat/me/read`
-- Admin REST (allowlist-gated):
-  - `GET /api/chat/admin/conversations?filter=open|all|archived&search=`
-  - `GET /api/chat/admin/conversations/:id`
-  - `POST /api/chat/admin/conversations/:id/messages`
-  - `POST /api/chat/admin/conversations/:id/read`
-  - `POST /api/chat/admin/conversations/:id/archive` (+ `/unarchive`)
-- WebSocket: `GET /api/chat/ws` via `@fastify/websocket`, same JWT-cookie auth. Single in-process broadcast hub pushes `message:new` + `message:read` events to the conversation owner + every admin socket
-- `nginx.conf`: Upgrade/Connection headers added so WebSocket handshake proxies correctly
-
-Frontend:
-- `lib/api.js`: chat + admin endpoints
-- `hooks/chat.js`: `useChat()` — REST fetch + WebSocket subscription + optimistic send + markRead
-- `components/ChatWidget.jsx` + `.css`: floating 48×48 neutral button, subtle 9px gold unread dot (**no numbers, no pulse** per spec), slide-up 360×520 panel with welcome copy, bubble thread, Enter-to-send. Hidden for admin accounts. Dimmed while the onboarding tour is up (uses `:has(.react-joyride__spotlight)`).
-- `pages/AdminChats.jsx` + `.css`: two-pane inbox at `/admin/chats`. Filter (open/all/archived) + search (name/email/body). Unread bubble to top with gold dot. Live updates via the same WebSocket. Archive/unarchive actions. Route component self-enforces the email allowlist and redirects non-admins.
-
-**Known limitations (deferred to v2):**
-- Text only (no attachments)
-- No typing indicator (read receipts are in)
-- In-process pub/sub — would need Redis if backend scales horizontally
+### S24 · `--gold-readable` token added
+- **Source:** §6 accessibility (3.33:1 gold-on-white fails WCAG AA)
+- **Files:** `frontend/src/index.css`
+- **Change:** New `--gold-readable: #7a5c2c` (~4.9:1 vs white) for any small body-text use. `--gold` kept for display/accent (headlines pass as large text at 3:1).
+- **Follow-up:** Individual sites of body-text gold will migrate incrementally as we touch them. No forced global swap to avoid visual regressions.
 
 ---
 
-## How to test
+## Pending (from Ship list)
 
-1. **Deploy.** CI/CD tag-push runs `prisma migrate deploy` automatically. Two new migrations apply (tutorial fields + chat tables).
-2. **iOS app rebuild.** The new features include native changes (IG Story share needs `storyComposer` + `share.js`). `npx cap sync ios && npx cap open ios`, then Product → Run in Xcode.
-3. Smoke tests:
-   - On iPhone: open a property card → tap "סטורי" → Instagram opens with the composed image; check price range on /customers/new at 375px width; open a template on /templates and tap "מסך מלא"; click the chat floating button, send a message.
-   - On desktop: navigate Properties → Owners → Customers — no empty-card flash; click a KPI tile on a property → panel opens centered, no sidebar overlap; sign in with a fresh agent account → tutorial starts; go to `/admin/chats` as `talfuks1234@gmail.com` → see the conversation created by your test session.
-   - Share the customer URL (`/agents/<slug>/<propertySlug>`) on WhatsApp → preview card renders with cover photo + price.
+Still to ship on day 2+: **S4** (offline-write queue — L effort, own day), **S5** (HEIC → JPEG conversion), **S6** (full RTL sweep), **S11** (stale-lead pill), **S12** (Dashboard "היום" strip), **S13** (lazy chunks), **S15** (kanban perf), **S18** (more DateQuickChips), **S19** (iOS Contacts save — needs device), **S21** (mobile global search), **S23** (aria-label sweep), **S25** (RTL icon mirroring).
 
-## Deploy commands
-
-Because the user explicitly requested a deploy at the end of this work batch, the recommended sequence is:
-
-```bash
-cd /Users/adam/RealestateApp
-git push origin main
-TAG=v$(date +%Y.%m.%d-%H%M) && git tag "$TAG" && git push origin "$TAG"
-gh run watch "$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status
-```
-
-iOS app (T5 adds `storyComposer` which is web-side, but a rebuild is advisable so the bundled web assets match the server):
-
-```bash
-cd frontend
-npx cap sync ios
-npx cap open ios  # then Product → Run in Xcode
-```
+**Day 1 commit ships once you say go.** Not pushed yet.

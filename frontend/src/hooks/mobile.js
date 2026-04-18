@@ -192,7 +192,11 @@ export function useDraftAutosave(key, value, { debounce = 400 } = {}) {
     timer.current = setTimeout(() => {
       try {
         if (value == null) sessionStorage.removeItem(key);
-        else sessionStorage.setItem(key, JSON.stringify(value));
+        // S16: wrap the draft in { value, savedAt } so the restore banner
+        // can say "נשמר לפני 3 דקות" instead of just "נמצאה טיוטה".
+        // Stops agents from accidentally restoring a week-old draft
+        // they'd long forgotten about.
+        else sessionStorage.setItem(key, JSON.stringify({ value, savedAt: Date.now() }));
       } catch { /* ignore storage errors */ }
     }, debounce);
     return () => clearTimeout(timer.current);
@@ -206,7 +210,14 @@ export function useDraftAutosave(key, value, { debounce = 400 } = {}) {
 export function readDraft(key) {
   try {
     const s = sessionStorage.getItem(key);
-    return s ? JSON.parse(s) : null;
+    if (!s) return null;
+    const parsed = JSON.parse(s);
+    // S16: support both the new wrapped shape { value, savedAt } AND the
+    // legacy raw-object shape (so pre-upgrade drafts aren't lost).
+    if (parsed && typeof parsed === 'object' && 'value' in parsed && 'savedAt' in parsed) {
+      return parsed;
+    }
+    return { value: parsed, savedAt: null };
   } catch { return null; }
 }
 

@@ -21,7 +21,20 @@ export function ToastProvider({ children }) {
     const id = ++idSeq;
     const kind = opts.kind || 'success';
     const duration = opts.duration ?? (kind === 'error' ? 5000 : 2400);
-    setItems((cur) => [...cur, { id, message, kind }]);
+    // S22: cap the stack at 3 — rapid-fire API errors (offline, server
+    // hiccup) used to stack 5–7 toasts and block the screen for 20s.
+    // Oldest overflow toasts get evicted and their timers cleared so we
+    // don't leak setTimeout refs.
+    setItems((cur) => {
+      const next = [...cur, { id, message, kind }];
+      if (next.length <= 3) return next;
+      const overflow = next.slice(0, next.length - 3);
+      overflow.forEach((t) => {
+        const tm = timers.current.get(t.id);
+        if (tm) { clearTimeout(tm); timers.current.delete(t.id); }
+      });
+      return next.slice(-3);
+    });
     // Fire matching native haptic so toasts feel "physical" on iPhone
     if (kind === 'success') haptics.success();
     else if (kind === 'error') haptics.error();

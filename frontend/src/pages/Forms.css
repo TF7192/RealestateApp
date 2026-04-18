@@ -258,6 +258,14 @@
   flex-wrap: wrap;
 }
 
+/* S16: relative-time chip inside the draft banner — quieter shade so
+   it reads as metadata, not a second headline. */
+.draft-banner-age {
+  color: color-mix(in srgb, var(--gold) 62%, transparent);
+  font-weight: 500;
+  margin-inline-start: 4px;
+}
+
 .draft-banner-actions {
   display: flex;
   gap: 6px;
