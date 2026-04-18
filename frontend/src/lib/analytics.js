@@ -27,6 +27,14 @@ export function initAnalytics() {
       // double-count SPA history pushes.
       capture_pageview: false,
       capture_pageleave: true,
+      // Attach every event to a Person — even the ones that fire before the
+      // agent has been identified (initial pageview, autocapture clicks that
+      // happen while /me is still in flight). posthog-js's default changed
+      // to 'identified_only' in late 1.x, which silently dropped those early
+      // events off the Persons screen. 'always' restores the old behaviour:
+      // anonymous events create an anon Person, then identify() aliases it
+      // onto the real one so nothing is orphaned.
+      person_profiles: 'always',
       // Session replay with privacy defaults: mask every input by default
       // (addresses, prices, phone numbers are private), mask text in
       // elements tagged with .ph-mask (forms), block password fields.
@@ -62,12 +70,29 @@ export function identify(user) {
       display_name: user.displayName,
       // Intentionally omit phone — keep PII minimal
     });
+    // Register user props as *super-properties* so every subsequent capture
+    // (including autocapture, $pageview, session-replay chunks) carries the
+    // identity even if the call site forgot to pass it. Without this, events
+    // fired from places that don't re-read user context (e.g. error handlers
+    // in setTimeout callbacks) could still slip through person-less.
+    posthog.register({
+      user_id: user.id,
+      user_role: user.role,
+    });
   } catch { /* no-op */ }
 }
 
 export function resetIdentity() {
   if (!ready) return;
-  try { posthog.reset(); } catch { /* no-op */ }
+  try {
+    // Drop super-properties BEFORE reset so a lingering user_id from the
+    // previous session can't ride along on the next anonymous session's
+    // events. (posthog.reset() already clears the distinct_id, but registered
+    // properties survive across resets unless explicitly unregistered.)
+    posthog.unregister('user_id');
+    posthog.unregister('user_role');
+    posthog.reset();
+  } catch { /* no-op */ }
 }
 
 export function track(event, props = {}) {

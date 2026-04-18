@@ -88,6 +88,16 @@ All items trace back to the Ship list in `SHIP_LIST.md`. iPhone-first.
 
 ## Day 2 — iPhone fixes + bundle weight
 
+### HOTFIX · PostHog events showed up without a Person
+- **Source:** live user report ("some API requests that I see in posthog come without an identification, it doesnt have the PERSON in them")
+- **Files:** `frontend/src/lib/analytics.js`
+- **Root cause:** posthog-js 1.369 defaults `person_profiles` to `'identified_only'`, which means any event fired *before* `identify()` is called — initial `$pageview`, autocapture clicks during the /me round-trip, `$exception` from bootstrap errors — never creates a Person. Those events are still recorded, but they show up in PostHog with no Person attribution, exactly what the user was seeing.
+- **Fix:**
+  - `person_profiles: 'always'` on init: every event creates / attaches to a Person. Anonymous captures get an anon Person, which `identify()` then aliases onto the real one when auth resolves — so nothing is orphaned.
+  - `identify()` now also calls `posthog.register({ user_id, user_role })`. Registering those as *super-properties* means every subsequent capture (autocapture, pageviews, session-replay) carries the identity even if the call site forgets to pass it — e.g. errors in setTimeout handlers or third-party callbacks.
+  - `resetIdentity()` unregisters both super-props before `posthog.reset()` so a previous agent's `user_id` can't leak onto the next anonymous session's events (`reset()` clears distinct_id but registered props survive).
+- **Verification plan:** next PostHog session should show every event under a Person — including the initial pageview that previously rode on an anon distinct_id.
+
 ### HOTFIX · "דלג על הסיור" didn't collapse the tour
 - **Source:** live user report ("After I click on 'דלג על הסיור' it still persists and doesn't collapse the tutorial")
 - **Files:** `frontend/src/lib/tourKill.js`, `frontend/src/components/tour-tooltip.css`
