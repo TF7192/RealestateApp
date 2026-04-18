@@ -7,7 +7,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  /* Task 1 · sub-dialogs opened from a Portal-ed picker must stack ABOVE
+     that picker, not level with it. OwnerPicker sits at 1100; child
+     dialogs go to 1200 so the create-owner form lands on top when
+     spawned from inside the picker. Same rule should apply to every
+     future "dialog launched from another dialog" pair. */
+  z-index: 1200;
   padding: 16px;
   animation: ed-fade-in 0.18s ease-out;
 }

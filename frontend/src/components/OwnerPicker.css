@@ -42,7 +42,12 @@
   max-width: 100%;
   margin-top: auto;
   border-radius: 18px 18px 0 0;
-  max-height: 80vh;
+  /* Task 1 · account for the iOS keyboard (surfaced as --kb-h by
+     main.jsx's visualViewport listener) so the search results aren't
+     pushed below the keyboard while the agent is typing. Also respect
+     the bottom safe-area inset on notched devices. */
+  max-height: calc(80vh - var(--kb-h, 0px));
+  padding-bottom: env(safe-area-inset-bottom);
   animation: opb-up 0.22s ease-out;
 }
 
