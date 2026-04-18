@@ -41,6 +41,7 @@ export default function MobileTabBar() {
               key={t.to}
               to={t.to}
               end={t.end}
+              data-tour={t.to === '/properties' ? 'sidebar-properties' : undefined}
               className={({ isActive }) => `mtb-item ${isActive ? 'active' : ''}`}
               onClick={() => haptics.tap()}
             >
@@ -64,6 +65,7 @@ export default function MobileTabBar() {
               key={t.to}
               to={t.to}
               end={t.end}
+              data-tour={t.to === '/customers' ? 'sidebar-customers' : undefined}
               className={({ isActive }) => `mtb-item ${isActive ? 'active' : ''}`}
               onClick={() => haptics.tap()}
             >
