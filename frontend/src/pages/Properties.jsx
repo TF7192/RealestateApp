@@ -30,6 +30,7 @@ import WhatsAppIcon from '../components/WhatsAppIcon';
 import StickyActionBar from '../components/StickyActionBar';
 import { OverflowSheet } from '../components/MobilePickers';
 import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
+import PageTour from '../components/PageTour';
 import { shareSheet, openWhatsApp, shareWithPhotos } from '../native/share';
 import { telUrl, wazeUrl } from '../lib/waLink';
 import haptics from '../lib/haptics';
@@ -448,6 +449,17 @@ export default function Properties() {
 
   return (
     <PullRefresh onRefresh={load}>
+    <>
+    <PageTour
+      pageKey="properties"
+      steps={[
+        { target: 'body', placement: 'center',
+          title: 'הנכסים שלך',
+          content: 'כל הנכסים במקום אחד. גע בכרטיס לכניסה מלאה, או החלק ימינה למספר פעולות מהירות.' },
+        { target: 'body', placement: 'center',
+          content: 'בקצה העמוד (+) תמצאי/תמצא כפתור להוספת נכס חדש. שלב ראשון זה רק 7 שדות — אפשר להשלים יותר מאוחר.' },
+      ]}
+    />
     <div className="properties-page app-wide-cap">
       {/* P1-M16 — desktop-only page header. Mobile uses breadcrumb + ⋯ + bottom FAB. */}
       {!isMobile && (
@@ -1019,6 +1031,7 @@ export default function Properties() {
        *  the create-property action; the floating button visually clung to
        *  the last card and confused the layout.) */}
     </div>
+    </>
     </PullRefresh>
   );
 }

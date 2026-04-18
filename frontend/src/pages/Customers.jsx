@@ -36,6 +36,7 @@ import WhatsAppIcon from '../components/WhatsAppIcon';
 import PullRefresh from '../components/PullRefresh';
 import { OverflowSheet } from '../components/MobilePickers';
 import { useVisibilityBump, primeContactBump, useViewportMobile, useDelayedFlag } from '../hooks/mobile';
+import PageTour from '../components/PageTour';
 import haptics from '../lib/haptics';
 import { useToast, optimisticUpdate } from '../lib/toast';
 import { relativeTime, absoluteTime } from '../lib/time';
@@ -296,6 +297,16 @@ export default function Customers() {
 
   return (
     <PullRefresh onRefresh={loadLeads}>
+    <PageTour
+      pageKey="customers"
+      steps={[
+        { target: 'body', placement: 'center',
+          title: 'הלקוחות שלך',
+          content: 'כל הלקוחות המתעניינים. העמוד ממוין לפי חום הליד (HOT / WARM / COLD) וסינון מהיר לפי עיר, חדרים ותקציב.' },
+        { target: 'body', placement: 'center',
+          content: 'ברגע שיש התאמה בין לקוח לנכס, היא מופיעה אוטומטית על כרטיס הנכס בעמוד הנכסים.' },
+      ]}
+    />
     <div className="customers-page">
       <div className="page-header animate-in">
         <div className="page-header-info">

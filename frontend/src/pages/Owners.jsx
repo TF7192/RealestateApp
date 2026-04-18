@@ -7,6 +7,7 @@ import PullRefresh from '../components/PullRefresh';
 import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
+import PageTour from '../components/PageTour';
 import { useToast } from '../lib/toast';
 import { telUrl } from '../lib/waLink';
 import { openWhatsApp } from '../native/share';
@@ -96,6 +97,16 @@ export default function Owners() {
 
   return (
     <PullRefresh onRefresh={load}>
+      <PageTour
+        pageKey="owners"
+        steps={[
+          { target: 'body', placement: 'center',
+            title: 'בעלי הנכסים שלך',
+            content: 'זה ספר המוכרים והמשכירים. כל בעל נכס מקושר לנכסים שלו, עם טלפון, אימייל ומצב התקשרות.' },
+          { target: 'body', placement: 'center',
+            content: 'אפשר להחליק על שורה לגילוי פעולות מהירות: חיוג, וואטסאפ, ופתיחת כרטיס מלא.' },
+        ]}
+      />
       <div className="owners-page app-wide-cap">
         <div className="page-header animate-in">
           <div className="page-header-info">

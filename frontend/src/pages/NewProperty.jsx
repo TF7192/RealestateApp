@@ -28,6 +28,7 @@ import {
   inputPropsForCity,
 } from '../lib/inputProps';
 import { NumberField, PhoneField, SelectField } from '../components/SmartFields';
+import PageTour from '../components/PageTour';
 import { getPositionDetailed } from '../native/geolocation';
 import './Forms.css';
 import './NewProperty.css';
@@ -527,6 +528,18 @@ export default function NewProperty() {
 
   return (
     <div className={`form-page np-wizard has-sticky-bar ${isEdit ? 'np-is-edit' : ''}`}>
+      {!isEdit && (
+        <PageTour
+          pageKey="new-property"
+          steps={[
+            { target: 'body', placement: 'center',
+              title: 'נכס חדש בשני שלבים',
+              content: 'שלב 1 מספיק כדי לשמור נכס חדש: כתובת, מחיר, בעל נכס. שלב 2 להשלמת המאפיינים — אפשר להשלים מאוחר יותר.' },
+            { target: 'body', placement: 'center',
+              content: 'טיוטה נשמרת אוטומטית. אם יצאת באמצע, כשתחזור נציע להמשיך מאותו מקום.' },
+          ]}
+        />
+      )}
       <Link to={backTarget} className="back-link animate-in">
         <ArrowRight size={16} />
         {backLabel}

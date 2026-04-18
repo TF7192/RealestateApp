@@ -1,32 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Capacitor } from '@capacitor/core';
-import { useViewportMobile } from '../hooks/mobile';
 
 /**
- * First-login tour for agents. Uncontrolled stepping: Joyride owns the
- * current step while it's running; we only handle end-state events
- * (finished / skipped / close / skip). This avoids the previous bug
- * where our controlled stepIndex and Joyride's internal advance fought
- * each other on "הבא" and froze the overlay on a grey screen.
+ * First-login tour for agents.
  *
- * Robustness against missing targets: every step has a reasonable
- * fallback placement + target selector that also matches the mobile
- * tab bar (see MobileTabBar.jsx data-tour anchors), so the tour never
- * has to rely on an element that isn't mounted on the current
- * viewport. Steps that can't have a guaranteed anchor (e.g. Owners on
- * mobile, which lives inside the MoreSheet) are rendered as
- * centered explainers with target='body'.
+ * Uses centered explainer steps (target:'body' + placement:'center')
+ * for the initial overview so the tour doesn't depend on any specific
+ * element being mounted and never force-navigates the user. When the
+ * user dismisses/finishes, per-page tours (<PageTour>) take over on
+ * each first visit so the remaining feature walkthrough is contextual.
  */
 export default function OnboardingTour() {
   const { user, refresh } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isMobile = useViewportMobile();
   const [run, setRun] = useState(false);
+  const startedRef = useRef(false);
 
   const platform = Capacitor.getPlatform();
 
@@ -38,65 +29,70 @@ export default function OnboardingTour() {
   }, [user, platform]);
 
   useEffect(() => {
-    if (!shouldRun) { setRun(false); return; }
-    if (location.pathname !== '/' && !location.pathname.startsWith('/properties')) {
-      navigate('/properties');
-    }
-    const t = setTimeout(() => setRun(true), 600);
+    if (!shouldRun || startedRef.current) return;
+    startedRef.current = true;
+    // Give the page a beat to settle before the tour mounts
+    const t = setTimeout(() => setRun(true), 400);
     return () => clearTimeout(t);
-  }, [shouldRun, location.pathname, navigate]);
+  }, [shouldRun]);
 
-  const steps = useMemo(() => {
-    const welcome = {
+  const steps = useMemo(() => ([
+    {
       target: 'body',
       placement: 'center',
       title: 'ברוך/ה הבא/ה ל-Estia',
       content: 'סיור קצר (דקה) שיראה לך איפה כל דבר. אפשר לדלג בכל שלב — הסיור לא יחזור.',
       disableBeacon: true,
-    };
-    const wrap = {
+    },
+    {
       target: 'body',
       placement: 'center',
-      content: 'זהו. אפשר להתחיל — בהצלחה!',
+      title: 'נכסים',
+      content: 'כל הנכסים שלך במקום אחד — רשימה, עריכה, שיתוף ללקוחות, וכרטיס נכס מלא עם פעולות שיווק.',
       disableBeacon: true,
-    };
-
-    // Helper — build a step that falls back to body/center if the
-    // target selector isn't found. Joyride v3 handles this for us as
-    // long as we don't depend on a spotlight anchor.
-    const nav = (selector, content, title) => ({
-      target: selector,
-      content,
-      title,
-      placement: 'auto',
+    },
+    {
+      target: 'body',
+      placement: 'center',
+      title: 'בעלי נכסים',
+      content: 'ספר בעלי הנכסים שלך — המוכרים והמשכירים. כל בעל נכס משויך לנכסים שלו, עם היסטוריה מלאה.',
       disableBeacon: true,
-    });
-
-    if (isMobile) {
-      return [
-        welcome,
-        nav('[data-tour="sidebar-properties"]', 'כאן מרכז כל הנכסים שלך. הוספה, עריכה ושיתוף ללקוחות.'),
-        nav('[data-tour="sidebar-customers"]', 'הלקוחות המתעניינים — התאמה אוטומטית לנכסים על כרטיס הנכס.'),
-        {
-          target: 'body',
-          placement: 'center',
-          content: 'בתפריט ⋯ תמצאו גם את בעלי הנכסים, תבניות ההודעות, העברות וצ׳אט עם המפתחים.',
-          disableBeacon: true,
-        },
-        wrap,
-      ];
-    }
-
-    return [
-      welcome,
-      nav('[data-tour="sidebar-properties"]', 'כאן מרכז כל הנכסים שלך. מוסיפים, עורכים, ומשתפים ללקוחות ישירות מהרשימה.'),
-      nav('[data-tour="sidebar-owners"]',     'ספר בעלי הנכסים — כל הפרטים על המוכרים/המשכירים במקום אחד.'),
-      nav('[data-tour="sidebar-customers"]',  'הלקוחות המתעניינים. התאמה אוטומטית לנכסים מופיעה על כרטיס הנכס.'),
-      nav('[data-tour="sidebar-templates"]',  'תבניות הודעות — כותבים פעם אחת, השדות המתחלפים מתמלאים אוטומטית בכל שליחה.'),
-      nav('[data-tour="sidebar-transfers"]',  'העברות נכסים עם סוכנים אחרים במערכת. בעלי נכסים עוברים איתם.'),
-      wrap,
-    ];
-  }, [isMobile]);
+    },
+    {
+      target: 'body',
+      placement: 'center',
+      title: 'לקוחות',
+      content: 'הלקוחות המתעניינים. התאמות אוטומטיות לנכסים מופיעות על כרטיס הנכס, כדי שתדע מיד למי לשלוח.',
+      disableBeacon: true,
+    },
+    {
+      target: 'body',
+      placement: 'center',
+      title: 'תבניות הודעות',
+      content: 'כותבים פעם אחת, השדות המתחלפים (מחיר, חדרים, כתובת) מתמלאים אוטומטית בכל שליחה ללקוח.',
+      disableBeacon: true,
+    },
+    {
+      target: 'body',
+      placement: 'center',
+      title: 'העברות',
+      content: 'העברת נכס לסוכן אחר במערכת — בעלי הנכסים נשארים מקושרים. כולל היסטוריית העברות מלאה.',
+      disableBeacon: true,
+    },
+    {
+      target: 'body',
+      placement: 'center',
+      title: 'צ׳אט עם המפתחים',
+      content: 'כפתור הצ׳אט בפינה פותח שיחה ישירה איתנו — באגים, בקשות, שאלות. נחזור אליך מהר.',
+      disableBeacon: true,
+    },
+    {
+      target: 'body',
+      placement: 'center',
+      content: 'זהו. בכל עמוד שתבקרי/תבקר בפעם הראשונה נסביר שם את הפרטים הקטנים. בהצלחה!',
+      disableBeacon: true,
+    },
+  ]), []);
 
   const locale = {
     back: 'הקודם',
@@ -130,10 +126,6 @@ export default function OnboardingTour() {
     <Joyride
       run={run}
       steps={steps}
-      /* Uncontrolled — do NOT pass stepIndex. Joyride manages Next/Back
-         internally in continuous mode. Passing stepIndex while also
-         reacting to STEP_AFTER was causing the controlled/uncontrolled
-         clash that froze the overlay on "הבא". */
       continuous
       showProgress
       showSkipButton

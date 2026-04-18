@@ -16,6 +16,7 @@ import api from '../lib/api';
 import { useToast, optimisticUpdate } from '../lib/toast';
 import { relativeTime, absoluteTime } from '../lib/time';
 import { useDelayedFlag } from '../hooks/mobile';
+import PageTour from '../components/PageTour';
 import './Transfers.css';
 
 function statusInfo(s) {
@@ -94,6 +95,16 @@ export default function Transfers() {
 
   return (
     <div className="transfers-page">
+      <PageTour
+        pageKey="transfers"
+        steps={[
+          { target: 'body', placement: 'center',
+            title: 'העברות נכסים',
+            content: 'כל העברה נכנסת או יוצאת של נכס בין סוכנים במערכת. בעלי הנכסים עוברים איתם אוטומטית.' },
+          { target: 'body', placement: 'center',
+            content: 'העברה מתחילה מעמוד הנכס (כפתור "העבר"). סוכן המקבל מאשר, והנכס עובר לחשבון שלו.' },
+        ]}
+      />
       <div className="page-header animate-in">
         <div className="page-header-info">
           <h2>העברות</h2>

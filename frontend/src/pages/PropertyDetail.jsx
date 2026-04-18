@@ -36,6 +36,7 @@ import TransferPropertyDialog from '../components/TransferPropertyDialog';
 import LeadPickerSheet from '../components/LeadPickerSheet';
 import StickyActionBar from '../components/StickyActionBar';
 import WhatsAppIcon from '../components/WhatsAppIcon';
+import PageTour from '../components/PageTour';
 import PropertyHero from '../components/PropertyHero';
 import PropertyKpiTile from '../components/PropertyKpiTile';
 import PropertyPanelSheet from '../components/PropertyPanelSheet';
@@ -502,6 +503,18 @@ export default function PropertyDetail() {
 
   return (
     <div className="property-detail pd-dashboard">
+      <PageTour
+        pageKey="property-detail"
+        steps={[
+          { target: 'body', placement: 'center',
+            title: 'כרטיס הנכס',
+            content: 'הדשבורד לכל נכס: שיווק, בעל הנכס, תמונות, בלעדיות והערות — הכול במקום אחד. גע בכרטיס כדי לפתוח אותו.' },
+          { target: 'body', placement: 'center',
+            content: 'כרטיס השיווק עוקב אחרי 22 הפעולות שמקדמות נכס (פרסום, מכתבי שכנים, עיתונות וכו׳). סמן מה שעשית — אחוז ההתקדמות מתעדכן אוטומטית.' },
+          { target: 'body', placement: 'center',
+            content: 'מעל הכרטיס — כפתורי העברה, עריכה, שיתוף וסטורי (במובייל). את השיתוף ללקוח מקבלים כקישור עם דף נכס מעוצב.' },
+        ]}
+      />
       {/* Top toolbar */}
       <div className="pd-topbar">
         <Link to="/properties" className="pd-back animate-in">

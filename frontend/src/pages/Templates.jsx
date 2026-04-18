@@ -36,6 +36,7 @@ import {
 } from '../lib/templates';
 import ChipEditor from '../components/ChipEditor';
 import Portal from '../components/Portal';
+import PageTour from '../components/PageTour';
 import { Maximize2 } from 'lucide-react';
 import './Templates.css';
 
@@ -187,6 +188,16 @@ export default function Templates() {
 
   return (
     <div className="tpl-page app-wide-cap">
+      <PageTour
+        pageKey="templates"
+        steps={[
+          { target: 'body', placement: 'center',
+            title: 'תבניות הודעות',
+            content: 'כל תבנית היא הודעה שאתה שולח ללקוחות. השדות הזהובים (כתובת, מחיר, חדרים) מתחלפים אוטומטית לפי הנכס שנשלח.' },
+          { target: 'body', placement: 'center',
+            content: 'בצד — רשימת סוגי התבניות (מכירה, השכרה, העברה וכו׳). שינויים נשמרים אוטומטית פר-סוכן.' },
+        ]}
+      />
       {/* ── Hero ───────────────────────────────────────────────── */}
       <header className="tpl-hero animate-in">
         <div className="tpl-hero-meta">
