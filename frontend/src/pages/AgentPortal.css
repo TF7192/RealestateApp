@@ -1,5 +1,8 @@
 .agent-portal {
+  /* S2: dvh avoids iOS Safari URL-bar jump. Customer sees this page
+     from a WhatsApp link on their phone — no tolerance for layout flicker. */
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-primary);
   color: var(--text-primary);
   padding-bottom: 60px;
@@ -10,6 +13,7 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .ap-loading-spinner {

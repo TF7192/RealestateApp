@@ -1,5 +1,7 @@
 .customer-portal {
+  /* S2: iOS Safari dvh — URL bar animates without jumping the layout. */
   min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
 }
 

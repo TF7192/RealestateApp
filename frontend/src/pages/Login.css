@@ -3,7 +3,10 @@
    ═══════════════════════════════════ */
 
 .login-page {
+  /* S2: 100dvh avoids the toolbar-jump on iOS Safari as the URL bar
+     hides/reveals. 100vh stays as the fallback for ancient browsers. */
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -486,6 +489,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-primary);
 }
 

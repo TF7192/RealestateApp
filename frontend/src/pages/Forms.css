@@ -477,9 +477,12 @@
     border-radius: 16px;
   }
 
-  /* Smooth keyboard-aware scroll — form fields never hide behind keyboard */
+  /* Smooth keyboard-aware scroll — form fields never hide behind keyboard.
+     S20: Add the live --kb-h so scroll-into-view lands ABOVE the keyboard,
+     not behind it. On closed-keyboard state --kb-h is 0 and this reduces
+     to the old 200px. */
   .intake-form {
-    scroll-padding-bottom: 200px;
+    scroll-padding-bottom: calc(200px + var(--kb-h, 0px));
   }
 }
 
@@ -488,7 +491,11 @@
    add `.has-sticky-bar` so content reserves room above the floating row. */
 @media (max-width: 900px) {
   .form-page.has-sticky-bar {
-    padding-bottom: 88px;
+    /* S20: when the keyboard opens the sticky bar stays put but inputs
+       inside need extra clearance so focused-input-scroll doesn't push
+       them up behind the sticky bar + keyboard stack. */
+    padding-bottom: calc(88px + var(--kb-h, 0px));
+    scroll-padding-bottom: calc(120px + var(--kb-h, 0px));
   }
   /* Hide the duplicate in-page submit row on mobile — the sticky bar
      already presents the primary action. On desktop the sticky hides,

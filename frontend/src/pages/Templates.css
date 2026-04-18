@@ -1391,10 +1391,21 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  /* S7: var(--kb-h) is set by main.jsx when the iOS keyboard opens.
+     Without the keyboard-reserved padding the chip rail slides under
+     the Hebrew keyboard and users can't tap the fields they came here
+     to insert. On desktop + keyboard-closed state, --kb-h is 0px and
+     this collapses to the original safe-area padding. */
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom) + var(--kb-h, 0px));
   border-top: 1px solid var(--border);
   background: var(--bg-card);
   overflow-x: auto;
+  /* Keep the rail above the keyboard rather than inside the editor
+     scroll area — moves the chip row rather than letting the chrome
+     be covered. */
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 
 .tpl-fs-var {

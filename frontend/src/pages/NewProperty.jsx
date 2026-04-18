@@ -517,6 +517,18 @@ export default function NewProperty() {
   const goToStep = async (n) => {
     if (n === step) return;
     if (isEdit) {
+      // S9: flush the currently-focused input's uncommitted React state
+      // BEFORE building the save body. Without this blur, SmartFields'
+      // onChange hasn't fired for the in-flight character and the last
+      // keystroke disappears when the step switches.
+      try {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      } catch { /* ignore */ }
+      // Let React commit the blur-triggered state update before we read
+      // form state to build the save body.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
       try {
         await api.updateProperty(editId, buildFullEditBody());
       } catch { /* non-blocking; user still moves to the other tab */ }

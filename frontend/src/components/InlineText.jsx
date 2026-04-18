@@ -54,13 +54,22 @@ export default function InlineText({
     if (e.key === 'Escape') { e.preventDefault(); setDraft(value ?? ''); setEditing(false); }
   };
 
+  // S17: blur no longer silently commits. If the user taps outside the
+  // field accidentally, their in-flight edit is REVERTED — an accidental
+  // blur can't corrupt the underlying value. To actually save, press
+  // Enter (single-line) or Cmd/Ctrl+Enter (multiline). Esc still cancels.
+  const revertOnBlur = () => {
+    setDraft(value ?? '');
+    setEditing(false);
+  };
+
   if (editing) {
     return multiline ? (
       <textarea
         ref={ref}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onBlur={revertOnBlur}
         onKeyDown={onKeyDown}
         className={`inline-text-input ${className}`}
         rows={3}
@@ -71,7 +80,7 @@ export default function InlineText({
         type={type}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onBlur={revertOnBlur}
         onKeyDown={onKeyDown}
         className={`inline-text-input ${className}`}
       />
