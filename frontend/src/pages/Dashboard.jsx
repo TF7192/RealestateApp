@@ -22,6 +22,7 @@ import PullRefresh from '../components/PullRefresh';
 import { relativeDate } from '../lib/relativeDate';
 import { shareSheet } from '../native/share';
 import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
+import { pageCache } from '../lib/pageCache';
 import haptics from '../lib/haptics';
 import './Dashboard.css';
 
@@ -32,8 +33,11 @@ function formatPrice(price) {
 }
 
 export default function Dashboard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Seed from cache so a return trip paints stats instantly. If no
+  // cache exists (first visit) we fall back to loading = true.
+  const _cached = pageCache.get('dashboard');
+  const [data, setData] = useState(_cached || null);
+  const [loading, setLoading] = useState(!_cached);
 
   const load = async () => {
     try {
@@ -43,14 +47,21 @@ export default function Dashboard() {
         api.listLeads(),
         api.listOwners().catch(() => ({ items: [] })),
       ]);
-      setData({
+      const next = {
         summary,
         properties: props.items || [],
         leads: leads.items || [],
         owners: owners.items || [],
-      });
+      };
+      setData(next);
+      pageCache.set('dashboard', next);
+      // Seed per-page caches too so hopping to /properties /customers
+      // /owners right after the Dashboard loads paints them instantly.
+      pageCache.set('properties', next.properties);
+      pageCache.set('customers',  next.leads);
+      pageCache.set('owners',     next.owners);
     } catch {
-      setData({ summary: null, properties: [], leads: [], owners: [] });
+      setData((d) => d || { summary: null, properties: [], leads: [], owners: [] });
     } finally {
       setLoading(false);
     }
@@ -59,27 +70,11 @@ export default function Dashboard() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const [summary, props, leads, owners] = await Promise.all([
-          api.dashboard(),
-          api.listProperties({ mine: '1' }),
-          api.listLeads(),
-          api.listOwners().catch(() => ({ items: [] })),
-        ]);
-        if (cancelled) return;
-        setData({
-          summary,
-          properties: props.items || [],
-          leads: leads.items || [],
-          owners: owners.items || [],
-        });
-      } catch {
-        if (!cancelled) setData({ summary: null, properties: [], leads: [], owners: [] });
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      await load();
+      if (cancelled) return;
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showSkel = useDelayedFlag(loading, 220);

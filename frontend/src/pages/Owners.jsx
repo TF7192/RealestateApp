@@ -8,6 +8,7 @@ import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
 import PageTour from '../components/PageTour';
+import { pageCache } from '../lib/pageCache';
 import { useToast } from '../lib/toast';
 import { telUrl } from '../lib/waLink';
 import { openWhatsApp } from '../native/share';
@@ -23,8 +24,10 @@ export default function Owners() {
   const isMobile = useViewportMobile(820);
   const toast = useToast();
   const navigate = useNavigate();
-  const [owners, setOwners] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Seed from cache so a return trip paints instantly.
+  const _cached = pageCache.get('owners');
+  const [owners, setOwners] = useState(_cached || []);
+  const [loading, setLoading] = useState(!_cached);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null); // null | {} (new) | owner (edit)
   const cardRefs = useRef({});
@@ -32,7 +35,9 @@ export default function Owners() {
   const load = useCallback(async () => {
     try {
       const res = await api.listOwners();
-      setOwners(res?.items || []);
+      const next = res?.items || [];
+      setOwners(next);
+      pageCache.set('owners', next);
     } catch (e) {
       toast?.error?.(e?.message || 'טעינת בעלי הנכסים נכשלה');
       setOwners([]);

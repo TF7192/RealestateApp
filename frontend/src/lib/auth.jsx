@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api } from './api';
+import { clearPageCache } from './pageCache';
 
 const AuthContext = createContext(null);
 
@@ -41,6 +42,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try { await api.logout(); } catch { /* ignore */ }
     setUser(null);
+    clearPageCache();
   };
 
   return (

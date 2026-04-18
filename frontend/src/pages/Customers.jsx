@@ -37,6 +37,7 @@ import PullRefresh from '../components/PullRefresh';
 import { OverflowSheet } from '../components/MobilePickers';
 import { useVisibilityBump, primeContactBump, useViewportMobile, useDelayedFlag } from '../hooks/mobile';
 import PageTour from '../components/PageTour';
+import { pageCache } from '../lib/pageCache';
 import haptics from '../lib/haptics';
 import { useToast, optimisticUpdate } from '../lib/toast';
 import { relativeTime, absoluteTime } from '../lib/time';
@@ -91,9 +92,11 @@ export default function Customers() {
   const navigate = useNavigate();
   const toast = useToast();
   const isMobile = useViewportMobile(820);
-  const [leads, setLeads] = useState([]);
-  const [properties, setProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Seed from cache so tab returns don't flash the empty state.
+  const _cachedLeads = pageCache.get('customers');
+  const [leads, setLeads] = useState(_cachedLeads || []);
+  const [properties, setProperties] = useState(pageCache.get('properties') || []);
+  const [loading, setLoading] = useState(!_cachedLeads);
   const [lookingForFilter, setLookingForFilter] = useState('all'); // all | BUY | RENT
   const [interestFilter, setInterestFilter] = useState('all'); // all | PRIVATE | COMMERCIAL
   const [statusFilter, setStatusFilter] = useState('all');
@@ -126,14 +129,20 @@ export default function Customers() {
 
   const loadLeads = useCallback(async () => {
     const r = await api.listLeads();
-    setLeads(r.items || []);
+    const next = r.items || [];
+    setLeads(next);
+    pageCache.set('customers', next);
   }, []);
 
   useEffect(() => {
     loadLeads().finally(() => setLoading(false));
     // Load the agent's properties so we can show "N נכסים תואמים" pills (P3-D1).
     api.listProperties({ mine: '1' })
-      .then((res) => setProperties(res?.items || []))
+      .then((res) => {
+        const next = res?.items || [];
+        setProperties(next);
+        pageCache.set('properties', next);
+      })
       .catch(() => { /* ignore — pills simply hide */ });
   }, [loadLeads]);
 

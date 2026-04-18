@@ -31,6 +31,7 @@ import StickyActionBar from '../components/StickyActionBar';
 import { OverflowSheet } from '../components/MobilePickers';
 import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
 import PageTour from '../components/PageTour';
+import { pageCache } from '../lib/pageCache';
 import { shareSheet, openWhatsApp, shareWithPhotos } from '../native/share';
 import { telUrl, wazeUrl } from '../lib/waLink';
 import haptics from '../lib/haptics';
@@ -138,10 +139,13 @@ export default function Properties() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const isMobile = useViewportMobile(820);
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  // Gate the "טוען…" placeholder so it only shows up on genuinely slow fetches.
-  // Under ~220ms the page flips straight from empty-under-header to real data.
+  // Seed state from the in-memory pageCache so a return to this tab
+  // paints the previous result INSTANTLY — no empty-page flash while
+  // the background fetch runs. First visit: cache is null so we fall
+  // back to empty + show skeleton.
+  const _cached = pageCache.get('properties');
+  const [items, setItems] = useState(_cached || []);
+  const [loading, setLoading] = useState(!_cached);
   const showPropsSkel = useDelayedFlag(loading, 220);
   const [filter, setFilter] = useState('all');
   const [assetClassFilter, setAssetClassFilter] = useState('all');
@@ -179,7 +183,9 @@ export default function Properties() {
   const load = async () => {
     try {
       const res = await api.listProperties({ mine: '1' });
-      setItems(res.items || []);
+      const next = res.items || [];
+      setItems(next);
+      pageCache.set('properties', next);
     } catch { /* ignore */ }
     setLoading(false);
   };
