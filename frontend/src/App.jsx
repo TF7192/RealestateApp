@@ -23,6 +23,8 @@ import ShortcutsOverlay from './components/ShortcutsOverlay';
 import OfflineBanner from './components/OfflineBanner';
 import { useScrollRestore } from './hooks/mobile';
 import { useDocumentTitle, useGlobalShortcuts } from './hooks/shortcuts';
+import { usePageviewTracking } from './hooks/analytics';
+import { identify, resetIdentity } from './lib/analytics';
 
 import { useEffect } from 'react';
 import { initStatusBar } from './native';
@@ -38,10 +40,18 @@ function AppRoutes() {
 
   useScrollRestore();
   useDocumentTitle();
+  usePageviewTracking();
   useGlobalShortcuts({
     onOpenPalette: () => setPaletteOpen((v) => !v),
     onOpenHelp:    () => setHelpOpen(true),
   });
+
+  // Tie the logged-in user to PostHog so session replay + funnels are
+  // per-agent. On sign-out, reset so a new anonymous session starts.
+  useEffect(() => {
+    if (user?.id) identify(user);
+    else resetIdentity();
+  }, [user?.id]);
 
   useEffect(() => { initStatusBar(); }, []);
 

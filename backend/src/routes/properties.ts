@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { requireUser } from '../middleware/auth.js';
 import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
+import { track as phTrack } from '../lib/analytics.js';
 
 const DEFAULT_ACTION_KEYS = [
   'tabuExtract', 'photography', 'buildingPhoto', 'dronePhoto', 'virtualTour',
@@ -186,6 +187,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
           : undefined,
       },
       include: { images: true, marketingActions: true, propertyOwner: true },
+    });
+    phTrack('property_created', agentId, {
+      property_id: created.id,
+      asset_class: created.assetClass,
+      category: created.category,
+      city: created.city,
+      has_photos: (body.images?.length || 0) > 0,
     });
     return { property: serialize(created) };
   });

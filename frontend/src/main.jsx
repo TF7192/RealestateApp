@@ -5,6 +5,10 @@ import { ThemeProvider } from './lib/theme.jsx';
 import { ToastProvider } from './lib/toast.jsx';
 import './index.css';
 import App from './App.jsx';
+import { initAnalytics } from './lib/analytics.js';
+
+// PostHog bootstrap — no-op when VITE_POSTHOG_KEY is unset (dev)
+initAnalytics();
 
 // iOS keyboard handling + zoom guards.
 //

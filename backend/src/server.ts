@@ -25,6 +25,8 @@ import { registerGeoRoutes } from './routes/geo.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerOwnerRoutes } from './routes/owners.js';
 import { storageBackend, resolveUpload } from './lib/storage.js';
+import { track as phTrack, captureException as phCapture, shutdownAnalytics } from './lib/analytics.js';
+import crypto from 'node:crypto';
 import { authPlugin } from './middleware/auth.js';
 
 const PORT = Number(process.env.PORT || 4000);
@@ -122,16 +124,58 @@ async function build() {
   await app.register(registerPublicRoutes, { prefix: '/api/public' });
   await app.register(registerOwnerRoutes, { prefix: '/api/owners' });
 
+  // Request lifecycle observability — assigns a request_id, logs
+  // method/route/status/duration, and sends an api_request event to
+  // PostHog with the user id when known.
+  app.addHook('onRequest', async (req) => {
+    (req as any).__t0 = Date.now();
+    (req as any).__reqId = crypto.randomUUID();
+  });
+  app.addHook('onResponse', async (req, reply) => {
+    const t0 = (req as any).__t0 || Date.now();
+    const duration = Date.now() - t0;
+    const reqId = (req as any).__reqId;
+    const userId = ((req as any).user && (req as any).user.id) || null;
+    const route = (req as any).routeOptions?.url || req.url;
+    // Skip health and static uploads to keep event volume low
+    if (req.url === '/api/health' || req.url.startsWith('/uploads/')) return;
+    phTrack('api_request', userId, {
+      request_id: reqId,
+      method: req.method,
+      route,
+      status_code: reply.statusCode,
+      duration_ms: duration,
+    });
+  });
+
   app.setErrorHandler((err, req, reply) => {
     req.log.error({ err }, 'request failed');
-    const status = err.statusCode || 500;
+    const status = (err as any).statusCode || 500;
+    // Unhandled backend exceptions → PostHog
+    if (status >= 500) {
+      const userId = ((req as any).user && (req as any).user.id) || null;
+      phCapture(err, userId, {
+        method: req.method,
+        route: (req as any).routeOptions?.url || req.url,
+        request_id: (req as any).__reqId,
+      });
+    }
     reply.code(status).send({
       error: {
         message: status >= 500 ? 'Internal server error' : err.message,
-        code: err.code,
+        code: (err as any).code,
       },
     });
   });
+
+  // Flush PostHog events before the process exits
+  for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(sig, async () => {
+      try { await shutdownAnalytics(); } catch { /* noop */ }
+      try { await app.close(); } catch { /* noop */ }
+      process.exit(0);
+    });
+  }
 
   return app;
 }

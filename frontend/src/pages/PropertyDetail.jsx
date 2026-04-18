@@ -41,6 +41,7 @@ import PropertyKpiTile from '../components/PropertyKpiTile';
 import PropertyPanelSheet from '../components/PropertyPanelSheet';
 import { useCopyFeedback, useViewportMobile, useViewportDesktop } from '../hooks/mobile';
 import { openWhatsApp, shareWithPhotos } from '../native/share';
+import { track } from '../lib/analytics';
 import { telUrl, wazeUrl, waUrl } from '../lib/waLink';
 import { shareSheet } from '../native/share';
 import { leadMatchesProperty } from './Properties';
@@ -313,6 +314,11 @@ export default function PropertyDetail() {
     setPickerOpen(false);
     setPickerLeadsOverride(null);
     const text = editedText || buildMessage();
+    track('property_shared', {
+      property_id: property.id,
+      mode: opts?.withPhotos ? 'share_with_photos' : (lead ? 'direct_wa' : 'open_wa'),
+      has_recipient: !!lead,
+    });
     if (opts?.withPhotos) {
       await shareWithPhotos({
         photos: opts.photos,

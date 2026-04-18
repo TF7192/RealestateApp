@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { track as phTrack } from '../lib/analytics.js';
 
 /**
  * Owner routes — `/api/owners/*`. The Owner persona is distinct from Lead
@@ -79,6 +80,7 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
         relationship: body.relationship?.trim() || null,
       },
     });
+    phTrack('owner_created', u.id, { owner_id: owner.id });
     return { owner };
   });
 

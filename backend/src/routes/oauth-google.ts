@@ -20,6 +20,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { slugify, ensureUniqueSlug } from '../lib/slug.js';
+import { track as phTrack, identify as phIdentify } from '../lib/analytics.js';
 
 const COOKIE_NAME = 'estia_token';
 const STATE_COOKIE = 'estia_oauth_state';
@@ -191,6 +192,8 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 * 30,
     });
+    phIdentify(user.id, { email: user.email, role: user.role, display_name: user.displayName });
+    phTrack('login_completed', user.id, { role: user.role, provider: 'GOOGLE' });
 
     // Bounce back to the place the user came from (default: dashboard)
     const target = decoded.r && decoded.r.startsWith('/') ? decoded.r : '/';

@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { track as phTrack } from '../lib/analytics.js';
 
 const leadInput = z.object({
   name: z.string().min(1).max(120),
@@ -116,11 +117,19 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/', { onRequest: [app.requireAgent] }, async (req) => {
     const body = leadInput.parse(req.body);
+    const agentId = requireUser(req).id;
     const created = await prisma.lead.create({
       data: {
-        agentId: requireUser(req).id,
+        agentId,
         ...normalize(body),
       },
+    });
+    phTrack('lead_created', agentId, {
+      lead_id: created.id,
+      status: created.status,
+      interest_type: created.interestType,
+      looking_for: created.lookingFor,
+      city: created.city,
     });
     return { lead: created };
   });

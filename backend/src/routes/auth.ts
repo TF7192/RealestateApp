@@ -3,6 +3,7 @@ import argon2 from 'argon2';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { slugify, ensureUniqueSlug } from '../lib/slug.js';
+import { track as phTrack, identify as phIdentify } from '../lib/analytics.js';
 
 async function buildAgentSlug(displayName: string): Promise<string> {
   const base = slugify(displayName) || 'agent';
@@ -69,6 +70,8 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       { expiresIn: '30d' }
     );
     reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
+    phIdentify(user.id, { email: user.email, role: user.role, display_name: user.displayName });
+    phTrack('signup_completed', user.id, { role: user.role, provider: 'EMAIL' });
     return {
       user: publicUser(user),
       token,
@@ -90,6 +93,8 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       { expiresIn: '30d' }
     );
     reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
+    phIdentify(user.id, { email: user.email, role: user.role, display_name: user.displayName });
+    phTrack('login_completed', user.id, { role: user.role, provider: 'EMAIL' });
     return { user: publicUser(user), token };
   });
 
