@@ -27,6 +27,11 @@ import './PropertyPhotoManager.css';
 export default function PropertyPhotoManager({ propertyId, initial = [], onClose, onChange }) {
   const [images, setImages] = useState(() => [...initial].sort((a, b) => a.sortOrder - b.sortOrder));
   const [uploading, setUploading] = useState(0);
+  // Task 4 · optimistic thumbnails — created from the File objects the
+  // instant the picker closes, so the user sees their photos *now* instead
+  // of staring at an empty modal while HEIC→JPEG transcoding takes 3-5s.
+  // Each entry is { id, url (object URL), pending: true }.
+  const [pending, setPending] = useState([]);
   const [err, setErr] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
@@ -39,6 +44,11 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
     setImages([...initial].sort((a, b) => a.sortOrder - b.sortOrder));
   }, [initial]);
 
+  // Revoke object URLs on unmount so we don't leak blob memory.
+  useEffect(() => () => {
+    pending.forEach((p) => { try { URL.revokeObjectURL(p.url); } catch { /* ignore */ } });
+  }, [pending]);
+
   const refreshFromServer = async () => {
     try {
       const r = await api.getProperty(propertyId);
@@ -48,8 +58,8 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
     } catch (_) { /* ignore */ }
   };
 
-  const uploadOne = async (file) => {
-    if (!file.type.startsWith('image/')) return;
+  const uploadOne = async (file, pendingId) => {
+    if (!file.type.startsWith('image/') && !/\.heic$/i.test(file.name || '')) return;
     setUploading((n) => n + 1);
     setErr(null);
     try {
@@ -58,16 +68,34 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
       setErr(e.message || 'העלאה נכשלה');
     } finally {
       setUploading((n) => Math.max(0, n - 1));
+      // Drop this pending thumb — it's either now backed by a real server
+      // record (refreshFromServer will paint it) or it failed and the err
+      // banner explains why.
+      setPending((cur) => {
+        const next = cur.filter((p) => p.id !== pendingId);
+        const dropped = cur.find((p) => p.id === pendingId);
+        if (dropped) { try { URL.revokeObjectURL(dropped.url); } catch { /* ignore */ } }
+        return next;
+      });
     }
   };
 
   const handleFiles = async (fileList) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
+    // Task 4 · seed optimistic thumbs BEFORE the HTTP request fires, so
+    // Chrome has visible state-change on return from the file picker —
+    // both a reassurance for the agent and a cue that focus returned.
+    const seeded = files.map((file) => ({
+      id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      url: URL.createObjectURL(file),
+      name: file.name,
+    }));
+    setPending((cur) => [...cur, ...seeded]);
     // Upload sequentially so the server stays happy and ordering is predictable
-    for (const f of files) {
+    for (let i = 0; i < files.length; i += 1) {
       // eslint-disable-next-line no-await-in-loop
-      await uploadOne(f);
+      await uploadOne(files[i], seeded[i].id);
     }
     await refreshFromServer();
   };
@@ -188,18 +216,49 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
               <input
                 ref={fileInput}
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 multiple
                 style={{ display: 'none' }}
                 onChange={(e) => {
-                  handleFiles(e.target.files);
+                  // Task 4 · defensively restore focus to the tab after
+                  // the OS file picker closes. On macOS + Chrome there's
+                  // a long-standing quirk where focus sometimes hands off
+                  // to whichever app was behind Chrome instead of back to
+                  // the tab that opened the picker. Explicit window.focus()
+                  // is a best-effort nudge that's cheap to try and often
+                  // succeeds — browsers allow it when it's the same event
+                  // loop as a user gesture.
+                  try { window.focus(); } catch { /* ignore */ }
+                  const files = e.target.files;
+                  // Reset the input value BEFORE firing uploads so the
+                  // element isn't holding references while we upload;
+                  // also lets the user re-select the same file later.
                   e.target.value = '';
+                  handleFiles(files);
                 }}
               />
             </div>
 
+            {/* Task 4 · optimistic previews. Painted the moment the picker
+                closes, replaced by the real server-backed thumbs once the
+                upload + refresh finish. Having something on screen on return
+                to Chrome also makes any lost-focus moment less confusing. */}
+            {pending.length > 0 && (
+              <ul className="ppm-grid ppm-grid-pending">
+                {pending.map((p) => (
+                  <li key={p.id} className="ppm-thumb ppm-thumb-pending">
+                    <img src={p.url} alt={p.name} draggable={false} />
+                    <div className="ppm-thumb-pending-overlay">
+                      <Loader2 size={18} className="ppm-spin" />
+                      <span>מעלה…</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             {/* Thumbs */}
-            {images.length === 0 ? (
+            {images.length === 0 && pending.length === 0 ? (
               <div className="ppm-empty">
                 <ImageIcon size={36} />
                 <p>עדיין אין תמונות לנכס זה</p>

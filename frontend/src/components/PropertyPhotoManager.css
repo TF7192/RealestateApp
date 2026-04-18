@@ -331,6 +331,45 @@
   color: var(--text-muted);
 }
 
+/* Task 4 · optimistic pending thumbs appear above the committed grid.
+   Same layout as the main grid but with a tint + spinner overlay so
+   the user can tell which ones are still in flight. */
+.ppm-grid-pending {
+  margin-bottom: 12px;
+}
+
+.ppm-thumb-pending {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--gold-border);
+  opacity: 0.85;
+}
+
+.ppm-thumb-pending img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(0.8);
+}
+
+.ppm-thumb-pending-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  background: linear-gradient(0deg, rgba(0,0,0,0.45), rgba(0,0,0,0.15));
+}
+
 @media (max-width: 600px) {
   .ppm-backdrop { padding: 0; }
   .ppm-modal { max-height: 100vh; border-radius: 0; }
