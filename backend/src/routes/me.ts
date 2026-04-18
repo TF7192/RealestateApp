@@ -9,12 +9,34 @@ import { putUpload } from '../lib/storage.js';
 
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAuth] }, async (req) => {
+    // Opportunistically record the platform the agent first logged in on.
+    // We only write when firstLoginPlatform is null so it stays stable
+    // after the first call — the tour only fires on that same platform.
+    const uid = requireUser(req).id;
+    const xPlatform = (req.headers['x-estia-platform'] as string | undefined)?.slice(0, 20);
+    const platform = xPlatform && ['web', 'ios', 'android'].includes(xPlatform) ? xPlatform : null;
+    if (platform) {
+      await prisma.user.updateMany({
+        where: { id: uid, firstLoginPlatform: null },
+        data: { firstLoginPlatform: platform },
+      });
+    }
     const user = await prisma.user.findUnique({
-      where: { id: requireUser(req).id },
+      where: { id: uid },
       include: { agentProfile: true, customerProfile: true },
     });
     if (!user) return { user: null };
     return { user: toPublic(user) };
+  });
+
+  // End of tour (skip or finish). Idempotent — safe to call multiple times.
+  app.post('/tutorial/complete', { onRequest: [app.requireAuth] }, async (req) => {
+    const uid = requireUser(req).id;
+    await prisma.user.update({
+      where: { id: uid },
+      data: { hasCompletedTutorial: true },
+    });
+    return { ok: true };
   });
 
   const updateSchema = z.object({
@@ -86,5 +108,7 @@ function toPublic(user: any) {
     avatarUrl: user.avatarUrl,
     agentProfile: user.agentProfile,
     customerProfile: user.customerProfile,
+    hasCompletedTutorial: !!user.hasCompletedTutorial,
+    firstLoginPlatform: user.firstLoginPlatform || null,
   };
 }

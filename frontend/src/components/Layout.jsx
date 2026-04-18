@@ -230,6 +230,15 @@ export default function Layout({ onLogout }) {
                 to={item.path}
                 end={item.path === '/'}
                 data-label={item.label}
+                // data-tour targets used by the OnboardingTour (T10).
+                data-tour={
+                  item.path === '/properties' ? 'sidebar-properties' :
+                  item.path === '/owners'     ? 'sidebar-owners' :
+                  item.path === '/customers'  ? 'sidebar-customers' :
+                  item.path === '/templates'  ? 'sidebar-templates' :
+                  item.path === '/transfers'  ? 'sidebar-transfers' :
+                  undefined
+                }
                 className={({ isActive }) =>
                   `nav-item ${isActive ? 'active' : ''}`
                 }

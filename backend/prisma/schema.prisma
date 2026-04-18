@@ -82,6 +82,13 @@ model User {
   slug         String?      @unique
   phone        String?
   avatarUrl    String?
+  // ── Onboarding tutorial ────────────────────────────────────────
+  // Tracks whether the agent has completed (or skipped) the first-run
+  // tour, and which platform they first logged in on — we only show
+  // the tour on that same platform so it doesn't re-fire after a
+  // device switch.
+  hasCompletedTutorial Boolean  @default(false)
+  firstLoginPlatform   String?   // 'web' | 'ios' | 'android'
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 

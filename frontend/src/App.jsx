@@ -21,6 +21,7 @@ import { AuthProvider, useAuth } from './lib/auth';
 import CommandPalette from './components/CommandPalette';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
 import OfflineBanner from './components/OfflineBanner';
+import OnboardingTour from './components/OnboardingTour';
 import { useScrollRestore } from './hooks/mobile';
 import { useDocumentTitle, useGlobalShortcuts } from './hooks/shortcuts';
 import { usePageviewTracking } from './hooks/analytics';
@@ -147,6 +148,7 @@ function AppRoutes() {
       </Routes>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ShortcutsOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <OnboardingTour />
     </>
   );
 }

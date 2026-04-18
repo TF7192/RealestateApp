@@ -2,8 +2,15 @@
 // Uses same-origin /api/* via the nginx proxy in prod, and the Vite proxy in dev.
 
 import { getDistinctId as _phDistinctId } from './analytics';
+import { Capacitor } from '@capacitor/core';
 
 const BASE = import.meta.env.VITE_API_BASE || '/api';
+
+// Platform tag sent with every call so the backend can log the first
+// platform an agent logged in on (used by the onboarding tour gate).
+function platformHeader() {
+  try { return Capacitor.getPlatform(); } catch { return 'web'; }
+}
 
 // Forward the browser's stable PostHog distinct-id so the backend's
 // api_request events can attribute anonymous traffic (pre-login) to the
@@ -22,6 +29,7 @@ async function request(path, { method = 'GET', body, headers = {}, raw } = {}) {
     credentials: 'include',
     headers: {
       'Accept': 'application/json',
+      'X-Estia-Platform': platformHeader(),
       ...(phId ? { 'X-PostHog-Distinct-Id': phId } : null),
       ...headers,
     },
@@ -60,6 +68,7 @@ export const api = {
     request('/auth/google/native-exchange', { method: 'POST', body: { code } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/me'),
+  completeTutorial: () => request('/me/tutorial/complete', { method: 'POST' }),
   updateMe: (body) => request('/me', { method: 'PATCH', body }),
   uploadAvatar: (file) => {
     const fd = new FormData();
