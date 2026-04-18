@@ -454,67 +454,86 @@ export default function NewProperty() {
               בעל הנכס
             </h3>
 
-            {form.pickedOwner ? (
-              <div className="np-owner-card">
-                <div className="np-owner-card-avatar" aria-hidden="true">
-                  {(form.pickedOwner.name || '?').charAt(0)}
-                </div>
-                <div className="np-owner-card-meta">
-                  <strong>{form.pickedOwner.name}</strong>
-                  <span>{form.pickedOwner.phone || '—'}</span>
-                  {form.pickedOwner.email && <small>{form.pickedOwner.email}</small>}
-                </div>
-                <div className="np-owner-card-actions">
-                  {(form.pickedOwner.propertyCount ?? 0) > 0 && (
-                    <span className="np-owner-pill">
-                      <Building2 size={11} />
-                      <strong>{form.pickedOwner.propertyCount}</strong>
-                      <span>נכסים</span>
-                    </span>
-                  )}
+            {/* Owner-as-fields: the inline inputs are the always-visible
+              * primary form. The picker is a small auxiliary "quick-fill"
+              * link at the top — it just pre-fills these same inputs and
+              * stores the matched owner's id so the backend links instead
+              * of duplicating. Editing any field after a pick implicitly
+              * unlinks (the server-side dedupe by phone re-matches if the
+              * user just adjusted casing or a typo). */}
+            <div className="np-owner-quickpick">
+              <button
+                type="button"
+                className="np-owner-quickpick-btn"
+                onClick={() => setOwnerPickerOpen(true)}
+              >
+                <UserCheck size={12} />
+                כבר במערכת? בחר בעל קיים
+              </button>
+              {form.propertyOwnerId && (
+                <span className="np-owner-linked-badge" title="מקושר לכרטיס בעל קיים">
+                  <CheckCircle2 size={12} />
+                  בעל מקושר
                   <button
                     type="button"
-                    className="np-owner-swap"
-                    onClick={() => setOwnerPickerOpen(true)}
+                    className="np-owner-unlink-link"
+                    onClick={() => setForm((p) => ({
+                      ...p, propertyOwnerId: null, pickedOwner: null,
+                    }))}
                   >
-                    <RefreshCcw size={12} />
-                    החלף בעל
+                    שחרר
                   </button>
-                </div>
+                </span>
+              )}
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">שם מלא של בעל הנכס</label>
+                <input
+                  {...inputPropsForName()}
+                  className="form-input"
+                  value={form.owner}
+                  onChange={(e) => {
+                    update('owner', e.target.value);
+                    // Editing implicitly unlinks — server dedupes by phone
+                    if (form.propertyOwnerId) {
+                      setForm((p) => ({ ...p, propertyOwnerId: null, pickedOwner: null }));
+                    }
+                  }}
+                  placeholder="ישראל ישראלי"
+                  required
+                />
               </div>
-            ) : (
-              <>
-                <div className="np-owner-pick-row">
-                  <button
-                    type="button"
-                    className="btn btn-primary np-owner-pick-btn"
-                    onClick={() => setOwnerPickerOpen(true)}
-                  >
-                    <UserCheck size={14} />
-                    בחר בעל קיים
-                  </button>
-                  <span className="np-owner-pick-or">או הזן ידנית למטה</span>
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">שם מלא</label>
-                    <input
-                      {...inputPropsForName()}
-                      className="form-input"
-                      value={form.owner}
-                      onChange={(e) => update('owner', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">טלפון</label>
-                    <PhoneField
-                      value={form.ownerPhone}
-                      onChange={(v) => update('ownerPhone', v)}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+              <div className="form-group">
+                <label className="form-label">טלפון בעל הנכס</label>
+                <PhoneField
+                  value={form.ownerPhone}
+                  onChange={(v) => {
+                    update('ownerPhone', v);
+                    if (form.propertyOwnerId) {
+                      setForm((p) => ({ ...p, propertyOwnerId: null, pickedOwner: null }));
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">אימייל (אופציונלי)</label>
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoCapitalize="off"
+                  className="form-input"
+                  value={form.ownerEmail || ''}
+                  onChange={(e) => update('ownerEmail', e.target.value)}
+                  placeholder="owner@example.com"
+                  dir="ltr"
+                  style={{ textAlign: 'right' }}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="form-actions form-actions-desktop">
