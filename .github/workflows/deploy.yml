@@ -95,13 +95,16 @@ jobs:
           ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" '
             set -e
             cd /home/ec2-user/estia-new
+            # Prune BEFORE building so we never run out of disk mid-build.
+            # t3.small has 8–16GB root; each stale layer cache can be 1GB+.
+            sudo docker builder prune -af >/dev/null 2>&1 || true
+            sudo docker image prune -af >/dev/null 2>&1 || true
             sudo docker compose build --pull
             # --remove-orphans drops services no longer defined in the file
             # (e.g. the legacy postgres + redis containers from when the DB
             # ran on the host).  Keeps the EC2 in lockstep with the repo.
             sudo docker compose up -d --remove-orphans
             sudo docker compose exec -T backend npx prisma migrate deploy
-            sudo docker builder prune -af >/dev/null 2>&1 || true
             df -h / | tail -1
           '
 
