@@ -185,6 +185,18 @@ export default function Properties() {
 
   useEffect(() => { load(); }, []);
 
+  // T3 — when the list has ≤1 asset the content already fits the viewport
+  // (or there's just a single 96px card). Disable iOS rubber-band bounce
+  // while we're on the page so swiping up doesn't tug a basically-empty
+  // canvas. Restore the default on unmount so other pages keep their
+  // native bounce. Doesn't affect PullRefresh — that's JS-driven.
+  useEffect(() => {
+    if (items.length > 1) return undefined;
+    const prev = document.body.style.overscrollBehaviorY;
+    document.body.style.overscrollBehaviorY = 'none';
+    return () => { document.body.style.overscrollBehaviorY = prev; };
+  }, [items.length]);
+
   useEffect(() => {
     const ac = searchParams.get('assetClass');
     if (ac === 'residential') setAssetClassFilter('RESIDENTIAL');
