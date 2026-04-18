@@ -27,13 +27,18 @@ export default function OnboardingTour() {
 
   const isPhone = Capacitor.isNativePlatform() || isMobile;
 
-  const shouldRun = useMemo(() => {
-    if (areToursKilled()) return false;
-    if (!user || user.role !== 'AGENT') return false;
-    if (user.hasCompletedTutorial) return false;
-    if (isPhone) return false;
-    return true;
-  }, [user, isPhone]);
+  // Read the kill-switch fresh on every render — do NOT memoize.
+  // If we memoize on [user, isPhone], a `tick()` from the subscriber
+  // forces a re-render but the cached memo still returns the old
+  // value, and the tour keeps rendering even though killed is true.
+  // That was the entire bug the user was seeing.
+  const killed = areToursKilled();
+  const shouldRun =
+    !killed &&
+    !!user &&
+    user.role === 'AGENT' &&
+    !user.hasCompletedTutorial &&
+    !isPhone;
 
   useEffect(() => {
     if (!shouldRun || startedRef.current) return;
