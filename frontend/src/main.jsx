@@ -7,6 +7,30 @@ import './index.css';
 import App from './App.jsx';
 import { initAnalytics } from './lib/analytics.js';
 
+// One-shot client-side reset: bump this string whenever we need every
+// existing browser session to drop its per-page-tour markers (and any
+// other device-only UX flags). We stash the last-seen version in
+// localStorage under `estia-client-ver`; when it doesn't match, we wipe
+// the keys below once, then write the new version. Safe to run on every
+// page-load thanks to the equality guard.
+const ESTIA_CLIENT_VER = '2026-04-18-tour-reset-2';
+if (typeof window !== 'undefined') {
+  try {
+    if (localStorage.getItem('estia-client-ver') !== ESTIA_CLIENT_VER) {
+      Object.keys(localStorage).forEach((k) => {
+        if (
+          k.startsWith('estia-page-tour:') ||
+          k.startsWith('estia-draft:') ||
+          k.startsWith('react-joyride')
+        ) {
+          localStorage.removeItem(k);
+        }
+      });
+      localStorage.setItem('estia-client-ver', ESTIA_CLIENT_VER);
+    }
+  } catch { /* storage disabled — no-op */ }
+}
+
 // PostHog bootstrap — no-op when VITE_POSTHOG_KEY is unset (dev)
 initAnalytics();
 
