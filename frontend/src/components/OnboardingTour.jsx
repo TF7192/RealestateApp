@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
-import { useNavigate } from 'react-router-dom';
+import './onboarding.css';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Capacitor } from '@capacitor/core';

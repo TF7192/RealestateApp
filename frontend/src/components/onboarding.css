@@ -1,0 +1,234 @@
+/* ──────────────────────────────────────────────────────────────
+ * Onboarding — visual polish for react-joyride.
+ *
+ * Joyride's stock chrome is fine but too neutral for Estia's
+ * editorial-luxury feel. We add:
+ *
+ *   1. A slow gold breathing ring around the spotlight so the user's
+ *      eye is drawn without being shouted at.
+ *   2. A bounce-in tooltip with subtle elevation + gold-accent arrow.
+ *   3. A "pill-out" animation on the primary CTA so "הבא" reads as
+ *      the next step, not a placeholder button.
+ *   4. Soft grain + vignette on the overlay so the UI behind it
+ *      feels paused, not grey-dead.
+ *
+ * All of this respects prefers-reduced-motion — animations are
+ * replaced with plain fades.
+ * ────────────────────────────────────────────────────────────── */
+
+.react-joyride__overlay {
+  /* Replace the flat grey dim with a warmer vignette + quiet grain. */
+  background: radial-gradient(
+    circle at center,
+    rgba(10, 10, 15, 0.38) 0%,
+    rgba(10, 10, 15, 0.58) 100%
+  ) !important;
+  backdrop-filter: blur(3px) saturate(110%);
+  -webkit-backdrop-filter: blur(3px) saturate(110%);
+  animation: estia-tour-overlay-in 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes estia-tour-overlay-in {
+  from { opacity: 0; backdrop-filter: blur(0) saturate(100%); }
+  to   { opacity: 1; }
+}
+
+/* Spotlight — the cut-out around the focused element. Add a gold ring
+   that breathes so the eye knows where to look without an ad-like flash. */
+.react-joyride__spotlight {
+  box-shadow:
+    0 0 0 1px var(--gold),
+    0 0 0 4px color-mix(in srgb, var(--gold) 35%, transparent),
+    0 0 28px color-mix(in srgb, var(--gold) 55%, transparent) !important;
+  animation: estia-tour-spot 2.2s ease-in-out infinite;
+  border-radius: 14px !important;
+}
+
+@keyframes estia-tour-spot {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px var(--gold),
+      0 0 0 4px color-mix(in srgb, var(--gold) 30%, transparent),
+      0 0 22px color-mix(in srgb, var(--gold) 45%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--gold),
+      0 0 0 6px color-mix(in srgb, var(--gold) 20%, transparent),
+      0 0 38px color-mix(in srgb, var(--gold) 70%, transparent);
+  }
+}
+
+/* Tooltip — give it real presence: bounce-in, gold hairline, shadow. */
+.react-joyride__tooltip {
+  border: 1px solid var(--gold-border) !important;
+  box-shadow:
+    0 24px 60px rgba(30, 26, 20, 0.22),
+    0 0 0 1px color-mix(in srgb, var(--gold) 10%, transparent) inset !important;
+  animation: estia-tour-rise 0.45s cubic-bezier(0.22, 1.14, 0.36, 1);
+  max-width: 420px !important;
+}
+
+@keyframes estia-tour-rise {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.94); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+/* Little gold tick above the title area */
+.react-joyride__tooltip::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  inset-inline-end: 20px;
+  width: 22px;
+  height: 2px;
+  background: var(--gold);
+  border-radius: 2px;
+  opacity: 0.65;
+}
+
+.react-joyride__tooltip h1,
+.react-joyride__tooltip h4 {
+  font-family: var(--font-display) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+  font-size: 17px !important;
+  margin-bottom: 6px !important;
+  color: var(--text-primary) !important;
+}
+
+.react-joyride__tooltip__container {
+  direction: rtl !important;
+}
+
+/* Content text */
+.react-joyride__tooltip > div:first-child {
+  line-height: 1.6 !important;
+  color: var(--text-primary) !important;
+}
+
+/* Progress dots — thicker, gold for active */
+.react-joyride__beacon,
+.react-joyride__tooltip__footer > span {
+  color: var(--text-muted) !important;
+}
+
+/* Primary "הבא / סיימתי" CTA — pill + subtle pulse so the eye finds it */
+.react-joyride__tooltip button[data-action="primary"] {
+  position: relative;
+  overflow: hidden;
+  animation: estia-cta-pulse 2.4s ease-in-out infinite;
+  transition: transform 0.12s ease !important;
+}
+
+.react-joyride__tooltip button[data-action="primary"]:hover {
+  filter: brightness(1.05);
+}
+.react-joyride__tooltip button[data-action="primary"]:active {
+  transform: scale(0.96);
+}
+
+.react-joyride__tooltip button[data-action="primary"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 100%
+  );
+  transform: translateX(-150%);
+  animation: estia-cta-shine 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes estia-cta-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--gold) 35%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 6px 22px color-mix(in srgb, var(--gold) 55%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--gold) 18%, transparent);
+  }
+}
+
+@keyframes estia-cta-shine {
+  0%, 70%  { transform: translateX(-150%); }
+  85%      { transform: translateX(150%);  }
+  100%     { transform: translateX(150%);  }
+}
+
+/* Skip / Back buttons — quiet, matches body text */
+.react-joyride__tooltip button[data-action="skip"],
+.react-joyride__tooltip button[data-action="back"] {
+  transition: color 0.14s ease, background 0.14s ease !important;
+}
+.react-joyride__tooltip button[data-action="skip"]:hover,
+.react-joyride__tooltip button[data-action="back"]:hover {
+  color: var(--text-primary) !important;
+  background: var(--bg-elevated) !important;
+  border-radius: 8px;
+}
+
+/* Close (×) — make it tactile + hit-friendly */
+.react-joyride__tooltip button[data-action="close"] {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+  transition: background 0.14s ease, color 0.14s ease !important;
+}
+.react-joyride__tooltip button[data-action="close"]:hover {
+  background: var(--bg-elevated) !important;
+  color: var(--gold) !important;
+}
+
+/* Arrow accent */
+.react-joyride__tooltip svg[viewBox] {
+  filter: drop-shadow(0 2px 6px rgba(30, 26, 20, 0.12));
+}
+
+/* Make sure the tooltip is ABOVE the PropertyPanelSheet (z-index 1100)
+   and the ChatWidget panel (z-index 950). Joyride sets 1200 by default
+   via props but some descendant styles can compete — pin them here too. */
+.react-joyride__overlay      { z-index: 1195 !important; }
+.react-joyride__spotlight    { z-index: 1198 !important; }
+.react-joyride__tooltip__container,
+.react-joyride-floater       { z-index: 1210 !important; }
+
+/* Pointer cursor on spotlight — makes the walkthrough feel interactive */
+.react-joyride__spotlight { cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .react-joyride__overlay,
+  .react-joyride__spotlight,
+  .react-joyride__tooltip,
+  .react-joyride__tooltip button[data-action="primary"],
+  .react-joyride__tooltip button[data-action="primary"]::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .react-joyride__tooltip {
+    box-shadow: 0 12px 36px rgba(30, 26, 20, 0.14) !important;
+  }
+}
+
+/* Mobile: tooltips can be cramped at 375px — give them room + stack the
+   buttons vertically so "הבא" is always a full-width pill above "דלג". */
+@media (max-width: 480px) {
+  .react-joyride__tooltip {
+    max-width: calc(100vw - 28px) !important;
+    margin: 0 14px !important;
+    padding: 18px 18px 14px !important;
+  }
+  .react-joyride__tooltip__footer {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .react-joyride__tooltip button[data-action="primary"] {
+    width: 100%;
+    order: 1;
+  }
+}

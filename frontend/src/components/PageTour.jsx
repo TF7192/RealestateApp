@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
 import { useAuth } from '../lib/auth';
+import './onboarding.css';
 
 /**
  * PageTour — a tiny per-page walkthrough that runs ONCE per device.
@@ -25,7 +26,11 @@ export default function PageTour({ pageKey, steps, delay = 700 }) {
 
   useEffect(() => {
     if (!user || user.role !== 'AGENT') return undefined;
-    if (!user.hasCompletedTutorial) return undefined; // wait for the global tour
+    // No longer gated on hasCompletedTutorial — per-page tours fire
+    // independently, so if someone skipped the main onboarding (or the
+    // main onboarding already finished), they still get the per-page
+    // walkthrough on first visit. Each page still runs only once via
+    // its localStorage marker.
     if (!pageKey || !steps?.length) return undefined;
     const key = `estia-page-tour:${pageKey}`;
     try { if (localStorage.getItem(key)) return undefined; } catch { /* ignore */ }
