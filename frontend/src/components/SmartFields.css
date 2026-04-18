@@ -214,22 +214,31 @@
   }
 }
 
-/* ── PriceRange ── */
+/* ── PriceRange ──
+   min-width:0 on the wrapper + each cell so the grid can actually shrink
+   below its min-content width. Without them the Hebrew placeholder
+   "ללא הגבלה" could push the row past the viewport on 375px iPhones. */
 .sf-range {
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .sf-range-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
+  min-width: 0;
+  width: 100%;
 }
 
 .sf-range-cell {
   position: relative;
+  min-width: 0;
+  overflow: hidden; /* belt-and-braces — any stray content stays inside the cell */
 }
 
 .sf-range-cap {
