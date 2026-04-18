@@ -1,87 +1,39 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
 import { Capacitor } from '@capacitor/core';
-import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
+import {
+  areToursKilled,
+  killAllTours,
+  subscribeTourKill,
+} from '../lib/tourKill';
 import './tour-tooltip.css';
 
-// Synchronously hide every element Joyride mounts, BEFORE React re-
-// renders. Without this the spotlight + floater play their fade-out
-// animation for ~300ms, which the user was seeing as a shrinking
-// dark circle.
-export function forceUnmountTour() {
-  try { document.body.classList.add('tour-dead'); } catch { /* ignore */ }
-}
-function releaseTourDead() {
-  try { document.body.classList.remove('tour-dead'); } catch { /* ignore */ }
-}
-
-/**
- * First-login tour for agents.
- *
- * Key behaviors after user feedback:
- *   - Prominent "דלג על כל הסיורים לתמיד" button in every tooltip's
- *     top-right corner — one tap silences the tour + every per-page
- *     tour forever (server flag flipped, local flag set).
- *   - Closing (via skip button, the × in the corner, or the skipTour
- *     keyword) IMMEDIATELY unmounts Joyride so the spotlight element
- *     doesn't linger as a shrinking dark circle during Joyride's
- *     exit animation. We return null from the component the moment
- *     the user asks to close — Joyride's DOM goes away on the same tick.
- */
-
-const PAGE_TOUR_KEYS = [
-  'properties', 'owners', 'customers', 'templates',
-  'transfers', 'new-property', 'property-detail',
-];
-
-// Skip / close / finish all funnel through here. Besides the local
-// flags (which only protect the current device), we ALSO POST
-// /api/me/tutorial/complete so the state is persisted server-side —
-// log out + log back in on any device and the tour stays dismissed.
-export async function dismissAllTours() {
-  try {
-    PAGE_TOUR_KEYS.forEach((k) => {
-      localStorage.setItem(`estia-page-tour:${k}`, String(Date.now()));
-    });
-    localStorage.setItem('estia-tour-dismissed', '1');
-  } catch { /* storage disabled */ }
-  try { await api.completeTutorial(); } catch { /* ignore — local flags still protect */ }
-}
+// Re-exported so PageTour can import alongside the shared tooltip
+// component + styles without pulling this module twice.
+export { killAllTours };
 
 export default function OnboardingTour() {
-  const { user, refresh } = useAuth();
+  const { user } = useAuth();
   const isMobile = useViewportMobile();
   const [run, setRun] = useState(false);
-  const [dead, setDead] = useState(false); // set when user dismisses — unmounts Joyride on the same tick
   const startedRef = useRef(false);
 
-  // Mobile (native app OR any mobile-width web session) NEVER sees
-  // the tour. Per user request: "treat as already passed on phone,
-  // no matter where". We also post completeTutorial on first mount
-  // under these conditions so the server flag flips to true and a
-  // later desktop session stays quiet too.
+  // Force re-render whenever the global kill-switch fires, so this
+  // component re-evaluates shouldRun and returns null if killed.
+  const [, tick] = useReducer((n) => n + 1, 0);
+  useEffect(() => subscribeTourKill(tick), []);
+
   const isPhone = Capacitor.isNativePlatform() || isMobile;
 
   const shouldRun = useMemo(() => {
+    if (areToursKilled()) return false;
     if (!user || user.role !== 'AGENT') return false;
     if (user.hasCompletedTutorial) return false;
-    try { if (localStorage.getItem('estia-tour-dismissed')) return false; } catch { /* ignore */ }
     if (isPhone) return false;
     return true;
   }, [user, isPhone]);
-
-  // One-shot silencer for phone sessions — persists server-side.
-  useEffect(() => {
-    if (!isPhone) return;
-    if (!user || user.role !== 'AGENT') return;
-    if (user.hasCompletedTutorial) return;
-    (async () => {
-      try { await api.completeTutorial(); } catch { /* ignore */ }
-      refresh?.();
-    })();
-  }, [isPhone, user?.id, user?.hasCompletedTutorial, user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!shouldRun || startedRef.current) return;
@@ -90,72 +42,55 @@ export default function OnboardingTour() {
     return () => clearTimeout(t);
   }, [shouldRun]);
 
+  // One-shot silencer for phone sessions — fires server flag too.
+  useEffect(() => {
+    if (!isPhone) return;
+    if (!user || user.role !== 'AGENT') return;
+    if (user.hasCompletedTutorial) return;
+    killAllTours();
+  }, [isPhone, user?.id, user?.hasCompletedTutorial, user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const steps = useMemo(() => {
     const centered = (title, content) => ({
       target: 'body', placement: 'center', title, content, disableBeacon: true,
     });
     const anchored = (selector, title, content) => ({
-      target: selector, title, content,
-      disableBeacon: true,
-      spotlightPadding: 8,
-      placement: 'auto',
+      target: selector, title, content, disableBeacon: true,
+      spotlightPadding: 8, placement: 'auto',
     });
 
     if (isMobile) {
       return [
         centered('ברוכים הבאים ל-Estia',
-          'סיור קצר שיראה לכם איפה נמצא כל דבר. אפשר לדלג בכל שלב — הסיור לא יחזור.'),
+          'סיור קצר שיראה לכם איפה נמצא כל דבר. אפשר לדלג בכל שלב.'),
         anchored('[data-tour="sidebar-properties"]', 'נכסים',
-          'כל הנכסים שלכם, לחיצה על כרטיס פותחת את כל פעולות השיווק והעריכה.'),
+          'כל הנכסים שלכם. לחיצה על כרטיס פותחת פעולות שיווק ועריכה.'),
         anchored('[data-tour="sidebar-customers"]', 'לקוחות',
-          'הלקוחות המתעניינים. התאמות אוטומטיות לנכסים מופיעות בכרטיסי הנכסים.'),
-        centered('בעלי נכסים, תבניות, העברות וצ׳אט',
-          'בתפריט ⋯ למטה תמצאו את בעלי הנכסים, תבניות ההודעות, העברות נכסים וצ׳אט עם המפתחים.'),
-        centered('',
-          'זהו. בכל עמוד שתכנסו אליו בפעם הראשונה נראה לכם את הפרטים הקטנים של אותו עמוד. בהצלחה!'),
+          'הלקוחות המתעניינים. התאמות מופיעות אוטומטית על כרטיסי הנכסים.'),
+        centered('יתר הפיצ׳רים',
+          'בתפריט ⋯ תמצאו בעלי נכסים, תבניות הודעות, העברות וצ׳אט עם המפתחים.'),
+        centered('', 'בהצלחה!'),
       ];
     }
 
     return [
       centered('ברוכים הבאים ל-Estia',
-        'סיור קצר שיראה לכם איפה נמצא כל דבר. אפשר לדלג בכל שלב — הסיור לא יחזור.'),
+        'סיור קצר שיראה לכם איפה נמצא כל דבר. אפשר לדלג בכל שלב.'),
       anchored('[data-tour="sidebar-properties"]', 'נכסים',
-        'כל הנכסים שלכם במקום אחד — רשימה, עריכה, שיתוף ללקוחות, וכרטיס נכס מלא עם פעולות שיווק.'),
+        'כל הנכסים שלכם — רשימה, עריכה, שיתוף ללקוחות, וכרטיס נכס מלא.'),
       anchored('[data-tour="sidebar-owners"]', 'בעלי נכסים',
-        'ספר המוכרים והמשכירים. כל בעל נכס מקושר לנכסים שלו, עם היסטוריית התקשרות מלאה.'),
+        'ספר המוכרים והמשכירים, עם היסטוריית התקשרות מלאה.'),
       anchored('[data-tour="sidebar-customers"]', 'לקוחות',
-        'הלקוחות המתעניינים. התאמות אוטומטיות לנכסים מופיעות על כרטיס הנכס.'),
+        'הלקוחות המתעניינים והתאמות אוטומטיות לנכסים.'),
       anchored('[data-tour="sidebar-templates"]', 'תבניות הודעות',
-        'כותבים פעם אחת — השדות המשתנים (מחיר, חדרים, כתובת) מתמלאים אוטומטית בכל שליחה ללקוח.'),
+        'כותבים פעם אחת — השדות מתחלפים אוטומטית לפי הנכס.'),
       anchored('[data-tour="sidebar-transfers"]', 'העברות',
-        'העברת נכס לסוכן אחר במערכת — בעל הנכס והיסטוריה עוברים איתו.'),
+        'העברת נכס לסוכן אחר במערכת.'),
       centered('צ׳אט עם המפתחים',
-        'כפתור הצ׳אט פותח שיחה ישירה עם צוות Estia — באגים, בקשות ושאלות.'),
-      centered('',
-        'זהו. בכל עמוד שתכנסו אליו בפעם הראשונה נסביר שם את הפרטים הקטנים. בהצלחה!'),
+        'כפתור הצ׳אט פותח שיחה ישירה איתנו — באגים, בקשות ושאלות.'),
+      centered('', 'בהצלחה!'),
     ];
   }, [isMobile]);
-
-  const finish = async () => {
-    // Fire the server write FIRST so the fetch is in-flight before
-    // setDead/setRun cause React to unmount Joyride's tree. keepalive
-    // on the fetch further guarantees delivery if the page navigates.
-    const serverP = api.completeTutorial().catch(() => {});
-    try {
-      localStorage.setItem('estia-tour-dismissed', '1');
-    } catch { /* ignore */ }
-    forceUnmountTour();
-    setDead(true);
-    setRun(false);
-    await dismissAllTours();
-    await serverP;
-    refresh?.();
-  };
-
-  // When the component unmounts (either via dead or because the user
-  // is leaving the page), release the class so future mounts aren't
-  // suppressed.
-  useEffect(() => () => releaseTourDead(), []);
 
   const handleCallback = ({ status, action }) => {
     if (
@@ -163,14 +98,11 @@ export default function OnboardingTour() {
       status === STATUS.SKIPPED ||
       action === ACTIONS.CLOSE ||
       action === ACTIONS.SKIP
-    ) finish();
+    ) killAllTours();
   };
 
-  if (!shouldRun || dead) return null;
+  if (!shouldRun) return null;
 
-  // TourTooltip renders Joyride's tooltip ourselves so we can put the
-  // prominent skip pill in the top-right corner (and drop the built-in
-  // × button that used to leave the shrinking spotlight behind).
   return (
     <Joyride
       run={run}
@@ -183,12 +115,7 @@ export default function OnboardingTour() {
       disableScrolling={false}
       disableOverlayClose
       tooltipComponent={TourTooltip}
-      locale={{
-        back: 'הקודם',
-        last: 'סיימתי',
-        next: 'הבא',
-        skip: 'דלג על כל הסיורים לתמיד',
-      }}
+      locale={{ back: 'הקודם', last: 'סיימתי', next: 'הבא', skip: 'דלג על הסיור' }}
       callback={handleCallback}
       styles={tourStyles}
       floaterProps={floaterProps}
@@ -196,13 +123,11 @@ export default function OnboardingTour() {
   );
 }
 
-// ─── Custom tooltip ────────────────────────────────────────────────
-// react-joyride lets us pass a React component as the tooltip. Using
-// it instead of the default tooltip gives us:
-//   1. A prominent, always-visible "skip everything" pill in the top-
-//      right corner, no matter which step you're on.
-//   2. No hover-ghosted default × that lingered behind the tooltip.
-//   3. Hebrew-first layout with proper RTL gaps and padding.
+// ─── Custom tooltip ─────────────────────────────────────────────
+// Rendered INSTEAD of Joyride's default so the Skip button calls our
+// own kill-switch directly. We never rely on Joyride's callback
+// chain for dismissal — that was the source of every persistence
+// bug so far.
 // eslint-disable-next-line react/prop-types
 export function TourTooltip({
   continuous,
@@ -210,12 +135,22 @@ export function TourTooltip({
   step,
   backProps,
   primaryProps,
-  skipProps,
   tooltipProps,
   size,
   isLastStep,
 }) {
   const pct = size > 1 ? ((index + 1) / size) * 100 : 100;
+  const onSkip = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    killAllTours();
+  };
+  const onDone = (e) => {
+    // "Done" on the last step should also hard-kill the tour — the
+    // user saw enough, they don't want another one popping after.
+    if (isLastStep) killAllTours();
+    primaryProps?.onClick?.(e);
+  };
   return (
     <div {...tooltipProps} className="tour-tooltip" role="dialog" aria-modal="true">
       <span className="tour-tooltip-eyebrow">Estia · סיור מודרך</span>
@@ -244,26 +179,25 @@ export function TourTooltip({
               </button>
             )}
             {continuous && (
-              <button type="button" {...primaryProps} className="tour-btn tour-btn-primary">
+              <button
+                type="button"
+                {...primaryProps}
+                onClick={onDone}
+                className="tour-btn tour-btn-primary"
+              >
                 {isLastStep ? 'סיימתי' : 'הבא'}
               </button>
             )}
           </div>
         </div>
 
-        {/* Always-visible, full-width dismiss link. Text only — no X
-            icon (the × glyph was the user's reported black-circle
-            trigger) — and a big target so it's never missed. */}
+        {/* Big, always-visible skip — wired DIRECTLY to the global
+            kill-switch, no Joyride callback round-trip. */}
         <button
           type="button"
-          {...skipProps}
+          onClick={onSkip}
           className="tour-skip-link"
-          onClick={(e) => {
-            // Synchronously hide Joyride's DOM BEFORE Joyride's own
-            // callback fires, so there's no fade-out artifact.
-            forceUnmountTour();
-            skipProps?.onClick?.(e);
-          }}
+          aria-label="דלג על הסיור"
         >
           דלג על הסיור
         </button>
@@ -272,7 +206,7 @@ export function TourTooltip({
   );
 }
 
-// ─── shared tour styling ──────────────────────────────────────────
+// ─── Shared styling ────────────────────────────────────────────
 export const tourStyles = {
   options: {
     primaryColor: '#c9a96e',
@@ -285,12 +219,5 @@ export const tourStyles = {
 };
 
 export const floaterProps = {
-  styles: {
-    floater: {
-      transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease-out',
-      // Disable floater's own exit animation so the tooltip + spotlight
-      // disappear together when we set dead=true.
-      animationDuration: '0ms',
-    },
-  },
+  styles: { floater: { transition: 'opacity 0.18s ease-out' } },
 };
