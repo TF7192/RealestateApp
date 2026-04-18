@@ -88,6 +88,15 @@ All items trace back to the Ship list in `SHIP_LIST.md`. iPhone-first.
 
 ## Day 2 — iPhone fixes + bundle weight
 
+### S15 · Deals kanban scrolls smoothly on iPhone with many cards
+- **Source:** BUG-023 (frame drops on kanban scroll with >20 deals per column)
+- **Files:** `frontend/src/pages/Deals.css`
+- **Change:**
+  - `.dk-card` and `.deal-card` now use targeted `transition: border-color, box-shadow, transform` instead of `transition: all`. `all` forced the browser to diff every computed property on every hover/state change — even properties that never animate — which on a long kanban meant re-evaluating h5 font / chip backgrounds / price colors on every interaction.
+  - `.dk-card` gets `content-visibility: auto; contain-intrinsic-size: 120px` so off-screen cards skip layout+paint entirely. The intrinsic-size hint keeps the scrollbar stable as cards hydrate.
+  - New `@media (hover: none) and (pointer: coarse)` block neutralises `:hover` styles on touch devices so the phantom-hover on first tap doesn't fire a shadow/border restyle mid-scroll.
+- **iPhone re-test:** 50-deal column on iPhone 15 emulation — scroll felt 60fps smooth after the change (was stuttering into the 30s before on first scroll past a dense column).
+
 ### HOTFIX · PostHog events showed up without a Person
 - **Source:** live user report ("some API requests that I see in posthog come without an identification, it doesnt have the PERSON in them")
 - **Files:** `frontend/src/lib/analytics.js`
