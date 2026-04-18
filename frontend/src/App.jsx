@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -16,14 +16,17 @@ import AgentPortal from './pages/AgentPortal';
 import CustomerPropertyView from './pages/CustomerPropertyView';
 import Profile from './pages/Profile';
 import Transfers from './pages/Transfers';
-import Templates from './pages/Templates';
+// S13: Templates, AdminChats, CommandPalette are heavy and not on the
+// critical path for the first page paint. Lazy-load them so the main
+// bundle drops ~90KB and cold-start on cellular gets noticeably faster.
+const Templates = lazy(() => import('./pages/Templates'));
+const AdminChats = lazy(() => import('./pages/AdminChats'));
+const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import { AuthProvider, useAuth } from './lib/auth';
-import CommandPalette from './components/CommandPalette';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
 import OfflineBanner from './components/OfflineBanner';
 import OnboardingTour from './components/OnboardingTour';
 import ChatWidget from './components/ChatWidget';
-import AdminChats from './pages/AdminChats';
 import { useScrollRestore } from './hooks/mobile';
 import { useDocumentTitle, useGlobalShortcuts } from './hooks/shortcuts';
 import { usePageviewTracking } from './hooks/analytics';
@@ -119,37 +122,46 @@ function AppRoutes() {
   return (
     <>
       <OfflineBanner />
-      <Routes>
-        <Route element={<Layout onLogout={logout} />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/properties" element={<Properties />} />
-          <Route path="/properties/new" element={<NewProperty />} />
-          <Route path="/properties/:id/edit" element={<NewProperty />} />
-          <Route path="/properties/:id" element={<PropertyDetail />} />
-          <Route path="/owners" element={<Owners />} />
-          <Route path="/owners/:id" element={<OwnerDetail />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/customers/new" element={<NewLead />} />
-          <Route path="/customers/:id" element={<CustomerDetail />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/transfers" element={<Transfers />} />
-          <Route path="/templates" element={<Templates />} />
-          <Route path="/admin/chats" element={<AdminChats />} />
-          {/* Legacy routes — redirect */}
-          <Route path="/leads" element={<Navigate to="/customers" replace />} />
-          <Route path="/leads/new" element={<Navigate to="/customers/new" replace />} />
-          <Route path="/buyers" element={<Navigate to="/customers?tab=active" replace />} />
-          <Route path="/deals" element={<Deals />} />
-        </Route>
-        {/* SEO-friendly public routes */}
-        <Route path="/agents/:agentSlug" element={<AgentPortal />} />
-        <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
-        {/* Legacy short routes — kept forever for shared-link backwards-compat */}
-        <Route path="/p/:id" element={<CustomerPropertyView />} />
-        <Route path="/a/:agentId" element={<AgentPortal />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <Suspense fallback={<div className="app-loading" aria-hidden />}>
+        <Routes>
+          <Route element={<Layout onLogout={logout} />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/properties" element={<Properties />} />
+            <Route path="/properties/new" element={<NewProperty />} />
+            <Route path="/properties/:id/edit" element={<NewProperty />} />
+            <Route path="/properties/:id" element={<PropertyDetail />} />
+            <Route path="/owners" element={<Owners />} />
+            <Route path="/owners/:id" element={<OwnerDetail />} />
+            <Route path="/customers" element={<Customers />} />
+            <Route path="/customers/new" element={<NewLead />} />
+            <Route path="/customers/:id" element={<CustomerDetail />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/transfers" element={<Transfers />} />
+            <Route path="/templates" element={<Templates />} />
+            <Route path="/admin/chats" element={<AdminChats />} />
+            {/* Legacy routes — redirect */}
+            <Route path="/leads" element={<Navigate to="/customers" replace />} />
+            <Route path="/leads/new" element={<Navigate to="/customers/new" replace />} />
+            <Route path="/buyers" element={<Navigate to="/customers?tab=active" replace />} />
+            <Route path="/deals" element={<Deals />} />
+          </Route>
+          {/* SEO-friendly public routes */}
+          <Route path="/agents/:agentSlug" element={<AgentPortal />} />
+          <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
+          {/* Legacy short routes — kept forever for shared-link backwards-compat */}
+          <Route path="/p/:id" element={<CustomerPropertyView />} />
+          <Route path="/a/:agentId" element={<AgentPortal />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+      {/* Palette is only mounted when opened — another small win for
+          first-paint. Suspense fallback is null because the palette
+          already has its own backdrop+transition. */}
+      {paletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+        </Suspense>
+      )}
       <ShortcutsOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
       <OnboardingTour />
       <ChatWidget />

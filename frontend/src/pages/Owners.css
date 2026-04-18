@@ -274,8 +274,11 @@
 /* ── Floating "+" pill on mobile only ───────────────────── */
 .owners-fab {
   position: fixed;
-  left: 16px;
-  right: auto;
+  /* S6/RTL: logical start so the FAB lands on the visual-right in RTL,
+     inside the natural thumb arc. Was hardcoded `left: 16px` → visual
+     left, far from the thumb. */
+  inset-inline-start: 16px;
+  inset-inline-end: auto;
   bottom: calc(80px + env(safe-area-inset-bottom));
   z-index: 50;
   display: none;
