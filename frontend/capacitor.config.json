@@ -10,7 +10,7 @@
     "limitsNavigationsToAppBoundDomains": false,
     "scheme": "Estia",
     "allowsLinkPreview": false,
-    "overrideUserAgent": "Estia/1.0 (iOS)",
+    "appendUserAgent": "EstiaApp/1.0",
     "backgroundColor": "#f7f3ec",
     "supportedOrientations": ["portrait"]
   },
@@ -24,7 +24,15 @@
     "url": "https://estia.tripzio.xyz",
     "cleartext": false,
     "androidScheme": "https",
-    "iosScheme": "https"
+    "iosScheme": "https",
+    "allowNavigation": [
+      "accounts.google.com",
+      "oauth2.googleapis.com",
+      "openidconnect.googleapis.com",
+      "www.google.com",
+      "ssl.gstatic.com",
+      "*.googleusercontent.com"
+    ]
   },
   "plugins": {
     "SplashScreen": {

@@ -29,13 +29,12 @@ export default function Login() {
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
   const handleGoogle = () => {
-    // Real Google OAuth: redirect to the backend, which bounces to
-    // accounts.google.com and back to /api/auth/google/callback. The
-    // backend sets the httpOnly estia_token cookie and redirects to the
-    // page the user was on. (The old `loginWithGoogle(role)` path still
-    // exists in lib/auth.jsx as the demo-account fallback for local dev
-    // but is no longer wired to any button.)
-    setSubmitting(true);
+    // Navigation to /api/auth/google is synchronous; the page unmounts
+    // before any "loading" state matters. We intentionally do NOT gate
+    // this button on `submitting` — on iOS the WKWebView can refuse a
+    // cross-origin hop (when Capacitor's allowNavigation doesn't cover
+    // the target) and the page stays mounted, leaving the button stuck
+    // disabled. Keeping it always clickable means a second tap retries.
     const redirect = window.location.pathname + window.location.search;
     window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirect)}`;
   };
@@ -123,7 +122,7 @@ export default function Login() {
 
           {!flow && (
             <div className="auth-methods">
-              <button className="auth-method-btn google" onClick={handleGoogle} disabled={submitting}>
+              <button className="auth-method-btn google" onClick={handleGoogle}>
                 <svg width="20" height="20" viewBox="0 0 48 48">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
