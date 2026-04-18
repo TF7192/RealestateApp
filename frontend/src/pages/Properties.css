@@ -782,47 +782,67 @@
   .properties-page-overflow { display: none; }
 }
 
-/* Overflow button — top-left corner */
+/* Overflow (⋯) + "חפש דומים" — pinned to the logical START edge of the
+ * card (visual right in RTL) so they can't collide with the quick-action
+ * rail, which always lives at the logical END. Using logical properties
+ * (`inset-inline-start`) keeps the layout correct in both directions. */
 .pc-overflow-btn {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
+  top: 6px;
+  inset-inline-start: 6px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   border-radius: 50%;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 3;
+  transition: background 0.15s, transform 0.1s;
+}
+
+[data-theme="dark"] .pc-overflow-btn {
+  background: rgba(30, 26, 20, 0.72);
+  color: var(--text-primary);
 }
 
 .pc-overflow-btn:active {
   background: var(--bg-elevated);
+  transform: scale(0.94);
 }
 
-/* "חפש דומים" small pill — moved to top-left next to the overflow ⋯ to clear the new 48px rail. */
 .pc-similar-btn {
   position: absolute;
-  top: 6px;
-  left: 36px;
+  top: 10px;
+  /* leave 8px of breathing room between the pill and the ⋯ button */
+  inset-inline-start: 50px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 8px;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bg-elevated);
+  padding: 4px 10px;
+  min-height: 28px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-radius: 999px;
   cursor: pointer;
   z-index: 3;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .pc-similar-btn {
+  background: rgba(30, 26, 20, 0.72);
 }
 
 .pc-similar-btn:active {
