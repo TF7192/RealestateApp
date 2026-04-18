@@ -22,7 +22,7 @@ function posthogDistinctId() {
   return id && id.length <= 200 ? id : null;
 }
 
-async function request(path, { method = 'GET', body, headers = {}, raw } = {}) {
+async function request(path, { method = 'GET', body, headers = {}, raw, keepalive } = {}) {
   const phId = posthogDistinctId();
   const init = {
     method,
@@ -34,6 +34,7 @@ async function request(path, { method = 'GET', body, headers = {}, raw } = {}) {
       ...headers,
     },
   };
+  if (keepalive) init.keepalive = true;
   if (body !== undefined) {
     if (body instanceof FormData) {
       init.body = body;
@@ -68,7 +69,11 @@ export const api = {
     request('/auth/google/native-exchange', { method: 'POST', body: { code } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/me'),
-  completeTutorial: () => request('/me/tutorial/complete', { method: 'POST' }),
+  // keepalive ensures the POST survives a component unmount / page
+  // navigation — without it the tutorial-complete request can get
+  // cancelled when the tour component returns null right after the
+  // click, which is exactly what the user was seeing.
+  completeTutorial: () => request('/me/tutorial/complete', { method: 'POST', keepalive: true }),
 
   // In-app chat (T11)
   chatMe: () => request('/chat/me'),

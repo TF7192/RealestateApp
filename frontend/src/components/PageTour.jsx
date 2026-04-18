@@ -52,22 +52,24 @@ export default function PageTour({ pageKey, steps, delay = 700 }) {
   // PageTour returns early on its very first render — no flicker, no
   // tour — regardless of how fast the agent switches pages.
   const endTour = async (reason /* 'done' | 'skip' */) => {
+    // 1. Fire the server write FIRST so the fetch() is in-flight
+    //    before any state change can unmount us. keepalive:true on the
+    //    fetch ensures the request survives even if the component
+    //    tears down mid-flight.
+    const serverP = api.completeTutorial().catch(() => {});
+    // 2. Synchronous local flags — block every other PageTour instance
+    //    on the next navigation before React even re-renders.
+    try {
+      localStorage.setItem(`estia-page-tour:${pageKey}`, String(Date.now()));
+      localStorage.setItem('estia-tour-dismissed', '1');
+    } catch { /* ignore */ }
+    // 3. Visual teardown.
     forceUnmountTour();
     setDead(true);
     setRun(false);
-    try {
-      localStorage.setItem(`estia-page-tour:${pageKey}`, String(Date.now()));
-      // SYNCHRONOUS tour-wide flag — blocks every other PageTour mount
-      // on the next navigation even if the server call hasn't finished.
-      localStorage.setItem('estia-tour-dismissed', '1');
-    } catch { /* ignore */ }
-    if (reason === 'skip') {
-      // Skip ALSO writes all per-page keys so a re-enabled session
-      // doesn't re-trigger pages that were never personally visited.
-      await dismissAllTours();
-    } else {
-      try { await api.completeTutorial(); } catch { /* ignore */ }
-    }
+    // 4. Skip also writes all per-page keys for belt-and-braces.
+    if (reason === 'skip') await dismissAllTours();
+    await serverP;
     refresh?.();
   };
 

@@ -137,13 +137,18 @@ export default function OnboardingTour() {
   }, [isMobile]);
 
   const finish = async () => {
+    // Fire the server write FIRST so the fetch is in-flight before
+    // setDead/setRun cause React to unmount Joyride's tree. keepalive
+    // on the fetch further guarantees delivery if the page navigates.
+    const serverP = api.completeTutorial().catch(() => {});
+    try {
+      localStorage.setItem('estia-tour-dismissed', '1');
+    } catch { /* ignore */ }
     forceUnmountTour();
     setDead(true);
     setRun(false);
-    // dismissAllTours writes localStorage flags AND posts
-    // /api/me/tutorial/complete so logout/login on any device stays
-    // quiet.
     await dismissAllTours();
+    await serverP;
     refresh?.();
   };
 
