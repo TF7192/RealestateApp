@@ -100,9 +100,7 @@ export default function Transfers() {
         steps={[
           { target: 'body', placement: 'center',
             title: 'העברות נכסים',
-            content: 'כל העברה נכנסת או יוצאת של נכס בין סוכנים במערכת. בעלי הנכסים עוברים איתם אוטומטית.' },
-          { target: 'body', placement: 'center',
-            content: 'העברה מתחילה מעמוד הנכס (כפתור "העבר"). סוכן המקבל מאשר, והנכס עובר לחשבון שלו.' },
+            content: 'העברות נכנסות ויוצאות בין סוכנים. פותחים העברה מעמוד הנכס (כפתור "העבר"), הסוכן המקבל מאשר, והנכס עובר יחד עם בעל הנכס.' },
         ]}
       />
       <div className="page-header animate-in">

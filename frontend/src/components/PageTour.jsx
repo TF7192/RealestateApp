@@ -1,24 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
 import { useAuth } from '../lib/auth';
-import './onboarding.css';
 
 /**
- * PageTour — a tiny per-page walkthrough that runs ONCE per device.
+ * PageTour — ONE short explainer per page, once per device.
  *
- * Usage on a page:
- *   <PageTour pageKey="properties" steps={[
- *     { target: 'body', placement: 'center', content: '…' },
- *     { target: '[data-page-tour="add-fab"]', content: '…' },
- *   ]} />
+ * Gating:
+ *   - Agent role only
+ *   - localStorage `estia-page-tour:<pageKey>` not set
+ *   - Runs independently of the main onboarding (users who skipped the
+ *     intro still get page context)
  *
- * Gating rules:
- *   - Only for authenticated agents
- *   - Only AFTER the main OnboardingTour has completed (so the two
- *     don't fight for the overlay on first login)
- *   - Only once per device per page — tracked in localStorage under
- *     estia-page-tour:<pageKey>. No server field needed: re-install /
- *     re-login on a new device re-runs the page tours, which is fine.
+ * No external CSS — pass everything through Joyride's `styles` prop so
+ * we never fight the SVG overlay mask.
  */
 export default function PageTour({ pageKey, steps, delay = 700 }) {
   const { user } = useAuth();
@@ -26,11 +20,6 @@ export default function PageTour({ pageKey, steps, delay = 700 }) {
 
   useEffect(() => {
     if (!user || user.role !== 'AGENT') return undefined;
-    // No longer gated on hasCompletedTutorial — per-page tours fire
-    // independently, so if someone skipped the main onboarding (or the
-    // main onboarding already finished), they still get the per-page
-    // walkthrough on first visit. Each page still runs only once via
-    // its localStorage marker.
     if (!pageKey || !steps?.length) return undefined;
     const key = `estia-page-tour:${pageKey}`;
     try { if (localStorage.getItem(key)) return undefined; } catch { /* ignore */ }
@@ -44,16 +33,13 @@ export default function PageTour({ pageKey, steps, delay = 700 }) {
     setRun(false);
   };
 
-  const handleCallback = (data) => {
-    const { status, action } = data;
+  const handleCallback = ({ status, action }) => {
     if (
       status === STATUS.FINISHED ||
       status === STATUS.SKIPPED ||
       action === ACTIONS.CLOSE ||
       action === ACTIONS.SKIP
-    ) {
-      markDone();
-    }
+    ) markDone();
   };
 
   if (!run) return null;
@@ -63,49 +49,71 @@ export default function PageTour({ pageKey, steps, delay = 700 }) {
       run={run}
       steps={steps.map((s) => ({ disableBeacon: true, placement: 'auto', ...s }))}
       continuous
-      showProgress
+      showProgress={steps.length > 1}
       showSkipButton
+      hideCloseButton={false}
       scrollToFirstStep={false}
       disableScrolling={false}
       disableOverlayClose
       locale={{
         back: 'הקודם',
         close: 'סגור',
-        last: 'סיימתי',
+        last: 'הבנתי',
         next: 'הבא',
-        skip: 'דלג',
+        skip: 'דלג על הטיפ',
       }}
       callback={handleCallback}
       styles={{
         options: {
-          arrowColor: 'var(--bg-card)',
-          backgroundColor: 'var(--bg-card)',
-          primaryColor: 'var(--gold)',
-          textColor: 'var(--text-primary)',
+          arrowColor: '#ffffff',
+          backgroundColor: '#ffffff',
+          primaryColor: '#c9a96e',
+          textColor: '#1e1a14',
           overlayColor: 'rgba(10, 10, 15, 0.45)',
-          zIndex: 1150,
+          width: 360,
+          zIndex: 10000,
         },
-        tooltip: {
-          borderRadius: 16,
-          padding: '16px 18px',
-          direction: 'rtl',
-          fontFamily: 'var(--font-body)',
+        tooltipContainer: { direction: 'rtl', textAlign: 'right' },
+        tooltipTitle: {
+          fontFamily: 'Frank Ruhl Libre, Heebo, sans-serif',
+          fontWeight: 800,
+          fontSize: 17,
+          marginBottom: 6,
+          color: '#1e1a14',
+        },
+        tooltipContent: {
+          fontFamily: 'Heebo, sans-serif',
+          fontSize: 14,
+          lineHeight: 1.65,
+          color: '#1e1a14',
+          padding: '6px 0 0',
         },
         buttonNext: {
-          backgroundColor: 'var(--gold)',
+          backgroundColor: '#c9a96e',
           color: '#1a1409',
           borderRadius: 999,
           fontWeight: 800,
+          fontFamily: 'Frank Ruhl Libre, Heebo, sans-serif',
           padding: '8px 18px',
-          fontFamily: 'var(--font-display)',
         },
         buttonBack: {
-          color: 'var(--text-secondary)',
-          marginInlineEnd: 8,
+          color: '#6b6458',
+          marginInlineEnd: 6,
+          fontFamily: 'Heebo, sans-serif',
+          fontWeight: 600,
         },
         buttonSkip: {
-          color: 'var(--text-muted)',
+          color: '#6b6458',
+          fontFamily: 'Heebo, sans-serif',
+          fontWeight: 700,
+          fontSize: 13,
+          padding: '6px 12px',
+          border: '1px solid #e4dfd4',
+          borderRadius: 999,
+          background: '#faf7f0',
         },
+        buttonClose: { color: '#8a7a5c' },
+        spotlight: { borderRadius: 14 },
       }}
     />
   );

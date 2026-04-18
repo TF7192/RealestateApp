@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
-import './onboarding.css';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Capacitor } from '@capacitor/core';
@@ -8,11 +7,21 @@ import { Capacitor } from '@capacitor/core';
 /**
  * First-login tour for agents.
  *
- * Uses centered explainer steps (target:'body' + placement:'center')
- * for the initial overview so the tour doesn't depend on any specific
- * element being mounted and never force-navigates the user. When the
- * user dismisses/finishes, per-page tours (<PageTour>) take over on
- * each first visit so the remaining feature walkthrough is contextual.
+ * Keep it dead-simple: one linear tour, Joyride defaults untouched by
+ * external CSS (anything that overrides .react-joyride__overlay or
+ * .react-joyride__spotlight BREAKS the cut-out and blacks out the
+ * whole viewport — the whole tooltip included). All customization
+ * happens via the `styles` prop, which is the officially supported
+ * hook and doesn't fight Joyride's SVG mask.
+ *
+ * Steps anchor on real sidebar links via [data-tour="..."] — when the
+ * selector matches, the referenced button gets the bright cut-out; when
+ * it doesn't (e.g. the chat widget step, or mobile where those
+ * sidebar links aren't mounted), the step falls back to a centered
+ * explainer gracefully.
+ *
+ * Skip button is visible at every step (`showSkipButton: true`) with a
+ * clear color + border so the user can exit on the page they're on.
  */
 export default function OnboardingTour() {
   const { user, refresh } = useAuth();
@@ -31,60 +40,67 @@ export default function OnboardingTour() {
   useEffect(() => {
     if (!shouldRun || startedRef.current) return;
     startedRef.current = true;
-    // Give the page a beat to settle before the tour mounts
     const t = setTimeout(() => setRun(true), 400);
     return () => clearTimeout(t);
   }, [shouldRun]);
 
-  const steps = useMemo(() => {
-    // Helper: try to anchor on the real sidebar / tab-bar item. If that
-    // selector isn't on the current viewport (e.g. Owners has no mobile
-    // tab), fall back to a centered explainer. Joyride handles missing
-    // targets gracefully in continuous mode now that we don't override
-    // spotlight/overlay shadows.
-    const anchored = (selector, title, content, placement = 'auto') => ({
-      target: selector,
-      title,
-      content,
-      placement,
-      disableBeacon: true,
-      spotlightPadding: 6,
-    });
-    const centered = (title, content) => ({
+  const steps = useMemo(() => [
+    {
       target: 'body',
       placement: 'center',
-      title,
-      content,
+      title: 'ברוכים הבאים ל-Estia',
+      content: 'סיור קצר שיראה לכם איפה נמצא כל דבר. אפשר לדלג בכל שלב — הסיור לא יחזור.',
       disableBeacon: true,
-    });
-
-    return [
-      centered('ברוך/ה הבא/ה ל-Estia',
-        'סיור קצר (פחות מדקה) שמראה איפה נמצא כל דבר. אפשר לדלג בכל שלב — הסיור לא יחזור.'),
-      anchored('[data-tour="sidebar-properties"]', 'נכסים',
-        'כל הנכסים שלך במקום אחד — רשימה, עריכה, שיתוף ללקוחות, וכרטיס נכס מלא עם פעולות שיווק.'),
-      anchored('[data-tour="sidebar-owners"]', 'בעלי נכסים',
-        'ספר בעלי הנכסים שלך — המוכרים והמשכירים. כל בעל נכס מקושר לנכסים שלו, עם היסטוריה מלאה.'),
-      anchored('[data-tour="sidebar-customers"]', 'לקוחות',
-        'הלקוחות המתעניינים. התאמות אוטומטיות לנכסים מופיעות על כרטיס הנכס, כדי שתדעו למי לשלוח.'),
-      anchored('[data-tour="sidebar-templates"]', 'תבניות הודעות',
-        'כותבים פעם אחת — השדות המשתנים (מחיר, חדרים, כתובת) מתמלאים אוטומטית בכל שליחה ללקוח.'),
-      anchored('[data-tour="sidebar-transfers"]', 'העברות',
-        'העברת נכס לסוכן אחר במערכת. בעל הנכס והיסטוריית הנכס עוברים איתו.'),
-      centered('צ׳אט עם המפתחים',
-        'כפתור הצ׳אט בפינה התחתונה פותח שיחה ישירה עם צוות המפתחים — באגים, בקשות ושאלות. אנחנו חוזרים מהר.'),
-      centered('',
-        'זהו. בכל עמוד שתכנסו אליו בפעם הראשונה נסביר שם את הפרטים הקטנים. בהצלחה!'),
-    ];
-  }, []);
-
-  const locale = {
-    back: 'הקודם',
-    close: 'סגור',
-    last: 'סיימתי',
-    next: 'הבא',
-    skip: 'דלג',
-  };
+    },
+    {
+      target: '[data-tour="sidebar-properties"]',
+      title: 'נכסים',
+      content: 'כל הנכסים שלכם במקום אחד — רשימה, עריכה, שיתוף ללקוחות, וכרטיס נכס מלא עם פעולות שיווק.',
+      disableBeacon: true,
+      spotlightPadding: 8,
+    },
+    {
+      target: '[data-tour="sidebar-owners"]',
+      title: 'בעלי נכסים',
+      content: 'ספר המוכרים והמשכירים. כל בעל נכס מקושר לנכסים שלו, עם היסטוריית התקשרות מלאה.',
+      disableBeacon: true,
+      spotlightPadding: 8,
+    },
+    {
+      target: '[data-tour="sidebar-customers"]',
+      title: 'לקוחות',
+      content: 'הלקוחות המתעניינים. התאמות אוטומטיות לנכסים מופיעות על כרטיס הנכס.',
+      disableBeacon: true,
+      spotlightPadding: 8,
+    },
+    {
+      target: '[data-tour="sidebar-templates"]',
+      title: 'תבניות הודעות',
+      content: 'כותבים פעם אחת — השדות המשתנים (מחיר, חדרים, כתובת) מתמלאים אוטומטית בכל שליחה ללקוח.',
+      disableBeacon: true,
+      spotlightPadding: 8,
+    },
+    {
+      target: '[data-tour="sidebar-transfers"]',
+      title: 'העברות',
+      content: 'העברת נכס לסוכן אחר במערכת — בעל הנכס והיסטוריה עוברים איתו.',
+      disableBeacon: true,
+      spotlightPadding: 8,
+    },
+    {
+      target: 'body',
+      placement: 'center',
+      title: 'צ׳אט עם המפתחים',
+      content: 'כפתור הצ׳אט בפינה התחתונה פותח שיחה ישירה עם צוות Estia — באגים, בקשות ושאלות.',
+      disableBeacon: true,
+    },
+    {
+      target: 'body',
+      placement: 'center',
+      content: 'זהו. בכל עמוד שתכנסו אליו בפעם הראשונה נסביר שם את הפרטים הקטנים. בהצלחה!',
+      disableBeacon: true,
+    },
+  ], []);
 
   const finish = async () => {
     setRun(false);
@@ -92,16 +108,13 @@ export default function OnboardingTour() {
     refresh?.();
   };
 
-  const handleCallback = (data) => {
-    const { status, action } = data;
+  const handleCallback = ({ status, action }) => {
     if (
       status === STATUS.FINISHED ||
       status === STATUS.SKIPPED ||
       action === ACTIONS.CLOSE ||
       action === ACTIONS.SKIP
-    ) {
-      finish();
-    }
+    ) finish();
   };
 
   if (!shouldRun) return null;
@@ -113,41 +126,69 @@ export default function OnboardingTour() {
       continuous
       showProgress
       showSkipButton
+      hideCloseButton={false}
       scrollToFirstStep={false}
       disableScrolling={false}
       disableOverlayClose
-      locale={locale}
+      locale={{
+        back: 'הקודם',
+        close: 'סגור',
+        last: 'סיימתי',
+        next: 'הבא',
+        skip: 'דלג על הסיור',
+      }}
       callback={handleCallback}
       styles={{
         options: {
-          arrowColor: 'var(--bg-card)',
-          backgroundColor: 'var(--bg-card)',
-          primaryColor: 'var(--gold)',
-          textColor: 'var(--text-primary)',
+          arrowColor: '#ffffff',
+          backgroundColor: '#ffffff',
+          primaryColor: '#c9a96e',
+          textColor: '#1e1a14',
           overlayColor: 'rgba(10, 10, 15, 0.55)',
-          zIndex: 1200,
+          width: 380,
+          zIndex: 10000,
         },
-        tooltip: {
-          borderRadius: 16,
-          padding: '18px 20px',
-          direction: 'rtl',
-          fontFamily: 'var(--font-body)',
+        tooltipContainer: { direction: 'rtl', textAlign: 'right' },
+        tooltipTitle: {
+          fontFamily: 'Frank Ruhl Libre, Heebo, system-ui, sans-serif',
+          fontWeight: 800,
+          fontSize: 18,
+          marginBottom: 6,
+          color: '#1e1a14',
+        },
+        tooltipContent: {
+          fontFamily: 'Heebo, system-ui, sans-serif',
+          fontSize: 14,
+          lineHeight: 1.65,
+          color: '#1e1a14',
+          padding: '6px 0 0',
         },
         buttonNext: {
-          backgroundColor: 'var(--gold)',
+          backgroundColor: '#c9a96e',
           color: '#1a1409',
           borderRadius: 999,
           fontWeight: 800,
+          fontFamily: 'Frank Ruhl Libre, Heebo, sans-serif',
           padding: '8px 18px',
-          fontFamily: 'var(--font-display)',
         },
         buttonBack: {
-          color: 'var(--text-secondary)',
-          marginInlineEnd: 8,
+          color: '#6b6458',
+          marginInlineEnd: 6,
+          fontFamily: 'Heebo, sans-serif',
+          fontWeight: 600,
         },
         buttonSkip: {
-          color: 'var(--text-muted)',
+          color: '#6b6458',
+          fontFamily: 'Heebo, sans-serif',
+          fontWeight: 700,
+          fontSize: 13,
+          padding: '6px 12px',
+          border: '1px solid #e4dfd4',
+          borderRadius: 999,
+          background: '#faf7f0',
         },
+        buttonClose: { color: '#8a7a5c' },
+        spotlight: { borderRadius: 14 },
       }}
     />
   );

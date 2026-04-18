@@ -102,9 +102,7 @@ export default function Owners() {
         steps={[
           { target: 'body', placement: 'center',
             title: 'בעלי הנכסים שלך',
-            content: 'זה ספר המוכרים והמשכירים. כל בעל נכס מקושר לנכסים שלו, עם טלפון, אימייל ומצב התקשרות.' },
-          { target: 'body', placement: 'center',
-            content: 'אפשר להחליק על שורה לגילוי פעולות מהירות: חיוג, וואטסאפ, ופתיחת כרטיס מלא.' },
+            content: 'ספר המוכרים והמשכירים. כל בעל נכס מקושר לנכסים שלו. החליקו על שורה לחיוג, וואטסאפ או פתיחת הכרטיס המלא.' },
         ]}
       />
       <div className="owners-page app-wide-cap">

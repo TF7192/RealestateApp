@@ -455,9 +455,7 @@ export default function Properties() {
       steps={[
         { target: 'body', placement: 'center',
           title: 'הנכסים שלך',
-          content: 'כל הנכסים במקום אחד. גע בכרטיס לכניסה מלאה, או החלק ימינה למספר פעולות מהירות.' },
-        { target: 'body', placement: 'center',
-          content: 'בקצה העמוד (+) תמצאי/תמצא כפתור להוספת נכס חדש. שלב ראשון זה רק 7 שדות — אפשר להשלים יותר מאוחר.' },
+          content: 'כל הנכסים במקום אחד. לחצו על כרטיס כדי לפתוח, החליקו ימינה לפעולות מהירות, או הוסיפו נכס חדש בכפתור ה-+.' },
       ]}
     />
     <div className="properties-page app-wide-cap">

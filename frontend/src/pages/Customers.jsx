@@ -302,9 +302,7 @@ export default function Customers() {
       steps={[
         { target: 'body', placement: 'center',
           title: 'הלקוחות שלך',
-          content: 'כל הלקוחות המתעניינים. העמוד ממוין לפי חום הליד (HOT / WARM / COLD) וסינון מהיר לפי עיר, חדרים ותקציב.' },
-        { target: 'body', placement: 'center',
-          content: 'ברגע שיש התאמה בין לקוח לנכס, היא מופיעה אוטומטית על כרטיס הנכס בעמוד הנכסים.' },
+          content: 'לקוחות מתעניינים לפי חום הליד (חם/פושר/קר). כשיש התאמה בין לקוח לנכס היא מופיעה אוטומטית בכרטיס הנכס.' },
       ]}
     />
     <div className="customers-page">
