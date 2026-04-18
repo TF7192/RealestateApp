@@ -36,63 +36,47 @@ export default function OnboardingTour() {
     return () => clearTimeout(t);
   }, [shouldRun]);
 
-  const steps = useMemo(() => ([
-    {
+  const steps = useMemo(() => {
+    // Helper: try to anchor on the real sidebar / tab-bar item. If that
+    // selector isn't on the current viewport (e.g. Owners has no mobile
+    // tab), fall back to a centered explainer. Joyride handles missing
+    // targets gracefully in continuous mode now that we don't override
+    // spotlight/overlay shadows.
+    const anchored = (selector, title, content, placement = 'auto') => ({
+      target: selector,
+      title,
+      content,
+      placement,
+      disableBeacon: true,
+      spotlightPadding: 6,
+    });
+    const centered = (title, content) => ({
       target: 'body',
       placement: 'center',
-      title: 'ברוך/ה הבא/ה ל-Estia',
-      content: 'סיור קצר (דקה) שיראה לך איפה כל דבר. אפשר לדלג בכל שלב — הסיור לא יחזור.',
+      title,
+      content,
       disableBeacon: true,
-    },
-    {
-      target: 'body',
-      placement: 'center',
-      title: 'נכסים',
-      content: 'כל הנכסים שלך במקום אחד — רשימה, עריכה, שיתוף ללקוחות, וכרטיס נכס מלא עם פעולות שיווק.',
-      disableBeacon: true,
-    },
-    {
-      target: 'body',
-      placement: 'center',
-      title: 'בעלי נכסים',
-      content: 'ספר בעלי הנכסים שלך — המוכרים והמשכירים. כל בעל נכס משויך לנכסים שלו, עם היסטוריה מלאה.',
-      disableBeacon: true,
-    },
-    {
-      target: 'body',
-      placement: 'center',
-      title: 'לקוחות',
-      content: 'הלקוחות המתעניינים. התאמות אוטומטיות לנכסים מופיעות על כרטיס הנכס, כדי שתדע מיד למי לשלוח.',
-      disableBeacon: true,
-    },
-    {
-      target: 'body',
-      placement: 'center',
-      title: 'תבניות הודעות',
-      content: 'כותבים פעם אחת, השדות המתחלפים (מחיר, חדרים, כתובת) מתמלאים אוטומטית בכל שליחה ללקוח.',
-      disableBeacon: true,
-    },
-    {
-      target: 'body',
-      placement: 'center',
-      title: 'העברות',
-      content: 'העברת נכס לסוכן אחר במערכת — בעלי הנכסים נשארים מקושרים. כולל היסטוריית העברות מלאה.',
-      disableBeacon: true,
-    },
-    {
-      target: 'body',
-      placement: 'center',
-      title: 'צ׳אט עם המפתחים',
-      content: 'כפתור הצ׳אט בפינה פותח שיחה ישירה איתנו — באגים, בקשות, שאלות. נחזור אליך מהר.',
-      disableBeacon: true,
-    },
-    {
-      target: 'body',
-      placement: 'center',
-      content: 'זהו. בכל עמוד שתבקרי/תבקר בפעם הראשונה נסביר שם את הפרטים הקטנים. בהצלחה!',
-      disableBeacon: true,
-    },
-  ]), []);
+    });
+
+    return [
+      centered('ברוך/ה הבא/ה ל-Estia',
+        'סיור קצר (פחות מדקה) שמראה איפה נמצא כל דבר. אפשר לדלג בכל שלב — הסיור לא יחזור.'),
+      anchored('[data-tour="sidebar-properties"]', 'נכסים',
+        'כל הנכסים שלך במקום אחד — רשימה, עריכה, שיתוף ללקוחות, וכרטיס נכס מלא עם פעולות שיווק.'),
+      anchored('[data-tour="sidebar-owners"]', 'בעלי נכסים',
+        'ספר בעלי הנכסים שלך — המוכרים והמשכירים. כל בעל נכס מקושר לנכסים שלו, עם היסטוריה מלאה.'),
+      anchored('[data-tour="sidebar-customers"]', 'לקוחות',
+        'הלקוחות המתעניינים. התאמות אוטומטיות לנכסים מופיעות על כרטיס הנכס, כדי שתדעו למי לשלוח.'),
+      anchored('[data-tour="sidebar-templates"]', 'תבניות הודעות',
+        'כותבים פעם אחת — השדות המשתנים (מחיר, חדרים, כתובת) מתמלאים אוטומטית בכל שליחה ללקוח.'),
+      anchored('[data-tour="sidebar-transfers"]', 'העברות',
+        'העברת נכס לסוכן אחר במערכת. בעל הנכס והיסטוריית הנכס עוברים איתו.'),
+      centered('צ׳אט עם המפתחים',
+        'כפתור הצ׳אט בפינה התחתונה פותח שיחה ישירה עם צוות המפתחים — באגים, בקשות ושאלות. אנחנו חוזרים מהר.'),
+      centered('',
+        'זהו. בכל עמוד שתכנסו אליו בפעם הראשונה נסביר שם את הפרטים הקטנים. בהצלחה!'),
+    ];
+  }, []);
 
   const locale = {
     back: 'הקודם',
