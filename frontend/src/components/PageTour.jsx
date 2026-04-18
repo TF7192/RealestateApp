@@ -41,21 +41,31 @@ export default function PageTour({ pageKey, steps, delay = 700 }) {
     return () => clearTimeout(t);
   }, [user, pageKey, steps?.length, delay, isMobile]);
 
-  // Any "I'm done" signal flips the server flag too, so logout/login
-  // stays quiet. Done + Skip both route through here.
+  // Both Done and Skip now write the same SYNCHRONOUS flags before
+  // anything async starts. That matters because Joyride's callback
+  // runs on the click, then the user immediately navigates — if the
+  // server POST hasn't resolved by the time the next page mounts its
+  // PageTour, that page's useEffect checks user.hasCompletedTutorial
+  // (still false in the client state) and fires its own tour.
+  //
+  // With estia-tour-dismissed written synchronously, the next page's
+  // PageTour returns early on its very first render — no flicker, no
+  // tour — regardless of how fast the agent switches pages.
   const endTour = async (reason /* 'done' | 'skip' */) => {
     forceUnmountTour();
     setDead(true);
     setRun(false);
-    try { localStorage.setItem(`estia-page-tour:${pageKey}`, String(Date.now())); }
-    catch { /* ignore */ }
+    try {
+      localStorage.setItem(`estia-page-tour:${pageKey}`, String(Date.now()));
+      // SYNCHRONOUS tour-wide flag — blocks every other PageTour mount
+      // on the next navigation even if the server call hasn't finished.
+      localStorage.setItem('estia-tour-dismissed', '1');
+    } catch { /* ignore */ }
     if (reason === 'skip') {
-      // Skip = 'stop everywhere' — dismiss all page keys too.
+      // Skip ALSO writes all per-page keys so a re-enabled session
+      // doesn't re-trigger pages that were never personally visited.
       await dismissAllTours();
     } else {
-      // Done = persist server flag so the MAIN tour won't re-fire on
-      // another device. Page-tour localStorage markers handle the
-      // per-page silencing locally.
       try { await api.completeTutorial(); } catch { /* ignore */ }
     }
     refresh?.();
