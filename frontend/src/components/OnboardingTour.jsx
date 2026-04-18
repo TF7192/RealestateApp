@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Joyride, STATUS, EVENTS, ACTIONS } from 'react-joyride';
+import { Joyride, STATUS, ACTIONS } from 'react-joyride';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -7,20 +7,19 @@ import { Capacitor } from '@capacitor/core';
 import { useViewportMobile } from '../hooks/mobile';
 
 /**
- * First-login tour for agents.
+ * First-login tour for agents. Uncontrolled stepping: Joyride owns the
+ * current step while it's running; we only handle end-state events
+ * (finished / skipped / close / skip). This avoids the previous bug
+ * where our controlled stepIndex and Joyride's internal advance fought
+ * each other on "הבא" and froze the overlay on a grey screen.
  *
- * Runs only when ALL of these are true:
- *   - user is an AGENT
- *   - user.hasCompletedTutorial === false
- *   - currentPlatform === user.firstLoginPlatform
- *
- * Skip or finish both POST /api/me/tutorial/complete.
- *
- * Defensive against missing targets: on iPhone the sidebar isn't mounted
- * (MobileTabBar is used instead), so a step whose selector doesn't exist
- * would previously leave the overlay stuck on a grey screen. We handle
- * Joyride's error:target_not_found event by auto-advancing, AND we
- * serve a shorter mobile-specific step list.
+ * Robustness against missing targets: every step has a reasonable
+ * fallback placement + target selector that also matches the mobile
+ * tab bar (see MobileTabBar.jsx data-tour anchors), so the tour never
+ * has to rely on an element that isn't mounted on the current
+ * viewport. Steps that can't have a guaranteed anchor (e.g. Owners on
+ * mobile, which lives inside the MoreSheet) are rendered as
+ * centered explainers with target='body'.
  */
 export default function OnboardingTour() {
   const { user, refresh } = useAuth();
@@ -28,7 +27,6 @@ export default function OnboardingTour() {
   const location = useLocation();
   const isMobile = useViewportMobile();
   const [run, setRun] = useState(false);
-  const [stepIndex, setStepIndex] = useState(0);
 
   const platform = Capacitor.getPlatform();
 
@@ -48,9 +46,6 @@ export default function OnboardingTour() {
     return () => clearTimeout(t);
   }, [shouldRun, location.pathname, navigate]);
 
-  // Desktop tour points at sidebar data-tour anchors. Mobile tour uses
-  // the tab bar + centered steps for sections that live in MoreSheet
-  // (Owners, Templates, Transfers are NOT on the tab bar).
   const steps = useMemo(() => {
     const welcome = {
       target: 'body',
@@ -63,25 +58,30 @@ export default function OnboardingTour() {
       target: 'body',
       placement: 'center',
       content: 'זהו. אפשר להתחיל — בהצלחה!',
+      disableBeacon: true,
     };
+
+    // Helper — build a step that falls back to body/center if the
+    // target selector isn't found. Joyride v3 handles this for us as
+    // long as we don't depend on a spotlight anchor.
+    const nav = (selector, content, title) => ({
+      target: selector,
+      content,
+      title,
+      placement: 'auto',
+      disableBeacon: true,
+    });
 
     if (isMobile) {
       return [
         welcome,
-        {
-          target: '[data-tour="sidebar-properties"]',
-          content: 'כאן מרכז כל הנכסים שלך. הוספה, עריכה ושיתוף ללקוחות.',
-          placement: 'top',
-        },
-        {
-          target: '[data-tour="sidebar-customers"]',
-          content: 'הלקוחות המתעניינים — התאמה אוטומטית לנכסים על כרטיס הנכס.',
-          placement: 'top',
-        },
+        nav('[data-tour="sidebar-properties"]', 'כאן מרכז כל הנכסים שלך. הוספה, עריכה ושיתוף ללקוחות.'),
+        nav('[data-tour="sidebar-customers"]', 'הלקוחות המתעניינים — התאמה אוטומטית לנכסים על כרטיס הנכס.'),
         {
           target: 'body',
           placement: 'center',
-          content: 'בתפריט ⋯ תמצאי/מצא גם את בעלי הנכסים, תבניות ההודעות, העברות וצ׳אט עם המפתחים.',
+          content: 'בתפריט ⋯ תמצאו גם את בעלי הנכסים, תבניות ההודעות, העברות וצ׳אט עם המפתחים.',
+          disableBeacon: true,
         },
         wrap,
       ];
@@ -89,16 +89,11 @@ export default function OnboardingTour() {
 
     return [
       welcome,
-      { target: '[data-tour="sidebar-properties"]',
-        content: 'כאן מרכז כל הנכסים שלך. מוסיפים, עורכים, ומשתפים ללקוחות ישירות מהרשימה.' },
-      { target: '[data-tour="sidebar-owners"]',
-        content: 'ספר בעלי הנכסים — כל הפרטים על המוכרים/המשכירים במקום אחד.' },
-      { target: '[data-tour="sidebar-customers"]',
-        content: 'הלקוחות המתעניינים. התאמה אוטומטית לנכסים מופיעה על כרטיס הנכס.' },
-      { target: '[data-tour="sidebar-templates"]',
-        content: 'תבניות הודעות — כותבים פעם אחת, השדות המתחלפים מתמלאים אוטומטית בכל שליחה.' },
-      { target: '[data-tour="sidebar-transfers"]',
-        content: 'העברות נכסים עם סוכנים אחרים במערכת. בעלי נכסים עוברים איתם.' },
+      nav('[data-tour="sidebar-properties"]', 'כאן מרכז כל הנכסים שלך. מוסיפים, עורכים, ומשתפים ללקוחות ישירות מהרשימה.'),
+      nav('[data-tour="sidebar-owners"]',     'ספר בעלי הנכסים — כל הפרטים על המוכרים/המשכירים במקום אחד.'),
+      nav('[data-tour="sidebar-customers"]',  'הלקוחות המתעניינים. התאמה אוטומטית לנכסים מופיעה על כרטיס הנכס.'),
+      nav('[data-tour="sidebar-templates"]',  'תבניות הודעות — כותבים פעם אחת, השדות המתחלפים מתמלאים אוטומטית בכל שליחה.'),
+      nav('[data-tour="sidebar-transfers"]',  'העברות נכסים עם סוכנים אחרים במערכת. בעלי נכסים עוברים איתם.'),
       wrap,
     ];
   }, [isMobile]);
@@ -113,35 +108,19 @@ export default function OnboardingTour() {
 
   const finish = async () => {
     setRun(false);
-    setStepIndex(0);
     try { await api.completeTutorial(); } catch { /* ignore */ }
     refresh?.();
   };
 
   const handleCallback = (data) => {
-    const { status, type, action, index } = data;
-
-    // End cases — skip / finish / close button
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED ||
-        action === ACTIONS.CLOSE  || action === ACTIONS.SKIP) {
+    const { status, action } = data;
+    if (
+      status === STATUS.FINISHED ||
+      status === STATUS.SKIPPED ||
+      action === ACTIONS.CLOSE ||
+      action === ACTIONS.SKIP
+    ) {
       finish();
-      return;
-    }
-
-    // Target missing for this step — auto-advance so the overlay never
-    // gets stuck on a grey screen (root cause of the earlier bug).
-    if (type === EVENTS.TARGET_NOT_FOUND) {
-      const next = (action === ACTIONS.PREV ? index - 1 : index + 1);
-      if (next >= steps.length) { finish(); return; }
-      setStepIndex(Math.max(0, next));
-      return;
-    }
-
-    // Normal step advance: Joyride fires step:after when a step unmounts
-    if (type === EVENTS.STEP_AFTER) {
-      const next = (action === ACTIONS.PREV ? index - 1 : index + 1);
-      if (next >= steps.length) { finish(); return; }
-      setStepIndex(Math.max(0, next));
     }
   };
 
@@ -151,14 +130,16 @@ export default function OnboardingTour() {
     <Joyride
       run={run}
       steps={steps}
-      stepIndex={stepIndex}
+      /* Uncontrolled — do NOT pass stepIndex. Joyride manages Next/Back
+         internally in continuous mode. Passing stepIndex while also
+         reacting to STEP_AFTER was causing the controlled/uncontrolled
+         clash that froze the overlay on "הבא". */
       continuous
       showProgress
       showSkipButton
       scrollToFirstStep={false}
       disableScrolling={false}
       disableOverlayClose
-      // `hideBackButton={false}` default is fine
       locale={locale}
       callback={handleCallback}
       styles={{
