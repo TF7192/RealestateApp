@@ -37,6 +37,12 @@ const propertyInput = z.object({
   city: z.string().min(1).max(80),
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
+  // Task 3 · validated structured-address metadata. Supplied by the client
+  // when the agent picks from the AddressField typeahead; optional so
+  // existing flows without the picker (legacy rows, admin tools) still
+  // write.
+  placeId: z.string().max(120).nullable().optional(),
+  formattedAddress: z.string().max(400).nullable().optional(),
   owner: z.string().min(1).max(120),
   ownerPhone: z.string().min(3).max(40),
   ownerEmail: z.string().email().nullable().optional(),

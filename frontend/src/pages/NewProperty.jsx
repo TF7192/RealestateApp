@@ -20,6 +20,7 @@ import { useToast } from '../lib/toast';
 import { cityNames, streetNames } from '../data/mockData';
 import StickyActionBar from '../components/StickyActionBar';
 import OwnerPicker from '../components/OwnerPicker';
+import AddressField from '../components/AddressField';
 import { RoomsChips, DateQuickChips, SuggestPicker } from '../components/MobilePickers';
 import { useDraftAutosave, readDraft } from '../hooks/mobile';
 import { relLabel } from '../lib/relativeDate';
@@ -42,6 +43,13 @@ const INITIAL_FORM = {
   category: 'SALE',
   street: '',
   city: '',
+  // Task 3 · validated structured address — populated by AddressField when
+  // the agent picks from the Photon autocomplete. Nullable throughout so
+  // we don't break legacy draft restores that predate this schema.
+  placeId: null,
+  formattedAddress: null,
+  lat: null,
+  lng: null,
   owner: '',
   ownerPhone: '',
   ownerEmail: '',
@@ -182,6 +190,14 @@ export default function NewProperty() {
           category: p.category || 'SALE',
           street: p.street || '',
           city: p.city || '',
+          // Task 3 · hydrate structured-address fields from the server so
+          // edit-mode doesn't lose what was previously validated and the
+          // hasValidatedAddress guard on save passes without forcing the
+          // agent to re-pick.
+          placeId: p.placeId || null,
+          formattedAddress: p.formattedAddress || null,
+          lat: p.lat ?? null,
+          lng: p.lng ?? null,
           owner: p.owner || '',
           ownerPhone: p.ownerPhone || '',
           ownerEmail: p.ownerEmail || '',
@@ -313,8 +329,20 @@ export default function NewProperty() {
         toast.error('לא נמצאה כתובת בנקודה זו — מלא ידנית');
         return;
       }
-      if (city)   update('city', city);
-      if (street) update('street', street);
+      // Task 3 · "use current location" is itself a validation path — the
+      // reverse-geocode confirms a real street + coordinates. Stamp lat/lng
+      // onto the form alongside street/city so hasValidatedAddress passes
+      // without making the agent re-pick from the typeahead.
+      setForm((p) => ({
+        ...p,
+        city: city || p.city,
+        street: street || p.street,
+        lat: latitude,
+        lng: longitude,
+        // placeId stays null — reverse-geocode doesn't return an OSM id.
+        // lat/lng alone satisfy hasValidatedAddress.
+        formattedAddress: geo?.fullAddress || p.formattedAddress || null,
+      }));
       toast.success(`המיקום הוזן: ${[street, city].filter(Boolean).join(', ')}`);
     } catch (e) {
       toast.error('איתור המיקום נכשל');
@@ -351,6 +379,12 @@ export default function NewProperty() {
       type: form.type,
       street: form.street,
       city: form.city,
+      // Task 3 · structured address components — null for legacy / non-
+      // picker flows is fine, the backend schema treats them as optional.
+      placeId: form.placeId || null,
+      formattedAddress: form.formattedAddress || null,
+      lat: form.lat ?? null,
+      lng: form.lng ?? null,
       marketingPrice: Number(form.marketingPrice) || 0,
       sqm: Number(form.sqm) || 0,
     };
@@ -426,6 +460,17 @@ export default function NewProperty() {
     setError(null);
     try {
       if (!form.street || !form.city) throw new Error('חסר רחוב ועיר');
+      // Task 3 · the street must come from the AddressField autocomplete.
+      // `placeId` is stamped only when the agent picks from the list (or the
+      // property was already saved with one — edit mode fall-through below).
+      // Legacy properties without a placeId can re-save because we fall back
+      // to their existing lat/lng when present.
+      const hasValidatedAddress = !!form.placeId
+        || (form.lat != null && form.lng != null)
+        || (isEdit && existingMeta?.lat != null);
+      if (!hasValidatedAddress) {
+        throw new Error('בחר רחוב מהרשימה המוצעת כדי לאמת את הכתובת');
+      }
       const hasOwnerLink = !!form.propertyOwnerId;
       if (!hasOwnerLink && (!form.owner || !form.ownerPhone)) {
         throw new Error('חסרים פרטי בעל הנכס');
@@ -692,13 +737,39 @@ export default function NewProperty() {
             <div className="form-row form-row-3">
               <div className="form-group">
                 <label className="form-label">רחוב ומספר</label>
-                <SuggestPicker
-                  options={streetNames}
+                {/* Task 3 · Photon-backed autocomplete; only a picked
+                    suggestion stamps lat/lng/placeId/formattedAddress onto
+                    the form. Raw typing leaves placeId=null — form save
+                    blocks with a Hebrew validation message below. */}
+                <AddressField
                   value={form.street}
-                  onChange={(v) => update('street', v)}
+                  onChange={(v) => {
+                    setForm((p) => ({
+                      ...p,
+                      street: v,
+                      // Typing invalidates the previous pick. Lat/lng are
+                      // also cleared so the map / directions don't point to
+                      // the old address.
+                      placeId: null,
+                      formattedAddress: null,
+                      lat: null,
+                      lng: null,
+                    }));
+                  }}
+                  onPick={(r) => {
+                    setForm((p) => ({
+                      ...p,
+                      street: r.street || p.street,
+                      city: r.city || p.city,
+                      placeId: r.placeId,
+                      formattedAddress: r.formattedAddress,
+                      lat: r.lat,
+                      lng: r.lng,
+                    }));
+                  }}
+                  city={form.city}
                   placeholder="לדוגמה: הרצל 15"
-                  label="רחוב"
-                  inputProps={{ ...inputPropsForAddress(), required: true }}
+                  aria-label="רחוב ומספר"
                 />
               </div>
               <div className="form-group">

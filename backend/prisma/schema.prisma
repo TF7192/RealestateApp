@@ -195,6 +195,12 @@ model Property {
   city                       String
   lat                        Float?
   lng                        Float?
+  // Task 3 — validated structured address. `placeId` is the Photon / OSM id
+  // (e.g. "W123", "R456"); `formattedAddress` is the full Hebrew line from
+  // the Places provider. Nullable so legacy rows keep rendering from the
+  // free-text `street` + `city` until they're re-validated.
+  placeId                    String?
+  formattedAddress           String?
   // ── Property owner (the seller / landlord) ─────────────────────────────
   // `propertyOwnerId` references the new Owner table — the canonical record.
   // The legacy inline `owner` / `ownerPhone` / `ownerEmail` columns remain

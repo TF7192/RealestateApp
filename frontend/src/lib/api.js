@@ -208,6 +208,14 @@ export const api = {
   // server-side User-Agent header is set + rate-limit is shared).
   reverseGeocode: (lat, lon) =>
     request(`/geo/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`),
+  // Task 3 · forward-geocode autocomplete for AddressField. `city` is an
+  // optional bias hint — when the agent already picked a city the server
+  // appends it to the query so Photon ranks local matches first.
+  geoSearch: ({ q, city, limit = 8 } = {}) => {
+    const params = new URLSearchParams({ q, limit: String(limit), lang: 'he' });
+    if (city) params.set('city', city);
+    return request(`/geo/search?${params.toString()}`);
+  },
 
   // SEO public routes
   publicAgent: (agentSlug) => request(`/public/agents/${encodeURIComponent(agentSlug)}`),
