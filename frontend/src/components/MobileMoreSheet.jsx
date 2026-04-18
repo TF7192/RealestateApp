@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, UserCircle, Sun, Moon, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText } from 'lucide-react';
+import { User, UserCircle, Sun, Moon, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield } from 'lucide-react';
+
+const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import haptics from '../lib/haptics';
@@ -118,6 +120,16 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
                 {copied ? <Check size={16} color="var(--success)" /> : <span className="mms-arrow">›</span>}
               </span>
             </button>
+            {ADMIN_EMAILS.has((user?.email || '').toLowerCase()) && (
+              <button className="mms-row" onClick={() => go('/admin/chats')}>
+                <span className="mms-row-icon"><Shield size={18} /></span>
+                <span className="mms-row-text">
+                  <strong>מרכז שיחות</strong>
+                  <small>פאנל אדמין — כל שיחות המשתמשים</small>
+                </span>
+                <span className="mms-arrow">›</span>
+              </button>
+            )}
           </section>
 
           <section className="mms-section">

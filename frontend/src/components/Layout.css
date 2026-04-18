@@ -704,3 +704,14 @@ img.agent-avatar {
 .mobile-header.mh-hidden {
   transform: translateY(-100%);
 }
+
+/* Admin-only link — subtle gold underscore so it reads as "special access" */
+.nav-item-admin {
+  color: var(--gold) !important;
+  border: 1px dashed var(--gold-border);
+}
+.nav-item-admin.active,
+.nav-item-admin:hover {
+  background: var(--gold-glow) !important;
+  border-style: solid;
+}

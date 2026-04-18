@@ -18,12 +18,17 @@ import {
   ArrowRight,
   ArrowLeftRight,
   FileText,
+  Shield,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import MobileTabBar from './MobileTabBar';
 import MobileMoreSheet from './MobileMoreSheet';
+
+// Mirrors backend ADMIN_EMAILS default — anyone in this list sees the
+// admin chat link in the sidebar and the admin page loads for them.
+const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
 import haptics from '../lib/haptics';
 import './Layout.css';
 
@@ -273,6 +278,19 @@ export default function Layout({ onLogout }) {
               {copiedShare ? <Check size={18} /> : <Share2 size={18} />}
               <span>{copiedShare ? 'הקישור הועתק' : 'שיתוף הקטלוג שלי'}</span>
             </button>
+            {ADMIN_EMAILS.has((user?.email || '').toLowerCase()) && (
+              <NavLink
+                to="/admin/chats"
+                className={({ isActive }) =>
+                  `nav-item nav-action nav-item-admin ${isActive ? 'active' : ''}`
+                }
+                onClick={() => setSidebarOpen(false)}
+                title="מרכז שיחות אדמין"
+              >
+                <Shield size={18} />
+                <span>מרכז שיחות</span>
+              </NavLink>
+            )}
           </div>
         </nav>
 
