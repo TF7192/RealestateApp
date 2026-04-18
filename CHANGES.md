@@ -90,7 +90,20 @@ All items trace back to the Ship list in `SHIP_LIST.md`. iPhone-first.
 
 ---
 
-## Day 3 — emotional wins + flow
+## Day 3 — emotional wins + flow + Lighthouse
+
+### HOTFIX · Lighthouse-flagged load perf issues
+- **Source:** user Lighthouse run (2026-04-18) — render-blocking fonts ~290ms, LCP image lazy-loaded, PostHog dominating 3.3s critical path, missing meta description, invalid robots.txt
+- **Files:** `frontend/index.html`, `frontend/src/main.jsx`, `frontend/src/pages/Properties.jsx`, `frontend/public/robots.txt` (new)
+- **Change:**
+  - `index.html`: Google Fonts CSS switched to preload+swap (`rel="preload" as="style" onload="this.rel='stylesheet'"` + `<noscript>` fallback) so it fetches in parallel without blocking first paint. Lighthouse est. savings ≈290 ms.
+  - `index.html`: added `<meta name="description">` in Hebrew for SEO.
+  - `main.jsx`: `initAnalytics()` now fires inside `requestIdleCallback` (2s timeout fallback) instead of at bootstrap. PostHog was sitting in the critical path for 3.3s per Lighthouse; deferring to idle lets the first paint + /me + dashboard fetches win bandwidth. Session replay still starts automatically once init runs.
+  - `Properties.jsx`: first card's image (LCP candidate) gets `loading="eager"` + `fetchpriority="high"` + `decoding="async"`. Rest stay lazy as before.
+  - `public/robots.txt` (new): allow only the public customer-facing catalog paths (`/agents/*`, `/a/*`, `/p/*`), disallow authenticated surfaces (`/customers`, `/deals`, `/owners`, etc).
+- **Expected deltas (next Lighthouse run):** FCP/LCP improvement from fonts (~290ms) + PostHog defer (up to 3.3s main-thread relief), SEO fix from meta description + robots, LCP image discovery with fetchpriority.
+
+
 
 ### S11 · Stale-lead pill on customer cards
 - **Source:** SHIP_LIST S11 + empathy log ("I've gone quiet on leads and don't notice until the week is over")

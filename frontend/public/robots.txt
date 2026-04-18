@@ -1,0 +1,19 @@
+# Estia — real-estate CRM + customer-facing catalog pages.
+# Authenticated agent routes live under non-crawlable paths behind auth;
+# the public catalog pages (/agents/<slug>, /agents/<slug>/<property>) are
+# the only surfaces we want indexed.
+User-agent: *
+Allow: /agents/
+Allow: /a/
+Allow: /p/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /customers
+Disallow: /deals
+Disallow: /owners
+Disallow: /properties/new
+Disallow: /transfers
+Disallow: /profile
+Disallow: /templates
+
+Sitemap: https://estia.tripzio.xyz/sitemap.xml

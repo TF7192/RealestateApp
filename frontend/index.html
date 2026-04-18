@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
+    <!-- SEO / Lighthouse: document meta description -->
+    <meta
+      name="description"
+      content="Estia — CRM לניהול נכסים, לקוחות, ולידים לסוכני נדל״ן בישראל. ניהול יומיומי בעברית, בלחיצה אחת, מהטלפון."
+    />
+
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#f7f3ec" />
@@ -15,10 +21,25 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
 
-    <!-- Fonts — single family across the entire app -->
+    <!-- Fonts — single family across the entire app.
+         Lighthouse flagged the stylesheet link as render-blocking (~290ms
+         savings). Use the preload+swap pattern so the CSS fetches in
+         parallel with HTML parsing but doesn't block the first paint.
+         Browsers without JS fall back to the inline <noscript> stylesheet. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    >
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap"
+      >
+    </noscript>
 
     <title>Estia — ניהול נכסים ולידים</title>
   </head>

@@ -690,6 +690,10 @@ export default function Properties() {
       ) : (
         <div className="properties-grid">
           {filtered.map((prop, i) => {
+            // S-perf: the first card's image is the LCP on /properties.
+            // Lighthouse flagged it as lazy + no fetchpriority; eager-load
+            // the first one and let the rest stay lazy as before.
+            const isLcpCandidate = i === 0;
             const actions = prop.marketingActions || {};
             const done = Object.values(actions).filter(Boolean).length;
             const total = Object.values(actions).length || 22;
@@ -734,7 +738,13 @@ export default function Properties() {
                       <Link to={`/properties/${prop.id}`} className="pc-compact-link">
                         <div className="pc-compact-thumb">
                           {thumb ? (
-                            <img src={thumb} alt={prop.street} loading="lazy" />
+                            <img
+                              src={thumb}
+                              alt={prop.street}
+                              loading={isLcpCandidate ? 'eager' : 'lazy'}
+                              fetchpriority={isLcpCandidate ? 'high' : undefined}
+                              decoding="async"
+                            />
                           ) : (
                             <Building2 size={26} />
                           )}
@@ -840,7 +850,13 @@ export default function Properties() {
               <div key={prop.id} className={`property-card animate-in ${delayClass}`}>
                 <Link to={`/properties/${prop.id}`} className="property-card-link">
                   <div className="property-image">
-                    <img src={prop.images?.[0] || 'https://via.placeholder.com/800x450'} alt={prop.street} loading="lazy" />
+                    <img
+                      src={prop.images?.[0] || 'https://via.placeholder.com/800x450'}
+                      alt={prop.street}
+                      loading={isLcpCandidate ? 'eager' : 'lazy'}
+                      fetchpriority={isLcpCandidate ? 'high' : undefined}
+                      decoding="async"
+                    />
                     <div className="property-badges">
                       <span className={`badge ${prop.assetClass === 'COMMERCIAL' ? 'badge-warning' : 'badge-success'}`}>
                         {prop.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}

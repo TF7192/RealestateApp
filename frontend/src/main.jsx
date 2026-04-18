@@ -31,8 +31,23 @@ if (typeof window !== 'undefined') {
   } catch { /* storage disabled — no-op */ }
 }
 
-// PostHog bootstrap — no-op when VITE_POSTHOG_KEY is unset (dev)
-initAnalytics();
+// PostHog bootstrap — no-op when VITE_POSTHOG_KEY is unset (dev).
+//
+// Lighthouse (2026-04-18) flagged PostHog's /e endpoint sitting in the
+// critical render path for 3.3s, dominating LCP. Deferring init to
+// requestIdleCallback (with a 2s fallback) lets the first paint and the
+// initial /me + /dashboard calls win the network without fighting
+// PostHog's analytics payload for bandwidth. Session replay still starts
+// automatically once init runs — we just don't kick it off before the
+// first meaningful paint.
+if (typeof window !== 'undefined') {
+  const boot = () => { try { initAnalytics(); } catch { /* never crash */ } };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(boot, { timeout: 2000 });
+  } else {
+    setTimeout(boot, 1500);
+  }
+}
 
 // iOS keyboard handling + zoom guards.
 //
