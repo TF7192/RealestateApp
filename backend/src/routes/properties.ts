@@ -487,6 +487,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Upload a property image
+  // S5: iPhones shoot HEIC by default. Browsers (Chrome, Firefox,
+  // Android WhatsApp previews) don't render HEIC, so an agent uploading
+  // straight from camera-roll ships photos their customers can't see.
+  // Detect HEIC/HEIF and transcode to JPEG before writing to S3. The
+  // rest of the pipeline never sees the HEIC.
   app.post('/:id/images', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const property = await prisma.property.findUnique({ where: { id } });
@@ -495,10 +500,49 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     }
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: { message: 'No file' } });
-    const ext = path.extname(file.filename) || '.bin';
+    if (!file.mimetype.startsWith('image/')) {
+      return reply.code(400).send({ error: { message: 'Only image files are accepted' } });
+    }
+
+    let buffer = await file.toBuffer();
+    let mimetype = file.mimetype;
+    let ext = path.extname(file.filename) || '.jpg';
+
+    const isHeic =
+      mimetype === 'image/heic' ||
+      mimetype === 'image/heif' ||
+      /\.(heic|heif)$/i.test(file.filename || '');
+
+    if (isHeic) {
+      try {
+        // heic-convert handles the container; sharp then normalizes the
+        // decoded buffer (orientation, reasonable size) and re-encodes
+        // as quality-82 JPEG (visually lossless for property photos).
+        const heicConvert = (await import('heic-convert')).default;
+        const sharp = (await import('sharp')).default;
+        const jpegIntermediate = await heicConvert({
+          buffer,
+          format: 'JPEG',
+          quality: 0.9,
+        });
+        buffer = await sharp(Buffer.from(jpegIntermediate))
+          .rotate() // honor EXIF orientation
+          .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 82, mozjpeg: true })
+          .toBuffer();
+        mimetype = 'image/jpeg';
+        ext = '.jpg';
+      } catch (e) {
+        req.log.warn({ err: e }, 'heic conversion failed, aborting upload');
+        return reply.code(415).send({
+          error: { message: 'לא הצלחנו לעבד את התמונה. נסו לשלוח JPEG או PNG.' },
+        });
+      }
+    }
+
     const name = `${crypto.randomUUID()}${ext}`;
     const key = `properties/${id}/${name}`;
-    const url = await putUpload(key, await file.toBuffer(), file.mimetype);
+    const url = await putUpload(key, buffer, mimetype);
     const image = await prisma.propertyImage.create({
       data: { propertyId: id, url, sortOrder: 9999 },
     });
