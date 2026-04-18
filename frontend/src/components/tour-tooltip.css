@@ -1,0 +1,123 @@
+/* Custom tour tooltip — Joyride's tooltipComponent injects this.
+ *
+ * Careful: we ONLY style the tooltip DOM (which we own). We do NOT
+ * touch .react-joyride__overlay or .react-joyride__spotlight — those
+ * are the SVG mask that creates the cut-out, and overriding them
+ * blacks out the whole viewport.
+ */
+
+.tour-tooltip {
+  position: relative;
+  direction: rtl;
+  text-align: right;
+  background: #ffffff;
+  color: #1e1a14;
+  border: 1px solid rgba(201, 169, 110, 0.25);
+  border-radius: 16px;
+  padding: 52px 22px 18px;  /* top room for the skip pill */
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 24px 60px rgba(30, 26, 20, 0.22);
+  font-family: 'Heebo', system-ui, sans-serif;
+}
+
+.tour-skip-btn {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #faf7f0;
+  border: 1px solid #e4dfd4;
+  color: #6b6458;
+  font-family: 'Heebo', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+  z-index: 2;
+}
+.tour-skip-btn:hover {
+  color: #1e1a14;
+  border-color: #c9a96e;
+  background: #fff8e8;
+}
+.tour-skip-btn:active { transform: scale(0.97); }
+
+.tour-tooltip-title {
+  font-family: 'Frank Ruhl Libre', 'Heebo', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.25;
+  color: #1e1a14;
+  margin: 0 0 6px;
+}
+
+.tour-tooltip-content {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #1e1a14;
+  padding: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+.tour-tooltip-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.tour-progress {
+  font-size: 12px;
+  color: #8a7a5c;
+  font-family: 'Heebo', sans-serif;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tour-tooltip-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.tour-btn {
+  border: none;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-family: 'Frank Ruhl Libre', 'Heebo', sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: filter 0.12s ease, transform 0.1s ease;
+}
+.tour-btn:active { transform: scale(0.97); }
+
+.tour-btn-primary {
+  background: #c9a96e;
+  color: #1a1409;
+}
+.tour-btn-primary:hover { filter: brightness(1.05); }
+
+.tour-btn-ghost {
+  background: transparent;
+  color: #6b6458;
+  padding: 9px 12px;
+}
+.tour-btn-ghost:hover { color: #1e1a14; }
+
+@media (max-width: 480px) {
+  .tour-tooltip {
+    padding: 52px 16px 16px;
+    width: auto;
+  }
+  .tour-skip-btn {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+  .tour-tooltip-actions { flex: 1; justify-content: flex-end; }
+}

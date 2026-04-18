@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
+import { X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { Capacitor } from '@capacitor/core';
 import { useViewportMobile } from '../hooks/mobile';
+import './tour-tooltip.css';
 
 /**
  * First-login tour for agents.
  *
- * - No external CSS — everything via Joyride's `styles` prop so we
- *   don't fight react-joyride@3's SVG overlay mask.
- * - Close (×) / Skip both mark EVERY tour as done (main + all page
- *   tours) so tours never pop back up unless the user explicitly
- *   replays via the sidebar `?` button.
- * - Mobile uses MobileTabBar data-tour anchors; desktop uses sidebar
- *   anchors. Steps whose target is missing on the current viewport
- *   are skipped, so the tour never stalls on a missing element.
+ * Key behaviors after user feedback:
+ *   - Prominent "דלג על כל הסיורים לתמיד" button in every tooltip's
+ *     top-right corner — one tap silences the tour + every per-page
+ *     tour forever (server flag flipped, local flag set).
+ *   - Closing (via skip button, the × in the corner, or the skipTour
+ *     keyword) IMMEDIATELY unmounts Joyride so the spotlight element
+ *     doesn't linger as a shrinking dark circle during Joyride's
+ *     exit animation. We return null from the component the moment
+ *     the user asks to close — Joyride's DOM goes away on the same tick.
  */
 
 const PAGE_TOUR_KEYS = [
@@ -23,9 +25,6 @@ const PAGE_TOUR_KEYS = [
   'transfers', 'new-property', 'property-detail',
 ];
 
-// Public helper — dismiss every tour everywhere. Called from Skip/Close
-// in either the main tour OR a page tour. Also exposed on window so
-// external code (e.g. the sidebar ? button's logic) can reset it.
 export function dismissAllTours() {
   try {
     PAGE_TOUR_KEYS.forEach((k) => {
@@ -39,24 +38,15 @@ export default function OnboardingTour() {
   const { user, refresh } = useAuth();
   const isMobile = useViewportMobile();
   const [run, setRun] = useState(false);
+  const [dead, setDead] = useState(false); // set when user dismisses — unmounts Joyride on the same tick
   const startedRef = useRef(false);
-
-  const platform = Capacitor.getPlatform();
 
   const shouldRun = useMemo(() => {
     if (!user || user.role !== 'AGENT') return false;
     if (user.hasCompletedTutorial) return false;
-    // Respect the dismiss-all flag set by a previous Skip/Close.
     try { if (localStorage.getItem('estia-tour-dismissed')) return false; } catch { /* ignore */ }
-    // NOTE: we used to gate the tour on `firstLoginPlatform === platform`
-    // so it wouldn't re-fire on a device switch. That caused the tour
-    // to silently skip on the iPhone app whenever the user had signed
-    // up on the web first. The tour is cheap and user-dismissable, so
-    // just run it wherever the flag is still false — Skip/Close flips
-    // it server-side for every surface.
     return true;
   }, [user]);
-  void platform; // platform no longer gates the tour; kept for future use
 
   useEffect(() => {
     if (!shouldRun || startedRef.current) return;
@@ -77,9 +67,6 @@ export default function OnboardingTour() {
     });
 
     if (isMobile) {
-      // Mobile: anchor on the tab bar (Properties + Customers are there)
-      // and use centered steps for the sections that live in the More
-      // sheet (Owners, Templates, Transfers).
       return [
         centered('ברוכים הבאים ל-Estia',
           'סיור קצר שיראה לכם איפה נמצא כל דבר. אפשר לדלג בכל שלב — הסיור לא יחזור.'),
@@ -115,6 +102,10 @@ export default function OnboardingTour() {
   }, [isMobile]);
 
   const finish = async () => {
+    // Kill Joyride's DOM on the same tick so there's no lingering
+    // spotlight shrink animation (the "black circle" the user was
+    // seeing after pressing ×).
+    setDead(true);
     setRun(false);
     dismissAllTours();
     try { await api.completeTutorial(); } catch { /* ignore */ }
@@ -130,8 +121,11 @@ export default function OnboardingTour() {
     ) finish();
   };
 
-  if (!shouldRun) return null;
+  if (!shouldRun || dead) return null;
 
+  // TourTooltip renders Joyride's tooltip ourselves so we can put the
+  // prominent skip pill in the top-right corner (and drop the built-in
+  // × button that used to leave the shrinking spotlight behind).
   return (
     <Joyride
       run={run}
@@ -139,16 +133,16 @@ export default function OnboardingTour() {
       continuous
       showProgress
       showSkipButton
-      hideCloseButton={false}
+      hideCloseButton
       scrollToFirstStep={false}
       disableScrolling={false}
       disableOverlayClose
+      tooltipComponent={TourTooltip}
       locale={{
         back: 'הקודם',
-        close: 'סגור',
         last: 'סיימתי',
         next: 'הבא',
-        skip: 'דלג על הסיור',
+        skip: 'דלג על כל הסיורים לתמיד',
       }}
       callback={handleCallback}
       styles={tourStyles}
@@ -157,99 +151,79 @@ export default function OnboardingTour() {
   );
 }
 
+// ─── Custom tooltip ────────────────────────────────────────────────
+// react-joyride lets us pass a React component as the tooltip. Using
+// it instead of the default tooltip gives us:
+//   1. A prominent, always-visible "skip everything" pill in the top-
+//      right corner, no matter which step you're on.
+//   2. No hover-ghosted default × that lingered behind the tooltip.
+//   3. Hebrew-first layout with proper RTL gaps and padding.
+// eslint-disable-next-line react/prop-types
+export function TourTooltip({
+  // passed by Joyride at render time
+  continuous,
+  index,
+  step,
+  backProps,
+  primaryProps,
+  skipProps,
+  tooltipProps,
+  size,
+  isLastStep,
+}) {
+  return (
+    <div {...tooltipProps} className="tour-tooltip">
+      <button
+        type="button"
+        {...skipProps}
+        className="tour-skip-btn"
+        aria-label="דלג על כל הסיורים לתמיד"
+        title="דלג על כל הסיורים לתמיד"
+      >
+        <X size={14} /> דלג על כל הסיורים
+      </button>
+      {step.title && <div className="tour-tooltip-title">{step.title}</div>}
+      <div className="tour-tooltip-content">{step.content}</div>
+      <div className="tour-tooltip-footer">
+        <div className="tour-progress">
+          {size > 1 ? `${index + 1}/${size}` : ''}
+        </div>
+        <div className="tour-tooltip-actions">
+          {index > 0 && (
+            <button type="button" {...backProps} className="tour-btn tour-btn-ghost">
+              הקודם
+            </button>
+          )}
+          {continuous && (
+            <button type="button" {...primaryProps} className="tour-btn tour-btn-primary">
+              {isLastStep ? 'סיימתי' : 'הבא'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── shared tour styling ──────────────────────────────────────────
-// Pushed into Joyride's `styles` prop (safe surface — doesn't clash
-// with the SVG overlay mask). Extracted so PageTour reuses the exact
-// same look.
 export const tourStyles = {
   options: {
-    arrowColor: '#ffffff',
-    backgroundColor: '#ffffff',
     primaryColor: '#c9a96e',
     textColor: '#1e1a14',
     overlayColor: 'rgba(10, 10, 15, 0.55)',
     width: 380,
     zIndex: 10000,
   },
-  tooltip: {
-    // Key fix: the × lives top-end (visual left in RTL); give the
-    // whole tooltip breathing room so the title / progress dots don't
-    // drift under it.
-    padding: '22px 22px 18px',
-    borderRadius: 16,
-    boxShadow: '0 24px 60px rgba(30, 26, 20, 0.22), 0 0 0 1px rgba(201, 169, 110, 0.12) inset',
-  },
-  tooltipContainer: {
-    direction: 'rtl',
-    textAlign: 'right',
-  },
-  tooltipTitle: {
-    fontFamily: 'Frank Ruhl Libre, Heebo, system-ui, sans-serif',
-    fontWeight: 800,
-    fontSize: 18,
-    lineHeight: 1.25,
-    color: '#1e1a14',
-    // Leave generous room on BOTH sides so the absolutely-positioned ×
-    // never collides with the title glyphs, regardless of how Joyride
-    // flips in RTL. 42px on each side = 34px button + 8px gap.
-    paddingInlineEnd: 42,
-    paddingInlineStart: 42,
-    margin: 0,
-    textAlign: 'right',
-  },
-  tooltipContent: {
-    fontFamily: 'Heebo, system-ui, sans-serif',
-    fontSize: 14,
-    lineHeight: 1.65,
-    color: '#1e1a14',
-    padding: '10px 0 0',
-  },
-  tooltipFooter: {
-    marginTop: 18,
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 8,
-    alignItems: 'center',
-  },
-  buttonNext: {
-    backgroundColor: '#c9a96e',
-    color: '#1a1409',
-    borderRadius: 999,
-    fontWeight: 800,
-    fontFamily: 'Frank Ruhl Libre, Heebo, sans-serif',
-    padding: '9px 20px',
-    outline: 'none',
-  },
-  buttonBack: {
-    color: '#6b6458',
-    fontFamily: 'Heebo, sans-serif',
-    fontWeight: 600,
-    marginInlineEnd: 4,
-  },
-  buttonSkip: {
-    color: '#6b6458',
-    fontFamily: 'Heebo, sans-serif',
-    fontWeight: 700,
-    fontSize: 13,
-    padding: '7px 14px',
-    border: '1px solid #e4dfd4',
-    borderRadius: 999,
-    background: '#faf7f0',
-  },
-  buttonClose: {
-    color: '#8a7a5c',
-    width: 22,
-    height: 22,
-    padding: 0,
-    // Move the × a bit further from the corner so it stops visually
-    // colliding with the title glyphs in RTL.
-    top: 14,
-    right: 14,
-    left: 'auto',
-  },
   spotlight: { borderRadius: 14 },
 };
 
 export const floaterProps = {
-  styles: { floater: { transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease-out' } },
+  styles: {
+    floater: {
+      transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease-out',
+      // Disable floater's own exit animation so the tooltip + spotlight
+      // disappear together when we set dead=true.
+      animationDuration: '0ms',
+    },
+  },
 };

@@ -1,74 +1,54 @@
 import { useEffect, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
 import { useAuth } from '../lib/auth';
-import { tourStyles, floaterProps, dismissAllTours } from './OnboardingTour';
+import {
+  tourStyles,
+  floaterProps,
+  dismissAllTours,
+  TourTooltip,
+} from './OnboardingTour';
 
 /**
- * PageTour — ONE short explainer per page, once per device.
+ * PageTour — per-page explainer. One tap on the skip pill kills every
+ * tour everywhere (main + all per-page), forever.
  *
- * Gating:
- *   - Agent role only
- *   - localStorage `estia-page-tour:<pageKey>` not set
- *   - Respects the dismiss-all flag set by Skip/Close anywhere
- *
- * Listens for `estia-tour:replay` on window so the sidebar `?` button
- * can re-fire this page's tour on demand even after it's been
- * marked done.
+ * Dead-on-close: we flip `dead=true` and immediately return null so
+ * Joyride's spotlight can't hang around as a shrinking dark circle.
  */
 export default function PageTour({ pageKey, steps, delay = 700 }) {
   const { user } = useAuth();
   const [run, setRun] = useState(false);
+  const [dead, setDead] = useState(false);
 
-  // Auto-run on first visit if not already seen.
   useEffect(() => {
     if (!user || user.role !== 'AGENT') return undefined;
     if (!pageKey || !steps?.length) return undefined;
-    const key = `estia-page-tour:${pageKey}`;
     try {
-      if (localStorage.getItem(key)) return undefined;
+      if (localStorage.getItem(`estia-page-tour:${pageKey}`)) return undefined;
       if (localStorage.getItem('estia-tour-dismissed')) return undefined;
     } catch { /* ignore */ }
     const t = setTimeout(() => setRun(true), delay);
     return () => clearTimeout(t);
   }, [user, pageKey, steps?.length, delay]);
 
-  // Replay-on-demand: the sidebar `?` button dispatches this with the
-  // current page's key. We clear the dismiss flag + the per-page
-  // marker before showing the tour again.
-  useEffect(() => {
-    const onReplay = (e) => {
-      if (e?.detail?.pageKey !== pageKey) return;
-      try {
-        localStorage.removeItem('estia-tour-dismissed');
-        localStorage.removeItem(`estia-page-tour:${pageKey}`);
-      } catch { /* ignore */ }
-      setRun(true);
-    };
-    window.addEventListener('estia-tour:replay', onReplay);
-    return () => window.removeEventListener('estia-tour:replay', onReplay);
-  }, [pageKey]);
-
-  const markDone = () => {
-    try { localStorage.setItem(`estia-page-tour:${pageKey}`, String(Date.now())); }
-    catch { /* ignore */ }
-    setRun(false);
-  };
-
   const handleCallback = ({ status, action }) => {
     if (action === ACTIONS.CLOSE || action === ACTIONS.SKIP) {
-      // X or Skip in a page tour is an explicit "stop showing me these
-      // anywhere" — mark EVERY tour as done (server + all page keys),
-      // as the user requested.
+      // Explicit "stop showing me tours anywhere" — wipe every marker
+      // and unmount Joyride on the same tick so no circle lingers.
       dismissAllTours();
+      setDead(true);
       setRun(false);
       return;
     }
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-      markDone();
+      try { localStorage.setItem(`estia-page-tour:${pageKey}`, String(Date.now())); }
+      catch { /* ignore */ }
+      setDead(true);
+      setRun(false);
     }
   };
 
-  if (!run) return null;
+  if (!run || dead) return null;
 
   return (
     <Joyride
@@ -77,16 +57,16 @@ export default function PageTour({ pageKey, steps, delay = 700 }) {
       continuous
       showProgress={steps.length > 1}
       showSkipButton
-      hideCloseButton={false}
+      hideCloseButton
       scrollToFirstStep={false}
       disableScrolling={false}
       disableOverlayClose
+      tooltipComponent={TourTooltip}
       locale={{
         back: 'הקודם',
-        close: 'סגור',
         last: 'הבנתי',
         next: 'הבא',
-        skip: 'דלג על הטיפ',
+        skip: 'דלג על כל הסיורים לתמיד',
       }}
       callback={handleCallback}
       styles={tourStyles}
