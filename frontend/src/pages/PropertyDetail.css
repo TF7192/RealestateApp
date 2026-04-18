@@ -140,13 +140,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;           /* title + action drop to separate rows when crowded */
+  row-gap: 8px;
+  min-width: 0;
 }
 
 .dc-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;              /* allow Hebrew title to shrink/ellipsize in a flex row */
+  flex: 1 1 auto;
   font-family: var(--font-display);
   font-size: 14px;
   font-weight: 700;
@@ -154,6 +159,13 @@
   color: var(--text-primary);
   margin: 0;
   text-transform: uppercase;
+}
+
+.dc-title > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dc-icon {
@@ -183,6 +195,15 @@
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   text-decoration: none;
   white-space: nowrap;
+  flex: 0 0 auto;            /* don't stretch, don't shrink — wrap instead */
+  max-width: 100%;           /* never exceed the card's inner width */
+}
+
+/* When the header wraps (narrow card), push the CTA to the LEFT edge
+   (logical end in RTL) so it sits flush with the card instead of
+   leaning against the title. */
+.dc-header > .dc-cta {
+  margin-inline-start: auto;
 }
 
 .dc-cta:hover {
