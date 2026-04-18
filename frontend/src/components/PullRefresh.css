@@ -1,0 +1,40 @@
+.pr-wrap {
+  position: relative;
+  overflow: hidden;
+}
+
+.pr-indicator {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--gold, #c9a96e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(30, 26, 20, 0.1);
+  pointer-events: none;
+}
+
+.pr-indicator.ready   { background: var(--gold-glow); color: var(--gold); }
+.pr-indicator.refreshing .pr-spinner { animation: pr-spin 0.9s linear infinite; }
+
+.pr-spinner { display: flex; transition: transform 0.05s linear; }
+
+@keyframes pr-spin {
+  from { transform: rotate(0); }
+  to   { transform: rotate(360deg); }
+}
+
+.pr-content { will-change: transform; }
+
+/* Only active on touch devices — on desktop pull-to-refresh adds no value */
+@media (hover: hover) and (pointer: fine) {
+  .pr-indicator { display: none; }
+  .pr-content   { transform: none !important; }
+}

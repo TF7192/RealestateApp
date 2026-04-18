@@ -1,0 +1,330 @@
+/* CustomerDetail page — full per-lead profile (P0-D5) */
+
+.customer-detail-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── Loading / error states ──────────────────────────────────── */
+.cd-skel,
+.cd-error {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.cd-error svg { color: var(--danger); }
+
+/* ── Top toolbar: breadcrumb · status pill · matches · actions ──── */
+.cd-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.cd-crumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cd-crumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+
+.cd-crumb-link:hover {
+  color: var(--gold);
+  background: var(--gold-glow);
+}
+
+.cd-crumb-sep {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.cd-crumb-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 4px;
+}
+
+.cd-status-pill {
+  margin-inline-start: 4px;
+}
+
+.cd-match-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--gold-glow);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.cd-match-pill:hover {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+}
+
+.cd-match-pill strong {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.cd-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cd-toolbar-actions .btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.cd-tpl-btn {
+  border-color: var(--gold-border) !important;
+  color: var(--gold) !important;
+}
+
+.cd-tpl-btn:hover {
+  background: var(--gold-glow) !important;
+}
+
+.cd-wa-btn .wa-green {
+  color: #25d366;
+}
+
+/* ── Two-column layout (desktop) ──────────────────────────────── */
+.cd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .cd-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+  }
+}
+
+/* ── Section card ─────────────────────────────────────────────── */
+.cd-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 22px;
+}
+
+.cd-section-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cd-form-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.cd-form-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Activity timeline (right column) ─────────────────────────── */
+.cd-timeline-section {
+  /* Sticky on desktop so it stays in view as the form scrolls */
+  position: relative;
+}
+
+@media (min-width: 1100px) {
+  .cd-timeline-section {
+    position: sticky;
+    top: 16px;
+  }
+}
+
+.cd-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+}
+
+/* Vertical thread connecting the dots */
+.cd-timeline::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  inset-inline-start: 13px;
+  width: 2px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.cd-tl-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  position: relative;
+}
+
+.cd-tl-dot {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.cd-tl-dot.sev-urgent {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.cd-tl-dot.sev-warning {
+  background: var(--warning-bg);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.cd-tl-dot.sev-soon {
+  background: var(--gold-glow);
+  border-color: var(--gold-border);
+  color: var(--gold);
+}
+
+.cd-tl-item.cd-tl-agreement-signed .cd-tl-dot,
+.cd-tl-item.cd-tl-status .cd-tl-dot {
+  background: var(--gold-glow);
+  border-color: var(--gold-border);
+  color: var(--gold);
+}
+
+.cd-tl-body {
+  flex: 1;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.cd-tl-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.cd-tl-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.cd-timeline-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 12px 6px;
+  line-height: 1.55;
+}
+
+.cd-timeline-empty p { margin: 0; }
+
+/* ── Mobile (<900px) — stack form on top, timeline below ─────── */
+@media (max-width: 900px) {
+  .cd-toolbar {
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+  }
+
+  .cd-crumb-name {
+    font-size: 16px;
+  }
+
+  .cd-section {
+    padding: 18px 16px;
+    border-radius: 18px;
+  }
+
+  .cd-toolbar-actions {
+    width: 100%;
+  }
+
+  .cd-toolbar-actions .btn {
+    flex: 1;
+    justify-content: center;
+    min-height: 40px;
+  }
+
+  .cd-form-actions .btn {
+    flex: 1;
+    justify-content: center;
+    min-height: 48px;
+  }
+}

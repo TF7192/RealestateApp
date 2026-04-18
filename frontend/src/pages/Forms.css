@@ -1,5 +1,5 @@
 .form-page {
-  max-width: 800px;
+  max-width: 1080px;
 }
 
 .intake-form {
@@ -241,14 +241,259 @@
   padding-top: 8px;
 }
 
+/* Draft-restore banner (gold) — shared by NewProperty & NewLead */
+.draft-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin: 4px 0 12px;
+  border-radius: 12px;
+  background: var(--gold-glow);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 600;
+  flex-wrap: wrap;
+}
+
+.draft-banner-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.draft-banner-actions .btn {
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+/* Clipboard phone suggestion chip (NewLead) */
+.clipboard-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 12px;
+  padding: 4px 4px 4px 10px;
+  border-radius: 99px;
+  background: var(--gold-glow);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 100%;
+}
+
+.clipboard-chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 6px 4px;
+  direction: rtl;
+}
+
+.clipboard-chip-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.clipboard-chip-dismiss:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * Mobile form polish — iOS-friendly
+ * ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
+  .form-page {
+    max-width: 100%;
+  }
+
   .form-row,
   .form-row-3,
   .form-row-4 {
     grid-template-columns: 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
   }
 
   .form-section {
-    padding: 16px;
+    padding: 18px 16px;
+    border-radius: 18px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(30, 26, 20, 0.04);
+  }
+
+  .form-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* Full-size inputs so iOS never auto-zooms + comfy tap targets */
+  .form-input,
+  .form-select,
+  .form-textarea {
+    min-height: 48px;
+    padding: 12px 14px;
+    font-size: 16px;           /* critical: prevents iOS focus zoom */
+    border-radius: 12px;
+    background: var(--bg-input);
+  }
+
+  .form-textarea {
+    min-height: 96px;
+    padding: 14px;
+    line-height: 1.5;
+  }
+
+  .form-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Segmented-control style for toggle groups */
+  .toggle-group {
+    border-radius: 12px;
+    background: var(--bg-elevated);
+    padding: 3px;
+    border: 1px solid var(--border);
+  }
+
+  .toggle-btn {
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 10px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+
+  .toggle-btn + .toggle-btn {
+    border-right: none;
+  }
+
+  .toggle-btn.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(30, 26, 20, 0.08);
+  }
+
+  /* Checkbox grid — bigger, friendlier targets */
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .checkbox-item {
+    min-height: 44px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .checkbox-item input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .checkbox-item:has(input:checked) {
+    background: var(--gold-glow);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  /* Inline save bar on mobile — keeping it sticky meant it could cover the
+     focused input when the keyboard was up. Now it just flows at the bottom
+     of the form, so the keyboard handler can freely scroll the focused input
+     into view without fighting a floating action row. */
+  .form-actions {
+    position: static;
+    flex-direction: column-reverse;
+    gap: 10px;
+    padding: 18px 0 calc(16px + env(safe-area-inset-bottom));
+    margin: 20px 0 0;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 14px 16px;
+    border-radius: 14px;
+    font-size: 15px;
+    min-height: 52px;
+    font-weight: 600;
+  }
+
+  .form-inline-action {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-inline-action .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 48px;
+    border-radius: 12px;
+  }
+
+  .inline-action-hint {
+    text-align: center;
+    font-size: 12px;
+  }
+
+  /* Upload area — bigger, friendlier */
+  .upload-area {
+    padding: 28px 18px;
+    border-radius: 16px;
+  }
+
+  /* Smooth keyboard-aware scroll — form fields never hide behind keyboard */
+  .intake-form {
+    scroll-padding-bottom: 200px;
+  }
+}
+
+/* Sticky save bar breakpoint — keep in sync with StickyActionBar.css
+   which hides itself above 900px. Pages that render a StickyActionBar
+   add `.has-sticky-bar` so content reserves room above the floating row. */
+@media (max-width: 900px) {
+  .form-page.has-sticky-bar {
+    padding-bottom: 88px;
+  }
+  /* Hide the duplicate in-page submit row on mobile — the sticky bar
+     already presents the primary action. On desktop the sticky hides,
+     and this row is visible as usual. */
+  .form-actions-desktop {
+    display: none;
   }
 }

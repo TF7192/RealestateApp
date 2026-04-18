@@ -408,7 +408,7 @@ img.agent-avatar {
   color: var(--gold);
 }
 
-/* Mobile header — glass, warm, honoring safe-area */
+/* Mobile header — precise grid so the title is truly centered */
 .mobile-header {
   display: none;
   position: fixed;
@@ -416,26 +416,36 @@ img.agent-avatar {
   right: 0;
   left: 0;
   z-index: 90;
-  height: calc(56px + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) 10px 0;
-  background:
-    linear-gradient(180deg, rgba(247, 243, 236, 0.92) 0%, rgba(247, 243, 236, 0.82) 100%);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: saturate(180%) blur(16px);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  height: calc(52px + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) 8px 0;
+  background: rgba(247, 243, 236, 0.94);
+  border-bottom: 1px solid rgba(30, 26, 20, 0.08);
+  backdrop-filter: saturate(180%) blur(28px);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  grid-template-columns: 48px 1fr 48px;
 }
 
+.mobile-header { display: grid; }
+
+@media (min-width: 1025px) { .mobile-header { display: none !important; } }
+
+.mh-side {
+  display: inline-flex;
+  align-items: center;
+}
+
+.mh-leading { justify-content: flex-end; }
+.mh-trailing { justify-content: flex-start; }
+
 [data-theme="dark"] .mobile-header {
-  background:
-    linear-gradient(180deg, rgba(13, 15, 20, 0.88) 0%, rgba(13, 15, 20, 0.75) 100%);
+  background: rgba(13, 15, 20, 0.9);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
 .mobile-header .btn-ghost {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -443,30 +453,70 @@ img.agent-avatar {
   background: transparent;
   color: var(--text-primary);
   border: 1px solid transparent;
-  transition: all 0.15s;
+  padding: 0;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-header .btn-ghost:hover,
 .mobile-header .btn-ghost:active {
+  transform: scale(0.92);
   background: var(--gold-glow);
-  color: var(--gold);
-  border-color: var(--gold-border);
+}
+
+.mh-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--gold-border);
+}
+
+.mh-avatar.placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+  color: var(--bg-primary);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 14px;
 }
 
 .mobile-logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   color: var(--text-primary);
   letter-spacing: -0.2px;
+  text-decoration: none;
 }
 
 .mobile-logo .logo-icon {
   color: var(--gold);
+  font-size: 16px;
+}
+
+.mh-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+  text-align: center;
+}
+
+.mobile-logo {
+  justify-self: center;
   font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.mh-profile-btn {
+  padding: 0 !important;
 }
 
 .sidebar-overlay {
@@ -516,15 +566,26 @@ img.agent-avatar {
   @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
 
   .mobile-header {
-    display: flex;
+    display: grid;
   }
 
   .main-content {
     margin-right: 0;
     padding: 14px;
-    padding-top: calc(56px + env(safe-area-inset-top) + 14px);
+    padding-top: calc(52px + env(safe-area-inset-top) + 14px);
+    /* Room for bottom tab bar (MobileTabBar applies a bigger value there) */
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    animation: page-in 0.36s cubic-bezier(0.22, 1, 0.36, 1);
   }
+
+  @keyframes page-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Hide the legacy drawer sidebar on mobile — tab bar + More sheet cover navigation */
+  .sidebar { display: none; }
+  .sidebar-overlay { display: none; }
 
   .page-header {
     flex-direction: column;
@@ -533,7 +594,7 @@ img.agent-avatar {
   }
 
   .page-header h2 {
-    font-size: 26px;
+    font-size: 22px;
     letter-spacing: -0.3px;
   }
 
@@ -550,6 +611,48 @@ img.agent-avatar {
 
   .nav-section-label {
     font-size: 11px;
+  }
+
+  /* iOS-style page heading — sized for ≤430 px iPhone widths */
+  .page-header h2 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    line-height: 1.1;
+    margin: 2px 0 2px;
+  }
+
+  .page-header p {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+
+  /* Cards get softer iOS corners + gentler shadows */
+  .card,
+  .stat-card,
+  .property-card,
+  .customer-card,
+  .dk-col,
+  .deal-card {
+    border-radius: 18px !important;
+    box-shadow: 0 1px 2px rgba(30, 26, 20, 0.04), 0 6px 20px rgba(30, 26, 20, 0.06) !important;
+  }
+
+  .btn {
+    padding: 11px 18px;
+    font-weight: 600;
+    border-radius: 14px;
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s;
+  }
+  .btn:active {
+    transform: scale(0.96);
+  }
+
+  .btn-lg {
+    padding: 14px 22px;
+    border-radius: 16px;
   }
 }
 
@@ -571,4 +674,30 @@ img.agent-avatar {
     font-size: 14px;
     justify-content: center;
   }
+}
+
+/* P1-M1 / P1-M7 — burger menu when no back action, contextual title wrap */
+.mh-burger-btn,
+.mh-back-btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+}
+
+.mh-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* P1-M15 — auto-hide mobile header on scroll-down */
+.mobile-header {
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0.24, 1);
+  will-change: transform;
+}
+.mobile-header.mh-hidden {
+  transform: translateY(-100%);
 }

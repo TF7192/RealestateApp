@@ -42,12 +42,127 @@
   position: relative;
 }
 
+/* Signal cards — reminders shown above the main grid */
+.dash-signals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.sig-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: inherit;
+  text-decoration: none;
+  transition: all 0.18s;
+}
+
+.sig-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(30, 26, 20, 0.06);
+}
+
+.sig-card strong {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.1px;
+  display: block;
+}
+
+.sig-card small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sig-card svg {
+  flex-shrink: 0;
+}
+
+.sig-warning { border-color: var(--warning-bg); background: var(--warning-bg); }
+.sig-warning svg { color: var(--warning); }
+
+.sig-muted { border-color: var(--border-light); background: var(--bg-elevated); }
+.sig-muted svg { color: var(--text-muted); }
+
+.sig-gold { border-color: var(--gold-border); background: var(--gold-glow); }
+.sig-gold svg { color: var(--gold); }
+.sig-gold strong { color: var(--gold); }
+
+/* Empty-state card (shown when user has no properties / leads yet) */
+.dashboard-empty {
+  margin-top: 4px;
+  padding: 48px 24px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-elevated) 100%);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.de-illustration {
+  font-size: 44px;
+  opacity: 0.85;
+}
+
+.dashboard-empty h3 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.dashboard-empty p {
+  max-width: 380px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.de-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.de-inline {
+  padding: 18px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.de-inline a {
+  color: var(--gold);
+  font-weight: 600;
+  text-decoration: none;
+  margin-right: 4px;
+}
+
 /* Stats — clickable cards */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 10px;
   margin-bottom: 20px;
+}
+
+/* Dot indicator (only visible under mobile carousel) */
+.stats-dots {
+  display: none;
 }
 
 .stat-card {
@@ -205,6 +320,12 @@
   color: var(--gold);
 }
 
+.ppi-updated {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
 /* Activity list */
 .activity-list {
   padding: 8px 24px 16px;
@@ -332,6 +453,14 @@
   text-overflow: ellipsis;
 }
 
+.lead-last {
+  font-size: 10px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .lead-flame {
   color: var(--danger);
   flex-shrink: 0;
@@ -355,16 +484,81 @@
   }
 }
 
+/* ≤900px: horizontal scroll-snap carousel on mobile */
+@media (max-width: 900px) {
+  .stats-grid {
+    display: flex;
+    grid-template-columns: none;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding: 4px 4px 8px;
+    margin-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .stats-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stats-grid > .stat-card {
+    flex: 0 0 72%;
+    scroll-snap-align: center;
+    min-height: 92px;
+  }
+
+  .stats-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .stats-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.2s, transform 0.2s;
+  }
+
+  .stats-dot.active {
+    background: var(--gold);
+    transform: scale(1.3);
+  }
+}
+
 @media (max-width: 1024px) {
   .welcome-section {
     flex-direction: column;
     align-items: flex-start;
-    gap: 20px;
-    padding: 24px;
+    gap: 14px;
+    padding: 18px 16px;
+    margin-bottom: 16px;
+    border-radius: 16px;
   }
 
   .welcome-content h2 {
-    font-size: 24px;
+    font-size: 20px;
+    line-height: 1.15;
+  }
+
+  .welcome-content p {
+    font-size: 13px;
+  }
+
+  .welcome-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .welcome-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 10px 12px;
+    font-size: 13px;
   }
 
   .dashboard-grid {
@@ -381,11 +575,7 @@
 }
 
 @media (max-width: 640px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-
+  /* stats-grid handled by mobile carousel rule at <=900px */
   .stat-card {
     padding: 12px;
     gap: 8px;

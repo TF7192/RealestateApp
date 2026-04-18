@@ -2,6 +2,15 @@ import type { FastifyPluginAsync } from 'fastify';
 import argon2 from 'argon2';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { slugify, ensureUniqueSlug } from '../lib/slug.js';
+
+async function buildAgentSlug(displayName: string): Promise<string> {
+  const base = slugify(displayName) || 'agent';
+  return ensureUniqueSlug(base, async (cand) => {
+    const x = await prisma.user.findUnique({ where: { slug: cand } });
+    return !!x;
+  });
+}
 
 const COOKIE_NAME = 'estia_token';
 const COOKIE_OPTS = {
@@ -39,12 +48,16 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(409).send({ error: { message: 'Email already registered' } });
     }
     const passwordHash = await argon2.hash(body.password);
+    const slug = body.role === 'AGENT'
+      ? await buildAgentSlug(body.displayName)
+      : null;
     const user = await prisma.user.create({
       data: {
         email: body.email,
         passwordHash,
         role: body.role,
         displayName: body.displayName,
+        slug,
         phone: body.phone,
         provider: 'EMAIL',
         agentProfile: body.role === 'AGENT' ? { create: {} } : undefined,
@@ -89,11 +102,13 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
 
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
+      const slug = body.role === 'AGENT' ? await buildAgentSlug(displayName) : null;
       user = await prisma.user.create({
         data: {
           email,
           role: body.role,
           displayName,
+          slug,
           provider: 'GOOGLE',
           googleId: `mock-${body.role.toLowerCase()}`,
           agentProfile: body.role === 'AGENT' ? { create: {} } : undefined,
@@ -120,6 +135,7 @@ function publicUser(u: {
   email: string;
   role: string;
   displayName: string;
+  slug?: string | null;
   phone: string | null;
   avatarUrl: string | null;
 }) {
@@ -128,6 +144,7 @@ function publicUser(u: {
     email: u.email,
     role: u.role,
     displayName: u.displayName,
+    slug: u.slug ?? null,
     phone: u.phone,
     avatarUrl: u.avatarUrl,
   };

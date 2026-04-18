@@ -1,6 +1,6 @@
 /* Wizard stepper header for NewProperty */
 .np-wizard {
-  max-width: 880px;
+  max-width: 1080px;
 }
 
 .np-steps {
@@ -81,3 +81,140 @@
   .np-steps { flex-wrap: wrap; }
   .np-step-line { display: none; }
 }
+
+/* Geolocation button next to address inputs */
+.np-geo-group {
+  margin-bottom: 12px;
+}
+
+.np-geo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--gold-glow);
+  color: var(--gold);
+  border: 1px solid var(--gold-border);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.np-geo-btn:hover:not(:disabled) {
+  background: var(--gold);
+  color: var(--bg-primary);
+  border-color: var(--gold);
+}
+
+.np-geo-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* Owner picker integration */
+.np-owner-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.np-owner-pick-btn {
+  height: 38px;
+}
+
+.np-owner-pick-or {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.np-owner-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--gold-border);
+  background: var(--gold-glow);
+}
+
+.np-owner-card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+  color: white;
+  font-weight: 700;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.np-owner-card-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.np-owner-card-meta strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.np-owner-card-meta span {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.np-owner-card-meta small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.np-owner-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.np-owner-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--gold-border);
+}
+
+.np-owner-swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--gold);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  padding: 4px 6px;
+}
+
+.np-owner-swap:hover {
+  color: var(--gold-light);
+}
+

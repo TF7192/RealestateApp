@@ -7,23 +7,43 @@ import {
   MapPin,
   Bed,
   Maximize,
-  MessageCircle,
   LinkIcon,
   Check,
   SlidersHorizontal,
   X,
   Navigation,
   Trash2,
+  MoreHorizontal,
+  Share2,
+  ArrowLeftRight,
+  Phone,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import ConfirmDialog from '../components/ConfirmDialog';
 import WhatsAppSheet from '../components/WhatsAppSheet';
+import PullRefresh from '../components/PullRefresh';
+import LeadPickerSheet from '../components/LeadPickerSheet';
+import TransferPropertyDialog from '../components/TransferPropertyDialog';
+import SwipeRow from '../components/SwipeRow';
+import WhatsAppIcon from '../components/WhatsAppIcon';
+import StickyActionBar from '../components/StickyActionBar';
+import { OverflowSheet } from '../components/MobilePickers';
+import { useViewportMobile } from '../hooks/mobile';
+import { shareSheet, openWhatsApp, shareWithPhotos } from '../native/share';
+import { telUrl, wazeUrl } from '../lib/waLink';
+import haptics from '../lib/haptics';
+import {
+  buildVariables as tplBuildVars,
+  renderTemplate as tplRender,
+  pickTemplateKind as tplPickKind,
+} from '../lib/templates';
 import {
   getDistanceKm,
   resolveLocation,
   allLocationNames,
 } from '../data/mockData';
+import { PriceRange, NumberField, SelectField } from '../components/SmartFields';
 import './Properties.css';
 
 function formatPrice(price) {
@@ -55,12 +75,54 @@ function buildWhatsAppMessage(prop, agent) {
   if (prop.notes) { lines.push(''); lines.push(prop.notes); }
   lines.push('');
   lines.push(`📷 תמונות ופרטים נוספים:`);
-  lines.push(`${window.location.origin}/p/${prop.id}`);
+  const pUrl = prop.slug && agent?.slug
+    ? `${window.location.origin}/agents/${encodeURI(agent.slug)}/${encodeURI(prop.slug)}`
+    : `${window.location.origin}/p/${prop.id}`;
+  lines.push(pUrl);
   if (agent?.displayName) {
     lines.push('');
     lines.push(`${agent.displayName} | ${agent.agency || ''} | ${agent.phone || ''}`);
   }
   return lines.join('\n');
+}
+
+// P3-M8 / P3-M9 — does a lead "match" a property? Returns boolean.
+// Criteria: same assetClass, same interest (BUY↔SALE, RENT↔RENT),
+// same city, price within [budget*0.85 .. budget*1.15] if budget set
+// (lead model has no min/max), rooms within ±1.
+export function leadMatchesProperty(lead, property) {
+  if (!lead || !property) return false;
+  // Asset class: lead.interestType (PRIVATE/COMMERCIAL) ↔ property.assetClass (RESIDENTIAL/COMMERCIAL)
+  const leadAsset = lead.assetClass || (lead.interestType === 'COMMERCIAL' ? 'COMMERCIAL' : 'RESIDENTIAL');
+  if (leadAsset !== property.assetClass) return false;
+  // Category: lead.lookingFor (BUY/RENT) ↔ property.category (SALE/RENT)
+  const wantsSale = lead.lookingFor === 'BUY' || lead.interest === 'BUY';
+  const wantsRent = lead.lookingFor === 'RENT' || lead.interest === 'RENT';
+  if (wantsSale && property.category !== 'SALE') return false;
+  if (wantsRent && property.category !== 'RENT') return false;
+  // City
+  if (lead.city && property.city &&
+      String(lead.city).trim() !== String(property.city).trim()) return false;
+  // Price: support either explicit min/max or single budget number
+  const price = property.marketingPrice;
+  if (price) {
+    const min = Number(lead.priceMin) || (lead.budget ? Math.round(lead.budget * 0.85) : null);
+    const max = Number(lead.priceMax) || (lead.budget ? Math.round(lead.budget * 1.15) : null);
+    if (min && price < min) return false;
+    if (max && price > max) return false;
+  }
+  // Rooms within ±1 (lead.rooms may be a string like "3" or "3-4")
+  const pr = parseFloat(property.rooms);
+  if (!isNaN(pr) && lead.rooms != null && lead.rooms !== '') {
+    const tokens = String(lead.rooms).match(/\d+(\.\d+)?/g) || [];
+    if (tokens.length) {
+      const nums = tokens.map(Number);
+      const lo = Math.min(...nums);
+      const hi = Math.max(...nums);
+      if (pr < lo - 1 || pr > hi + 1) return false;
+    }
+  }
+  return true;
 }
 
 function buildShareUrl(filters) {
@@ -74,6 +136,7 @@ function buildShareUrl(filters) {
 export default function Properties() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const isMobile = useViewportMobile(820);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -85,17 +148,29 @@ export default function Properties() {
   const [locationRadius, setLocationRadius] = useState(5);
   const [advFilters, setAdvFilters] = useState({
     city: '',
-    minPrice: '',
-    maxPrice: '',
+    minPrice: null,
+    maxPrice: null,
     minRooms: '',
     maxRooms: '',
-    minSqm: '',
-    maxSqm: '',
+    minSqm: null,
+    maxSqm: null,
   });
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [waShare, setWaShare] = useState(null); // { text, recipients }
-  const [leadList, setLeadList] = useState([]);
+  const [waShare, setWaShare] = useState(null); // { text, title }
+  const [templates, setTemplates] = useState(null);
+  const [leads, setLeads] = useState([]);
+  const [leadPickerFor, setLeadPickerFor] = useState(null); // prop being shared
+  const [overflowFor, setOverflowFor] = useState(null); // prop for ⋯ menu
+  const [similarFor, setSimilarFor] = useState(null); // prop for "חפש דומים"
+  const [transferProp, setTransferProp] = useState(null);
+  const [pageOverflowOpen, setPageOverflowOpen] = useState(false); // P1-M16
+  const [matchesPickerFor, setMatchesPickerFor] = useState(null); // P3-M8: { prop, leads }
+
+  useEffect(() => {
+    api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
+    api.listLeads().then((r) => setLeads(r.items || r.leads || [])).catch(() => {});
+  }, []);
 
   const load = async () => {
     try {
@@ -106,10 +181,6 @@ export default function Properties() {
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => {
-    // Load leads once so the WhatsApp sheet can offer matched recipients
-    api.listLeads().then((r) => setLeadList(r.items || [])).catch(() => {});
-  }, []);
 
   useEffect(() => {
     const ac = searchParams.get('assetClass');
@@ -163,38 +234,71 @@ export default function Properties() {
 
   const cities = [...new Set(items.map((p) => p.city))];
 
+  // P3-M8 — pre-compute matched leads per property
+  const matchesByProp = useMemo(() => {
+    const map = new Map();
+    items.forEach((p) => {
+      const matches = (leads || []).filter((l) => leadMatchesProperty(l, p));
+      map.set(p.id, matches);
+    });
+    return map;
+  }, [items, leads]);
+
+  // P1-M16 — push count into the breadcrumb on mobile
+  useEffect(() => {
+    if (!isMobile) return undefined;
+    window.dispatchEvent(new CustomEvent('estia:title', { detail: `נכסים · ${filtered.length}` }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('estia:title', { detail: '' }));
+    };
+  }, [isMobile, filtered.length]);
+
   const agentInfo = {
     displayName: user?.displayName,
     agency: user?.agentProfile?.agency,
     phone: user?.phone,
   };
 
+  const buildMessageForProp = (prop) => {
+    const kind = tplPickKind(prop, 'client');
+    const tpl = templates?.find((t) => t.kind === kind);
+    if (tpl?.body) {
+      const vars = tplBuildVars(prop, user, { stripAgent: false });
+      return tplRender(tpl.body, vars);
+    }
+    return buildWhatsAppMessage(prop, agentInfo);
+  };
+
+  // Entry point for sharing: show lead picker first; fall back to WhatsAppSheet
+  // (no recipient) if user taps "פתח ללא נמען".
   const handleWhatsApp = (e, prop) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const text = buildWhatsAppMessage(prop, agentInfo);
-    // Rank leads that match this property first (same city, budget-range, etc.)
-    const scored = leadList.map((l) => {
-      let score = 0;
-      if (l.city && l.city === prop.city) score += 3;
-      if (l.lookingFor === 'RENT' && prop.category === 'RENT') score += 2;
-      if (l.lookingFor === 'BUY' && prop.category === 'SALE') score += 2;
-      if (prop.assetClass === 'COMMERCIAL' && l.interestType === 'COMMERCIAL') score += 2;
-      if (prop.assetClass === 'RESIDENTIAL' && l.interestType === 'PRIVATE') score += 1;
-      if (l.budget && prop.marketingPrice && l.budget >= prop.marketingPrice * 0.7) score += 1;
-      return { l, score };
-    }).sort((a, b) => b.score - a.score);
-    const recipients = scored.map(({ l, score }) => ({
-      id: l.id,
-      name: l.name,
-      phone: l.phone,
-      sub: score >= 3
-        ? 'התאמה גבוהה'
-        : score > 0
-        ? 'התאמה חלקית'
-        : `${l.city || ''}${l.priceRangeLabel ? ` · ${l.priceRangeLabel}` : ''}`,
-    }));
-    setWaShare({ text, recipients, title: `שליחת ${prop.street}, ${prop.city}` });
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    haptics.tap();
+    setLeadPickerFor(prop);
+  };
+
+  const handlePickLead = async (lead, editedText, opts) => {
+    const prop = leadPickerFor;
+    setLeadPickerFor(null);
+    if (!prop) return;
+    const text = editedText || buildMessageForProp(prop);
+    const url = prop.slug && user?.slug
+      ? `${window.location.origin}/agents/${encodeURI(user.slug)}/${encodeURI(prop.slug)}`
+      : `${window.location.origin}/p/${prop.id}`;
+    // Native iOS only: share with photos via OS share sheet
+    if (opts?.withPhotos) {
+      await shareWithPhotos({
+        photos: opts.photos,
+        text,
+        title: `${prop.street}, ${prop.city}`,
+        url,
+      });
+      return;
+    }
+    await openWhatsApp({ phone: lead?.phone, text });
   };
 
   const handleGenerateLink = () => {
@@ -225,12 +329,6 @@ export default function Properties() {
     advFilters.maxSqm ||
     locationQuery;
 
-  const handleDeleteClick = (e, prop) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setToDelete(prop);
-  };
-
   const confirmDelete = async () => {
     if (!toDelete) return;
     setDeleting(true);
@@ -242,38 +340,147 @@ export default function Properties() {
     setDeleting(false);
   };
 
+  const openOverflow = (e, prop) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOverflowFor(prop);
+  };
+
+  const openSimilar = (e, prop) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSimilarFor(prop);
+  };
+
+  const applySimilarRooms = (prop) => {
+    if (prop.rooms == null) return;
+    setAdvFilters((f) => ({
+      ...f,
+      minRooms: String(prop.rooms),
+      maxRooms: String(prop.rooms),
+    }));
+    setShowAdvanced(true);
+  };
+
+  const applySimilarSqm = (prop) => {
+    const band = 10;
+    setAdvFilters((f) => ({
+      ...f,
+      minSqm: Math.max(0, prop.sqm - band),
+      maxSqm: prop.sqm + band,
+    }));
+    setShowAdvanced(true);
+  };
+
+  const applySimilarCity = (prop) => {
+    setAdvFilters((f) => ({ ...f, city: prop.city }));
+    setShowAdvanced(true);
+  };
+
+  const handleShareProp = async (prop) => {
+    const url = prop.slug && user?.slug
+      ? `${window.location.origin}/agents/${encodeURI(user.slug)}/${encodeURI(prop.slug)}`
+      : `${window.location.origin}/p/${prop.id}`;
+    await shareSheet({
+      title: `${prop.street}, ${prop.city}`,
+      text: `${prop.type} — ${formatPrice(prop.marketingPrice)}`,
+      url,
+    });
+  };
+
+  const overflowActions = overflowFor
+    ? [
+        {
+          label: 'שיתוף',
+          icon: Share2,
+          onClick: () => handleShareProp(overflowFor),
+        },
+        {
+          label: 'העברה לסוכן אחר',
+          icon: ArrowLeftRight,
+          onClick: () => setTransferProp(overflowFor),
+        },
+        {
+          label: 'מחק נכס',
+          icon: Trash2,
+          color: 'danger',
+          onClick: () => setToDelete(overflowFor),
+        },
+      ]
+    : [];
+
+  const similarActions = similarFor
+    ? [
+        ...(similarFor.rooms != null
+          ? [{
+              label: `נכסים עם ${similarFor.rooms} חדרים`,
+              icon: Bed,
+              onClick: () => applySimilarRooms(similarFor),
+            }]
+          : []),
+        {
+          label: `נכסים בגודל דומה (${similarFor.sqm} מ״ר)`,
+          icon: Maximize,
+          onClick: () => applySimilarSqm(similarFor),
+        },
+        {
+          label: `נכסים בעיר ${similarFor.city}`,
+          icon: Building2,
+          onClick: () => applySimilarCity(similarFor),
+        },
+      ]
+    : [];
+
   return (
-    <div className="properties-page">
-      <div className="page-header animate-in">
-        <div className="page-header-info">
-          <h2>הנכסים שלי</h2>
-          <p>{filtered.length} מתוך {items.length} נכסים</p>
+    <PullRefresh onRefresh={load}>
+    <div className="properties-page app-wide-cap">
+      {/* P1-M16 — desktop-only page header. Mobile uses breadcrumb + ⋯ + bottom FAB. */}
+      {!isMobile && (
+        <div className="page-header animate-in">
+          <div className="page-header-info">
+            <h2>הנכסים שלי</h2>
+            <p>{filtered.length} מתוך {items.length} נכסים</p>
+          </div>
+          <div className="page-header-actions">
+            <button
+              className={`btn btn-secondary ${copiedLink ? 'btn-copied' : ''}`}
+              onClick={handleGenerateLink}
+              title="יצירת קישור לשיתוף עם הלקוח — כולל כל הסינונים הפעילים"
+            >
+              {copiedLink ? <Check size={18} /> : <LinkIcon size={18} />}
+              {copiedLink ? 'הקישור הועתק' : 'קישור ללקוח'}
+            </button>
+            <Link to="/properties/new" className="btn btn-primary">
+              <Plus size={18} />
+              קליטת נכס חדש
+            </Link>
+          </div>
         </div>
-        <div className="page-header-actions">
-          <button
-            className={`btn btn-secondary ${copiedLink ? 'btn-copied' : ''}`}
-            onClick={handleGenerateLink}
-            title="יצירת קישור לשיתוף עם הלקוח — כולל כל הסינונים הפעילים"
-          >
-            {copiedLink ? <Check size={18} /> : <LinkIcon size={18} />}
-            {copiedLink ? 'הקישור הועתק' : 'קישור ללקוח'}
-          </button>
-          <Link to="/properties/new" className="btn btn-primary">
-            <Plus size={18} />
-            קליטת נכס חדש
-          </Link>
-        </div>
-      </div>
+      )}
 
       <div className="filters-bar animate-in animate-in-delay-1">
-        <div className="search-box">
-          <Search size={18} />
-          <input
-            type="text"
-            placeholder="חיפוש לפי כתובת, עיר, בעלים..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        {/* P1-M12 — sticky search wrapper */}
+        <div className="sticky-search properties-sticky-search">
+          {/* P1-M16 — page-level ⋯ on mobile (top-left of sticky search) */}
+          {isMobile && (
+            <button
+              type="button"
+              className="properties-page-overflow touch-target"
+              onClick={() => setPageOverflowOpen(true)}
+              aria-label="אפשרויות נוספות"
+            >
+              <MoreHorizontal size={18} />
+            </button>
+          )}
+          <div className="search-box">
+            <Search size={18} />
+            <input
+              type="text"
+              placeholder="חיפוש לפי כתובת, עיר, בעלים..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
         <div className="filter-tabs">
           {[
@@ -363,44 +570,59 @@ export default function Properties() {
           <div className="agent-filters-grid">
             <div className="form-group">
               <label className="form-label">עיר</label>
-              <select
-                className="form-select"
+              <SelectField
                 value={advFilters.city}
-                onChange={(e) => setAdvFilters({ ...advFilters, city: e.target.value })}
-              >
-                <option value="">כל הערים</option>
-                {cities.map((c) => (<option key={c} value={c}>{c}</option>))}
-              </select>
+                onChange={(v) => setAdvFilters({ ...advFilters, city: v })}
+                placeholder="כל הערים"
+                options={cities.map((c) => ({ value: c, label: c }))}
+              />
             </div>
-            <div className="form-group">
-              <label className="form-label">מחיר מ-</label>
-              <input type="number" className="form-input" placeholder="₪" value={advFilters.minPrice} onChange={(e) => setAdvFilters({ ...advFilters, minPrice: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">מחיר עד</label>
-              <input type="number" className="form-input" placeholder="₪" value={advFilters.maxPrice} onChange={(e) => setAdvFilters({ ...advFilters, maxPrice: e.target.value })} />
+            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+              <label className="form-label">טווח מחיר</label>
+              <PriceRange
+                minVal={advFilters.minPrice}
+                maxVal={advFilters.maxPrice}
+                onChangeMin={(n) => setAdvFilters({ ...advFilters, minPrice: n })}
+                onChangeMax={(n) => setAdvFilters({ ...advFilters, maxPrice: n })}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">חדרים מ-</label>
-              <input type="number" className="form-input" value={advFilters.minRooms} onChange={(e) => setAdvFilters({ ...advFilters, minRooms: e.target.value })} />
+              <NumberField
+                placeholder="3"
+                value={advFilters.minRooms === '' ? null : Number(advFilters.minRooms)}
+                onChange={(v) => setAdvFilters({ ...advFilters, minRooms: v == null ? '' : String(v) })}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">חדרים עד</label>
-              <input type="number" className="form-input" value={advFilters.maxRooms} onChange={(e) => setAdvFilters({ ...advFilters, maxRooms: e.target.value })} />
+              <NumberField
+                placeholder="5"
+                value={advFilters.maxRooms === '' ? null : Number(advFilters.maxRooms)}
+                onChange={(v) => setAdvFilters({ ...advFilters, maxRooms: v == null ? '' : String(v) })}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">שטח מ- (מ״ר)</label>
-              <input type="number" className="form-input" value={advFilters.minSqm} onChange={(e) => setAdvFilters({ ...advFilters, minSqm: e.target.value })} />
+              <NumberField
+                unit="מ״ר"
+                value={advFilters.minSqm}
+                onChange={(v) => setAdvFilters({ ...advFilters, minSqm: v })}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">שטח עד (מ״ר)</label>
-              <input type="number" className="form-input" value={advFilters.maxSqm} onChange={(e) => setAdvFilters({ ...advFilters, maxSqm: e.target.value })} />
+              <NumberField
+                unit="מ״ר"
+                value={advFilters.maxSqm}
+                onChange={(v) => setAdvFilters({ ...advFilters, maxSqm: v })}
+              />
             </div>
           </div>
           <div className="agent-filters-actions">
             <button
               className="btn btn-ghost btn-sm"
-              onClick={() => { setAdvFilters({ city: '', minPrice: '', maxPrice: '', minRooms: '', maxRooms: '', minSqm: '', maxSqm: '' }); setLocationQuery(''); }}
+              onClick={() => { setAdvFilters({ city: '', minPrice: null, maxPrice: null, minRooms: '', maxRooms: '', minSqm: null, maxSqm: null }); setLocationQuery(''); }}
             >
               <X size={14} /> נקה סינון
             </button>
@@ -420,9 +642,146 @@ export default function Properties() {
             const done = Object.values(actions).filter(Boolean).length;
             const total = Object.values(actions).length || 22;
             const pct = Math.round((done / total) * 100);
+            const delayClass = `animate-in-delay-${Math.min(i + 1, 5)}`;
+            const thumb = prop.images?.[0];
 
+            const swipeActions = [
+              {
+                icon: Phone,
+                label: 'התקשר',
+                color: 'gold',
+                onClick: () => { window.location.href = `tel:${prop.ownerPhone}`; },
+              },
+              {
+                icon: WhatsAppIcon,
+                label: 'וואטסאפ',
+                color: 'green',
+                onClick: () => handleWhatsApp(null, prop),
+              },
+              {
+                icon: Navigation,
+                label: 'ניווט',
+                color: 'blue',
+                onClick: () => {
+                  const url = `https://waze.com/ul?q=${encodeURIComponent(prop.street + ' ' + prop.city)}`;
+                  window.open(url, '_system');
+                },
+              },
+            ];
+
+            if (isMobile) {
+              // ── Compact 96px mobile row ─────────────────────────────
+              const matchCount = matchesByProp.get(prop.id)?.length || 0;
+              return (
+                <div
+                  key={prop.id}
+                  className={`property-card property-card-compact animate-in ${delayClass}`}
+                >
+                  <SwipeRow actions={swipeActions}>
+                    <div className="pc-compact-inner">
+                      <Link to={`/properties/${prop.id}`} className="pc-compact-link">
+                        <div className="pc-compact-thumb">
+                          {thumb ? (
+                            <img src={thumb} alt={prop.street} loading="lazy" />
+                          ) : (
+                            <Building2 size={26} />
+                          )}
+                        </div>
+                        <div className="pc-compact-meta">
+                          <div className="pc-compact-title">
+                            {prop.street}, {prop.city}
+                          </div>
+                          <div className="pc-compact-price">
+                            {formatPrice(prop.marketingPrice)}
+                          </div>
+                          <div className="pc-compact-specs">
+                            {prop.rooms != null && (
+                              <span><Bed size={12} /> {prop.rooms} חד׳</span>
+                            )}
+                            <span><Maximize size={12} /> {prop.sqm} מ״ר</span>
+                            {prop._distance != null && (
+                              <span className="pc-distance">
+                                <Navigation size={11} />
+                                {prop._distance.toFixed(1)} ק״מ
+                              </span>
+                            )}
+                          </div>
+                          {matchCount > 0 && (
+                            <button
+                              type="button"
+                              className="pc-match-pill"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                haptics.tap();
+                                setMatchesPickerFor(prop);
+                              }}
+                              aria-label={`${matchCount} לידים תואמים — ${prop.street}`}
+                            >
+                              {matchCount} לידים תואמים
+                            </button>
+                          )}
+                        </div>
+                      </Link>
+
+                      <button
+                        className="pc-overflow-btn touch-target"
+                        onClick={(e) => openOverflow(e, prop)}
+                        aria-label={`אפשרויות נוספות ${prop.street}`}
+                      >
+                        <MoreHorizontal size={16} />
+                      </button>
+
+                      <button
+                        className="pc-similar-btn"
+                        onClick={(e) => openSimilar(e, prop)}
+                        aria-label={`חיפוש נכסים דומים ל-${prop.street}`}
+                      >
+                        <MoreHorizontal size={12} /> חפש דומים
+                      </button>
+
+                      {/* P0-M10 / P1-M14 — 48×48 icon-only quick-action rail */}
+                      <div className="pc-rail" role="group" aria-label={`פעולות מהירות ${prop.street}`}>
+                        <a
+                          href={telUrl(prop.ownerPhone)}
+                          className="pc-rail-btn pc-rail-call"
+                          aria-label={`התקשר לבעלי ${prop.street}`}
+                          onClick={(e) => { e.stopPropagation(); haptics.tap(); }}
+                        >
+                          <Phone />
+                          <span>התקשר</span>
+                        </a>
+                        <button
+                          type="button"
+                          className="pc-rail-btn pc-rail-wa"
+                          onClick={(e) => handleWhatsApp(e, prop)}
+                          aria-label={`שלח את ${prop.street} בוואטסאפ`}
+                        >
+                          <WhatsAppIcon />
+                          <span>וואטסאפ</span>
+                        </button>
+                        <a
+                          href={wazeUrl(`${prop.street} ${prop.city}`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pc-rail-btn pc-rail-nav"
+                          aria-label={`נווט אל ${prop.street}`}
+                          onClick={(e) => { e.stopPropagation(); haptics.tap(); }}
+                        >
+                          <Navigation />
+                          <span>ניווט</span>
+                        </a>
+                      </div>
+                    </div>
+                  </SwipeRow>
+                </div>
+              );
+            }
+
+            // ── Desktop richer card ────────────────────────────────
+            const matchCount = matchesByProp.get(prop.id)?.length || 0;
             return (
-              <div key={prop.id} className={`property-card animate-in animate-in-delay-${Math.min(i + 1, 5)}`}>
+              <div key={prop.id} className={`property-card animate-in ${delayClass}`}>
                 <Link to={`/properties/${prop.id}`} className="property-card-link">
                   <div className="property-image">
                     <img src={prop.images?.[0] || 'https://via.placeholder.com/800x450'} alt={prop.street} loading="lazy" />
@@ -434,6 +793,20 @@ export default function Properties() {
                         {prop.category === 'SALE' ? 'מכירה' : 'השכרה'}
                       </span>
                     </div>
+                    {matchCount > 0 && (
+                      <button
+                        type="button"
+                        className="property-match-pill"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setMatchesPickerFor(prop);
+                        }}
+                        aria-label={`${matchCount} לידים תואמים — ${prop.street}`}
+                      >
+                        {matchCount} לידים תואמים
+                      </button>
+                    )}
                     <div className="property-price-overlay">
                       {formatPrice(prop.marketingPrice)}
                     </div>
@@ -451,12 +824,7 @@ export default function Properties() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setAdvFilters((f) => ({
-                              ...f,
-                              minRooms: String(prop.rooms),
-                              maxRooms: String(prop.rooms),
-                            }));
-                            setShowAdvanced(true);
+                            applySimilarRooms(prop);
                           }}
                           title="הצג את כל הנכסים עם מספר חדרים זהה"
                         >
@@ -469,13 +837,7 @@ export default function Properties() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          const band = 10;
-                          setAdvFilters((f) => ({
-                            ...f,
-                            minSqm: String(Math.max(0, prop.sqm - band)),
-                            maxSqm: String(prop.sqm + band),
-                          }));
-                          setShowAdvanced(true);
+                          applySimilarSqm(prop);
                         }}
                         title="הצג נכסים בגודל דומה"
                       >
@@ -487,8 +849,7 @@ export default function Properties() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setAdvFilters((f) => ({ ...f, city: prop.city }));
-                          setShowAdvanced(true);
+                          applySimilarCity(prop);
                         }}
                         title={`הצג נכסים ב${prop.city}`}
                       >
@@ -520,15 +881,16 @@ export default function Properties() {
                   onClick={(e) => handleWhatsApp(e, prop)}
                   title="שלח את כל פרטי הנכס + תמונות בוואטסאפ"
                 >
-                  <MessageCircle size={16} />
+                  <WhatsAppIcon size={16} />
                   <span>שלח ללקוח</span>
                 </button>
                 <button
-                  className="property-del-btn"
-                  onClick={(e) => handleDeleteClick(e, prop)}
-                  title="מחיקת נכס"
+                  className="property-overflow-btn"
+                  onClick={(e) => openOverflow(e, prop)}
+                  title="אפשרויות נוספות"
+                  aria-label="אפשרויות נוספות"
                 >
-                  <Trash2 size={14} />
+                  <MoreHorizontal size={14} />
                 </button>
               </div>
             );
@@ -558,12 +920,85 @@ export default function Properties() {
       {waShare && (
         <WhatsAppSheet
           title={waShare.title}
-          subtitle="ערוך את ההודעה ובחר למי לשלוח"
+          subtitle="ערוך את ההודעה — לחיצה על 'פתח בוואטסאפ' תעביר לבחירת נמען"
           message={waShare.text}
-          recipients={waShare.recipients}
           onClose={() => setWaShare(null)}
         />
       )}
+
+      {leadPickerFor && (
+        <LeadPickerSheet
+          property={leadPickerFor}
+          leads={leads}
+          previewText={buildMessageForProp(leadPickerFor)}
+          onPick={handlePickLead}
+          onClose={() => setLeadPickerFor(null)}
+        />
+      )}
+
+      <OverflowSheet
+        open={!!overflowFor}
+        onClose={() => setOverflowFor(null)}
+        title={overflowFor ? `${overflowFor.street}, ${overflowFor.city}` : ''}
+        actions={overflowActions}
+      />
+
+      <OverflowSheet
+        open={!!similarFor}
+        onClose={() => setSimilarFor(null)}
+        title="חיפוש נכסים דומים"
+        actions={similarActions}
+      />
+
+      {transferProp && (
+        <TransferPropertyDialog
+          property={transferProp}
+          onClose={() => setTransferProp(null)}
+          onDone={() => { setTransferProp(null); load(); }}
+        />
+      )}
+
+      {/* P3-M8 — picker filtered to matching leads only */}
+      {matchesPickerFor && (
+        <LeadPickerSheet
+          property={matchesPickerFor}
+          leads={matchesByProp.get(matchesPickerFor.id) || []}
+          previewText={buildMessageForProp(matchesPickerFor)}
+          onPick={(lead, editedText) => {
+            const prop = matchesPickerFor;
+            setMatchesPickerFor(null);
+            if (!prop) return;
+            const text = editedText || buildMessageForProp(prop);
+            if (lead === null) {
+              window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+              return;
+            }
+            const phone = (lead.phone || '').replace(/[^\d]/g, '');
+            const intl = phone.startsWith('0') ? '972' + phone.slice(1) : phone;
+            window.open('https://wa.me/' + intl + '?text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+          }}
+          onClose={() => setMatchesPickerFor(null)}
+        />
+      )}
+
+      {/* P1-M16 — page-level overflow on mobile */}
+      <OverflowSheet
+        open={pageOverflowOpen}
+        onClose={() => setPageOverflowOpen(false)}
+        title="נכסים"
+        actions={[
+          {
+            label: copiedLink ? 'הקישור הועתק' : 'קישור ללקוח',
+            icon: copiedLink ? Check : LinkIcon,
+            onClick: handleGenerateLink,
+          },
+        ]}
+      />
+
+      {/* (FAB removed — the bottom tab bar's central "+" already exposes
+       *  the create-property action; the floating button visually clung to
+       *  the last card and confused the layout.) */}
     </div>
+    </PullRefresh>
   );
 }

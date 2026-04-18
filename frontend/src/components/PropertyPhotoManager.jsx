@@ -10,6 +10,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import api from '../lib/api';
+import Portal from './Portal';
 import './PropertyPhotoManager.css';
 
 /**
@@ -148,114 +149,116 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
   };
 
   return (
-    <div className="ppm-backdrop" onClick={onClose}>
-      <div className="ppm-modal" onClick={(e) => e.stopPropagation()}>
-        <header className="ppm-header">
-          <div>
-            <h3>ניהול תמונות הנכס</h3>
-            <p>{images.length} תמונות · גרור כדי לסדר · לחץ על ★ להגדרת תמונת השער</p>
-          </div>
-          <button className="btn-ghost" onClick={onClose} aria-label="סגור">
-            <X size={18} />
-          </button>
-        </header>
-
-        <div className="ppm-body">
-          {err && (
-            <div className="ppm-error">
-              <AlertCircle size={14} />
-              {err}
+    <Portal>
+      <div className="ppm-backdrop" onClick={onClose}>
+        <div className="ppm-modal" onClick={(e) => e.stopPropagation()}>
+          <header className="ppm-header">
+            <div>
+              <h3>ניהול תמונות הנכס</h3>
+              <p>{images.length} תמונות · גרור כדי לסדר · לחץ על ★ להגדרת תמונת השער</p>
             </div>
-          )}
+            <button className="btn-ghost" onClick={onClose} aria-label="סגור">
+              <X size={18} />
+            </button>
+          </header>
 
-          {/* Dropzone */}
-          <div
-            className={`ppm-dropzone ${dragOver ? 'is-over' : ''}`}
-            onClick={() => fileInput.current?.click()}
-            onDragOver={onZoneDragOver}
-            onDragLeave={onZoneDragLeave}
-            onDrop={onZoneDrop}
-          >
-            <div className="ppm-dropzone-inner">
-              <div className="ppm-dropzone-icon">
-                {uploading > 0 ? <Loader2 size={28} className="ppm-spin" /> : <Upload size={28} />}
+          <div className="ppm-body">
+            {err && (
+              <div className="ppm-error">
+                <AlertCircle size={14} />
+                {err}
               </div>
-              <strong>{uploading > 0 ? `מעלה ${uploading} תמונות…` : 'לחץ או גרור לכאן תמונות'}</strong>
-              <span>JPG או PNG · ניתן לבחור מספר קבצים יחד</span>
+            )}
+
+            {/* Dropzone */}
+            <div
+              className={`ppm-dropzone ${dragOver ? 'is-over' : ''}`}
+              onClick={() => fileInput.current?.click()}
+              onDragOver={onZoneDragOver}
+              onDragLeave={onZoneDragLeave}
+              onDrop={onZoneDrop}
+            >
+              <div className="ppm-dropzone-inner">
+                <div className="ppm-dropzone-icon">
+                  {uploading > 0 ? <Loader2 size={28} className="ppm-spin" /> : <Upload size={28} />}
+                </div>
+                <strong>{uploading > 0 ? `מעלה ${uploading} תמונות…` : 'לחץ או גרור לכאן תמונות'}</strong>
+                <span>JPG או PNG · ניתן לבחור מספר קבצים יחד</span>
+              </div>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  handleFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
             </div>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/*"
-              multiple
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                handleFiles(e.target.files);
-                e.target.value = '';
-              }}
-            />
+
+            {/* Thumbs */}
+            {images.length === 0 ? (
+              <div className="ppm-empty">
+                <ImageIcon size={36} />
+                <p>עדיין אין תמונות לנכס זה</p>
+                <span>התמונה הראשונה שתעלה תשמש כתמונת השער</span>
+              </div>
+            ) : (
+              <ul className="ppm-grid">
+                {images.map((img, i) => (
+                  <li
+                    key={img.id}
+                    className={`ppm-thumb ${i === 0 ? 'is-cover' : ''} ${dragIndex === i ? 'is-dragging' : ''} ${overIndex === i ? 'is-over' : ''}`}
+                    draggable
+                    onDragStart={onDragStart(i)}
+                    onDragOver={onDragOverItem(i)}
+                    onDrop={onDropItem(i)}
+                    onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+                  >
+                    <img src={img.url} alt={`תמונה ${i + 1}`} draggable={false} />
+                    <div className="ppm-thumb-overlay">
+                      {i === 0 ? (
+                        <span className="ppm-cover-badge">
+                          <Star size={12} fill="currentColor" />
+                          תמונת שער
+                        </span>
+                      ) : (
+                        <button
+                          className="ppm-action-chip"
+                          onClick={() => handleSetCover(img.id)}
+                          disabled={busy}
+                          title="קבע כתמונת שער"
+                        >
+                          <ArrowUpToLine size={13} />
+                          הפוך לשער
+                        </button>
+                      )}
+                      <button
+                        className="ppm-action-chip danger"
+                        onClick={() => handleDelete(img.id)}
+                        disabled={busy}
+                        title="מחק תמונה"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    <span className="ppm-thumb-number">{i + 1}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
-          {/* Thumbs */}
-          {images.length === 0 ? (
-            <div className="ppm-empty">
-              <ImageIcon size={36} />
-              <p>עדיין אין תמונות לנכס זה</p>
-              <span>התמונה הראשונה שתעלה תשמש כתמונת השער</span>
-            </div>
-          ) : (
-            <ul className="ppm-grid">
-              {images.map((img, i) => (
-                <li
-                  key={img.id}
-                  className={`ppm-thumb ${i === 0 ? 'is-cover' : ''} ${dragIndex === i ? 'is-dragging' : ''} ${overIndex === i ? 'is-over' : ''}`}
-                  draggable
-                  onDragStart={onDragStart(i)}
-                  onDragOver={onDragOverItem(i)}
-                  onDrop={onDropItem(i)}
-                  onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
-                >
-                  <img src={img.url} alt={`תמונה ${i + 1}`} draggable={false} />
-                  <div className="ppm-thumb-overlay">
-                    {i === 0 ? (
-                      <span className="ppm-cover-badge">
-                        <Star size={12} fill="currentColor" />
-                        תמונת שער
-                      </span>
-                    ) : (
-                      <button
-                        className="ppm-action-chip"
-                        onClick={() => handleSetCover(img.id)}
-                        disabled={busy}
-                        title="קבע כתמונת שער"
-                      >
-                        <ArrowUpToLine size={13} />
-                        הפוך לשער
-                      </button>
-                    )}
-                    <button
-                      className="ppm-action-chip danger"
-                      onClick={() => handleDelete(img.id)}
-                      disabled={busy}
-                      title="מחק תמונה"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                  <span className="ppm-thumb-number">{i + 1}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <footer className="ppm-footer">
+            <span className="ppm-footer-hint">שינויים נשמרים אוטומטית</span>
+            <button className="btn btn-secondary" onClick={onClose}>
+              סגור
+            </button>
+          </footer>
         </div>
-
-        <footer className="ppm-footer">
-          <span className="ppm-footer-hint">שינויים נשמרים אוטומטית</span>
-          <button className="btn btn-secondary" onClick={onClose}>
-            סגור
-          </button>
-        </footer>
       </div>
-    </div>
+    </Portal>
   );
 }

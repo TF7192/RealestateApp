@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import haptics from './haptics';
 import './toast.css';
 
 const ToastContext = createContext(null);
@@ -21,6 +22,10 @@ export function ToastProvider({ children }) {
     const kind = opts.kind || 'success';
     const duration = opts.duration ?? (kind === 'error' ? 5000 : 2400);
     setItems((cur) => [...cur, { id, message, kind }]);
+    // Fire matching native haptic so toasts feel "physical" on iPhone
+    if (kind === 'success') haptics.success();
+    else if (kind === 'error') haptics.error();
+    else if (kind === 'warning') haptics.warning();
     const tm = setTimeout(() => dismiss(id), duration);
     timers.current.set(id, tm);
     return id;

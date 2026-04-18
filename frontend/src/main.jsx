@@ -6,6 +6,78 @@ import { ToastProvider } from './lib/toast.jsx';
 import './index.css';
 import App from './App.jsx';
 
+// iOS keyboard handling + zoom guards.
+//
+// When a text input gains focus iOS raises the keyboard, which usually hides
+// the field. We:
+//   1. Subscribe to Capacitor's Keyboard plugin (native app only) to get the
+//      exact keyboard height and expose it as a CSS var (--kb-h) so pages can
+//      add bottom padding while the keyboard is up.
+//   2. In both native and web, always scroll the focused element into view
+//      after a frame so nothing is hidden.
+if (typeof window !== 'undefined') {
+  let kbHeight = 0;
+  const setKb = (h) => {
+    kbHeight = h || 0;
+    document.documentElement.style.setProperty('--kb-h', `${kbHeight}px`);
+    document.body.classList.toggle('kb-open', kbHeight > 0);
+  };
+  setKb(0);
+
+  // Hook the Capacitor keyboard plugin when available (iPhone app).
+  import('@capacitor/core').then(({ Capacitor }) => {
+    if (!Capacitor?.isNativePlatform?.()) return;
+    import('@capacitor/keyboard').then(({ Keyboard }) => {
+      Keyboard.addListener('keyboardWillShow', (info) => setKb(info.keyboardHeight));
+      Keyboard.addListener('keyboardDidShow',  (info) => setKb(info.keyboardHeight));
+      Keyboard.addListener('keyboardWillHide', () => setKb(0));
+      Keyboard.addListener('keyboardDidHide',  () => setKb(0));
+    }).catch(() => {});
+  }).catch(() => {});
+
+  // Scroll focused input into view — on both native and web. Uses the
+  // VisualViewport when available (mobile Safari) to measure the actual
+  // visible area after the keyboard opens.
+  const bringIntoView = (el) => {
+    if (!el) return;
+    const vv = window.visualViewport;
+    const rect = el.getBoundingClientRect();
+    const margin = 24; // small buffer so the field isn't flush with the keyboard
+    const viewportH = vv?.height ?? window.innerHeight;
+    if (rect.bottom > viewportH - margin || rect.top < margin) {
+      try {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch { /* ignore */ }
+    }
+  };
+  document.addEventListener('focusin', (e) => {
+    const t = e.target;
+    if (!t) return;
+    const tag = (t.tagName || '').toLowerCase();
+    if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return;
+    // Wait for the keyboard animation to finish before measuring
+    setTimeout(() => bringIntoView(t), 320);
+    setTimeout(() => bringIntoView(t), 650);
+  });
+  // Re-run on visualViewport resize (keyboard opens/closes)
+  window.visualViewport?.addEventListener('resize', () => {
+    const el = document.activeElement;
+    if (!el) return;
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') bringIntoView(el);
+  });
+
+  // Belt-and-suspenders: block multi-touch pinch-zoom + double-tap zoom.
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('gesturechange', (e) => e.preventDefault());
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>

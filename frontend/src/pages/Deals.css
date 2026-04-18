@@ -98,11 +98,11 @@
   .deal-form-grid { grid-template-columns: 1fr; }
 }
 
-/* Kanban */
+/* Kanban (P1-D2 — horizontal at ≥1000 px) */
 .deals-kanban {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 16px;
   min-height: 420px;
 }
 
@@ -116,6 +116,34 @@
 }
 
 .dk-col.dk-fell_through { opacity: 0.75; }
+
+/* P2-D3 — empty stages collapse to a 24px row showing just the label */
+@media (min-width: 1000px) {
+  .dk-col-empty {
+    max-height: 24px;
+    min-height: 24px;
+    overflow: hidden;
+    align-self: flex-start;
+  }
+
+  .dk-col-empty .dk-head {
+    padding: 4px 12px;
+    border-bottom: none;
+    background: transparent;
+    min-height: 24px;
+    line-height: 16px;
+  }
+
+  .dk-col-empty .dk-title { font-size: 11px; }
+
+  .dk-col-empty .dk-count {
+    padding: 0 6px;
+    font-size: 10px;
+    min-width: 18px;
+  }
+
+  .dk-col-empty .dk-body { display: none; }
+}
 
 .dk-head {
   display: flex;
@@ -218,34 +246,219 @@
   font-size: 12px;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 999px) {
   .deals-kanban { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ──────────────────────────────────────────────────────────────
+ * Deals page — mobile polish
+ * ──────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
-  /* Horizontal swipe kanban on phones — each column is a near-full-width panel */
+  .deals-page { overflow-x: hidden; }
+
+  /* Vertical stack of status sections on mobile — no horizontal scroll */
   .deals-kanban {
     display: flex;
+    flex-direction: column;
     grid-template-columns: unset;
-    gap: 12px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
-    padding-bottom: 6px;
+    gap: 10px;
+    min-height: 0;
   }
 
   .dk-col {
-    flex: 0 0 82%;
-    scroll-snap-align: start;
     max-height: none;
+    border-radius: 16px;
+    background: var(--bg-card);
+  }
+
+  .dk-col.dk-fell_through {
+    opacity: 1;
+  }
+
+  .dk-head {
+    padding: 12px 16px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .dk-title {
+    font-size: 14px;
+    letter-spacing: -0.1px;
+  }
+
+  .dk-count {
+    padding: 3px 10px;
+    font-size: 11px;
   }
 
   .dk-body {
-    max-height: 60vh;
+    max-height: none;
+    overflow: visible;
+    padding: 8px 10px 12px;
+    gap: 8px;
   }
 
+  .dk-card {
+    padding: 14px;
+    border-radius: 12px;
+    gap: 8px;
+    box-shadow: 0 1px 2px rgba(30, 26, 20, 0.04);
+  }
+
+  .dk-card h5 {
+    font-size: 15px;
+    letter-spacing: -0.1px;
+  }
+
+  .dk-prices {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 0 4px;
+    gap: 12px;
+  }
+
+  .dk-price-main {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .dk-price-offer {
+    font-size: 12px;
+  }
+
+  .dk-actions {
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .dk-actions .btn {
+    min-height: 40px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+
+  /* When tab = signed / all, the existing card grid kicks in — tighten it */
+  .deals-cards {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .deal-card {
+    border-radius: 16px;
+    padding: 2px;
+    box-shadow: 0 1px 2px rgba(30, 26, 20, 0.04);
+  }
+
+  .deal-card-top {
+    padding: 14px 16px 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .deal-property-info h4 {
+    font-size: 16px;
+    letter-spacing: -0.2px;
+  }
+
+  .deal-date {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .deal-prices {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 10px 14px;
+    margin: 0 14px;
+    border-radius: 12px;
+  }
+
+  .deal-agents {
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 16px 4px;
+    margin-top: 6px;
+  }
+
+  .deal-actions {
+    padding: 12px 14px 14px;
+    gap: 8px;
+  }
+
+  .deal-actions .btn {
+    min-height: 42px;
+    border-radius: 12px;
+  }
+
+  /* Filter bar — keep horizontal-scroll but contain it properly and remove the
+     screen-cutting overflow that caused the bug */
+  .deals-page .filters-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0;
+    margin: 0 0 12px;
+    background: transparent;
+    border: none;
+  }
+
+  .deals-page .filter-tabs {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 3px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .deals-page .filter-tabs::-webkit-scrollbar { display: none; }
+
+  .deals-page .filter-tab {
+    flex: 1;
+    min-width: auto;
+    padding: 9px 10px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+
+  .deals-page .filter-tab.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px rgba(30, 26, 20, 0.08);
+    font-weight: 600;
+  }
+
+  .deals-page .filter-count {
+    font-size: 10px;
+    opacity: 0.75;
+  }
+
+  /* Totals bar on signed tab — full width, smaller */
   .deals-totals {
     width: 100%;
+    gap: 10px;
+  }
+
+  .deals-total {
+    flex: 1;
+    padding: 10px 14px;
+    min-width: 0;
+    border-radius: 14px;
+  }
+
+  .dt-value {
+    font-size: 16px;
+    letter-spacing: -0.2px;
+  }
+
+  .dt-label {
+    font-size: 11px;
   }
 }
 

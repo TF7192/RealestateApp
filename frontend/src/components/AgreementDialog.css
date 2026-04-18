@@ -186,3 +186,73 @@
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
 }
+
+/* Mobile — modal becomes a full-height sheet */
+@media (max-width: 640px) {
+  .agreement-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .agreement-modal {
+    max-height: 94vh;
+    border-radius: 22px 22px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: ag-sheet-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @keyframes ag-sheet-in {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .agreement-header {
+    position: relative;
+    padding: 18px 20px 12px;
+  }
+
+  .agreement-header::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 5px;
+    border-radius: 99px;
+    background: var(--border-light);
+  }
+
+  .agreement-body {
+    padding: 14px 18px 20px;
+  }
+
+  /* Bigger form inputs inside modal forms (edit dialogs) */
+  .agreement-modal .form-input,
+  .agreement-modal .form-select,
+  .agreement-modal .form-textarea {
+    min-height: 48px;
+    font-size: 16px;
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  .deal-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .deal-form-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+
+  .deal-form-actions .btn {
+    width: 100%;
+    min-height: 50px;
+    justify-content: center;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+}

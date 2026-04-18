@@ -9,7 +9,8 @@ import {
   Handshake,
 } from 'lucide-react';
 import api from '../lib/api';
-import { relativeTime, absoluteTime } from '../lib/time';
+import { absoluteTime } from '../lib/time';
+import { relativeDate } from '../lib/relativeDate';
 import './Deals.css';
 
 const STATUS_OPTIONS = [
@@ -90,7 +91,7 @@ export default function Deals() {
   };
 
   return (
-    <div className="deals-page">
+    <div className="deals-page app-wide-cap">
       <div className="page-header animate-in">
         <div className="page-header-info">
           <h2>עסקאות</h2>
@@ -189,9 +190,17 @@ export default function Deals() {
                     </span>
                   </div>
                 </div>
-                <span className="deal-date" title={absoluteTime(deal.updateDate)}>
-                  {relativeTime(deal.updateDate)}
-                </span>
+                {(() => {
+                  const rel = relativeDate(deal.updateDate);
+                  return (
+                    <span
+                      className={`deal-date rel-${rel.severity}`}
+                      title={absoluteTime(deal.updateDate)}
+                    >
+                      {rel.label}
+                    </span>
+                  );
+                })()}
               </div>
 
               <div className="deal-prices">
@@ -285,8 +294,12 @@ function DealsKanban({ deals, onEdit, onSign }) {
     <div className="deals-kanban animate-in animate-in-delay-2">
       {columns.map((col) => {
         const colDeals = deals.filter((d) => d.status === col.key);
+        const isEmpty = colDeals.length === 0;
         return (
-          <div key={col.key} className={`dk-col dk-${col.key.toLowerCase()}`}>
+          <div
+            key={col.key}
+            className={`dk-col dk-${col.key.toLowerCase()} ${isEmpty ? 'dk-col-empty' : ''}`}
+          >
             <header className="dk-head">
               <span className="dk-title">{col.label}</span>
               <span className="dk-count">{colDeals.length}</span>

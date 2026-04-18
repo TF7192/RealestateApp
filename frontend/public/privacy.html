@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Estia · מדיניות פרטיות</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7f3ec;
+      --card: #ffffff;
+      --text: #1e1a14;
+      --muted: #54503e;
+      --soft: #8b8574;
+      --border: rgba(30, 26, 20, 0.08);
+      --gold: #b48b4c;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Assistant', -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { line-height: 1.75; }
+    header {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 56px 24px 28px;
+      text-align: right;
+      border-bottom: 1px solid var(--border);
+    }
+    header .eyebrow {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(180, 139, 76, 0.14);
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin: 0 0 6px;
+    }
+    header p { margin: 0; color: var(--muted); font-size: 15px; }
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 28px 24px 80px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 34px 0 10px;
+      letter-spacing: -0.2px;
+    }
+    h2::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 18px;
+      background: var(--gold);
+      margin-left: 10px;
+      border-radius: 2px;
+      transform: translateY(2px);
+    }
+    p, li {
+      font-size: 15px;
+      color: var(--text);
+    }
+    ul { padding-right: 22px; margin: 8px 0 10px; }
+    li { margin-bottom: 4px; }
+    code {
+      background: rgba(30, 26, 20, 0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', Menlo, monospace;
+      font-size: 13px;
+      color: var(--gold);
+      direction: ltr;
+      display: inline-block;
+    }
+    .contact {
+      margin-top: 36px;
+      padding: 20px 22px;
+      border-radius: 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+    .contact strong { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; }
+    .contact a { color: var(--gold); font-weight: 600; text-decoration: none; }
+    footer {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 24px 24px 40px;
+      text-align: center;
+      color: var(--soft);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+    .updated {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="eyebrow">Estia</span>
+    <h1>מדיניות פרטיות</h1>
+    <p>יישום Estia — פלטפורמה לניהול נכסים, לידים ועסקאות עבור סוכני נדל״ן.</p>
+    <span class="updated">עדכון אחרון: 17 באפריל 2026</span>
+  </header>
+
+  <main>
+    <h2>למי המסמך מיועד</h2>
+    <p>
+      מסמך זה חל על אפליקציית Estia באייפון ועל הגרסה האינטרנטית של השירות
+      בכתובת <code>estia.tripzio.xyz</code>. השירות מיועד לשימוש סוכני נדל״ן
+      לניהול הפעילות העסקית שלהם.
+    </p>
+
+    <h2>מהם הנתונים שאנו אוספים</h2>
+    <ul>
+      <li>פרטי חשבון של הסוכן — שם, אימייל, טלפון, תמונת פרופיל (אופציונלי) וביוגרפיה.</li>
+      <li>פרטי נכסים שהסוכן מזין — כתובת, מחיר, שטח, תמונות, סרטונים, הערות.</li>
+      <li>פרטי לידים ולקוחות שהסוכן מזין — שם, טלפון, אימייל, תקציב, תאריכי הסכם תיווך.</li>
+      <li>עסקאות — מחיר סגירה, עמלות, שותפים ועו״ד.</li>
+      <li>מיקום — רק אם הסוכן הפעיל את ההרשאה, לצורך חיפוש נכסים קרובים.</li>
+      <li>נתוני התחברות — קוקיז של JWT ותאריך הכניסה האחרון.</li>
+    </ul>
+
+    <h2>למה אנו משתמשים בנתונים</h2>
+    <ul>
+      <li>הפעלת השירות עצמו — שמירה, עריכה וצפייה בנכסים ובלקוחות.</li>
+      <li>שיתוף קטלוג אישי ציבורי של הסוכן (URL ייחודי) שמציג רק את נכסיו.</li>
+      <li>שליחת הודעות וואטסאפ יזומות על ידי הסוכן (הודעה מופקת במכשיר, נפתחת באפליקציית וואטסאפ — המערכת לא שולחת הודעות באופן עצמאי).</li>
+      <li>תזכורות על פעולות שיווק.</li>
+    </ul>
+
+    <h2>שיתוף מידע עם צדדים שלישיים</h2>
+    <p>
+      אנו <strong>לא מוכרים</strong> ולא משכירים את הנתונים שלך. המידע נשמר
+      בשרתים שלנו. מידע הקשור לנכסים מסוימים מוצג באופן ציבורי רק בקישור הקטלוג
+      שהסוכן בחר לשתף (<code>/a/:id</code>) ובעמוד נכס ציבורי (<code>/p/:id</code>),
+      לפי בחירתו.
+    </p>
+
+    <h2>שמירה ואחסון</h2>
+    <ul>
+      <li>נתוני טקסט נשמרים ב-Postgres על שרת EC2 באזור EU (אירלנד/שטוקהולם).</li>
+      <li>תמונות, סרטונים וקבצים חתומים נשמרים על אחסון מקומי של השרת.</li>
+      <li>גיבויים שבועיים עם שמירה של 30 ימים.</li>
+      <li>סיסמאות נשמרות לאחר hashing עם argon2.</li>
+    </ul>
+
+    <h2>הרשאות באייפון</h2>
+    <ul>
+      <li><strong>מצלמה ותמונות:</strong> לצילום והוספת תמונות של נכסים.</li>
+      <li><strong>מיקום:</strong> לחיפוש נכסים לפי קרבה בלבד. ניתן לבטל בכל עת בהגדרות iOS.</li>
+      <li><strong>אנשי קשר:</strong> להאצת הוספת לקוחות (אופציונלי).</li>
+    </ul>
+
+    <h2>הזכויות שלך</h2>
+    <p>
+      בהתאם לחוק הגנת הפרטיות הישראלי, הנך זכאי:
+    </p>
+    <ul>
+      <li>לעיין במידע שלך ובמידע שקלטת.</li>
+      <li>לבקש תיקון או מחיקה של המידע.</li>
+      <li>לבקש ייצוא של הנתונים לקובץ.</li>
+      <li>לבטל את החשבון — כל המידע יימחק תוך 30 ימים.</li>
+    </ul>
+
+    <h2>קוקיז וטכנולוגיות דומות</h2>
+    <p>
+      האתר משתמש בקוקי אחד בלבד: <code>estia_token</code> — מזהה JWT חתום
+      לצורך זיהוי הסוכן המחובר. אין שימוש בקוקיז שיווקיים או בצדדים שלישיים
+      מעקביים.
+    </p>
+
+    <h2>ילדים</h2>
+    <p>
+      השירות מיועד לסוכני נדל״ן בוגרים. איננו אוספים מידע במתכוון על ילדים
+      מתחת לגיל 16.
+    </p>
+
+    <h2>שינויים במדיניות</h2>
+    <p>
+      אם נעדכן את המדיניות נפרסם את הגרסה המעודכנת בעמוד זה ונעדכן את התאריך
+      למעלה. שינויים מהותיים יופיעו גם בתוך האפליקציה.
+    </p>
+
+    <div class="contact">
+      <strong>צרו קשר</strong>
+      לכל שאלה או בקשה הקשורה לנתונים שלך:<br>
+      <a href="mailto:hello@tripzio.xyz">hello@tripzio.xyz</a>
+    </div>
+  </main>
+
+  <footer>
+    Estia · מערכת לסוכני נדל״ן
+  </footer>
+</body>
+</html>

@@ -11,24 +11,26 @@
     "scheme": "Estia",
     "allowsLinkPreview": false,
     "overrideUserAgent": "Estia/1.0 (iOS)",
-    "backgroundColor": "#0d0f14"
+    "backgroundColor": "#f7f3ec",
+    "supportedOrientations": ["portrait"]
   },
   "android": {
     "allowMixedContent": false,
     "captureInput": true,
     "webContentsDebuggingEnabled": true,
-    "backgroundColor": "#0d0f14"
+    "backgroundColor": "#f7f3ec"
   },
   "server": {
-    "hostname": "estia.local",
+    "url": "https://estia.tripzio.xyz",
+    "cleartext": false,
     "androidScheme": "https",
-    "iosScheme": "capacitor"
+    "iosScheme": "https"
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 1200,
+      "launchShowDuration": 1000,
       "launchAutoHide": true,
-      "backgroundColor": "#0d0f14",
+      "backgroundColor": "#f7f3ec",
       "androidScaleType": "CENTER_CROP",
       "showSpinner": false,
       "splashFullScreen": true,
@@ -36,14 +38,14 @@
       "useDialog": false
     },
     "StatusBar": {
-      "style": "DARK",
-      "backgroundColor": "#0d0f14",
+      "style": "LIGHT",
+      "backgroundColor": "#f7f3ec",
       "overlaysWebView": false
     },
     "Keyboard": {
-      "resize": "native",
+      "resize": "body",
       "resizeOnFullScreen": true,
-      "style": "DARK"
+      "style": "DEFAULT"
     },
     "Haptics": {},
     "Preferences": {

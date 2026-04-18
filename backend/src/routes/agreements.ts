@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { putUpload } from '../lib/storage.js';
 
 const sendSchema = z.object({
   leadId: z.string().nullable().optional(),
@@ -54,15 +55,12 @@ export const registerAgreementRoutes: FastifyPluginAsync = async (app) => {
     if (!agreement) return reply.code(404).send({ error: { message: 'Not found' } });
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: { message: 'No file' } });
-    const uploadsDir = path.resolve(process.env.UPLOADS_DIR || './uploads');
-    const subDir = path.join(uploadsDir, 'agreements', id);
-    await fs.mkdir(subDir, { recursive: true });
     const ext = path.extname(file.filename) || '.pdf';
     const name = `${crypto.randomUUID()}${ext}`;
-    const filePath = path.join(subDir, name);
+    const key = `agreements/${id}/${name}`;
     const buffer = await file.toBuffer();
-    await fs.writeFile(filePath, buffer);
-    const rel = path.relative(uploadsDir, filePath).replaceAll(path.sep, '/');
+    await putUpload(key, buffer, file.mimetype);
+    const rel = key;
     const uploaded = await prisma.uploadedFile.create({
       data: {
         ownerId: requireUser(req).id,

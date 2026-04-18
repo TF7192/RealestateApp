@@ -18,6 +18,12 @@ import { registerLookupRoutes } from './routes/lookups.js';
 import { registerReportRoutes } from './routes/reports.js';
 import { registerMeRoutes } from './routes/me.js';
 import { registerAgentRoutes } from './routes/agents.js';
+import { registerTransferRoutes } from './routes/transfers.js';
+import { registerTemplateRoutes } from './routes/templates.js';
+import { registerGeoRoutes } from './routes/geo.js';
+import { registerPublicRoutes } from './routes/public.js';
+import { registerOwnerRoutes } from './routes/owners.js';
+import { storageBackend, resolveUpload } from './lib/storage.js';
 import { authPlugin } from './middleware/auth.js';
 
 const PORT = Number(process.env.PORT || 4000);
@@ -66,12 +72,30 @@ async function build() {
     timeWindow: '1 minute',
     allowList: (req) => req.url.startsWith('/api/health'),
   });
-  await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
-  await app.register(fastifyStatic, {
-    root: UPLOADS_DIR,
-    prefix: '/uploads/',
-    decorateReply: false,
-  });
+  // 100MB cap covers property photos and short property video tours.
+  await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } });
+  // /uploads/* serving — exactly one of these mounts depending on backend:
+  //   • s3:    a 302-redirect handler that signs a 1h presigned URL
+  //   • local: fastifyStatic served from the on-disk uploads dir
+  if (storageBackend === 's3') {
+    app.get('/uploads/*', async (req, reply) => {
+      const key = (req.params as any)['*'] as string;
+      if (!key) return reply.code(404).send({ error: { message: 'Not found' } });
+      try {
+        const r = await resolveUpload(key);
+        if (r.kind === 'redirect') return reply.redirect(302, r.url);
+        return reply.sendFile(key);
+      } catch (e: any) {
+        return reply.code(404).send({ error: { message: 'Not found' } });
+      }
+    });
+  } else {
+    await app.register(fastifyStatic, {
+      root: UPLOADS_DIR,
+      prefix: '/uploads/',
+      decorateReply: false,
+    });
+  }
 
   await app.register(authPlugin);
 
@@ -90,6 +114,11 @@ async function build() {
   await app.register(registerLookupRoutes, { prefix: '/api/lookups' });
   await app.register(registerReportRoutes, { prefix: '/api/reports' });
   await app.register(registerAgentRoutes, { prefix: '/api/agents' });
+  await app.register(registerTransferRoutes, { prefix: '/api' });
+  await app.register(registerTemplateRoutes, { prefix: '/api/templates' });
+  await app.register(registerGeoRoutes, { prefix: '/api/geo' });
+  await app.register(registerPublicRoutes, { prefix: '/api/public' });
+  await app.register(registerOwnerRoutes, { prefix: '/api/owners' });
 
   app.setErrorHandler((err, req, reply) => {
     req.log.error({ err }, 'request failed');

@@ -1,4 +1,5 @@
 import { X, AlertTriangle } from 'lucide-react';
+import Portal from './Portal';
 import './ConfirmDialog.css';
 
 export default function ConfirmDialog({
@@ -12,6 +13,7 @@ export default function ConfirmDialog({
   busy = false,
 }) {
   return (
+    <Portal>
     <div className="confirm-backdrop" onClick={onClose}>
       <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
         <header className="confirm-header">
@@ -40,5 +42,6 @@ export default function ConfirmDialog({
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

@@ -19,6 +19,9 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import api from '../lib/api';
+import StickyActionBar from '../components/StickyActionBar';
+import WhatsAppIcon from '../components/WhatsAppIcon';
+import { useViewportMobile } from '../hooks/mobile';
 import './CustomerPropertyView.css';
 
 function formatPrice(price) {
@@ -28,17 +31,30 @@ function formatPrice(price) {
 }
 
 export default function CustomerPropertyView() {
-  const { id } = useParams();
+  // Supports BOTH route shapes:
+  //   /agents/:agentSlug/:propertySlug  (SEO-friendly)
+  //   /p/:id                            (legacy short)
+  const { id, agentSlug, propertySlug } = useParams();
   const [property, setProperty] = useState(null);
   const [agent, setAgent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
+  const isMobile = useViewportMobile();
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
+        // Slug route → fetch via /api/public/agents/:slug/properties/:slug
+        if (agentSlug && propertySlug) {
+          const r = await api.publicProperty(agentSlug, propertySlug);
+          if (cancelled) return;
+          setProperty(r.property);
+          setAgent(r.agent);
+          return;
+        }
+        // Legacy id route
         const res = await api.getProperty(id);
         if (cancelled) return;
         setProperty(res.property);
@@ -56,7 +72,7 @@ export default function CustomerPropertyView() {
     }
     load();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, agentSlug, propertySlug]);
 
   if (loading) {
     return (
@@ -86,7 +102,11 @@ export default function CustomerPropertyView() {
   const agentName = agent?.displayName || 'סוכן';
   const agentPhone = agent?.phone || '';
   const agentPhoneDigits = agentPhone.replace(/[^0-9]/g, '');
-  const agentBackLink = agent?.id ? `/a/${agent.id}` : null;
+  const agentBackLink = agent?.slug
+    ? `/agents/${agent.slug}`
+    : agent?.id
+      ? `/a/${agent.id}`
+      : null;
 
   const handleWhatsApp = () => {
     const text = `שלום, אני מתעניין/ת בנכס ב${property.street}, ${property.city}. אשמח לפרטים נוספים.`;
@@ -332,6 +352,17 @@ export default function CustomerPropertyView() {
             </div>
           </div>
 
+          {property.videos?.length > 0 && (
+            <div className="cpv-videos">
+              <h3>סרטונים ({property.videos.length})</h3>
+              <div className="cpv-videos-grid">
+                {property.videos.map((v) => (
+                  <CpvVideo key={v.id} video={v} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {property.notes && (
             <div className="cpv-notes">
               <h3>תיאור</h3>
@@ -362,7 +393,7 @@ export default function CustomerPropertyView() {
                 <MessageCircle size={20} />
                 שלח הודעה בוואטסאפ
               </button>
-              {agentPhone && (
+              {agentPhone && !isMobile && (
                 <a
                   href={`tel:${agentPhone}`}
                   className="btn btn-secondary btn-lg cpv-contact-btn"
@@ -376,18 +407,65 @@ export default function CustomerPropertyView() {
         </aside>
       </div>
 
-      <div className="cpv-mobile-bar">
+      <StickyActionBar visible className="sab-icons cpv-sab">
         {agentPhone && (
-          <a href={`tel:${agentPhone}`} className="btn btn-secondary">
+          <a
+            href={`tel:${agentPhone}`}
+            className="btn btn-primary"
+            aria-label="התקשר"
+          >
             <Phone size={18} />
             התקשר
           </a>
         )}
-        <button className="btn btn-primary" onClick={handleWhatsApp}>
-          <MessageCircle size={18} />
+        <button
+          type="button"
+          className="btn cpv-wa-btn"
+          onClick={handleWhatsApp}
+          aria-label="וואטסאפ"
+        >
+          <WhatsAppIcon size={18} />
           וואטסאפ
         </button>
-      </div>
+      </StickyActionBar>
     </div>
+  );
+}
+
+function embedUrl(url) {
+  const yt = url.match(/(?:youtu\.be\/|youtube\.com\/watch\?v=|youtube\.com\/embed\/)([\w-]{11})/)?.[1];
+  if (yt) return `https://www.youtube.com/embed/${yt}?rel=0&playsinline=1`;
+  const vimeo = url.match(/vimeo\.com\/(\d+)/)?.[1];
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo}`;
+  return null;
+}
+
+function CpvVideo({ video }) {
+  if (video.kind === 'upload' || video.url?.startsWith('/uploads/')) {
+    return (
+      <div className="cpv-video">
+        <video src={video.url} controls preload="metadata" playsInline />
+        {video.title && <span className="cpv-video-caption">{video.title}</span>}
+      </div>
+    );
+  }
+  const embed = embedUrl(video.url);
+  if (embed) {
+    return (
+      <div className="cpv-video">
+        <iframe
+          title={video.title || 'וידאו'}
+          src={embed}
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+  return (
+    <a className="cpv-video-link" href={video.url} target="_blank" rel="noreferrer">
+      ▶ צפה בסרטון
+    </a>
   );
 }

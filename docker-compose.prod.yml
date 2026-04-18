@@ -1,0 +1,75 @@
+# Production compose — single-host deployment.
+#
+# Differences vs docker-compose.yml:
+#   • Redis dropped (zero references in backend source).
+#   • Frontend exposes only 3001 bound to 127.0.0.1 (nginx on the host
+#     terminates TLS and proxies to it).
+#   • Backend uses S3 for uploads when UPLOADS_BACKEND=s3.
+#   • Bigger log rotation cap so containers don't fill the EBS volume.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-estia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-estia}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Bind to localhost only — DB is never reachable from the public internet.
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-estia} -d ${POSTGRES_DB:-estia}"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-estia}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-estia}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-https://estia.tripzio.xyz}
+      UPLOADS_BACKEND: ${UPLOADS_BACKEND:-s3}
+      UPLOADS_DIR: /app/uploads
+      S3_BUCKET: ${S3_BUCKET:-estia-prod}
+      S3_REGION: ${S3_REGION:-eu-north-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    volumes:
+      - uploads_data:/app/uploads   # local fallback used only when UPLOADS_BACKEND=local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT:-6002}:4000"
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on: [ backend ]
+    ports:
+      - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-3001}:80"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  postgres_data:
+  uploads_data:

@@ -9,8 +9,6 @@ import {
   Thermometer,
   Snowflake,
   Calendar,
-  FileSignature,
-  FileCheck2,
 } from 'lucide-react';
 import {
   leads,
@@ -73,13 +71,6 @@ export default function Leads() {
     window.open(
       `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`,
       '_blank'
-    );
-  };
-
-  const handleSendForSignature = (lead) => {
-    alert(
-      `נשלח להסכם תיווך דיגיטלי אל ${lead.name} (${lead.phone}).\n` +
-        'לאחר החתימה הקובץ יצורף אוטומטית לכרטיס הלקוח.'
     );
   };
 
@@ -198,23 +189,6 @@ export default function Leads() {
                   )}
                 </span>
               </div>
-              <div className="lcd-row">
-                <span className="lcd-label">חתימת הסכם תיווך</span>
-                <span className="lcd-value">{lead.brokerageSignedAt || '—'}</span>
-              </div>
-              <div className="lcd-row">
-                <span className="lcd-label">סיום הסכם תיווך</span>
-                <span className="lcd-value">{lead.brokerageExpiresAt || '—'}</span>
-              </div>
-              {lead.signedAgreementFile && (
-                <div className="lcd-row">
-                  <span className="lcd-label">קובץ חתום</span>
-                  <span className="lcd-value signed-file">
-                    <FileCheck2 size={13} />
-                    {lead.signedAgreementFile}
-                  </span>
-                </div>
-              )}
               {lead.propertiesViewed.length > 0 && (
                 <div className="lcd-row">
                   <span className="lcd-label">נכסים שנצפו</span>
@@ -257,14 +231,6 @@ export default function Leads() {
                   <Phone size={14} />
                   {lead.phone}
                 </a>
-                <button
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => handleSendForSignature(lead)}
-                  title="שליחת הסכם לחתימה דיגיטלית"
-                >
-                  <FileSignature size={14} />
-                  חתימה
-                </button>
                 <button
                   className="btn btn-sm btn-primary"
                   onClick={() => handleWhatsApp(lead)}

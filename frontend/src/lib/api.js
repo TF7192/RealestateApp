@@ -69,6 +69,41 @@ export const api = {
   reorderPropertyImages: (id, order) =>
     request(`/properties/${id}/images/reorder`, { method: 'PUT', body: { order } }),
 
+  // Property videos
+  listPropertyVideos: (id) => request(`/properties/${id}/videos`),
+  uploadPropertyVideo: (id, file, onProgress) => {
+    // Use XHR for upload progress (fetch doesn't expose it)
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${BASE}/properties/${id}/videos`, true);
+      xhr.withCredentials = true;
+      xhr.upload.onprogress = (e) => {
+        if (onProgress && e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { resolve({}); }
+        } else {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            reject(new Error(data?.error?.message || `HTTP ${xhr.status}`));
+          } catch { reject(new Error(`HTTP ${xhr.status}`)); }
+        }
+      };
+      xhr.onerror = () => reject(new Error('העלאה נכשלה'));
+      const fd = new FormData();
+      fd.append('file', file);
+      xhr.send(fd);
+    });
+  },
+  addExternalVideo: (id, body) =>
+    request(`/properties/${id}/videos/external`, { method: 'POST', body }),
+  deletePropertyVideo: (id, videoId) =>
+    request(`/properties/${id}/videos/${videoId}`, { method: 'DELETE' }),
+
   listLeads: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/leads${qs ? `?${qs}` : ''}`);
@@ -109,6 +144,47 @@ export const api = {
     const qs = new URLSearchParams({ agentId, ...params }).toString();
     return request(`/properties?${qs}`);
   },
+
+  // Reverse-geocode (uses Nominatim through our backend so the
+  // server-side User-Agent header is set + rate-limit is shared).
+  reverseGeocode: (lat, lon) =>
+    request(`/geo/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`),
+
+  // SEO public routes
+  publicAgent: (agentSlug) => request(`/public/agents/${encodeURIComponent(agentSlug)}`),
+  publicProperty: (agentSlug, propertySlug) =>
+    request(`/public/agents/${encodeURIComponent(agentSlug)}/properties/${encodeURIComponent(propertySlug)}`),
+  // Lookup helper: given an internal property id, returns the slug pair
+  // so the dashboard can build a marketable URL. Auth-free.
+  lookupPropertySlug: (id) =>
+    request(`/public/lookup/property/${encodeURIComponent(id)}`),
+
+  // Owners
+  listOwners:        () => request('/owners'),
+  getOwner:          (id) => request(`/owners/${id}`),
+  createOwner:       (body) => request('/owners', { method: 'POST', body }),
+  updateOwner:       (id, body) => request(`/owners/${id}`, { method: 'PATCH', body }),
+  deleteOwner:       (id) => request(`/owners/${id}`, { method: 'DELETE' }),
+  searchOwners:      (q) => request(`/owners/search?q=${encodeURIComponent(q)}`),
+
+  // Message templates
+  listTemplates: () => request('/templates'),
+  saveTemplate: (kind, body) =>
+    request(`/templates/${kind}`, { method: 'PUT', body: { body } }),
+  resetTemplate: (kind) =>
+    request(`/templates/${kind}`, { method: 'DELETE' }),
+
+  // Property transfers
+  searchAgentByEmail: (email) =>
+    request(`/transfers/agents/search?email=${encodeURIComponent(email)}`),
+  listTransfers: () => request('/transfers'),
+  initiateTransfer: (propertyId, body) =>
+    request(`/properties/${propertyId}/transfer`, { method: 'POST', body }),
+  logWhatsappTransfer: (propertyId) =>
+    request(`/properties/${propertyId}/transfer/whatsapp`, { method: 'POST' }),
+  acceptTransfer: (id) => request(`/transfers/${id}/accept`, { method: 'POST' }),
+  declineTransfer: (id) => request(`/transfers/${id}/decline`, { method: 'POST' }),
+  cancelTransfer: (id) => request(`/transfers/${id}/cancel`, { method: 'POST' }),
 };
 
 export default api;

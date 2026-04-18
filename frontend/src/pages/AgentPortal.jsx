@@ -23,7 +23,12 @@ function formatPrice(price) {
 }
 
 export default function AgentPortal() {
-  const { agentId } = useParams();
+  // Supports BOTH route shapes:
+  //   /agents/:agentSlug  (SEO-friendly)
+  //   /a/:agentId         (legacy short)
+  const params = useParams();
+  const agentKey = params.agentSlug || params.agentId;
+  const isSlugRoute = !!params.agentSlug;
   const [agent, setAgent] = useState(null);
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,13 +50,22 @@ export default function AgentPortal() {
     let cancelled = false;
     async function run() {
       try {
-        const [a, p] = await Promise.all([
-          api.getAgentPublic(agentId),
-          api.listAgentProperties(agentId, { status: 'ACTIVE' }),
-        ]);
-        if (!cancelled) {
-          setAgent(a.agent);
-          setProperties(p.items || []);
+        if (isSlugRoute) {
+          // New SEO endpoint returns agent + properties in one shot
+          const r = await api.publicAgent(agentKey);
+          if (!cancelled) {
+            setAgent(r.agent);
+            setProperties(r.properties || []);
+          }
+        } else {
+          const [a, p] = await Promise.all([
+            api.getAgentPublic(agentKey),
+            api.listAgentProperties(agentKey, { status: 'ACTIVE' }),
+          ]);
+          if (!cancelled) {
+            setAgent(a.agent);
+            setProperties(p.items || []);
+          }
         }
       } catch (e) {
         if (!cancelled) setError(e.message || 'שגיאה בטעינה');
@@ -61,7 +75,7 @@ export default function AgentPortal() {
     }
     run();
     return () => { cancelled = true; };
-  }, [agentId]);
+  }, [agentKey, isSlugRoute]);
 
   const filtered = useMemo(() => {
     return properties.filter((p) => {
@@ -269,6 +283,10 @@ export default function AgentPortal() {
 
         <div className="ap-grid">
           {filtered.map((p) => {
+            const propPath =
+              p.slug && agent?.slug
+                ? `/agents/${encodeURI(agent.slug)}/${encodeURI(p.slug)}`
+                : `/p/${p.id}`;
             const interest = () => {
               const text = [
                 `שלום ${agent.displayName},`,
@@ -276,7 +294,7 @@ export default function AgentPortal() {
                 `(מחיר: ${formatPrice(p.marketingPrice)})`,
                 'אשמח לפרטים נוספים / תיאום ביקור.',
                 '',
-                `${window.location.origin}/p/${p.id}`,
+                `${window.location.origin}${propPath}`,
               ].join('\n');
               const digits = (agent.phone || '').replace(/[^0-9]/g, '');
               const url = digits
@@ -286,7 +304,7 @@ export default function AgentPortal() {
             };
             return (
               <div key={p.id} className="ap-card">
-                <Link to={`/p/${p.id}`} className="ap-card-inner">
+                <Link to={propPath} className="ap-card-inner">
                   <div className="ap-card-image">
                     <img src={p.images?.[0] || 'https://via.placeholder.com/800x450'} alt={p.street} loading="lazy" />
                     <div className="ap-card-badges">

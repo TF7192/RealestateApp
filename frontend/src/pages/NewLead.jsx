@@ -1,54 +1,106 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save } from 'lucide-react';
+import { ArrowRight, Save, Clipboard, X } from 'lucide-react';
 import { cityNames, streetNames } from '../data/mockData';
+import { useToast } from '../lib/toast';
+import StickyActionBar from '../components/StickyActionBar';
+import { RoomsChips, SuggestPicker } from '../components/MobilePickers';
+import { useDraftAutosave, readDraft, useClipboardPhone } from '../hooks/mobile';
+import {
+  inputPropsForName,
+  inputPropsForCity,
+  inputPropsForAddress,
+} from '../lib/inputProps';
+import { PhoneField, PriceRange, Segmented, SelectField } from '../components/SmartFields';
 import './Forms.css';
+
+const DRAFT_KEY = 'estia-draft:new-lead';
+
+const INITIAL_FORM = {
+  name: '',
+  phone: '',
+  interestType: 'פרטי',
+  lookingFor: 'buy',
+  city: '',
+  street: '',
+  roomsMin: '',
+  roomsMax: '',
+  priceMin: null,
+  priceMax: null,
+  preApproval: false,
+  source: '',
+  sector: 'כללי',
+  balconyRequired: false,
+  schoolProximity: '',
+  parkingRequired: false,
+  elevatorRequired: false,
+  safeRoomRequired: false,
+  acRequired: false,
+  storageRequired: false,
+  notes: '',
+};
 
 export default function NewLead() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    name: '',
-    phone: '',
-    interestType: 'פרטי',
-    lookingFor: 'buy',
-    city: '',
-    street: '',
-    rooms: '',
-    priceMin: '',
-    priceMax: '',
-    preApproval: false,
-    source: '',
-    sector: 'כללי',
-    balconyRequired: false,
-    schoolProximity: '',
-    parkingRequired: false,
-    elevatorRequired: false,
-    safeRoomRequired: false,
-    acRequired: false,
-    storageRequired: false,
-    brokerageSignedAt: '',
-    brokerageExpiresAt: '',
-    notes: '',
-  });
+  const toast = useToast();
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [draftBanner, setDraftBanner] = useState(null);
+  const [clipboardSuggestion, setClipboardSuggestion] = useState(null);
+  const [clipboardDismissed, setClipboardDismissed] = useState(false);
+  const peekedRef = useRef(false);
+
+  const { peek } = useClipboardPhone();
+  const { clear: clearDraft } = useDraftAutosave(DRAFT_KEY, form);
+
+  // ── Draft restore banner on mount ──────────────────────────────────
+  useEffect(() => {
+    const draft = readDraft(DRAFT_KEY);
+    if (draft && (draft.name || draft.phone || draft.city)) {
+      setDraftBanner(draft);
+    }
+  }, []);
+
+  const restoreDraft = () => {
+    if (draftBanner) {
+      setForm({ ...INITIAL_FORM, ...draftBanner });
+      setDraftBanner(null);
+      toast.info('הטיוטה שוחזרה');
+    }
+  };
+  const discardDraft = () => {
+    clearDraft();
+    setDraftBanner(null);
+    toast.info('הטיוטה נמחקה');
+  };
+
+  // ── Clipboard phone auto-paste ─────────────────────────────────────
+  const tryPeekClipboard = async () => {
+    if (peekedRef.current) return;
+    peekedRef.current = true;
+    if (clipboardDismissed) return;
+    if (form.phone) return;
+    const phone = await peek();
+    if (phone) setClipboardSuggestion(phone);
+  };
+
+  const acceptClipboard = () => {
+    if (clipboardSuggestion) {
+      update('phone', clipboardSuggestion);
+      setClipboardSuggestion(null);
+      toast.success('טלפון הודבק');
+    }
+  };
+  const dismissClipboard = () => {
+    setClipboardSuggestion(null);
+    setClipboardDismissed(true);
+  };
 
   const update = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  // Default end-of-agreement to 6 months after signing — industry default
-  const onSignedAtChange = (value) => {
-    setForm((prev) => {
-      const next = { ...prev, brokerageSignedAt: value };
-      if (value && !prev.brokerageExpiresAt) {
-        const d = new Date(value);
-        d.setMonth(d.getMonth() + 6);
-        next.brokerageExpiresAt = d.toISOString().slice(0, 10);
-      }
-      return next;
-    });
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
+    clearDraft();
     navigate('/leads');
   };
 
@@ -59,7 +111,7 @@ export default function NewLead() {
   }, [form.city]);
 
   return (
-    <div className="form-page">
+    <div className="form-page has-sticky-bar" onFocusCapture={tryPeekClipboard} onTouchStartCapture={tryPeekClipboard}>
       <Link to="/customers" className="back-link animate-in">
         <ArrowRight size={16} />
         חזרה ללידים
@@ -72,13 +124,36 @@ export default function NewLead() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="intake-form animate-in animate-in-delay-1">
+      {draftBanner && (
+        <div className="draft-banner animate-in" role="status">
+          <span>נמצאה טיוטה שנשמרה</span>
+          <div className="draft-banner-actions">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>שחזר</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft}>מחק</button>
+          </div>
+        </div>
+      )}
+
+      {clipboardSuggestion && (
+        <div className="clipboard-chip animate-in" role="status">
+          <button type="button" className="clipboard-chip-main" onClick={acceptClipboard}>
+            <Clipboard size={14} />
+            <span>{clipboardSuggestion} מהלוח — הוסף</span>
+          </button>
+          <button type="button" className="clipboard-chip-dismiss" aria-label="סגור" onClick={dismissClipboard}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      <form id="lead-form" onSubmit={handleSubmit} className="intake-form animate-in animate-in-delay-1">
         <div className="form-section">
           <h3 className="form-section-title">פרטים אישיים</h3>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">שם הלקוח</label>
               <input
+                {...inputPropsForName()}
                 className="form-input"
                 placeholder="שם מלא"
                 value={form.name}
@@ -87,86 +162,55 @@ export default function NewLead() {
             </div>
             <div className="form-group">
               <label className="form-label">טלפון</label>
-              <input
-                className="form-input"
-                placeholder="050-1234567"
+              <PhoneField
                 value={form.phone}
-                onChange={(e) => update('phone', e.target.value)}
+                onChange={(v) => update('phone', v)}
               />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">מקור הליד</label>
-              <select
-                className="form-select"
+              <SelectField
                 value={form.source}
-                onChange={(e) => update('source', e.target.value)}
-              >
-                <option value="">בחר מקור...</option>
-                <option>פייסבוק</option>
-                <option>יד 2</option>
-                <option>אתר</option>
-                <option>הפניה</option>
-                <option>הפניה מלקוח</option>
-                <option>סיור סוכנים</option>
-                <option>בית פתוח</option>
-                <option>שלט</option>
-                <option>אחר</option>
-              </select>
+                onChange={(v) => update('source', v)}
+                placeholder="בחר מקור..."
+                options={['פייסבוק', 'יד 2', 'אתר', 'הפניה', 'הפניה מלקוח', 'סיור סוכנים', 'בית פתוח', 'שלט', 'אחר']}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">סוג התעניינות</label>
-              <div className="toggle-group">
-                <button
-                  type="button"
-                  className={`toggle-btn ${form.interestType === 'פרטי' ? 'active' : ''}`}
-                  onClick={() => update('interestType', 'פרטי')}
-                >
-                  פרטי
-                </button>
-                <button
-                  type="button"
-                  className={`toggle-btn ${form.interestType === 'מסחרי' ? 'active' : ''}`}
-                  onClick={() => update('interestType', 'מסחרי')}
-                >
-                  מסחרי
-                </button>
-              </div>
+              <Segmented
+                value={form.interestType}
+                onChange={(v) => update('interestType', v)}
+                options={[
+                  { value: 'פרטי', label: 'פרטי' },
+                  { value: 'מסחרי', label: 'מסחרי' },
+                ]}
+                ariaLabel="סוג התעניינות"
+              />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">קנייה / שכירות</label>
-              <div className="toggle-group">
-                <button
-                  type="button"
-                  className={`toggle-btn ${form.lookingFor === 'buy' ? 'active' : ''}`}
-                  onClick={() => update('lookingFor', 'buy')}
-                >
-                  קנייה
-                </button>
-                <button
-                  type="button"
-                  className={`toggle-btn ${form.lookingFor === 'rent' ? 'active' : ''}`}
-                  onClick={() => update('lookingFor', 'rent')}
-                >
-                  שכירות
-                </button>
-              </div>
+              <Segmented
+                value={form.lookingFor}
+                onChange={(v) => update('lookingFor', v)}
+                options={[
+                  { value: 'buy', label: 'קנייה' },
+                  { value: 'rent', label: 'שכירות' },
+                ]}
+                ariaLabel="קנייה או שכירות"
+              />
             </div>
             <div className="form-group">
               <label className="form-label">מגזר</label>
-              <select
-                className="form-select"
+              <SelectField
                 value={form.sector}
-                onChange={(e) => update('sector', e.target.value)}
-              >
-                <option>כללי</option>
-                <option>דתי</option>
-                <option>חרדי</option>
-                <option>ערבי</option>
-              </select>
+                onChange={(v) => update('sector', v)}
+                options={['כללי', 'דתי', 'חרדי', 'ערבי']}
+              />
             </div>
           </div>
         </div>
@@ -176,82 +220,62 @@ export default function NewLead() {
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">עיר מבוקשת</label>
-              <input
-                className="form-input"
-                placeholder="התחל להקליד — לדוגמה: רא..."
+              <SuggestPicker
+                options={cityNames}
                 value={form.city}
-                onChange={(e) => update('city', e.target.value)}
-                list="lead-city-list"
-                autoComplete="off"
+                onChange={(v) => update('city', v)}
+                placeholder="תל אביב, ירושלים, חיפה…"
+                label="עיר"
+                inputProps={{ ...inputPropsForCity(), autoComplete: 'off' }}
               />
-              <datalist id="lead-city-list">
-                {cityNames.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
             </div>
             <div className="form-group">
               <label className="form-label">רחוב (אופציונלי)</label>
-              <input
-                className="form-input"
-                placeholder="התחל להקליד רחוב..."
+              <SuggestPicker
+                options={streetOptions}
                 value={form.street}
-                onChange={(e) => update('street', e.target.value)}
-                list="lead-street-list"
-                autoComplete="off"
-              />
-              <datalist id="lead-street-list">
-                {streetOptions.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            </div>
-          </div>
-          <div className="form-row form-row-3">
-            <div className="form-group">
-              <label className="form-label">מספר חדרים</label>
-              <input
-                className="form-input"
-                placeholder="לדוגמה: 4-5"
-                value={form.rooms}
-                onChange={(e) => update('rooms', e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">מחיר מינימום</label>
-              <input
-                type="number"
-                className="form-input"
-                placeholder="₪"
-                value={form.priceMin}
-                onChange={(e) => update('priceMin', e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">מחיר מקסימום</label>
-              <input
-                type="number"
-                className="form-input"
-                placeholder="₪"
-                value={form.priceMax}
-                onChange={(e) => update('priceMax', e.target.value)}
+                onChange={(v) => update('street', v)}
+                placeholder="רוטשילד, אלנבי…"
+                label="רחוב"
+                inputProps={{ ...inputPropsForAddress(), autoComplete: 'off' }}
               />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
+              <RoomsChips
+                value={form.roomsMin}
+                onChange={(v) => update('roomsMin', v)}
+                label="חדרים: מ"
+              />
+            </div>
+            <div className="form-group">
+              <RoomsChips
+                value={form.roomsMax}
+                onChange={(v) => update('roomsMax', v)}
+                label="חדרים: עד"
+              />
+            </div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label className="form-label">טווח מחיר</label>
+            <PriceRange
+              minVal={form.priceMin}
+              maxVal={form.priceMax}
+              onChangeMin={(n) => update('priceMin', n)}
+              onChangeMax={(n) => update('priceMax', n)}
+              perMonth={form.lookingFor === 'rent'}
+            />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
               <label className="form-label">קירבה לבית ספר</label>
-              <select
-                className="form-select"
+              <SelectField
                 value={form.schoolProximity}
-                onChange={(e) => update('schoolProximity', e.target.value)}
-              >
-                <option value="">לא חשוב</option>
-                <option>עד 200 מטר</option>
-                <option>עד 500 מטר</option>
-                <option>הליכה</option>
-                <option>עד ק״מ</option>
-              </select>
+                onChange={(v) => update('schoolProximity', v)}
+                placeholder="לא חשוב"
+                options={['עד 200 מטר', 'עד 500 מטר', 'הליכה', 'עד ק״מ']}
+              />
             </div>
           </div>
           <div className="checkbox-grid">
@@ -322,30 +346,6 @@ export default function NewLead() {
         </div>
 
         <div className="form-section">
-          <h3 className="form-section-title">הסכם תיווך</h3>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">מועד חתימה על הסכם תיווך</label>
-              <input
-                type="date"
-                className="form-input"
-                value={form.brokerageSignedAt}
-                onChange={(e) => onSignedAtChange(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">מועד סיום הסכם תיווך</label>
-              <input
-                type="date"
-                className="form-input"
-                value={form.brokerageExpiresAt}
-                onChange={(e) => update('brokerageExpiresAt', e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section">
           <h3 className="form-section-title">הערות</h3>
           <div className="form-group">
             <textarea
@@ -358,7 +358,7 @@ export default function NewLead() {
           </div>
         </div>
 
-        <div className="form-actions">
+        <div className="form-actions form-actions-desktop">
           <button type="submit" className="btn btn-primary btn-lg">
             <Save size={18} />
             שמור ליד
@@ -368,6 +368,14 @@ export default function NewLead() {
           </Link>
         </div>
       </form>
+
+      <StickyActionBar visible>
+        <button type="submit" form="lead-form" className="btn btn-primary btn-lg">
+          <Save size={18} />
+          שמור ליד
+        </button>
+        <Link to="/customers" className="btn btn-secondary btn-lg">ביטול</Link>
+      </StickyActionBar>
     </div>
   );
 }

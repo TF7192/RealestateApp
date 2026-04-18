@@ -6,8 +6,6 @@ import {
   MessageCircle,
   CheckCircle,
   XCircle,
-  FileSignature,
-  FileCheck2,
 } from 'lucide-react';
 import { leads, properties } from '../data/mockData';
 import './Buyers.css';
@@ -30,13 +28,6 @@ export default function Buyers() {
   }, [search, lookingForFilter, interestFilter]);
 
   const countBy = (pred) => leads.filter(pred).length;
-
-  const handleSendForSignature = (buyer) => {
-    alert(
-      `נשלח להסכם תיווך דיגיטלי אל ${buyer.name} (${buyer.phone}).\n` +
-        'לאחר החתימה הקובץ יצורף אוטומטית לכרטיס הלקוח.'
-    );
-  };
 
   return (
     <div className="buyers-page">
@@ -106,9 +97,6 @@ export default function Buyers() {
               <th>אישור עקרוני</th>
               <th>עיר</th>
               <th>חדרים</th>
-              <th>חתימת הסכם</th>
-              <th>סיום הסכם</th>
-              <th>קובץ חתום</th>
               <th>נכסים שנצפו</th>
               <th>פעולות</th>
             </tr>
@@ -153,18 +141,6 @@ export default function Buyers() {
                 </td>
                 <td>{buyer.city}</td>
                 <td>{buyer.rooms || '—'}</td>
-                <td>{buyer.brokerageSignedAt || '—'}</td>
-                <td>{buyer.brokerageExpiresAt || '—'}</td>
-                <td>
-                  {buyer.signedAgreementFile ? (
-                    <span className="file-chip">
-                      <FileCheck2 size={13} />
-                      {buyer.signedAgreementFile}
-                    </span>
-                  ) : (
-                    <span className="file-missing">—</span>
-                  )}
-                </td>
                 <td>
                   <div className="viewed-properties">
                     {buyer.propertiesViewed.length > 0
@@ -204,20 +180,13 @@ export default function Buyers() {
                     >
                       <MessageCircle size={14} />
                     </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      title="שלח הסכם תיווך לחתימה דיגיטלית"
-                      onClick={() => handleSendForSignature(buyer)}
-                    >
-                      <FileSignature size={14} />
-                    </button>
                   </div>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={12} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   לא נמצאו לקוחות בסינון הנוכחי
                 </td>
               </tr>

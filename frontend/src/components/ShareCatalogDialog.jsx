@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Copy, Check, MessageCircle, ExternalLink } from 'lucide-react';
 import './ShareCatalogDialog.css';
 
@@ -31,7 +32,9 @@ export default function ShareCatalogDialog({
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
-  return (
+  // Render via portal — escapes any ancestor's `transform`/`filter`
+  // containing block so the modal always overlays the full viewport.
+  return createPortal(
     <div className="scd-backdrop" onClick={onClose}>
       <div className="scd-modal" onClick={(e) => e.stopPropagation()}>
         <header className="scd-header">
@@ -77,6 +80,7 @@ export default function ShareCatalogDialog({
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

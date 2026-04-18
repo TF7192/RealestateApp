@@ -1,0 +1,74 @@
+name: Deploy to production
+
+# Triggers on push of any tag matching `v*` (per the deploy convention).
+# Manual dispatch is also allowed for hotfixes.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+concurrency:
+  group: estia-prod
+  cancel-in-progress: false   # don't cancel a deploy mid-flight
+
+jobs:
+  deploy:
+    name: ssh → rsync → docker compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/estia.pem
+          chmod 600 ~/.ssh/estia.pem
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Rsync source to EC2
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/estia.pem" \
+            --include='/backend/' --include='/backend/src/***' --include='/backend/prisma/***' \
+            --include='/backend/package.json' --include='/backend/package-lock.json' \
+            --include='/backend/Dockerfile' --include='/backend/tsconfig.json' \
+            --include='/frontend/' --include='/frontend/src/***' --include='/frontend/public/***' \
+            --include='/frontend/package.json' --include='/frontend/package-lock.json' \
+            --include='/frontend/Dockerfile' --include='/frontend/nginx.conf' \
+            --include='/frontend/index.html' --include='/frontend/vite.config.js' \
+            --include='/frontend/eslint.config.js' --include='/frontend/capacitor.config.json' \
+            --include='/docker-compose.prod.yml' --include='/scripts/***' \
+            --exclude='*' \
+            ./ "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ec2-user/estia-new/"
+
+      - name: Build + restart on EC2
+        run: |
+          ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" '
+            set -e
+            cd /home/ec2-user/estia-new
+            sudo docker compose -f docker-compose.prod.yml build --pull
+            sudo docker compose -f docker-compose.prod.yml up -d
+            sudo docker compose -f docker-compose.prod.yml exec -T backend npx prisma migrate deploy
+            sudo docker builder prune -af >/dev/null 2>&1 || true
+            df -h / | tail -1
+          '
+
+      - name: Healthcheck
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -sf https://estia.tripzio.xyz/api/health | grep -q '"ok":true'; then
+              echo "✓ deploy healthy on attempt $i"
+              exit 0
+            fi
+            echo "  waiting for backend ($i/5)…"
+            sleep 5
+          done
+          echo "✗ healthcheck failed"
+          exit 1
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/estia.pem

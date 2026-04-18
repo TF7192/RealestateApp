@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import { requireUser } from '../middleware/auth.js';
+import { putUpload } from '../lib/storage.js';
 
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAuth] }, async (req) => {
@@ -62,15 +63,10 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
     if (!file.mimetype.startsWith('image/')) {
       return reply.code(400).send({ error: { message: 'Only image files allowed' } });
     }
-    const uploadsDir = path.resolve(process.env.UPLOADS_DIR || './uploads');
-    const subDir = path.join(uploadsDir, 'avatars', uid);
-    await fs.mkdir(subDir, { recursive: true });
     const ext = path.extname(file.filename) || '.png';
     const name = `${crypto.randomUUID()}${ext}`;
-    const filePath = path.join(subDir, name);
-    await fs.writeFile(filePath, await file.toBuffer());
-    const rel = path.relative(uploadsDir, filePath).replaceAll(path.sep, '/');
-    const url = `/uploads/${rel}`;
+    const key = `avatars/${uid}/${name}`;
+    const url = await putUpload(key, await file.toBuffer(), file.mimetype);
     await prisma.user.update({ where: { id: uid }, data: { avatarUrl: url } });
     const user = await prisma.user.findUnique({
       where: { id: uid },

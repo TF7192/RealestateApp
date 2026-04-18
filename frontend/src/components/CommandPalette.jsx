@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Building2, Users, Handshake, LayoutDashboard, Plus, UserPlus, User } from 'lucide-react';
 import api from '../lib/api';
+import Portal from './Portal';
 import './CommandPalette.css';
 
 const STATIC_ENTRIES = [
@@ -80,62 +81,64 @@ export default function CommandPalette({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="cmdp-backdrop" onClick={onClose}>
-      <div className="cmdp-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="cmdp-search">
-          <Search size={16} />
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="חפש לקוח, נכס או מסך… (⌘K)"
-            value={q}
-            onChange={(e) => { setQ(e.target.value); setIndex(0); }}
-          />
-          <kbd>ESC</kbd>
-        </div>
-        <div className="cmdp-results">
-          {navMatches.length > 0 && (
-            <Section title="ניווט">
-              {navMatches.map((e, i) => (
-                <Item key={e.to} item={e} active={index === i} onPick={() => { navigate(e.to); onClose(); }} />
-              ))}
-            </Section>
-          )}
-          {leadMatches.length > 0 && (
-            <Section title="לקוחות">
-              {leadMatches.map((l, i) => (
-                <Item
-                  key={l.id}
-                  item={{ icon: Users, title: l.name, subtitle: `${l.city || ''} · ${l.phone || ''}` }}
-                  active={index === navMatches.length + i}
-                  onPick={() => { navigate(`/customers?selected=${l.id}`); onClose(); }}
-                />
-              ))}
-            </Section>
-          )}
-          {propMatches.length > 0 && (
-            <Section title="נכסים">
-              {propMatches.map((p, i) => (
-                <Item
-                  key={p.id}
-                  item={{ icon: Building2, title: `${p.street}, ${p.city}`, subtitle: `${p.type} · ${p.owner}` }}
-                  active={index === navMatches.length + leadMatches.length + i}
-                  onPick={() => { navigate(`/properties/${p.id}`); onClose(); }}
-                />
-              ))}
-            </Section>
-          )}
-          {query && leadMatches.length === 0 && propMatches.length === 0 && navMatches.length === 0 && (
-            <div className="cmdp-empty">לא נמצאו תוצאות</div>
-          )}
-        </div>
-        <div className="cmdp-footer">
-          <span><kbd>↑</kbd><kbd>↓</kbd> ניווט</span>
-          <span><kbd>Enter</kbd> פתח</span>
-          <span><kbd>Esc</kbd> סגור</span>
+    <Portal>
+      <div className="cmdp-backdrop" onClick={onClose}>
+        <div className="cmdp-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="cmdp-search">
+            <Search size={16} />
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="חפש לקוח, נכס או מסך… (⌘K)"
+              value={q}
+              onChange={(e) => { setQ(e.target.value); setIndex(0); }}
+            />
+            <kbd>ESC</kbd>
+          </div>
+          <div className="cmdp-results">
+            {navMatches.length > 0 && (
+              <Section title="ניווט">
+                {navMatches.map((e, i) => (
+                  <Item key={e.to} item={e} active={index === i} onPick={() => { navigate(e.to); onClose(); }} />
+                ))}
+              </Section>
+            )}
+            {leadMatches.length > 0 && (
+              <Section title="לקוחות">
+                {leadMatches.map((l, i) => (
+                  <Item
+                    key={l.id}
+                    item={{ icon: Users, title: l.name, subtitle: `${l.city || ''} · ${l.phone || ''}` }}
+                    active={index === navMatches.length + i}
+                    onPick={() => { navigate(`/customers?selected=${l.id}`); onClose(); }}
+                  />
+                ))}
+              </Section>
+            )}
+            {propMatches.length > 0 && (
+              <Section title="נכסים">
+                {propMatches.map((p, i) => (
+                  <Item
+                    key={p.id}
+                    item={{ icon: Building2, title: `${p.street}, ${p.city}`, subtitle: `${p.type} · ${p.owner}` }}
+                    active={index === navMatches.length + leadMatches.length + i}
+                    onPick={() => { navigate(`/properties/${p.id}`); onClose(); }}
+                  />
+                ))}
+              </Section>
+            )}
+            {query && leadMatches.length === 0 && propMatches.length === 0 && navMatches.length === 0 && (
+              <div className="cmdp-empty">לא נמצאו תוצאות</div>
+            )}
+          </div>
+          <div className="cmdp-footer">
+            <span><kbd>↑</kbd><kbd>↓</kbd> ניווט</span>
+            <span><kbd>Enter</kbd> פתח</span>
+            <span><kbd>Esc</kbd> סגור</span>
+          </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 }
 

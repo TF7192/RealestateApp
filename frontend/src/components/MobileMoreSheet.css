@@ -1,0 +1,238 @@
+.mms-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 26, 20, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 140;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.mms-backdrop.open {
+  opacity: 1;
+}
+
+.mms-sheet {
+  width: 100%;
+  max-height: 86vh;
+  background: var(--bg-card);
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  padding: 8px 16px calc(18px + env(safe-area-inset-bottom));
+  box-shadow: 0 -20px 60px rgba(30, 26, 20, 0.28);
+  overflow-y: auto;
+  transform: translateY(100%);
+  animation: mms-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes mms-in {
+  to { transform: translateY(0); }
+}
+
+.mms-grabber {
+  width: 40px;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--border-light);
+  margin: 6px auto 10px;
+}
+
+/* "Me" card at the top */
+.mms-header {
+  margin-bottom: 10px;
+}
+
+.mms-me {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.18s ease;
+}
+
+.mms-me:active { transform: scale(0.98); }
+
+.mms-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 1px solid var(--border-light);
+}
+
+.mms-avatar.placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+  color: var(--bg-primary);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 20px;
+}
+
+.mms-me-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.mms-me-text strong {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mms-me-text small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.mms-chevron {
+  color: var(--gold);
+  font-size: 22px;
+  line-height: 1;
+  font-family: var(--font-display);
+}
+
+/* Grouped rows — iOS-style settings groups */
+.mms-section {
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.mms-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-align: right;
+  transition: background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mms-row + .mms-row {
+  border-top: 1px solid var(--border);
+}
+
+.mms-row:active {
+  background: var(--gold-glow);
+}
+
+.mms-row-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--gold);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mms-row.primary .mms-row-icon {
+  background: var(--gold-glow);
+  color: var(--gold);
+}
+
+.mms-row-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.mms-row-text strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mms-row-text small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.mms-row-trail {
+  display: inline-flex;
+  align-items: center;
+}
+
+.mms-arrow {
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+  font-family: var(--font-display);
+}
+
+.mms-section.danger .mms-row {
+  color: var(--danger);
+}
+
+.mms-section.danger .mms-row-icon {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* iOS-like toggle */
+.mms-switch {
+  display: inline-block;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--border-light);
+  transition: background 0.25s ease;
+  flex-shrink: 0;
+}
+
+.mms-switch span {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: right 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mms-switch.on {
+  background: var(--gold);
+}
+
+.mms-switch.on span {
+  right: 18px;
+}
+
+.mms-hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 4px 0 8px;
+}

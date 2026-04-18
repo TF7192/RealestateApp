@@ -3,6 +3,7 @@ import {
   X, Check, ExternalLink, Upload, Link2, FileText, AlertCircle, Trash2,
 } from 'lucide-react';
 import api from '../lib/api';
+import Portal from './Portal';
 import './MarketingActionDialog.css';
 
 // Configuration per action key: kind determines the collection flow.
@@ -115,169 +116,171 @@ export default function MarketingActionDialog({
   };
 
   return (
-    <div className="agreement-backdrop" onClick={onClose}>
-      <div className="agreement-modal ma-modal" onClick={(e) => e.stopPropagation()}>
-        <header className="agreement-header">
-          <div>
-            <h3>{config.label}</h3>
-            <p>{config.hint}</p>
-          </div>
-          <button className="btn-ghost" onClick={onClose}>
-            <X size={18} />
-          </button>
-        </header>
-
-        <div className="agreement-body">
-          {error && (
-            <div className="agreement-error">
-              <AlertCircle size={14} />
-              {error}
+    <Portal>
+      <div className="agreement-backdrop" onClick={onClose}>
+        <div className="agreement-modal ma-modal" onClick={(e) => e.stopPropagation()}>
+          <header className="agreement-header">
+            <div>
+              <h3>{config.label}</h3>
+              <p>{config.hint}</p>
             </div>
-          )}
+            <button className="btn-ghost" onClick={onClose}>
+              <X size={18} />
+            </button>
+          </header>
 
-          {done && (
-            <div className="ma-done-banner">
-              <Check size={16} />
-              הפעולה סומנה כהושלמה
-            </div>
-          )}
-
-          {/* Upload flow */}
-          {config.kind === 'upload' && (
-            <div className="ma-section">
-              <h4>העלאת קובץ</h4>
-              <div
-                className={`ma-dropzone ${uploading ? 'is-busy' : ''}`}
-                onClick={() => fileInput.current?.click()}
-              >
-                <Upload size={28} />
-                <p>{uploading ? 'מעלה...' : 'לחץ לבחירת קובץ'}</p>
-                <span>{config.accept?.includes('image') ? 'תמונות JPG / PNG' : 'PDF או תמונה'}</span>
+          <div className="agreement-body">
+            {error && (
+              <div className="agreement-error">
+                <AlertCircle size={14} />
+                {error}
               </div>
-              <input
-                ref={fileInput}
-                type="file"
-                accept={config.accept}
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleUpload(f);
-                }}
-              />
+            )}
 
-              <label className="ma-field-label">הערות (אופציונלי)</label>
-              <textarea
-                className="ma-textarea"
-                rows={2}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="הערות על הקובץ שהועלה"
-              />
-            </div>
-          )}
+            {done && (
+              <div className="ma-done-banner">
+                <Check size={16} />
+                הפעולה סומנה כהושלמה
+              </div>
+            )}
 
-          {/* Link flow */}
-          {config.kind === 'link' && (
-            <div className="ma-section">
-              <h4>קישור לפרסום</h4>
-              <div className="ma-link-row">
-                <div className="ma-input-with-icon">
-                  <Link2 size={14} />
-                  <input
-                    type="url"
-                    className="ma-input"
-                    placeholder="https://..."
-                    value={link}
-                    onChange={(e) => setLink(e.target.value)}
-                  />
+            {/* Upload flow */}
+            {config.kind === 'upload' && (
+              <div className="ma-section">
+                <h4>העלאת קובץ</h4>
+                <div
+                  className={`ma-dropzone ${uploading ? 'is-busy' : ''}`}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <Upload size={28} />
+                  <p>{uploading ? 'מעלה...' : 'לחץ לבחירת קובץ'}</p>
+                  <span>{config.accept?.includes('image') ? 'תמונות JPG / PNG' : 'PDF או תמונה'}</span>
                 </div>
-                {link && /^https?:\/\//.test(link) && (
-                  <a
-                    href={link}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn-ghost btn-sm"
-                  >
-                    <ExternalLink size={14} />
-                    פתח
-                  </a>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept={config.accept}
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUpload(f);
+                  }}
+                />
+
+                <label className="ma-field-label">הערות (אופציונלי)</label>
+                <textarea
+                  className="ma-textarea"
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="הערות על הקובץ שהועלה"
+                />
+              </div>
+            )}
+
+            {/* Link flow */}
+            {config.kind === 'link' && (
+              <div className="ma-section">
+                <h4>קישור לפרסום</h4>
+                <div className="ma-link-row">
+                  <div className="ma-input-with-icon">
+                    <Link2 size={14} />
+                    <input
+                      type="url"
+                      className="ma-input"
+                      placeholder="https://..."
+                      value={link}
+                      onChange={(e) => setLink(e.target.value)}
+                    />
+                  </div>
+                  {link && /^https?:\/\//.test(link) && (
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-ghost btn-sm"
+                    >
+                      <ExternalLink size={14} />
+                      פתח
+                    </a>
+                  )}
+                </div>
+
+                <label className="ma-field-label">הערות (אופציונלי)</label>
+                <textarea
+                  className="ma-textarea"
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="למשל: תאריך פרסום, אסטרטגיית מחיר..."
+                />
+
+                <button className="btn btn-primary ma-save-btn" onClick={handleSaveLink} disabled={busy}>
+                  <Check size={14} />
+                  שמור ובטא כהושלם
+                </button>
+              </div>
+            )}
+
+            {/* Notes flow */}
+            {config.kind === 'notes' && (
+              <div className="ma-section">
+                <h4>פרטים</h4>
+                <label className="ma-field-label">הערות</label>
+                <textarea
+                  className="ma-textarea"
+                  rows={4}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={config.hint}
+                />
+                <button className="btn btn-primary ma-save-btn" onClick={handleSaveNotes} disabled={busy}>
+                  <Check size={14} />
+                  שמור וסמן כהושלם
+                </button>
+              </div>
+            )}
+
+            {/* Current notes preview when already has content */}
+            {(initial.notes || initial.link) && !['upload', 'link', 'notes'].includes(config.kind) && (
+              <div className="ma-section">
+                <h4>פרטים שמורים</h4>
+                {initial.link && (
+                  <div className="ma-saved-row">
+                    <Link2 size={14} />
+                    <a href={initial.link} target="_blank" rel="noreferrer">
+                      {initial.link}
+                    </a>
+                  </div>
+                )}
+                {initial.notes && (
+                  <div className="ma-saved-row">
+                    <FileText size={14} />
+                    {initial.notes}
+                  </div>
                 )}
               </div>
+            )}
 
-              <label className="ma-field-label">הערות (אופציונלי)</label>
-              <textarea
-                className="ma-textarea"
-                rows={2}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="למשל: תאריך פרסום, אסטרטגיית מחיר..."
-              />
-
-              <button className="btn btn-primary ma-save-btn" onClick={handleSaveLink} disabled={busy}>
-                <Check size={14} />
-                שמור ובטא כהושלם
-              </button>
-            </div>
-          )}
-
-          {/* Notes flow */}
-          {config.kind === 'notes' && (
-            <div className="ma-section">
-              <h4>פרטים</h4>
-              <label className="ma-field-label">הערות</label>
-              <textarea
-                className="ma-textarea"
-                rows={4}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={config.hint}
-              />
-              <button className="btn btn-primary ma-save-btn" onClick={handleSaveNotes} disabled={busy}>
-                <Check size={14} />
-                שמור וסמן כהושלם
-              </button>
-            </div>
-          )}
-
-          {/* Current notes preview when already has content */}
-          {(initial.notes || initial.link) && !['upload', 'link', 'notes'].includes(config.kind) && (
-            <div className="ma-section">
-              <h4>פרטים שמורים</h4>
-              {initial.link && (
-                <div className="ma-saved-row">
-                  <Link2 size={14} />
-                  <a href={initial.link} target="_blank" rel="noreferrer">
-                    {initial.link}
-                  </a>
-                </div>
-              )}
-              {initial.notes && (
-                <div className="ma-saved-row">
-                  <FileText size={14} />
-                  {initial.notes}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Bottom: clear/undo action */}
-          {done && (
-            <div className="ma-clear-row">
-              <button className="btn btn-ghost" onClick={handleUnmark} disabled={busy}>
-                <Trash2 size={14} />
-                בטל סימון
-              </button>
-            </div>
-          )}
-          {!done && config.kind === 'upload' && (
-            <div className="ma-clear-row">
-              <button className="btn btn-secondary" onClick={handleMarkDone} disabled={busy}>
-                סמן כהושלם ללא קובץ
-              </button>
-            </div>
-          )}
+            {/* Bottom: clear/undo action */}
+            {done && (
+              <div className="ma-clear-row">
+                <button className="btn btn-ghost" onClick={handleUnmark} disabled={busy}>
+                  <Trash2 size={14} />
+                  בטל סימון
+                </button>
+              </div>
+            )}
+            {!done && config.kind === 'upload' && (
+              <div className="ma-clear-row">
+                <button className="btn btn-secondary" onClick={handleMarkDone} disabled={busy}>
+                  סמן כהושלם ללא קובץ
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 }

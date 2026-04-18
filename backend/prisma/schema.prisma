@@ -78,6 +78,8 @@ model User {
   provider     AuthProvider @default(EMAIL)
   googleId     String?      @unique
   displayName  String
+  // Public, SEO-friendly identifier — used in /agents/<slug> URLs.
+  slug         String?      @unique
   phone        String?
   avatarUrl    String?
   createdAt    DateTime     @default(now())
@@ -92,9 +94,13 @@ model User {
   // Audit trail
   sessions   Session[]
   properties Property[]    @relation("AgentProperties")
+  owners     Owner[]       @relation("AgentOwners")
   leads      Lead[]        @relation("AgentLeads")
   deals      Deal[]        @relation("AgentDeals")
   files      UploadedFile[]
+  transfersSent     PropertyTransfer[] @relation("TransferFrom")
+  transfersReceived PropertyTransfer[] @relation("TransferTo")
+  templates         MessageTemplate[]
 
   @@index([role])
 }
@@ -135,6 +141,8 @@ model Property {
   id               String           @id @default(cuid())
   agentId          String
   agent            User             @relation("AgentProperties", fields: [agentId], references: [id])
+  // Per-agent SEO slug — used in /agents/<agent>/<property> URLs.
+  slug             String?
   assetClass       AssetClass
   category         PropertyCategory
   status           PropertyStatus   @default(ACTIVE)
@@ -143,6 +151,13 @@ model Property {
   city             String
   lat              Float?
   lng              Float?
+  // ── Property owner (the seller / landlord) ─────────────────────────────
+  // `propertyOwnerId` references the new Owner table — the canonical record.
+  // The legacy inline `owner` / `ownerPhone` / `ownerEmail` columns remain
+  // as a denormalized copy so older code keeps working during the rollout;
+  // they're auto-synced from the Owner row at write-time.
+  propertyOwnerId  String?
+  propertyOwner    Owner?           @relation(fields: [propertyOwnerId], references: [id], onDelete: SetNull)
   owner            String
   ownerPhone       String
   ownerEmail       String?
@@ -178,12 +193,70 @@ model Property {
   marketingActions MarketingAction[]
   viewings         PropertyViewing[]
   inquiries        PropertyInquiry[]
+  videos           PropertyVideo[]
   deal             Deal?
   agreements       Agreement[]
+  transfers        PropertyTransfer[]
 
   @@index([agentId])
   @@index([city])
   @@index([assetClass, category, status])
+  @@index([propertyOwnerId])
+  @@unique([agentId, slug])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Owner — a real person who owns one or more of an agent's listed properties.
+//
+// Distinct from `Lead` (which represents a CUSTOMER — a prospective buyer or
+// renter looking through the agent's listings). One physical human can be
+// represented by both an Owner and a Lead row if they wear both hats; that's
+// expected and tracked separately so the agent's "ספר בעלים" stays clean.
+// ────────────────────────────────────────────────────────────────────────────
+model Owner {
+  id          String     @id @default(cuid())
+  agentId     String
+  agent       User       @relation("AgentOwners", fields: [agentId], references: [id], onDelete: Cascade)
+  name        String
+  phone       String
+  email       String?
+  notes       String?
+  // Relationship hint, e.g. "בעל יחיד", "ירושה", "חברה". Optional copy.
+  relationship String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  properties  Property[]
+
+  @@index([agentId])
+  @@index([phone])
+}
+
+enum TransferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  WHATSAPP_SENT
+}
+
+model PropertyTransfer {
+  id           String         @id @default(cuid())
+  propertyId   String
+  property     Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  fromAgentId  String
+  fromAgent    User           @relation("TransferFrom", fields: [fromAgentId], references: [id])
+  toAgentId    String?
+  toAgent      User?          @relation("TransferTo", fields: [toAgentId], references: [id])
+  toAgentEmail String?        // kept in case the target isn't registered yet
+  status       TransferStatus @default(PENDING)
+  message      String?
+  createdAt    DateTime       @default(now())
+  respondedAt  DateTime?
+
+  @@index([fromAgentId])
+  @@index([toAgentId])
+  @@index([status])
 }
 
 model PropertyImage {
@@ -191,6 +264,22 @@ model PropertyImage {
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   url        String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([propertyId])
+}
+
+model PropertyVideo {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  url        String   // served via /uploads/videos/... or an external URL
+  kind       String   @default("upload")  // "upload" | "external" (youtube/vimeo)
+  title      String?
+  posterUrl  String?
+  sizeBytes  Int?
+  mimeType   String?
   sortOrder  Int      @default(0)
   createdAt  DateTime @default(now())
 
@@ -341,6 +430,26 @@ model UploadedFile {
 
   @@index([ownerId])
   @@index([kind])
+}
+
+enum MessageTemplateKind {
+  BUY_PRIVATE       // residential + sale
+  RENT_PRIVATE      // residential + rent
+  BUY_COMMERCIAL    // commercial + sale
+  RENT_COMMERCIAL   // commercial + rent
+  TRANSFER          // agent-to-agent handoff (no agent info)
+}
+
+model MessageTemplate {
+  id        String              @id @default(cuid())
+  agentId   String
+  agent     User                @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  kind      MessageTemplateKind
+  body      String
+  updatedAt DateTime            @updatedAt
+
+  @@unique([agentId, kind])
+  @@index([agentId])
 }
 
 model CityLookup {

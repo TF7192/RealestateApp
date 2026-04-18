@@ -1,0 +1,191 @@
+/* ────────────────────────────────────────────────────────────────
+ * ChipEditor — premium chip-based template composer
+ *
+ * The editor itself looks like a sheet of paper; chips are gold-
+ * trimmed atoms that clearly read "this becomes a real value".
+ * ──────────────────────────────────────────────────────────────── */
+
+.chip-ed {
+  min-height: 240px;
+  padding: 18px 20px;
+  background: var(--bg-input, #fff);
+  border: 1.5px solid var(--border-light);
+  border-radius: 16px;
+  font-family: var(--font-body, 'Assistant'), system-ui, sans-serif;
+  /* 16px prevents iOS zoom-on-focus */
+  font-size: 16px;
+  line-height: 2;
+  color: var(--text-primary);
+  direction: rtl;
+  text-align: right;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  /* Standard rich-text editing: full select / drag / copy / paste.
+   * (Plaintext-only was breaking selection across chip boundaries.) */
+  -webkit-user-select: text;
+  user-select: text;
+  caret-color: var(--gold, #c9a96e);
+  /* Subtle paper feel */
+  background-image:
+    linear-gradient(var(--bg-input, #fff), var(--bg-input, #fff)),
+    radial-gradient(
+      ellipse at top right,
+      rgba(201, 169, 110, 0.04),
+      transparent 60%
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.chip-ed:focus,
+.chip-ed:focus-visible {
+  border-color: var(--gold, #c9a96e);
+  box-shadow:
+    0 0 0 4px var(--gold-glow, rgba(201, 169, 110, 0.12)),
+    0 1px 0 rgba(201, 169, 110, 0.06) inset;
+}
+
+.chip-ed:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* ────────── The chip itself ────────── */
+.chip-ed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px 3px 10px;
+  margin: 0 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg,
+    rgba(201, 169, 110, 0.14) 0%,
+    rgba(201, 169, 110, 0.22) 100%);
+  border: 1px solid var(--gold-border, rgba(201, 169, 110, 0.38));
+  color: var(--gold, #8a6d38);
+  font-family: var(--font-display, 'Assistant'), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+  /* user-select: all → drag-selecting across the chip captures it as one
+   * atomic unit, so multi-line selection / copy / paste works naturally. */
+  user-select: all;
+  -webkit-user-select: all;
+  cursor: pointer;
+  vertical-align: baseline;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 1px 2px rgba(201, 169, 110, 0.15);
+  transition: transform 0.14s, box-shadow 0.14s, background 0.14s;
+}
+
+.chip-ed-chip::before {
+  content: '◆';
+  font-size: 7px;
+  margin-inline-end: 3px;
+  margin-inline-start: -2px;
+  color: var(--gold, #c9a96e);
+  opacity: 0.75;
+  transform: translateY(-1px);
+}
+
+.chip-ed-chip:hover {
+  background: linear-gradient(180deg,
+    rgba(201, 169, 110, 0.22) 0%,
+    rgba(201, 169, 110, 0.32) 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 2px 6px rgba(201, 169, 110, 0.22);
+}
+
+[data-theme="dark"] .chip-ed-chip {
+  background: linear-gradient(180deg,
+    rgba(201, 169, 110, 0.18) 0%,
+    rgba(201, 169, 110, 0.28) 100%);
+  color: var(--gold, #d6b87a);
+  border-color: rgba(201, 169, 110, 0.45);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+/* Pop animation when freshly inserted */
+@keyframes chip-ed-pop {
+  0%   { transform: scale(0.6) rotate(-4deg); opacity: 0; }
+  60%  { transform: scale(1.12) rotate(1deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+.chip-ed-chip-pop {
+  animation: chip-ed-pop 0.32s cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}
+
+/* × delete button — visible on hover/focus on desktop, persistent on touch */
+.chip-ed-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-inline-start: 4px;
+  border-radius: 999px;
+  background: rgba(201, 169, 110, 0.85);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 0.9;
+  opacity: 0;
+  transform: scale(0.8);
+  cursor: pointer;
+  transition: opacity 0.14s, transform 0.14s, background 0.14s;
+  user-select: none;
+  -webkit-user-select: none;
+  vertical-align: middle;
+}
+
+.chip-ed-chip:hover .chip-ed-chip-x,
+.chip-ed-chip:focus-within .chip-ed-chip-x {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.chip-ed-chip-x:hover {
+  background: var(--danger, #b91c1c);
+  transform: scale(1.1);
+}
+
+/* Touch devices don't have hover — always show × so it's discoverable */
+@media (pointer: coarse) {
+  .chip-ed-chip-x {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+}
+
+/* Mobile sizing — bigger touch targets, looser line-height */
+@media (max-width: 640px) {
+  .chip-ed {
+    min-height: 200px;
+    padding: 16px 14px;
+    line-height: 2.1;
+    font-size: 16px;
+  }
+  .chip-ed-chip {
+    font-size: 13px;
+    padding: 3px 11px 4px;
+    line-height: 1.55;
+  }
+}
+
+/* Inside a modal/dialog, editor lives on a tinted surface */
+.chip-ed-wrap {
+  position: relative;
+}

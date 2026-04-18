@@ -14,14 +14,21 @@ import {
   IdCard,
   FileText,
   AlertCircle,
+  Sun,
+  Moon,
+  Palette,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useTheme } from '../lib/theme';
+import { inputPropsForName } from '../lib/inputProps';
+import { PhoneField } from '../components/SmartFields';
 import './Profile.css';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user, refresh } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
   const fileInput = useRef(null);
 
   const [form, setForm] = useState({
@@ -82,7 +89,9 @@ export default function Profile() {
     }
   };
 
-  const catalogUrl = `${window.location.origin}/a/${user.id}`;
+  const catalogUrl = user.slug
+    ? `${window.location.origin}/agents/${encodeURI(user.slug)}`
+    : `${window.location.origin}/a/${user.id}`;
   const copyCatalog = () => {
     navigator.clipboard.writeText(catalogUrl);
     setCopied(true);
@@ -188,14 +197,13 @@ export default function Profile() {
                 value={form.displayName}
                 onChange={(e) => update('displayName', e.target.value)}
                 placeholder="יוסי כהן"
+                {...inputPropsForName()}
               />
             </Field>
             <Field label="טלפון" icon={Phone} dir="ltr">
-              <input
-                className="form-input"
+              <PhoneField
                 value={form.phone}
-                onChange={(e) => update('phone', e.target.value)}
-                placeholder="050-1234567"
+                onChange={(v) => update('phone', v)}
               />
             </Field>
             <Field label="תפקיד" icon={IdCard}>
@@ -241,6 +249,39 @@ export default function Profile() {
           />
           <div className="profile-bio-counter">
             {form.bio.length} / 500
+          </div>
+        </section>
+
+        {/* P5-M5: theme toggle reachable on mobile without needing the sidebar */}
+        <section className="profile-section">
+          <div className="profile-section-head">
+            <Palette size={16} />
+            <h3>מראה</h3>
+            <span>בהיר / כהה — נשמר במכשיר</span>
+          </div>
+          <div className="profile-theme-row">
+            <button
+              type="button"
+              className={`profile-theme-opt ${theme === 'light' ? 'sel' : ''}`}
+              onClick={() => { if (theme !== 'light') toggleTheme(); }}
+            >
+              <Sun size={18} />
+              <div>
+                <strong>בהיר</strong>
+                <small>יומי, קלאסי</small>
+              </div>
+            </button>
+            <button
+              type="button"
+              className={`profile-theme-opt ${theme === 'dark' ? 'sel' : ''}`}
+              onClick={() => { if (theme !== 'dark') toggleTheme(); }}
+            >
+              <Moon size={18} />
+              <div>
+                <strong>כהה</strong>
+                <small>לילה, נוח לעיניים</small>
+              </div>
+            </button>
           </div>
         </section>
 
