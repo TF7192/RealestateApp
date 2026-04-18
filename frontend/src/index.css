@@ -754,3 +754,18 @@ html, body {
     transition: none !important;
   }
 }
+
+/* T9: progressive enhancement — use 100dvh on iOS so the layout doesn't
+   jump when Safari's bottom toolbar hides/reveals. Applies only where
+   full-height is meaningful. */
+@supports (height: 100dvh) {
+  .layout,
+  .main-content,
+  .login-page,
+  .customer-portal,
+  .agent-portal,
+  .mobile-app {
+    min-height: 100dvh;
+  }
+  .sidebar { height: 100dvh; }
+}
