@@ -26,6 +26,7 @@
     "@fastify/multipart": "^8.3.0",
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/static": "^7.0.4",
+    "@fastify/websocket": "^11.2.0",
     "@prisma/client": "^5.22.0",
     "argon2": "^0.41.1",
     "dotenv": "^16.4.5",

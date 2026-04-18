@@ -22,6 +22,8 @@ import CommandPalette from './components/CommandPalette';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
 import OfflineBanner from './components/OfflineBanner';
 import OnboardingTour from './components/OnboardingTour';
+import ChatWidget from './components/ChatWidget';
+import AdminChats from './pages/AdminChats';
 import { useScrollRestore } from './hooks/mobile';
 import { useDocumentTitle, useGlobalShortcuts } from './hooks/shortcuts';
 import { usePageviewTracking } from './hooks/analytics';
@@ -132,6 +134,7 @@ function AppRoutes() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/transfers" element={<Transfers />} />
           <Route path="/templates" element={<Templates />} />
+          <Route path="/admin/chats" element={<AdminChats />} />
           {/* Legacy routes — redirect */}
           <Route path="/leads" element={<Navigate to="/customers" replace />} />
           <Route path="/leads/new" element={<Navigate to="/customers/new" replace />} />
@@ -149,6 +152,7 @@ function AppRoutes() {
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ShortcutsOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
       <OnboardingTour />
+      <ChatWidget />
     </>
   );
 }

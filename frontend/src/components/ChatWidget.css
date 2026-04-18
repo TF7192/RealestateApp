@@ -1,0 +1,209 @@
+/* ChatWidget — subtle floating button + slide-up panel for the
+ * customer ↔ developer chat. Brief: neutral color, no loud badge. */
+
+.chatw-btn {
+  position: fixed;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  inset-inline-end: 18px;
+  z-index: 900;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(30, 26, 20, 0.14);
+  transition: color 0.15s, border-color 0.15s, transform 0.1s, background 0.15s;
+}
+.chatw-btn:hover  { color: var(--gold); border-color: var(--gold-border); background: var(--gold-glow); }
+.chatw-btn:active { transform: scale(0.94); }
+.chatw-btn.has-dot { color: var(--gold); border-color: var(--gold-border); }
+
+/* Subtle new-message indicator: a small gold dot. No counts, no pulse. */
+.chatw-dot {
+  position: absolute;
+  top: 9px;
+  inset-inline-end: 9px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 2px solid var(--bg-card);
+}
+
+/* Panel */
+.chatw-panel-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  pointer-events: none;
+}
+.chatw-panel {
+  position: absolute;
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  inset-inline-end: 18px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  height: 520px;
+  max-height: calc(100dvh - 120px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 16px 48px rgba(30, 26, 20, 0.18);
+  overflow: hidden;
+  pointer-events: auto;
+  animation: chatw-rise 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes chatw-rise {
+  from { transform: translateY(14px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@media (max-width: 640px) {
+  .chatw-panel {
+    inset-inline-end: 12px;
+    inset-inline-start: 12px;
+    width: auto;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+}
+
+.chatw-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.chatw-head strong {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: block;
+}
+.chatw-head span {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.chatw-close {
+  width: 30px; height: 30px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.chatw-close:hover { background: var(--bg-card); color: var(--text-primary); }
+
+.chatw-welcome {
+  padding: 14px 16px;
+  background: var(--gold-glow);
+  border-bottom: 1px solid var(--gold-border);
+}
+.chatw-welcome p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.chatw-list {
+  flex: 1 1 auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+}
+
+.chatw-msg { display: flex; flex-direction: column; max-width: 82%; gap: 2px; }
+.chatw-msg.is-me    { align-self: flex-end; align-items: flex-end; }
+.chatw-msg.is-admin { align-self: flex-start; align-items: flex-start; }
+
+.chatw-bubble {
+  padding: 9px 12px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.chatw-msg.is-me .chatw-bubble {
+  background: var(--gold);
+  color: #1a1409;
+  border-bottom-right-radius: 4px;
+}
+.chatw-msg.is-admin .chatw-bubble {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+.chatw-meta {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.chatw-meta time { direction: ltr; unicode-bidi: plaintext; }
+
+.chatw-compose {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.chatw-compose textarea {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  resize: none;
+  max-height: 140px;
+  min-height: 40px;
+  outline: none;
+}
+.chatw-compose textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-glow);
+}
+.chatw-compose button {
+  width: 40px; height: 40px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #1a1409;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 0.15s;
+}
+.chatw-compose button:disabled { opacity: 0.5; cursor: default; }
+.chatw-compose button:hover:not(:disabled) { filter: brightness(1.05); }
+
+/* Hide chat widget when the onboarding tour overlay is up so the tour's
+   spotlight isn't competing with the chat button. Joyride uses
+   .react-joyride__spotlight — we piggy-back on its presence. */
+body:has(.react-joyride__spotlight) .chatw-btn,
+body:has(.react-joyride__tooltip) .chatw-btn {
+  opacity: 0.3;
+  pointer-events: none;
+}

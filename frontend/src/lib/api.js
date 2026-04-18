@@ -69,6 +69,25 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/me'),
   completeTutorial: () => request('/me/tutorial/complete', { method: 'POST' }),
+
+  // In-app chat (T11)
+  chatMe: () => request('/chat/me'),
+  chatSend: (body) => request('/chat/me/messages', { method: 'POST', body: { body } }),
+  chatMarkRead: () => request('/chat/me/read', { method: 'POST' }),
+  // Admin endpoints
+  adminChatList: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/chat/admin/conversations${qs ? `?${qs}` : ''}`);
+  },
+  adminChatGet: (id) => request(`/chat/admin/conversations/${id}`),
+  adminChatSend: (id, body) =>
+    request(`/chat/admin/conversations/${id}/messages`, { method: 'POST', body: { body } }),
+  adminChatRead: (id) =>
+    request(`/chat/admin/conversations/${id}/read`, { method: 'POST' }),
+  adminChatArchive: (id) =>
+    request(`/chat/admin/conversations/${id}/archive`, { method: 'POST' }),
+  adminChatUnarchive: (id) =>
+    request(`/chat/admin/conversations/${id}/unarchive`, { method: 'POST' }),
   updateMe: (body) => request('/me', { method: 'PATCH', body }),
   uploadAvatar: (file) => {
     const fd = new FormData();
