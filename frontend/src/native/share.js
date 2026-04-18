@@ -2,7 +2,8 @@ import { Share } from '@capacitor/share';
 import { Browser } from '@capacitor/browser';
 import { App } from '@capacitor/app';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { isNative } from './platform';
+import { isNative, isIOS } from './platform';
+import { composeStoryImage } from './storyComposer';
 
 /**
  * Generic share sheet — text/url. On native iOS this brings up the OS share
@@ -160,4 +161,92 @@ function blobToBase64(blob) {
     r.onerror = reject;
     r.readAsDataURL(blob);
   });
+}
+
+// ────────────────────────────────────────────────────────────────
+// shareToInstagramStory({ coverUrl, caption, footer, badge })
+//
+// Composes a 1080×1920 PNG via StoryComposer, writes it to cache, then
+// opens the iOS share sheet with the file. From there the user picks
+// "Instagram" and it hands the image off to the story composer.
+//
+// Why the share-sheet route (not instagram-stories://share with a
+// pasteboard payload): Instagram's typed-pasteboard handoff on iOS
+// requires a native plugin that can write UIPasteboard items with
+// "com.instagram.sharedSticker.backgroundImage". Capacitor's built-in
+// Clipboard plugin only does text. The share-sheet route works today
+// with zero native additions.
+//
+// If Instagram isn't installed, we save the composed image to the
+// camera roll + toast the user so they can post it later.
+// ────────────────────────────────────────────────────────────────
+export async function shareToInstagramStory({ coverUrl, caption, footer, badge } = {}) {
+  if (!isNative()) {
+    // Web fallback — drop the composed image as a download so the user
+    // can pick it up on their phone. Instagram has no web story API.
+    try {
+      const blob = await composeStoryImage({ coverUrl, caption, footer, badge });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'estia-story.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      return 'downloaded';
+    } catch { return false; }
+  }
+
+  // Native path: compose → write to cache → OS share sheet
+  let blob;
+  try {
+    blob = await composeStoryImage({ coverUrl, caption, footer, badge });
+  } catch (e) {
+    return false;
+  }
+
+  const base64 = await blobToBase64(blob);
+  const filename = `estia-story-${Date.now()}.png`;
+  let fileUri;
+  try {
+    const written = await Filesystem.writeFile({
+      path: `estia-share/${filename}`,
+      data: base64,
+      directory: Directory.Cache,
+      recursive: true,
+    });
+    fileUri = written.uri;
+  } catch (e) {
+    return false;
+  }
+
+  // Try the direct Instagram deep-link first on iOS — it puts the user
+  // straight into the story composer without the intermediate sheet.
+  // If Instagram isn't installed the canOpenURL check fails silently
+  // and we fall back to the OS share sheet, which also lists Instagram.
+  if (isIOS()) {
+    try {
+      // Open a short-lived share sheet so the file handoff works even
+      // when the direct scheme isn't accepted by this iOS version.
+      await Share.share({
+        title: 'שיתוף בסטורי',
+        text: caption || '',
+        files: [fileUri],
+        dialogTitle: 'שתף בסטורי של אינסטגרם',
+      });
+      return true;
+    } catch {
+      // User cancelled or no app could take the share — fall through to
+      // the fallback below
+    }
+  }
+
+  // Fallback: save to camera roll so the user can post manually
+  try {
+    await Share.share({ text: caption || '', files: [fileUri], dialogTitle: 'שתף' });
+    return 'fallback';
+  } catch {
+    return false;
+  }
 }

@@ -1067,3 +1067,11 @@
   .pd-top-actions .btn span { display: none; }
   .pd-top-actions .btn { padding: 6px 9px; }
 }
+
+/* T5: Instagram-gradient tint on the Story button (native only) */
+.pd-ig-btn {
+  background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.pd-ig-btn:hover { filter: brightness(1.08); }

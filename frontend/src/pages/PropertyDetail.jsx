@@ -40,7 +40,8 @@ import PropertyHero from '../components/PropertyHero';
 import PropertyKpiTile from '../components/PropertyKpiTile';
 import PropertyPanelSheet from '../components/PropertyPanelSheet';
 import { useCopyFeedback, useViewportMobile, useViewportDesktop } from '../hooks/mobile';
-import { openWhatsApp, shareWithPhotos } from '../native/share';
+import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/share';
+import { isNative } from '../native/platform';
 import { track } from '../lib/analytics';
 import { telUrl, wazeUrl, waUrl } from '../lib/waLink';
 import { shareSheet } from '../native/share';
@@ -354,6 +355,39 @@ export default function PropertyDetail() {
     });
   };
 
+  const handleInstagramStory = async () => {
+    track('property_shared', {
+      property_id: property.id,
+      mode: 'instagram_story',
+    });
+    const cover = (property.images && property.images[0]) || null;
+    const priceLabel = property.marketingPrice
+      ? `₪${Number(property.marketingPrice).toLocaleString('he-IL')}` +
+        (property.category === 'RENT' ? ' / חודש' : '')
+      : null;
+    const badge = property.category === 'RENT' ? 'להשכרה' : 'למכירה';
+    // Use the same caption the agent would send to a client — keeps the
+    // story consistent with everything else we ship (StoryComposer is the
+    // single renderer; WhatsApp uses the raw text).
+    const captionParts = [
+      `${property.type} ב${property.street}, ${property.city}`,
+      property.rooms ? `${property.rooms} חדרים · ${property.sqm} מ״ר` : `${property.sqm} מ״ר`,
+      priceLabel,
+    ].filter(Boolean);
+    const caption = captionParts.join('\n');
+    const footer  = user?.displayName
+      ? `${user.displayName}${user.agentProfile?.agency ? ' · ' + user.agentProfile.agency : ''}`
+      : 'Estia';
+    const result = await shareToInstagramStory({ coverUrl: cover, caption, footer, badge });
+    if (result === 'fallback') {
+      toast?.info?.('התמונה נשמרה לשיתוף — בחר אינסטגרם מהגיליון');
+    } else if (result === 'downloaded') {
+      toast?.info?.('הסטורי הורד כתמונה — העלה אותו מהאלבום באינסטגרם');
+    } else if (!result) {
+      toast?.error?.('התקן את אינסטגרם כדי לשתף סטורי');
+    }
+  };
+
   const handleDelete = async () => {
     setDeleting(true);
     try {
@@ -487,6 +521,20 @@ export default function PropertyDetail() {
             <Share2 size={14} />
             <span>שתף</span>
           </button>
+          {isNative() && (
+            <button
+              className="btn btn-secondary btn-sm pd-ig-btn"
+              onClick={handleInstagramStory}
+              aria-label="שתף בסטורי של אינסטגרם"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="2" y="2" width="20" height="20" rx="5" />
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+              </svg>
+              <span>סטורי</span>
+            </button>
+          )}
           <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={14} />
             <span>מחיקה</span>
