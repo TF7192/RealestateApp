@@ -1,7 +1,14 @@
 # Production compose — RDS-backed, S3-backed, single-host runtime.
-# Database lives in RDS (estia-prod-db.eu-north-1.rds.amazonaws.com).
-# Uploads live in S3 (estia-prod bucket). The host runs only the backend
-# + frontend containers.
+#
+# Hard guarantee: NOTHING is stored locally.
+#   • Database  → AWS RDS PostgreSQL  (estia-prod-db.eu-north-1.rds.amazonaws.com)
+#   • Uploads   → AWS S3              (s3://estia-prod/uploads/)
+#   • DB backups→ AWS S3              (s3://estia-prod/db-backups/, 14-day rotation)
+#   • Secrets   → AWS Secrets Manager (estia/prod/db-password, estia/prod/jwt-secret)
+#
+# The EC2 host runs only the backend + frontend containers, with no
+# persistent volumes. If a container or the host is replaced, no data
+# is lost — every byte of state lives in AWS-managed services.
 
 services:
   backend:
@@ -14,9 +21,12 @@ services:
       NODE_ENV: production
       PORT: 4000
       HOST: 0.0.0.0
+      # `/app/uploads` is intentionally an ephemeral container path. With
+      # UPLOADS_BACKEND=s3 the storage layer never writes to it. Should an
+      # operator ever flip back to UPLOADS_BACKEND=local for local debugging,
+      # files would land here and disappear on container restart — that's by
+      # design (production = S3 always).
       UPLOADS_DIR: /app/uploads
-    volumes:
-      - uploads_data:/app/uploads
     ports:
       - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT:-6002}:4000"
     logging:
@@ -34,6 +44,3 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-
-volumes:
-  uploads_data:

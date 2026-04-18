@@ -1,0 +1,76 @@
+/* PropertyKpiTile — editorial-luxury KPI block */
+.pkt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  text-align: right;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  min-width: 0;
+}
+
+.pkt-interactive {
+  cursor: pointer;
+}
+
+.pkt-interactive:hover {
+  transform: translateY(-1px);
+  border-color: var(--gold-border);
+  box-shadow: 0 6px 18px rgba(30, 26, 20, 0.06);
+}
+
+/* Thin gold ring around tiles with positive values */
+.pkt-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid var(--gold-border);
+  pointer-events: none;
+}
+
+.pkt-value {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.pkt-ring .pkt-value {
+  color: var(--gold);
+}
+
+.pkt-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  text-transform: none;
+}
+
+.pkt-sublabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+@media (max-width: 820px) {
+  .pkt {
+    padding: 14px 14px;
+    border-radius: 14px;
+  }
+  .pkt-value {
+    font-size: 22px;
+  }
+}

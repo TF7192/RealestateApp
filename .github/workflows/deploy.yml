@@ -40,7 +40,7 @@ jobs:
             --include='/frontend/Dockerfile' --include='/frontend/nginx.conf' \
             --include='/frontend/index.html' --include='/frontend/vite.config.js' \
             --include='/frontend/eslint.config.js' --include='/frontend/capacitor.config.json' \
-            --include='/docker-compose.prod.yml' --include='/scripts/***' \
+            --include='/docker-compose.yml' --include='/scripts/***' \
             --exclude='*' \
             ./ "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ec2-user/estia-new/"
 
@@ -49,9 +49,12 @@ jobs:
           ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" '
             set -e
             cd /home/ec2-user/estia-new
-            sudo docker compose -f docker-compose.prod.yml build --pull
-            sudo docker compose -f docker-compose.prod.yml up -d
-            sudo docker compose -f docker-compose.prod.yml exec -T backend npx prisma migrate deploy
+            sudo docker compose build --pull
+            # --remove-orphans drops services no longer defined in the file
+            # (e.g. the legacy postgres + redis containers from when the DB
+            # ran on the host).  Keeps the EC2 in lockstep with the repo.
+            sudo docker compose up -d --remove-orphans
+            sudo docker compose exec -T backend npx prisma migrate deploy
             sudo docker builder prune -af >/dev/null 2>&1 || true
             df -h / | tail -1
           '
