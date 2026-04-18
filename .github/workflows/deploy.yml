@@ -44,6 +44,52 @@ jobs:
             --exclude='*' \
             ./ "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ec2-user/estia-new/"
 
+      # Surgically patch the production .env with secrets managed centrally
+      # in GitHub Actions. We only touch the keys listed in MANAGED_KEYS — any
+      # other line (DATABASE_URL, JWT_SECRET, AWS_*, …) is preserved as-is, so
+      # this is safe to run unconditionally on every deploy.
+      - name: Sync managed secrets to EC2 .env
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          PUBLIC_ORIGIN: ${{ secrets.PUBLIC_ORIGIN }}
+          POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+        run: |
+          # Build a patch file locally (never logged — keep secrets out of CI output).
+          umask 077
+          PATCH=$(mktemp)
+          {
+            [ -n "$GOOGLE_CLIENT_ID" ]        && echo "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
+            [ -n "$GOOGLE_CLIENT_SECRET" ]    && echo "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET"
+            [ -n "$PUBLIC_ORIGIN" ]           && echo "PUBLIC_ORIGIN=$PUBLIC_ORIGIN"
+            [ -n "$POSTHOG_PROJECT_API_KEY" ] && echo "POSTHOG_PROJECT_API_KEY=$POSTHOG_PROJECT_API_KEY"
+            [ -n "$POSTHOG_HOST" ]            && echo "POSTHOG_HOST=$POSTHOG_HOST"
+          } > "$PATCH"
+
+          if [ ! -s "$PATCH" ]; then
+            echo "No managed secrets set — skipping .env patch"
+            rm -f "$PATCH"
+            exit 0
+          fi
+
+          scp -i ~/.ssh/estia.pem "$PATCH" \
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/estia-env-patch"
+          rm -f "$PATCH"
+
+          ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" '
+            set -e
+            ENV_FILE=/home/ec2-user/estia-new/.env
+            sudo touch "$ENV_FILE"
+            sudo chmod 600 "$ENV_FILE"
+            # Strip any existing lines for keys we manage, then append the new values.
+            while IFS="=" read -r key _; do
+              [ -n "$key" ] && sudo sed -i "/^${key}=/d" "$ENV_FILE"
+            done < /tmp/estia-env-patch
+            cat /tmp/estia-env-patch | sudo tee -a "$ENV_FILE" >/dev/null
+            shred -u /tmp/estia-env-patch 2>/dev/null || rm -f /tmp/estia-env-patch
+          '
+
       - name: Build + restart on EC2
         run: |
           ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" '
