@@ -15,8 +15,10 @@ export function ThemeProvider({ children }) {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored === 'dark' || stored === 'light') return stored;
     } catch { /* storage disabled */ }
-    // First visit — respect the user's OS preference, default to light
-    if (window.matchMedia?.('(prefers-color-scheme: dark)')?.matches) return 'dark';
+    // First visit — always default to light. (We used to follow the OS's
+    // prefers-color-scheme, but the app's identity is the warm paper +
+    // gold palette, so light is the intended first impression. Users who
+    // want dark can still toggle from the sidebar.)
     return 'light';
   });
 
