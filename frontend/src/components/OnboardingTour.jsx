@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
+import { Capacitor } from '@capacitor/core';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
@@ -35,13 +36,18 @@ const PAGE_TOUR_KEYS = [
   'transfers', 'new-property', 'property-detail',
 ];
 
-export function dismissAllTours() {
+// Skip / close / finish all funnel through here. Besides the local
+// flags (which only protect the current device), we ALSO POST
+// /api/me/tutorial/complete so the state is persisted server-side —
+// log out + log back in on any device and the tour stays dismissed.
+export async function dismissAllTours() {
   try {
     PAGE_TOUR_KEYS.forEach((k) => {
       localStorage.setItem(`estia-page-tour:${k}`, String(Date.now()));
     });
     localStorage.setItem('estia-tour-dismissed', '1');
   } catch { /* storage disabled */ }
+  try { await api.completeTutorial(); } catch { /* ignore — local flags still protect */ }
 }
 
 export default function OnboardingTour() {
@@ -51,12 +57,31 @@ export default function OnboardingTour() {
   const [dead, setDead] = useState(false); // set when user dismisses — unmounts Joyride on the same tick
   const startedRef = useRef(false);
 
+  // Mobile (native app OR any mobile-width web session) NEVER sees
+  // the tour. Per user request: "treat as already passed on phone,
+  // no matter where". We also post completeTutorial on first mount
+  // under these conditions so the server flag flips to true and a
+  // later desktop session stays quiet too.
+  const isPhone = Capacitor.isNativePlatform() || isMobile;
+
   const shouldRun = useMemo(() => {
     if (!user || user.role !== 'AGENT') return false;
     if (user.hasCompletedTutorial) return false;
     try { if (localStorage.getItem('estia-tour-dismissed')) return false; } catch { /* ignore */ }
+    if (isPhone) return false;
     return true;
-  }, [user]);
+  }, [user, isPhone]);
+
+  // One-shot silencer for phone sessions — persists server-side.
+  useEffect(() => {
+    if (!isPhone) return;
+    if (!user || user.role !== 'AGENT') return;
+    if (user.hasCompletedTutorial) return;
+    (async () => {
+      try { await api.completeTutorial(); } catch { /* ignore */ }
+      refresh?.();
+    })();
+  }, [isPhone, user?.id, user?.hasCompletedTutorial, user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!shouldRun || startedRef.current) return;
@@ -112,15 +137,13 @@ export default function OnboardingTour() {
   }, [isMobile]);
 
   const finish = async () => {
-    // Kill Joyride's DOM synchronously — body.tour-dead hides every
-    // element Joyride mounted before the next paint, so there's no
-    // shrinking spotlight animation on the way out. React state
-    // change follows and tears the component down on the next tick.
     forceUnmountTour();
     setDead(true);
     setRun(false);
-    dismissAllTours();
-    try { await api.completeTutorial(); } catch { /* ignore */ }
+    // dismissAllTours writes localStorage flags AND posts
+    // /api/me/tutorial/complete so logout/login on any device stays
+    // quiet.
+    await dismissAllTours();
     refresh?.();
   };
 

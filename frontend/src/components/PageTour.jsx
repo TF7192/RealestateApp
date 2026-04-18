@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Joyride, STATUS, ACTIONS } from 'react-joyride';
+import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../lib/auth';
+import { useViewportMobile } from '../hooks/mobile';
 import {
   tourStyles,
   floaterProps,
@@ -17,11 +19,14 @@ import {
  */
 export default function PageTour({ pageKey, steps, delay = 700 }) {
   const { user } = useAuth();
+  const isMobile = useViewportMobile();
   const [run, setRun] = useState(false);
   const [dead, setDead] = useState(false);
 
   useEffect(() => {
     if (!user || user.role !== 'AGENT') return undefined;
+    // Phone sessions never see page tours either.
+    if (Capacitor.isNativePlatform() || isMobile) return undefined;
     if (!pageKey || !steps?.length) return undefined;
     try {
       if (localStorage.getItem(`estia-page-tour:${pageKey}`)) return undefined;
@@ -29,7 +34,7 @@ export default function PageTour({ pageKey, steps, delay = 700 }) {
     } catch { /* ignore */ }
     const t = setTimeout(() => setRun(true), delay);
     return () => clearTimeout(t);
-  }, [user, pageKey, steps?.length, delay]);
+  }, [user, pageKey, steps?.length, delay, isMobile]);
 
   const handleCallback = ({ status, action }) => {
     if (action === ACTIONS.CLOSE || action === ACTIONS.SKIP) {
