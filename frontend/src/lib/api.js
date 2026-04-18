@@ -1,13 +1,30 @@
 // Lightweight fetch wrapper for the Estia backend.
 // Uses same-origin /api/* via the nginx proxy in prod, and the Vite proxy in dev.
 
+import { getDistinctId as _phDistinctId } from './analytics';
+
 const BASE = import.meta.env.VITE_API_BASE || '/api';
 
+// Forward the browser's stable PostHog distinct-id so the backend's
+// api_request events can attribute anonymous traffic (pre-login) to the
+// same person in PostHog that posthog-js already sees. After sign-in the
+// server picks the real user id from the JWT instead, so this header is
+// only load-bearing for unauthenticated requests.
+function posthogDistinctId() {
+  const id = _phDistinctId();
+  return id && id.length <= 200 ? id : null;
+}
+
 async function request(path, { method = 'GET', body, headers = {}, raw } = {}) {
+  const phId = posthogDistinctId();
   const init = {
     method,
     credentials: 'include',
-    headers: { 'Accept': 'application/json', ...headers },
+    headers: {
+      'Accept': 'application/json',
+      ...(phId ? { 'X-PostHog-Distinct-Id': phId } : null),
+      ...headers,
+    },
   };
   if (body !== undefined) {
     if (body instanceof FormData) {
@@ -68,6 +85,13 @@ export const api = {
   },
   deletePropertyImage: (id, imageId) =>
     request(`/properties/${id}/images/${imageId}`, { method: 'DELETE' }),
+  uploadExclusivityAgreement: (id, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return request(`/properties/${id}/agreement`, { method: 'POST', body: fd });
+  },
+  deleteExclusivityAgreement: (id) =>
+    request(`/properties/${id}/agreement`, { method: 'DELETE' }),
   reorderPropertyImages: (id, order) =>
     request(`/properties/${id}/images/reorder`, { method: 'PUT', body: { order } }),
 

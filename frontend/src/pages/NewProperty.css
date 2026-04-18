@@ -370,3 +370,67 @@
 
   .np-mobile-only { display: block; }
 }
+
+/* Exclusivity agreement PDF upload — lives inside the בלעדיות section. */
+.np-agreement {
+  margin-top: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--gold-glow), transparent);
+  border: 1px solid var(--gold-border);
+}
+.np-agreement-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.np-agreement-head strong {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+.np-agreement-head span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.np-agreement-drop {
+  width: 100%;
+  padding: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1.5px dashed var(--gold-border);
+  border-radius: 10px;
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.np-agreement-drop:hover:not(:disabled) {
+  background: var(--gold-glow);
+  border-color: var(--gold);
+}
+.np-agreement-drop:disabled { opacity: 0.6; cursor: wait; }
+.np-agreement-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.np-agreement-link {
+  color: var(--gold);
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 13px;
+}
+.np-agreement-link:hover { text-decoration: underline; }
+.np-agreement-actions { display: inline-flex; gap: 6px; }
+

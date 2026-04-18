@@ -35,7 +35,7 @@ import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import PullRefresh from '../components/PullRefresh';
 import { OverflowSheet } from '../components/MobilePickers';
-import { useVisibilityBump, primeContactBump, useViewportMobile } from '../hooks/mobile';
+import { useVisibilityBump, primeContactBump, useViewportMobile, useDelayedFlag } from '../hooks/mobile';
 import haptics from '../lib/haptics';
 import { useToast, optimisticUpdate } from '../lib/toast';
 import { relativeTime, absoluteTime } from '../lib/time';
@@ -253,7 +253,10 @@ export default function Customers() {
     setDeleting(false);
   };
 
-  if (loading) {
+  // Only render skeletons if loading has dragged on past the flash-threshold.
+  // Fast navigations swap straight from blank-under-header to real data.
+  const showSkel = useDelayedFlag(loading, 220);
+  if (loading && showSkel) {
     return (
       <div className="customers-page">
         <div className="page-header animate-in">
@@ -272,6 +275,20 @@ export default function Customers() {
               <div className="skel skel-line w-40" />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+  if (loading) {
+    // First ~220ms of loading: show just the page header, no skeletons or
+    // empty state, so fast fetches resolve into their real data without
+    // any flash.
+    return (
+      <div className="customers-page">
+        <div className="page-header animate-in">
+          <div className="page-header-info">
+            <h2>לקוחות</h2>
+          </div>
         </div>
       </div>
     );

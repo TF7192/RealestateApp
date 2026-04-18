@@ -29,7 +29,7 @@ import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import StickyActionBar from '../components/StickyActionBar';
 import { OverflowSheet } from '../components/MobilePickers';
-import { useViewportMobile } from '../hooks/mobile';
+import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
 import { shareSheet, openWhatsApp, shareWithPhotos } from '../native/share';
 import { telUrl, wazeUrl } from '../lib/waLink';
 import haptics from '../lib/haptics';
@@ -139,6 +139,9 @@ export default function Properties() {
   const isMobile = useViewportMobile(820);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Gate the "טוען…" placeholder so it only shows up on genuinely slow fetches.
+  // Under ~220ms the page flips straight from empty-under-header to real data.
+  const showPropsSkel = useDelayedFlag(loading, 220);
   const [filter, setFilter] = useState('all');
   const [assetClassFilter, setAssetClassFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -630,11 +633,16 @@ export default function Properties() {
         </div>
       )}
 
-      {loading ? (
+      {loading && showPropsSkel ? (
         <div className="empty-state">
           <Building2 size={48} />
           <h3>טוען נכסים…</h3>
         </div>
+      ) : loading ? (
+        // Fast-load window: render the filters/header but nothing where
+        // the grid will appear, so fast fetches swap straight to real
+        // data without a "loading" placeholder flash.
+        null
       ) : (
         <div className="properties-grid">
           {filtered.map((prop, i) => {

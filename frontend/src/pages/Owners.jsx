@@ -6,7 +6,7 @@ import OwnerEditDialog from '../components/OwnerEditDialog';
 import PullRefresh from '../components/PullRefresh';
 import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
-import { useViewportMobile } from '../hooks/mobile';
+import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
 import { useToast } from '../lib/toast';
 import { telUrl } from '../lib/waLink';
 import { openWhatsApp } from '../native/share';
@@ -60,7 +60,8 @@ export default function Owners() {
     await load();
   };
 
-  if (loading) {
+  const showSkel = useDelayedFlag(loading, 220);
+  if (loading && showSkel) {
     return (
       <div className="owners-page app-wide-cap">
         <div className="page-header animate-in">
@@ -77,6 +78,17 @@ export default function Owners() {
               <div className="skel skel-line w-50" />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+  if (loading) {
+    return (
+      <div className="owners-page app-wide-cap">
+        <div className="page-header animate-in">
+          <div className="page-header-info">
+            <h2>בעלי נכסים</h2>
+          </div>
         </div>
       </div>
     );

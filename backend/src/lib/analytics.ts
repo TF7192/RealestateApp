@@ -32,9 +32,15 @@ function getClient(): PostHog | null {
 export function track(event: string, userId: string | null | undefined, properties: Record<string, any> = {}) {
   const c = getClient();
   if (!c) return;
+  // Drop events we can't attribute to a person. Generating a fresh random
+  // "anon-*" per call was creating thousands of single-event ghost people
+  // in PostHog and polluting the Persons list. Upstream callers should
+  // forward a stable browser distinct-id (e.g. from posthog-js) when
+  // they want anonymous traffic tracked.
+  if (!userId) return;
   try {
     c.capture({
-      distinctId: userId || `anon-${Math.random().toString(36).slice(2, 10)}`,
+      distinctId: userId,
       event,
       properties: {
         env: process.env.NODE_ENV || 'production',

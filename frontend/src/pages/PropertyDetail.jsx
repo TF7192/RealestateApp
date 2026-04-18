@@ -66,21 +66,31 @@ const MARKETING_LABELS = {
   facebook: 'פייסבוק',
   marketplace: 'מרקט פלייס',
   onMap: 'on map',
-  madlan: 'מדל״ן',
+  madlan: 'מדלן',
   whatsappGroup: 'קבוצת וואטס-אפ',
   officeWhatsapp: 'וואטס-אפ משרדי',
-  externalCoop: 'שת״פ חיצוני',
+  // `externalCoop` is the legacy key (still in old rows); we keep it in
+  // the label map so historical data renders, but we expose it under the
+  // renamed meaning — שיתופי פעולה עם מתווכים.
+  externalCoop: 'שיתופי פעולה מתווכים',
+  brokerCoop: 'שיתופי פעולה מתווכים',
   video: 'סרטון',
   neighborLetters: 'מכתבי שכנים',
   coupons: 'גזירונים',
-  flyers: 'פלאיירים',
-  newspaper: 'עיתון',
+  flyers: 'עלונים',
+  newspaper: 'עיתונות מקומית',
   agentTour: 'סיור סוכנים',
   openHouse: 'בית פתוח',
 };
 
 // Group the 22 actions into three scannable sections so the agent can find
 // and mark the one they want in a couple of glances instead of scrolling.
+//
+// Within "שטח ופרינט" the order follows the agent's real workflow:
+// photography first (shots are the base asset), then sign + tabu extract,
+// then mailed-to-neighbors outreach (this is the agent's opening move —
+// the whole building learns about the listing), then the print channels
+// (flyers/coupons) and finally local press.
 const MARKETING_GROUPS = [
   {
     key: 'digital',
@@ -90,12 +100,18 @@ const MARKETING_GROUPS = [
   {
     key: 'field',
     label: 'שטח ופרינט',
-    keys: ['sign', 'tabuExtract', 'photography', 'buildingPhoto', 'dronePhoto', 'flyers', 'coupons', 'newspaper', 'neighborLetters'],
+    keys: [
+      'photography', 'buildingPhoto', 'dronePhoto',
+      'sign', 'tabuExtract',
+      'neighborLetters',
+      'flyers', 'coupons',
+      'newspaper',
+    ],
   },
   {
     key: 'agent',
     label: 'פעילות סוכנים',
-    keys: ['whatsappGroup', 'officeWhatsapp', 'externalCoop', 'agentTour', 'openHouse'],
+    keys: ['whatsappGroup', 'officeWhatsapp', 'brokerCoop', 'agentTour', 'openHouse'],
   },
 ];
 

@@ -302,6 +302,27 @@ export function useViewportMobile(breakpoint = 820) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// useDelayedFlag — returns true only after `active` has stayed true
+// for `delayMs` continuously. Used to gate "loading skeletons" so they
+// don't flash on fast navigations: if the API responds in under 200ms
+// (the common case on LAN / warm caches), no skeleton is ever shown,
+// and the page swaps directly from blank-under-header to real data or
+// the empty state.
+// ────────────────────────────────────────────────────────────────
+export function useDelayedFlag(active, delayMs = 220) {
+  const [flagged, setFlagged] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setFlagged(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setFlagged(true), delayMs);
+    return () => clearTimeout(timer);
+  }, [active, delayMs]);
+  return flagged;
+}
+
+// ────────────────────────────────────────────────────────────────
 // useViewportDesktop — >=breakpoint (default 1100px)
 // ────────────────────────────────────────────────────────────────
 export function useViewportDesktop(breakpoint = 1100) {

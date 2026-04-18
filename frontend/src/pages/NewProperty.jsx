@@ -56,19 +56,52 @@ const INITIAL_FORM = {
   balconySize: null,
   buildingAge: null,
   renovated: '',
+  buildState: '',
   vacancyDate: '',
+  vacancyFlexible: false,
   sector: 'כללי',
   airDirections: '',
   notes: '',
   closingPrice: null,
   sqmArnona: null,
+  sqmTabu: null,
+  sqmGross: null,
+  sqmNet: null,
   exclusiveStart: '',
   exclusiveEnd: '',
+  // Registry / fees
+  neighborhood: '',
+  gush: '',
+  helka: '',
+  arnonaAmount: null,
+  buildingCommittee: null,
+  // Elevator details
   elevator: false,
+  elevatorCount: null,
+  shabbatElevator: false,
+  // Parking details
   parking: false,
+  parkingType: '',
+  parkingCount: null,
+  parkingCovered: false,
+  parkingCoupled: false,
+  parkingTandem: false,
+  parkingEvCharger: false,
+  nearbyParking: false,
+  // Storage details
   storage: false,
+  storageLocation: '',
+  storageSize: null,
+  // Amenities + shelters
   ac: false,
   safeRoom: false,
+  floorShelter: false,
+  shelter: false,
+  // Commercial-only
+  kitchenette: false,
+  meetingRoom: false,
+  workstations: null,
+  lobbySecurity: false,
 };
 
 /**
@@ -138,6 +171,7 @@ export default function NewProperty() {
         if (!p || !p.id) throw new Error('נכס לא נמצא');
         const dateOnly = (v) => (v ? String(v).slice(0, 10) : '');
         setForm({
+          ...INITIAL_FORM,
           assetClass: p.assetClass || 'RESIDENTIAL',
           category: p.category || 'SALE',
           street: p.street || '',
@@ -156,24 +190,52 @@ export default function NewProperty() {
           balconySize: p.balconySize ?? null,
           buildingAge: p.buildingAge ?? null,
           renovated: p.renovated || '',
+          buildState: p.buildState || '',
           vacancyDate: dateOnly(p.vacancyDate),
+          vacancyFlexible: !!p.vacancyFlexible,
           sector: p.sector || 'כללי',
           airDirections: p.airDirections || '',
           notes: p.notes || '',
           closingPrice: p.closingPrice ?? null,
           sqmArnona: p.sqmArnona ?? null,
+          sqmTabu: p.sqmTabu ?? null,
+          sqmGross: p.sqmGross ?? null,
+          sqmNet: p.sqmNet ?? null,
           exclusiveStart: dateOnly(p.exclusiveStart),
           exclusiveEnd: dateOnly(p.exclusiveEnd),
+          neighborhood: p.neighborhood || '',
+          gush: p.gush || '',
+          helka: p.helka || '',
+          arnonaAmount: p.arnonaAmount ?? null,
+          buildingCommittee: p.buildingCommittee ?? null,
           elevator: !!p.elevator,
+          elevatorCount: p.elevatorCount ?? null,
+          shabbatElevator: !!p.shabbatElevator,
           parking: !!p.parking,
+          parkingType: p.parkingType || '',
+          parkingCount: p.parkingCount ?? null,
+          parkingCovered: !!p.parkingCovered,
+          parkingCoupled: !!p.parkingCoupled,
+          parkingTandem: !!p.parkingTandem,
+          parkingEvCharger: !!p.parkingEvCharger,
+          nearbyParking: !!p.nearbyParking,
           storage: !!p.storage,
+          storageLocation: p.storageLocation || '',
+          storageSize: p.storageSize ?? null,
           ac: !!p.ac,
           safeRoom: !!p.safeRoom,
+          floorShelter: !!p.floorShelter,
+          shelter: !!p.shelter,
+          kitchenette: !!p.kitchenette,
+          meetingRoom: !!p.meetingRoom,
+          workstations: p.workstations ?? null,
+          lobbySecurity: !!p.lobbySecurity,
         });
         setExistingMeta({
           street: p.street,
           city: p.city,
           imageCount: (p.imageList || []).length,
+          exclusivityAgreementUrl: p.exclusivityAgreementUrl || null,
         });
       } catch (e) {
         if (!cancelled) setError(e.message || 'טעינה נכשלה');
@@ -271,6 +333,87 @@ export default function NewProperty() {
     });
   };
 
+  // Full body builder for edit mode — every PATCH (from either step) sends
+  // the union of fields, so switching tabs without explicit save can't
+  // silently drop work. On CREATE we still use the minimal step-1 body so
+  // the initial insert fast-paths.
+  const numOrNull = (v) => (v === '' || v == null ? null : Number(v));
+  const buildStep1Body = () => {
+    const body = {
+      assetClass: form.assetClass,
+      category: form.category,
+      type: form.type,
+      street: form.street,
+      city: form.city,
+      marketingPrice: Number(form.marketingPrice) || 0,
+      sqm: Number(form.sqm) || 0,
+    };
+    if (form.propertyOwnerId) {
+      body.propertyOwnerId = form.propertyOwnerId;
+    } else {
+      body.owner = form.owner;
+      body.ownerPhone = form.ownerPhone;
+      if (form.ownerEmail) body.ownerEmail = form.ownerEmail;
+    }
+    return body;
+  };
+  const buildStep2Body = () => ({
+    type: form.type,
+    rooms: numOrNull(form.rooms),
+    floor: numOrNull(form.floor),
+    totalFloors: numOrNull(form.totalFloors),
+    balconySize: Number(form.balconySize) || 0,
+    buildingAge: numOrNull(form.buildingAge),
+    renovated: form.renovated || null,
+    buildState: form.buildState || null,
+    vacancyDate: form.vacancyDate || null,
+    vacancyFlexible: !!form.vacancyFlexible,
+    sector: form.sector || null,
+    airDirections: form.airDirections || null,
+    notes: form.notes || null,
+    closingPrice: numOrNull(form.closingPrice),
+    sqmArnona: numOrNull(form.sqmArnona),
+    sqmTabu: numOrNull(form.sqmTabu),
+    sqmGross: numOrNull(form.sqmGross),
+    sqmNet: numOrNull(form.sqmNet),
+    exclusiveStart: form.exclusiveStart ? new Date(form.exclusiveStart).toISOString() : null,
+    exclusiveEnd: form.exclusiveEnd ? new Date(form.exclusiveEnd).toISOString() : null,
+    // Registry / fees
+    neighborhood: form.neighborhood || null,
+    gush: form.gush || null,
+    helka: form.helka || null,
+    arnonaAmount: numOrNull(form.arnonaAmount),
+    buildingCommittee: numOrNull(form.buildingCommittee),
+    // Elevator
+    elevator: !!form.elevator,
+    elevatorCount: numOrNull(form.elevatorCount),
+    shabbatElevator: !!form.shabbatElevator,
+    // Parking
+    parking: !!form.parking,
+    parkingType: form.parkingType || null,
+    parkingCount: numOrNull(form.parkingCount),
+    parkingCovered: !!form.parkingCovered,
+    parkingCoupled: !!form.parkingCoupled,
+    parkingTandem: !!form.parkingTandem,
+    parkingEvCharger: !!form.parkingEvCharger,
+    nearbyParking: !!form.nearbyParking,
+    // Storage
+    storage: !!form.storage,
+    storageLocation: form.storageLocation || null,
+    storageSize: numOrNull(form.storageSize),
+    // Shelters + amenities
+    ac: !!form.ac,
+    safeRoom: !!form.safeRoom,
+    floorShelter: !!form.floorShelter,
+    shelter: !!form.shelter,
+    // Commercial
+    kitchenette: !!form.kitchenette,
+    meetingRoom: !!form.meetingRoom,
+    workstations: numOrNull(form.workstations),
+    lobbySecurity: !!form.lobbySecurity,
+  });
+  const buildFullEditBody = () => ({ ...buildStep1Body(), ...buildStep2Body() });
+
   // ── Step 1 save: creates the property ──────────────────────────────
   const saveStep1 = async (e) => {
     e?.preventDefault?.();
@@ -284,28 +427,14 @@ export default function NewProperty() {
       if (!form.marketingPrice) throw new Error('חסר מחיר שיווק');
       if (!form.sqm) throw new Error('חסר שטח במ״ר');
       setSubmitting(true);
-      const body = {
-        assetClass: form.assetClass,
-        category: form.category,
-        type: form.type,
-        street: form.street,
-        city: form.city,
-        marketingPrice: Number(form.marketingPrice) || 0,
-        sqm: Number(form.sqm) || 0,
-      };
-      if (hasOwnerLink) {
-        body.propertyOwnerId = form.propertyOwnerId;
-      } else {
-        body.owner = form.owner;
-        body.ownerPhone = form.ownerPhone;
-        if (form.ownerEmail) body.ownerEmail = form.ownerEmail;
-      }
       if (isEdit) {
-        await api.updateProperty(editId, body);
-        toast.success('פרטי היסוד עודכנו · המשך למאפיינים');
+        // Send the full union so step-2-only fields can't get dropped
+        // when someone hits save from step 1.
+        await api.updateProperty(editId, buildFullEditBody());
+        toast.success('פרטי הנכס עודכנו · המשך למאפיינים');
         setStep(2);
       } else {
-        const res = await api.createProperty(body);
+        const res = await api.createProperty(buildStep1Body());
         const id = res.property?.id;
         setPropertyId(id);
         toast.success('הנכס נשמר · המשך להשלמת הפרטים');
@@ -325,28 +454,10 @@ export default function NewProperty() {
     setError(null);
     setSubmitting(true);
     try {
-      const patch = {
-        type: form.type,
-        rooms: form.rooms !== '' && form.rooms != null ? Number(form.rooms) : null,
-        floor: form.floor != null && form.floor !== '' ? Number(form.floor) : null,
-        totalFloors: form.totalFloors != null && form.totalFloors !== '' ? Number(form.totalFloors) : null,
-        balconySize: Number(form.balconySize) || 0,
-        buildingAge: form.buildingAge != null && form.buildingAge !== '' ? Number(form.buildingAge) : null,
-        renovated: form.renovated || null,
-        vacancyDate: form.vacancyDate || null,
-        sector: form.sector || null,
-        airDirections: form.airDirections || null,
-        notes: form.notes || null,
-        closingPrice: form.closingPrice != null && form.closingPrice !== '' ? Number(form.closingPrice) : null,
-        sqmArnona: form.sqmArnona != null && form.sqmArnona !== '' ? Number(form.sqmArnona) : null,
-        exclusiveStart: form.exclusiveStart ? new Date(form.exclusiveStart).toISOString() : null,
-        exclusiveEnd: form.exclusiveEnd ? new Date(form.exclusiveEnd).toISOString() : null,
-        elevator: form.elevator,
-        parking: form.parking,
-        storage: form.storage,
-        ac: form.ac,
-        safeRoom: form.safeRoom,
-      };
+      // Edit mode: send the full union too, so a save from step 2 never
+      // leaves step-1 edits un-persisted (the bug: "יצאתי ונכנסתי לעריכה
+      // ויש מצב שדברים לא נשמרו").
+      const patch = isEdit ? buildFullEditBody() : buildStep2Body();
       await api.updateProperty(propertyId, patch);
 
       // Upload photos sequentially
@@ -399,10 +510,19 @@ export default function NewProperty() {
 
   // In edit mode the property already exists, so the user can hop between
   // the two steps freely. In create mode, step 2 is gated behind step 1
-  // actually persisting.
-  const goToStep = (n) => {
+  // actually persisting. Crucially for edit mode: auto-save before
+  // switching so step-1 tweaks can't vanish when the agent hops to step 2
+  // without hitting the save button.
+  const goToStep = async (n) => {
     if (n === step) return;
-    if (isEdit || propertyId) setStep(n);
+    if (isEdit) {
+      try {
+        await api.updateProperty(editId, buildFullEditBody());
+      } catch { /* non-blocking; user still moves to the other tab */ }
+      setStep(n);
+      return;
+    }
+    if (propertyId) setStep(n);
   };
 
   return (
@@ -749,24 +869,77 @@ export default function NewProperty() {
               </div>
               <div className="form-group">
                 <label className="form-label">פינוי</label>
-                <input type="date" className="form-input" value={form.vacancyDate} onChange={(e) => update('vacancyDate', e.target.value)} />
+                <input
+                  type="date"
+                  className="form-input"
+                  value={form.vacancyDate}
+                  onChange={(e) => update('vacancyDate', e.target.value)}
+                  disabled={form.vacancyFlexible}
+                />
                 <DateQuickChips
                   value={form.vacancyDate}
-                  onChange={(v) => update('vacancyDate', v)}
+                  onChange={(v) => { update('vacancyDate', v); update('vacancyFlexible', false); }}
                   chips={['today', '+3m', '+6m']}
                 />
+                <label className="checkbox-item" style={{ marginTop: 6 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.vacancyFlexible}
+                    onChange={(e) => {
+                      update('vacancyFlexible', e.target.checked);
+                      if (e.target.checked) update('vacancyDate', '');
+                    }}
+                  />
+                  <span className="checkbox-custom" />
+                  גמיש
+                </label>
               </div>
             </div>
-            {isCommercial && (
-              <div className="form-row">
+            {isCommercial ? (
+              <>
+                <div className="form-row form-row-3">
+                  <div className="form-group">
+                    <label className="form-label">שטח ברוטו</label>
+                    <NumberField unit="מ״ר" placeholder="220" value={form.sqmGross} onChange={(v) => update('sqmGross', v)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">שטח נטו</label>
+                    <NumberField unit="מ״ר" placeholder="180" value={form.sqmNet} onChange={(v) => update('sqmNet', v)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">מצב בנייה</label>
+                    <SelectField
+                      value={form.buildState}
+                      onChange={(v) => update('buildState', v)}
+                      placeholder="בחר…"
+                      options={['מעטפת', 'גמר']}
+                    />
+                  </div>
+                </div>
+                <div className="form-row form-row-3">
+                  <div className="form-group">
+                    <label className="form-label">מ״ר ארנונה</label>
+                    <NumberField unit="מ״ר" placeholder="115" value={form.sqmArnona} onChange={(v) => update('sqmArnona', v)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">מ״ר טאבו</label>
+                    <NumberField unit="מ״ר" placeholder="120" value={form.sqmTabu} onChange={(v) => update('sqmTabu', v)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">מספר עמדות ישיבה</label>
+                    <NumberField placeholder="12" value={form.workstations} onChange={(v) => update('workstations', v)} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="form-row form-row-2">
+                <div className="form-group">
+                  <label className="form-label">מ״ר טאבו</label>
+                  <NumberField unit="מ״ר" placeholder="120" value={form.sqmTabu} onChange={(v) => update('sqmTabu', v)} />
+                </div>
                 <div className="form-group">
                   <label className="form-label">מ״ר ארנונה</label>
-                  <NumberField
-                    unit="מ״ר"
-                    placeholder="115"
-                    value={form.sqmArnona}
-                    onChange={(v) => update('sqmArnona', v)}
-                  />
+                  <NumberField unit="מ״ר" placeholder="115" value={form.sqmArnona} onChange={(v) => update('sqmArnona', v)} />
                 </div>
               </div>
             )}
@@ -776,7 +949,16 @@ export default function NewProperty() {
                 { key: 'parking', label: 'חניה' },
                 { key: 'storage', label: 'מחסן' },
                 { key: 'ac', label: 'מזגנים' },
-                ...(!isCommercial ? [{ key: 'safeRoom', label: 'ממ״ד' }] : []),
+                ...(isCommercial
+                  ? [
+                      { key: 'kitchenette',   label: 'מטבחון' },
+                      { key: 'meetingRoom',   label: 'חדר ישיבות' },
+                      { key: 'lobbySecurity', label: 'עמדת שמירה בלובי' },
+                      { key: 'nearbyParking', label: 'חניה זמינה בסביבה' },
+                    ]
+                  : [{ key: 'safeRoom', label: 'ממ״ד' }]),
+                { key: 'floorShelter', label: 'מרחב מוגן קומתי' },
+                { key: 'shelter',      label: 'מקלט' },
               ].map(({ key, label }) => (
                 <label key={key} className="checkbox-item">
                   <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />
@@ -786,6 +968,141 @@ export default function NewProperty() {
               ))}
             </div>
           </div>
+
+          {/* ── אזור ורישום ─────────────────────────────────────────── */}
+          <div className="form-section">
+            <h3 className="form-section-title">אזור ורישום</h3>
+            <div className="form-row form-row-3">
+              <div className="form-group">
+                <label className="form-label">שכונה</label>
+                <input
+                  className="form-input"
+                  value={form.neighborhood}
+                  onChange={(e) => update('neighborhood', e.target.value)}
+                  placeholder="רמת שרת"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">גוש</label>
+                <input
+                  className="form-input"
+                  value={form.gush}
+                  onChange={(e) => update('gush', e.target.value)}
+                  placeholder="6118"
+                  inputMode="numeric"
+                  dir="ltr"
+                  style={{ textAlign: 'right' }}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">חלקה</label>
+                <input
+                  className="form-input"
+                  value={form.helka}
+                  onChange={(e) => update('helka', e.target.value)}
+                  placeholder="212"
+                  inputMode="numeric"
+                  dir="ltr"
+                  style={{ textAlign: 'right' }}
+                />
+              </div>
+            </div>
+            <div className="form-row form-row-2">
+              <div className="form-group">
+                <label className="form-label">ארנונה חודשית</label>
+                <NumberField unit="₪" placeholder="450" value={form.arnonaAmount} onChange={(v) => update('arnonaAmount', v)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">ועד בית חודשי</label>
+                <NumberField unit="₪" placeholder="220" value={form.buildingCommittee} onChange={(v) => update('buildingCommittee', v)} />
+              </div>
+            </div>
+          </div>
+
+          {/* ── מעלית מפורט ─────────────────────────────────────────── */}
+          {form.elevator && (
+            <div className="form-section">
+              <h3 className="form-section-title">פרטי מעלית</h3>
+              <div className="form-row form-row-2">
+                <div className="form-group">
+                  <label className="form-label">כמה מעליות</label>
+                  <NumberField placeholder="1" min={1} max={12} value={form.elevatorCount} onChange={(v) => update('elevatorCount', v)} />
+                </div>
+                <div className="form-group" style={{ alignSelf: 'end' }}>
+                  <label className="checkbox-item" style={{ marginBottom: 0 }}>
+                    <input type="checkbox" checked={form.shabbatElevator} onChange={(e) => update('shabbatElevator', e.target.checked)} />
+                    <span className="checkbox-custom" />
+                    מעלית שבת
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── חניה מפורט ─────────────────────────────────────────── */}
+          {form.parking && (
+            <div className="form-section">
+              <h3 className="form-section-title">פרטי חניה</h3>
+              <div className="form-row form-row-3">
+                <div className="form-group">
+                  <label className="form-label">סוג</label>
+                  <SelectField
+                    value={form.parkingType}
+                    onChange={(v) => update('parkingType', v)}
+                    placeholder="בחר…"
+                    options={[
+                      { value: 'tabu',    label: 'חניה בטאבו' },
+                      { value: 'private', label: 'חניית דיירים פרטית' },
+                      { value: 'nearby',  label: 'חניה בקרבת הנכס' },
+                    ]}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">כמות</label>
+                  <NumberField placeholder="1" min={0} max={20} value={form.parkingCount} onChange={(v) => update('parkingCount', v)} />
+                </div>
+              </div>
+              <div className="checkbox-grid">
+                {[
+                  { key: 'parkingCovered',   label: 'מקורה' },
+                  { key: 'parkingCoupled',   label: 'צמודה' },
+                  { key: 'parkingTandem',    label: 'עוקבת' },
+                  { key: 'parkingEvCharger', label: 'עמדת הטענה לרכב חשמלי' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="checkbox-item">
+                    <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />
+                    <span className="checkbox-custom" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── מחסן מפורט ─────────────────────────────────────────── */}
+          {form.storage && (
+            <div className="form-section">
+              <h3 className="form-section-title">פרטי מחסן</h3>
+              <div className="form-row form-row-2">
+                <div className="form-group">
+                  <label className="form-label">מיקום</label>
+                  <SelectField
+                    value={form.storageLocation}
+                    onChange={(v) => update('storageLocation', v)}
+                    placeholder="בחר…"
+                    options={[
+                      { value: 'attached', label: 'צמוד לנכס' },
+                      { value: 'basement', label: 'במרתף' },
+                    ]}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">גודל</label>
+                  <NumberField unit="מ״ר" placeholder="4" min={0} max={200} value={form.storageSize} onChange={(v) => update('storageSize', v)} />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="form-section">
             <h3 className="form-section-title">בלעדיות והערות</h3>
@@ -809,6 +1126,14 @@ export default function NewProperty() {
                 />
               </div>
             </div>
+            {isEdit && (
+              <ExclusivityAgreementUpload
+                propertyId={editId}
+                initialUrl={existingMeta?.exclusivityAgreementUrl}
+                onChange={(url) => setExistingMeta((m) => ({ ...(m || {}), exclusivityAgreementUrl: url }))}
+                toast={toast}
+              />
+            )}
             <div className="form-group">
               <textarea className="form-textarea" rows={3} placeholder="הערות נוספות על הנכס..." value={form.notes} onChange={(e) => update('notes', e.target.value)} />
             </div>
@@ -922,3 +1247,90 @@ export default function NewProperty() {
     </div>
   );
 }
+
+function ExclusivityAgreementUpload({ propertyId, initialUrl, onChange, toast }) {
+  const [url, setUrl] = useState(initialUrl || null);
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => { setUrl(initialUrl || null); }, [initialUrl]);
+
+  const onPick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast?.error?.("רק קובץ PDF");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await api.uploadExclusivityAgreement(propertyId, file);
+      const newUrl = res?.exclusivityAgreementUrl || null;
+      setUrl(newUrl);
+      onChange?.(newUrl);
+      toast?.success?.("הסכם הבלעדיות נשמר");
+    } catch (err) {
+      toast?.error?.(err?.message || "העלאת ההסכם נכשלה");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRemove = async () => {
+    if (!url) return;
+    setBusy(true);
+    try {
+      await api.deleteExclusivityAgreement(propertyId);
+      setUrl(null);
+      onChange?.(null);
+      toast?.info?.("הוסר");
+    } catch (err) {
+      toast?.error?.(err?.message || "הסרה נכשלה");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="np-agreement">
+      <div className="np-agreement-head">
+        <strong>הסכם בלעדיות חתום (PDF)</strong>
+        <span>חובה לפרסום ביד 2</span>
+      </div>
+      {url ? (
+        <div className="np-agreement-row np-agreement-has">
+          <a href={url} target="_blank" rel="noreferrer" className="np-agreement-link">
+            פתח את ההסכם
+          </a>
+          <div className="np-agreement-actions">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => inputRef.current?.click()} disabled={busy}>
+              החלף קובץ
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onRemove} disabled={busy}>
+              הסר
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="np-agreement-drop"
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+        >
+          <Upload size={16} />
+          {busy ? "מעלה…" : "בחר PDF מההתקן"}
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf"
+        style={{ display: "none" }}
+        onChange={onPick}
+      />
+    </div>
+  );
+}
+

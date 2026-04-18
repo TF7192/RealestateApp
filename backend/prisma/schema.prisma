@@ -92,12 +92,12 @@ model User {
   customerProfile CustomerProfile?
 
   // Audit trail
-  sessions   Session[]
-  properties Property[]    @relation("AgentProperties")
-  owners     Owner[]       @relation("AgentOwners")
-  leads      Lead[]        @relation("AgentLeads")
-  deals      Deal[]        @relation("AgentDeals")
-  files      UploadedFile[]
+  sessions          Session[]
+  properties        Property[]         @relation("AgentProperties")
+  owners            Owner[]            @relation("AgentOwners")
+  leads             Lead[]             @relation("AgentLeads")
+  deals             Deal[]             @relation("AgentDeals")
+  files             UploadedFile[]
   transfersSent     PropertyTransfer[] @relation("TransferFrom")
   transfersReceived PropertyTransfer[] @relation("TransferTo")
   templates         MessageTemplate[]
@@ -138,56 +138,92 @@ model Session {
 
 // ─── Domain ────────────────────────────────────────────────────────────────
 model Property {
-  id               String           @id @default(cuid())
-  agentId          String
-  agent            User             @relation("AgentProperties", fields: [agentId], references: [id])
+  id                         String                     @id @default(cuid())
+  agentId                    String
+  agent                      User                       @relation("AgentProperties", fields: [agentId], references: [id])
   // Per-agent SEO slug — used in /agents/<agent>/<property> URLs.
-  slug             String?
-  assetClass       AssetClass
-  category         PropertyCategory
-  status           PropertyStatus   @default(ACTIVE)
-  type             String           // דירה, משרד, חנות, etc.
-  street           String
-  city             String
-  lat              Float?
-  lng              Float?
+  slug                       String?
+  assetClass                 AssetClass
+  category                   PropertyCategory
+  status                     PropertyStatus             @default(ACTIVE)
+  type                       String // דירה, משרד, חנות, etc.
+  street                     String
+  city                       String
+  lat                        Float?
+  lng                        Float?
   // ── Property owner (the seller / landlord) ─────────────────────────────
   // `propertyOwnerId` references the new Owner table — the canonical record.
   // The legacy inline `owner` / `ownerPhone` / `ownerEmail` columns remain
   // as a denormalized copy so older code keeps working during the rollout;
   // they're auto-synced from the Owner row at write-time.
-  propertyOwnerId  String?
-  propertyOwner    Owner?           @relation(fields: [propertyOwnerId], references: [id], onDelete: SetNull)
-  owner            String
-  ownerPhone       String
-  ownerEmail       String?
-  exclusiveStart   DateTime?
-  exclusiveEnd     DateTime?
-  marketingPrice   Int
-  closingPrice     Int?
-  offer            Int?
-  sqm              Int
-  sqmArnona        Int?
-  rooms            Float?
-  floor            Int?
-  totalFloors      Int?
-  elevator         Boolean          @default(false)
-  renovated        String?
-  vacancyDate      String?
-  parking          Boolean          @default(false)
-  storage          Boolean          @default(false)
-  balconySize      Int              @default(0)
-  airDirections    String?
-  ac               Boolean          @default(false)
-  safeRoom         Boolean          @default(false)
-  buildingAge      Int?
-  sector           String?
-  notes            String?
-  lastContact      DateTime?
-  lastContactNotes String?
+  propertyOwnerId            String?
+  propertyOwner              Owner?                     @relation(fields: [propertyOwnerId], references: [id], onDelete: SetNull)
+  owner                      String
+  ownerPhone                 String
+  ownerEmail                 String?
+  exclusiveStart             DateTime?
+  exclusiveEnd               DateTime?
+  marketingPrice             Int
+  closingPrice               Int?
+  offer                      Int?
+  sqm                        Int
+  sqmArnona                  Int?
+  sqmTabu                    Int?
+  sqmGross                   Int? // Commercial: gross area
+  sqmNet                     Int? // Commercial: net usable area
+  rooms                      Float?
+  floor                      Int?
+  totalFloors                Int?
+  // ── Elevator ────────────────────────────────────────────────
+  elevator                   Boolean                    @default(false)
+  elevatorCount              Int? // How many elevators in the building
+  shabbatElevator            Boolean                    @default(false)
+  // ────────────────────────────────────────────────────────────
+  renovated                  String?
+  buildState                 String? // Commercial: shell (מעטפת) / finished (גמר)
+  vacancyDate                String?
+  vacancyFlexible            Boolean                    @default(false)
+  // ── Parking ─────────────────────────────────────────────────
+  parking                    Boolean                    @default(false)
+  parkingType                String? // "tabu" | "nearby" | "private"
+  parkingCount               Int?
+  parkingCovered             Boolean                    @default(false)
+  parkingCoupled             Boolean                    @default(false) // צמודות
+  parkingTandem              Boolean                    @default(false) // עוקבות
+  parkingEvCharger           Boolean                    @default(false)
+  nearbyParking              Boolean                    @default(false) // Commercial: public parking nearby
+  // ── Storage ─────────────────────────────────────────────────
+  storage                    Boolean                    @default(false)
+  storageLocation            String? // "attached" | "basement"
+  storageSize                Int?
+  // ────────────────────────────────────────────────────────────
+  balconySize                Int                        @default(0)
+  airDirections              String?
+  ac                         Boolean                    @default(false)
+  safeRoom                   Boolean                    @default(false) // ממ״ד (in-unit)
+  floorShelter               Boolean                    @default(false) // מרחב מוגן קומתי (floor-level)
+  shelter                    Boolean                    @default(false) // מקלט (building-level)
+  buildingAge                Int?
+  sector                     String?
+  notes                      String?
+  // ── Registry / fees ─────────────────────────────────────────
+  neighborhood               String?
+  gush                       String? // Israeli land registry block
+  helka                      String? // Israeli land registry parcel
+  arnonaAmount               Int? // Monthly arnona fee (shekel)
+  buildingCommittee          Int? // Monthly ועד בית fee
+  // ── Commercial-specific amenities ──────────────────────────
+  kitchenette                Boolean                    @default(false)
+  meetingRoom                Boolean                    @default(false)
+  workstations               Int?
+  lobbySecurity              Boolean                    @default(false)
+  // ── Exclusivity agreement ──────────────────────────────────
+  exclusivityAgreementUrl    String? // S3 key or URL to signed PDF
+  lastContact                DateTime?
+  lastContactNotes           String?
   marketingReminderFrequency MarketingReminderFrequency @default(WEEKLY)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
 
   images           PropertyImage[]
   marketingActions MarketingAction[]
@@ -198,11 +234,11 @@ model Property {
   agreements       Agreement[]
   transfers        PropertyTransfer[]
 
+  @@unique([agentId, slug])
   @@index([agentId])
   @@index([city])
   @@index([assetClass, category, status])
   @@index([propertyOwnerId])
-  @@unique([agentId, slug])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -214,19 +250,19 @@ model Property {
 // expected and tracked separately so the agent's "ספר בעלים" stays clean.
 // ────────────────────────────────────────────────────────────────────────────
 model Owner {
-  id          String     @id @default(cuid())
-  agentId     String
-  agent       User       @relation("AgentOwners", fields: [agentId], references: [id], onDelete: Cascade)
-  name        String
-  phone       String
-  email       String?
-  notes       String?
+  id           String   @id @default(cuid())
+  agentId      String
+  agent        User     @relation("AgentOwners", fields: [agentId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String
+  email        String?
+  notes        String?
   // Relationship hint, e.g. "בעל יחיד", "ירושה", "חברה". Optional copy.
   relationship String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  properties  Property[]
+  properties Property[]
 
   @@index([agentId])
   @@index([phone])
@@ -248,7 +284,7 @@ model PropertyTransfer {
   fromAgent    User           @relation("TransferFrom", fields: [fromAgentId], references: [id])
   toAgentId    String?
   toAgent      User?          @relation("TransferTo", fields: [toAgentId], references: [id])
-  toAgentEmail String?        // kept in case the target isn't registered yet
+  toAgentEmail String? // kept in case the target isn't registered yet
   status       TransferStatus @default(PENDING)
   message      String?
   createdAt    DateTime       @default(now())
@@ -274,8 +310,8 @@ model PropertyVideo {
   id         String   @id @default(cuid())
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  url        String   // served via /uploads/videos/... or an external URL
-  kind       String   @default("upload")  // "upload" | "external" (youtube/vimeo)
+  url        String // served via /uploads/videos/... or an external URL
+  kind       String   @default("upload") // "upload" | "external" (youtube/vimeo)
   title      String?
   posterUrl  String?
   sizeBytes  Int?
@@ -287,14 +323,14 @@ model PropertyVideo {
 }
 
 model MarketingAction {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   propertyId String
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  actionKey  String   // e.g. "tabuExtract", "photography"…
-  done       Boolean  @default(false)
+  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  actionKey  String // e.g. "tabuExtract", "photography"…
+  done       Boolean   @default(false)
   doneAt     DateTime?
   notes      String?
-  link       String?  // Listing URL (yad2/madlan/facebook) or any reference URL
+  link       String? // Listing URL (yad2/madlan/facebook) or any reference URL
 
   @@unique([propertyId, actionKey])
   @@index([propertyId])
@@ -328,36 +364,36 @@ model PropertyInquiry {
 }
 
 model Lead {
-  id                  String           @id @default(cuid())
-  agentId             String
-  agent               User             @relation("AgentLeads", fields: [agentId], references: [id])
-  name                String
-  phone               String
-  email               String?
-  interestType        LeadInterestType @default(PRIVATE)
-  lookingFor          LeadLookingFor   @default(BUY)
-  city                String?
-  street              String?
-  rooms               String?
-  priceRangeLabel     String?
-  budget              Int?
-  preApproval         Boolean          @default(false)
-  sector              String?
-  balconyRequired     Boolean          @default(false)
-  parkingRequired     Boolean          @default(false)
-  elevatorRequired    Boolean          @default(false)
-  safeRoomRequired    Boolean          @default(false)
-  acRequired          Boolean          @default(false)
-  storageRequired     Boolean          @default(false)
-  schoolProximity     String?
-  source              String?
-  status              LeadStatus       @default(WARM)
-  notes               String?
-  brokerageSignedAt   DateTime?
-  brokerageExpiresAt  DateTime?
-  lastContact         DateTime?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  id                 String           @id @default(cuid())
+  agentId            String
+  agent              User             @relation("AgentLeads", fields: [agentId], references: [id])
+  name               String
+  phone              String
+  email              String?
+  interestType       LeadInterestType @default(PRIVATE)
+  lookingFor         LeadLookingFor   @default(BUY)
+  city               String?
+  street             String?
+  rooms              String?
+  priceRangeLabel    String?
+  budget             Int?
+  preApproval        Boolean          @default(false)
+  sector             String?
+  balconyRequired    Boolean          @default(false)
+  parkingRequired    Boolean          @default(false)
+  elevatorRequired   Boolean          @default(false)
+  safeRoomRequired   Boolean          @default(false)
+  acRequired         Boolean          @default(false)
+  storageRequired    Boolean          @default(false)
+  schoolProximity    String?
+  source             String?
+  status             LeadStatus       @default(WARM)
+  notes              String?
+  brokerageSignedAt  DateTime?
+  brokerageExpiresAt DateTime?
+  lastContact        DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   viewings        PropertyViewing[]
   customerProfile CustomerProfile?
@@ -369,16 +405,16 @@ model Lead {
 }
 
 model Deal {
-  id             String     @id @default(cuid())
+  id             String           @id @default(cuid())
   agentId        String
-  agent          User       @relation("AgentDeals", fields: [agentId], references: [id])
-  propertyId     String?    @unique
-  property       Property?  @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  agent          User             @relation("AgentDeals", fields: [agentId], references: [id])
+  propertyId     String?          @unique
+  property       Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   propertyStreet String
   city           String
   assetClass     AssetClass
   category       PropertyCategory
-  status         DealStatus @default(NEGOTIATING)
+  status         DealStatus       @default(NEGOTIATING)
   marketingPrice Int
   offer          Int?
   closedPrice    Int?
@@ -386,45 +422,45 @@ model Deal {
   buyerAgent     String?
   sellerAgent    String?
   lawyer         String?
-  updateDate     DateTime   @default(now())
+  updateDate     DateTime         @default(now())
   signedAt       DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([agentId])
   @@index([status])
 }
 
 model Agreement {
-  id         String   @id @default(cuid())
-  leadId     String?
-  lead       Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  propertyId String?
-  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  signerName String
+  id          String        @id @default(cuid())
+  leadId      String?
+  lead        Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  propertyId  String?
+  property    Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  signerName  String
   signerPhone String?
   signerEmail String?
-  fileId     String?
-  file       UploadedFile? @relation(fields: [fileId], references: [id])
-  sentAt     DateTime @default(now())
-  signedAt   DateTime?
-  status     String   @default("SENT") // SENT | SIGNED | EXPIRED | CANCELLED
-  note       String?
+  fileId      String?
+  file        UploadedFile? @relation(fields: [fileId], references: [id])
+  sentAt      DateTime      @default(now())
+  signedAt    DateTime?
+  status      String        @default("SENT") // SENT | SIGNED | EXPIRED | CANCELLED
+  note        String?
 
   @@index([leadId])
   @@index([propertyId])
 }
 
 model UploadedFile {
-  id         String   @id @default(cuid())
-  ownerId    String
-  owner      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  kind       String   // "property_image" | "signed_agreement" | "other"
+  id           String   @id @default(cuid())
+  ownerId      String
+  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  kind         String // "property_image" | "signed_agreement" | "other"
   originalName String
-  mimeType   String
-  sizeBytes  Int
-  path       String   // relative path on disk inside /uploads
-  createdAt  DateTime @default(now())
+  mimeType     String
+  sizeBytes    Int
+  path         String // relative path on disk inside /uploads
+  createdAt    DateTime @default(now())
 
   agreements Agreement[]
 
@@ -433,11 +469,11 @@ model UploadedFile {
 }
 
 enum MessageTemplateKind {
-  BUY_PRIVATE       // residential + sale
-  RENT_PRIVATE      // residential + rent
-  BUY_COMMERCIAL    // commercial + sale
-  RENT_COMMERCIAL   // commercial + rent
-  TRANSFER          // agent-to-agent handoff (no agent info)
+  BUY_PRIVATE // residential + sale
+  RENT_PRIVATE // residential + rent
+  BUY_COMMERCIAL // commercial + sale
+  RENT_COMMERCIAL // commercial + rent
+  TRANSFER // agent-to-agent handoff (no agent info)
 }
 
 model MessageTemplate {
@@ -453,17 +489,17 @@ model MessageTemplate {
 }
 
 model CityLookup {
-  name    String  @id
-  lat     Float
-  lng     Float
+  name String @id
+  lat  Float
+  lng  Float
 }
 
 model StreetLookup {
-  id      String @id @default(cuid())
-  name    String
-  city    String
-  lat     Float
-  lng     Float
+  id   String @id @default(cuid())
+  name String
+  city String
+  lat  Float
+  lng  Float
 
   @@unique([name, city])
   @@index([city])

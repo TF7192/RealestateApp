@@ -21,7 +21,7 @@ import ShareCatalogDialog from '../components/ShareCatalogDialog';
 import PullRefresh from '../components/PullRefresh';
 import { relativeDate } from '../lib/relativeDate';
 import { shareSheet } from '../native/share';
-import { useViewportMobile } from '../hooks/mobile';
+import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
 import haptics from '../lib/haptics';
 import './Dashboard.css';
 
@@ -82,7 +82,8 @@ export default function Dashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) {
+  const showSkel = useDelayedFlag(loading, 220);
+  if (loading && showSkel) {
     return (
       <PullRefresh onRefresh={load}>
         <div className="dashboard">
@@ -92,6 +93,18 @@ export default function Dashboard() {
               <div key={i} className="stat-card skel" style={{ height: 72 }} />
             ))}
           </div>
+        </div>
+      </PullRefresh>
+    );
+  }
+  if (loading) {
+    // Below the skeleton threshold: show just the welcome so the page
+    // chrome is present but no empty stat cards flash before the real
+    // numbers arrive.
+    return (
+      <PullRefresh onRefresh={load}>
+        <div className="dashboard">
+          <WelcomeSection />
         </div>
       </PullRefresh>
     );

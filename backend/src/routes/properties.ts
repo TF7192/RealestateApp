@@ -9,10 +9,12 @@ import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
 import { track as phTrack } from '../lib/analytics.js';
 
+// Canonical action keys for newly-created properties. `externalCoop` is
+// kept in existing rows but new keys use the renamed `brokerCoop`.
 const DEFAULT_ACTION_KEYS = [
   'tabuExtract', 'photography', 'buildingPhoto', 'dronePhoto', 'virtualTour',
   'sign', 'iList', 'yad2', 'facebook', 'marketplace', 'onMap', 'madlan',
-  'whatsappGroup', 'officeWhatsapp', 'externalCoop', 'video', 'neighborLetters',
+  'whatsappGroup', 'officeWhatsapp', 'brokerCoop', 'video', 'neighborLetters',
   'coupons', 'flyers', 'newspaper', 'agentTour', 'openHouse',
 ];
 
@@ -49,21 +51,57 @@ const propertyInput = z.object({
   offer: z.number().int().nonnegative().nullable().optional(),
   sqm: z.number().int().nonnegative(),
   sqmArnona: z.number().int().nonnegative().nullable().optional(),
+  sqmTabu: z.number().int().nonnegative().nullable().optional(),
+  sqmGross: z.number().int().nonnegative().nullable().optional(),
+  sqmNet: z.number().int().nonnegative().nullable().optional(),
   rooms: z.number().nullable().optional(),
   floor: z.number().int().nullable().optional(),
   totalFloors: z.number().int().nullable().optional(),
+  // Elevator
   elevator: z.boolean().optional(),
+  elevatorCount: z.number().int().nonnegative().nullable().optional(),
+  shabbatElevator: z.boolean().optional(),
+  // State
   renovated: z.string().max(60).nullable().optional(),
+  buildState: z.string().max(60).nullable().optional(),
+  // Vacancy
   vacancyDate: z.string().max(60).nullable().optional(),
+  vacancyFlexible: z.boolean().optional(),
+  // Parking
   parking: z.boolean().optional(),
+  parkingType: z.string().max(40).nullable().optional(),
+  parkingCount: z.number().int().nonnegative().nullable().optional(),
+  parkingCovered: z.boolean().optional(),
+  parkingCoupled: z.boolean().optional(),
+  parkingTandem: z.boolean().optional(),
+  parkingEvCharger: z.boolean().optional(),
+  nearbyParking: z.boolean().optional(),
+  // Storage
   storage: z.boolean().optional(),
+  storageLocation: z.string().max(40).nullable().optional(),
+  storageSize: z.number().int().nonnegative().nullable().optional(),
+  // Shelters & amenities
   balconySize: z.number().int().nonnegative().optional(),
   airDirections: z.string().max(120).nullable().optional(),
   ac: z.boolean().optional(),
   safeRoom: z.boolean().optional(),
+  floorShelter: z.boolean().optional(),
+  shelter: z.boolean().optional(),
   buildingAge: z.number().int().nullable().optional(),
   sector: z.string().max(60).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
+  // Registry / fees
+  neighborhood: z.string().max(80).nullable().optional(),
+  gush: z.string().max(40).nullable().optional(),
+  helka: z.string().max(40).nullable().optional(),
+  arnonaAmount: z.number().int().nonnegative().nullable().optional(),
+  buildingCommittee: z.number().int().nonnegative().nullable().optional(),
+  // Commercial-specific amenities
+  kitchenette: z.boolean().optional(),
+  meetingRoom: z.boolean().optional(),
+  workstations: z.number().int().nonnegative().nullable().optional(),
+  lobbySecurity: z.boolean().optional(),
+  // Exclusivity agreement is set via its own upload endpoint, not here.
   marketingReminderFrequency: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).optional(),
   images: z.array(z.string().url()).optional(),
 });
@@ -407,6 +445,44 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       } catch { /* ignore missing */ }
     }
     await prisma.propertyVideo.delete({ where: { id: videoId } });
+    return { ok: true };
+  });
+
+  // Upload the signed exclusivity-agreement PDF (required for Yad2).
+  // Single file, replaces any existing agreement. Stored in S3 (or local
+  // fallback in dev) under agreements/<propertyId>/<uuid>.pdf.
+  app.post('/:id/agreement', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const property = await prisma.property.findUnique({ where: { id } });
+    if (!property || property.agentId !== requireUser(req).id) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: { message: 'No file' } });
+    if (file.mimetype !== 'application/pdf') {
+      return reply.code(400).send({ error: { message: 'רק קבצי PDF' } });
+    }
+    const key = `agreements/${id}/${crypto.randomUUID()}.pdf`;
+    const url = await putUpload(key, await file.toBuffer(), file.mimetype);
+    const updated = await prisma.property.update({
+      where: { id },
+      data: { exclusivityAgreementUrl: url },
+    });
+    return { exclusivityAgreementUrl: updated.exclusivityAgreementUrl };
+  });
+
+  // Clear the exclusivity agreement pointer (does not delete the S3 object —
+  // kept for audit / re-activation).
+  app.delete('/:id/agreement', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const property = await prisma.property.findUnique({ where: { id } });
+    if (!property || property.agentId !== requireUser(req).id) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    await prisma.property.update({
+      where: { id },
+      data: { exclusivityAgreementUrl: null },
+    });
     return { ok: true };
   });
 

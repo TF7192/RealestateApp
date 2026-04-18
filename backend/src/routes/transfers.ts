@@ -118,7 +118,22 @@ export const registerTransferRoutes: FastifyPluginAsync = async (app) => {
     return { transfer };
   });
 
-  // Accept (target agent)
+  // Accept (target agent).
+  //
+  // In addition to re-assigning the property's agentId, we carry the linked
+  // Owner card across to the new agent so the recipient doesn't land on a
+  // property with a missing/foreign owner record. The rules:
+  //
+  //   1. No Owner linked → nothing extra to do.
+  //   2. Receiving agent already has an Owner with the same phone
+  //      (phone = dedupe key elsewhere in the codebase) → merge: relink
+  //      the property to that existing Owner. Delete the sender's Owner
+  //      only if the transferred property was its sole link.
+  //   3. Sender's Owner has no other properties under the sender →
+  //      reassign the Owner wholesale (cheaper than cloning).
+  //   4. Sender's Owner is linked to other non-transferred properties →
+  //      clone the card into the receiving agent's space so the sender
+  //      keeps their record intact.
   app.post('/transfers/:id/accept', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const uid = requireUser(req).id;
@@ -126,17 +141,75 @@ export const registerTransferRoutes: FastifyPluginAsync = async (app) => {
     if (!t || t.toAgentId !== uid) return reply.code(404).send({ error: { message: 'Not found' } });
     if (t.status !== 'PENDING') return reply.code(409).send({ error: { message: 'לא בהמתנה' } });
 
-    // Move ownership atomically
-    const [updated] = await prisma.$transaction([
-      prisma.propertyTransfer.update({
+    const property = await prisma.property.findUnique({
+      where: { id: t.propertyId },
+      include: { propertyOwner: true },
+    });
+    if (!property) return reply.code(404).send({ error: { message: 'Not found' } });
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const owner = property.propertyOwner;
+      let newPropertyOwnerId: string | null = property.propertyOwnerId;
+
+      if (owner) {
+        const otherLinksUnderSender = await tx.property.count({
+          where: {
+            propertyOwnerId: owner.id,
+            agentId: t.fromAgentId,
+            NOT: { id: property.id },
+          },
+        });
+
+        const existingForReceiver = owner.phone
+          ? await tx.owner.findFirst({
+              where: { agentId: uid, phone: owner.phone },
+            })
+          : null;
+
+        if (existingForReceiver) {
+          // (2) Merge into the receiver's existing card.
+          newPropertyOwnerId = existingForReceiver.id;
+          if (otherLinksUnderSender === 0) {
+            // The sender's card is orphaned now — drop it so it doesn't
+            // linger in the sender's Owners list with zero properties.
+            await tx.owner.delete({ where: { id: owner.id } }).catch(() => {});
+          }
+        } else if (otherLinksUnderSender === 0) {
+          // (3) Sole link — reassign the Owner to the receiver.
+          await tx.owner.update({
+            where: { id: owner.id },
+            data: { agentId: uid },
+          });
+          // newPropertyOwnerId unchanged — same row, new agent.
+        } else {
+          // (4) Sender keeps their card; clone for the receiver.
+          const clone = await tx.owner.create({
+            data: {
+              agentId: uid,
+              name: owner.name,
+              phone: owner.phone,
+              email: owner.email,
+              notes: owner.notes,
+              relationship: owner.relationship,
+            },
+          });
+          newPropertyOwnerId = clone.id;
+        }
+      }
+
+      await tx.property.update({
+        where: { id: property.id },
+        data: {
+          agentId: uid,
+          propertyOwnerId: newPropertyOwnerId,
+        },
+      });
+
+      return tx.propertyTransfer.update({
         where: { id },
         data: { status: 'ACCEPTED', respondedAt: new Date() },
-      }),
-      prisma.property.update({
-        where: { id: t.propertyId },
-        data: { agentId: uid },
-      }),
-    ]);
+      });
+    });
     return { transfer: updated };
   });
 

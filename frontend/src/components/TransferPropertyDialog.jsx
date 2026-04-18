@@ -137,7 +137,7 @@ export default function TransferPropertyDialog({ property, onClose, onDone }) {
               <>
                 <p className="tpd-lead">
                   הזן אימייל של סוכן רשום במערכת. לאחר אישור הסוכן המקבל — הבעלות על
-                  הנכס תועבר אליו באופן אוטומטי.
+                  הנכס, לצד פרטי בעל הנכס, יעברו אליו באופן אוטומטי.
                 </p>
                 <label className="tpd-label">אימייל הסוכן המקבל</label>
                 <div className="tpd-search-row">

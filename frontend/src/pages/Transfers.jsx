@@ -15,6 +15,7 @@ import {
 import api from '../lib/api';
 import { useToast, optimisticUpdate } from '../lib/toast';
 import { relativeTime, absoluteTime } from '../lib/time';
+import { useDelayedFlag } from '../hooks/mobile';
 import './Transfers.css';
 
 function statusInfo(s) {
@@ -32,6 +33,7 @@ export default function Transfers() {
   const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const showSkel = useDelayedFlag(loading, 220);
   const [tab, setTab] = useState('incoming');
 
   const load = async () => {
@@ -119,12 +121,14 @@ export default function Transfers() {
         </button>
       </div>
 
-      {loading ? (
+      {loading && showSkel ? (
         <div className="tr-list">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="tr-card skel" style={{ minHeight: 120 }} />
           ))}
         </div>
+      ) : loading ? (
+        null
       ) : list.length === 0 ? (
         <div className="tr-empty animate-in animate-in-delay-2">
           <ArrowLeftRight size={36} />

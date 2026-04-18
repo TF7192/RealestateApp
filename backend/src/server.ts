@@ -26,6 +26,7 @@ import { registerPublicRoutes } from './routes/public.js';
 import { registerOwnerRoutes } from './routes/owners.js';
 import { storageBackend, resolveUpload } from './lib/storage.js';
 import { track as phTrack, captureException as phCapture, shutdownAnalytics } from './lib/analytics.js';
+import { getUser } from './middleware/auth.js';
 import crypto from 'node:crypto';
 import { authPlugin } from './middleware/auth.js';
 
@@ -135,7 +136,17 @@ async function build() {
     const t0 = (req as any).__t0 || Date.now();
     const duration = Date.now() - t0;
     const reqId = (req as any).__reqId;
-    const userId = ((req as any).user && (req as any).user.id) || null;
+    // The auth plugin stashes the decoded JWT under a Symbol key via
+    // setUser/getUser — NOT on `req.user`. Reading `req.user.id` always
+    // returned undefined, so every authenticated request used to get a
+    // fresh random `anon-*` distinctId in PostHog. Use getUser() so
+    // logged-in traffic attributes to the real person.
+    const u = getUser(req);
+    // Anonymous-request fallback: clients (posthog-js) can forward their
+    // stable browser distinct-id via a header so repeat anonymous traffic
+    // clusters into one person instead of thousands of one-hit ghosts.
+    const anonId = (req.headers['x-posthog-distinct-id'] as string | undefined)?.slice(0, 200);
+    const userId = u?.id || anonId || null;
     const route = (req as any).routeOptions?.url || req.url;
     // Skip health and static uploads to keep event volume low
     if (req.url === '/api/health' || req.url.startsWith('/uploads/')) return;
@@ -145,6 +156,7 @@ async function build() {
       route,
       status_code: reply.statusCode,
       duration_ms: duration,
+      authenticated: !!u,
     });
   });
 
@@ -153,8 +165,9 @@ async function build() {
     const status = (err as any).statusCode || 500;
     // Unhandled backend exceptions → PostHog
     if (status >= 500) {
-      const userId = ((req as any).user && (req as any).user.id) || null;
-      phCapture(err, userId, {
+      const u = getUser(req);
+      const anonId = (req.headers['x-posthog-distinct-id'] as string | undefined)?.slice(0, 200);
+      phCapture(err, u?.id || anonId || null, {
         method: req.method,
         route: (req as any).routeOptions?.url || req.url,
         request_id: (req as any).__reqId,

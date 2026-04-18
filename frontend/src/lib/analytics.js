@@ -75,6 +75,14 @@ export function track(event, props = {}) {
   try { posthog.capture(event, props); } catch { /* no-op */ }
 }
 
+export function getDistinctId() {
+  if (!ready) return null;
+  try {
+    const id = posthog.get_distinct_id?.();
+    return typeof id === 'string' ? id : null;
+  } catch { return null; }
+}
+
 export function page(path, extra = {}) {
   if (!ready) return;
   try {
