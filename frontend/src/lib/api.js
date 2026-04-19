@@ -211,6 +211,15 @@ export const api = {
   // Task 3 · forward-geocode autocomplete for AddressField. `city` is an
   // optional bias hint — when the agent already picked a city the server
   // appends it to the query so Photon ranks local matches first.
+  // Task 2 — admin users table.
+  adminUsers: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+    });
+    const s = qs.toString();
+    return request(`/admin/users${s ? `?${s}` : ''}`);
+  },
   geoSearch: ({ q, city, limit = 8 } = {}) => {
     const params = new URLSearchParams({ q, limit: String(limit), lang: 'he' });
     if (city) params.set('city', city);

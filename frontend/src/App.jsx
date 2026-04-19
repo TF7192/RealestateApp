@@ -21,6 +21,7 @@ import Transfers from './pages/Transfers';
 // bundle drops ~90KB and cold-start on cellular gets noticeably faster.
 const Templates = lazy(() => import('./pages/Templates'));
 const AdminChats = lazy(() => import('./pages/AdminChats'));
+const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import { AuthProvider, useAuth } from './lib/auth';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
@@ -149,6 +150,7 @@ function AppRoutes() {
             <Route path="/transfers" element={<Transfers />} />
             <Route path="/templates" element={<Templates />} />
             <Route path="/admin/chats" element={<AdminChats />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
             {/* Legacy routes — redirect */}
             <Route path="/leads" element={<Navigate to="/customers" replace />} />
             <Route path="/leads/new" element={<Navigate to="/customers/new" replace />} />

@@ -19,6 +19,7 @@ import { registerLookupRoutes } from './routes/lookups.js';
 import { registerReportRoutes } from './routes/reports.js';
 import { registerMeRoutes } from './routes/me.js';
 import { registerChatRoutes } from './routes/chat.js';
+import { registerAdminRoutes } from './routes/admin.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { registerAgentRoutes } from './routes/agents.js';
 import { registerTransferRoutes } from './routes/transfers.js';
@@ -128,6 +129,7 @@ async function build() {
   await app.register(registerPublicRoutes, { prefix: '/api/public' });
   await app.register(registerOwnerRoutes, { prefix: '/api/owners' });
   await app.register(registerChatRoutes, { prefix: '/api/chat' });
+  await app.register(registerAdminRoutes, { prefix: '/api/admin' });
 
   // Request lifecycle observability — assigns a request_id, logs
   // method/route/status/duration, and sends an api_request event to

@@ -317,17 +317,30 @@ export default function Layout({ onLogout }) {
               <span>{copiedShare ? 'הקישור הועתק' : 'שיתוף הקטלוג שלי'}</span>
             </button>
             {ADMIN_EMAILS.has((user?.email || '').toLowerCase()) && (
-              <NavLink
-                to="/admin/chats"
-                className={({ isActive }) =>
-                  `nav-item nav-action nav-item-admin ${isActive ? 'active' : ''}`
-                }
-                onClick={() => setSidebarOpen(false)}
-                title="מרכז שיחות אדמין"
-              >
-                <Shield size={18} />
-                <span>מרכז שיחות</span>
-              </NavLink>
+              <>
+                <NavLink
+                  to="/admin/chats"
+                  className={({ isActive }) =>
+                    `nav-item nav-action nav-item-admin ${isActive ? 'active' : ''}`
+                  }
+                  onClick={() => setSidebarOpen(false)}
+                  title="מרכז שיחות אדמין"
+                >
+                  <Shield size={18} />
+                  <span>מרכז שיחות</span>
+                </NavLink>
+                <NavLink
+                  to="/admin/users"
+                  className={({ isActive }) =>
+                    `nav-item nav-action nav-item-admin ${isActive ? 'active' : ''}`
+                  }
+                  onClick={() => setSidebarOpen(false)}
+                  title="משתמשים — לוח אדמין"
+                >
+                  <Shield size={18} />
+                  <span>משתמשים</span>
+                </NavLink>
+              </>
             )}
           </div>
         </nav>
