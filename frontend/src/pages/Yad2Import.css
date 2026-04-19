@@ -5,6 +5,13 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* Mobile: leave room above the tab bar + safe area + the sticky
+     bottom action bar's height (≈68px). */
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  .y2-page { padding-bottom: 16px; }
 }
 
 .y2-back {
@@ -68,9 +75,9 @@
 
 .y2-input {
   width: 100%;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg-elevated);
   font-size: 16px; /* iOS zoom guard */
   font-family: var(--font-body);
@@ -78,6 +85,16 @@
   outline: none;
   direction: ltr;
   text-align: start;
+}
+
+/* Bigger primary CTA on mobile — the paste/scan flow's only button
+   should be obvious thumb-target. */
+@media (max-width: 767px) {
+  .y2-card .btn-primary {
+    min-height: 52px;
+    font-size: 15px;
+    border-radius: 14px;
+  }
 }
 
 .y2-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-glow); }
@@ -134,6 +151,15 @@
   object-fit: cover;
   border-radius: 8px;
   display: block;
+}
+
+/* Mobile: larger thumb so the agent can read the photo + tap target
+   for the whole row clears 56pt easily. */
+@media (max-width: 767px) {
+  .y2-thumb-wrap, .y2-thumb { width: 84px; height: 84px; border-radius: 12px; }
+  .y2-item label { padding: 14px 12px; gap: 14px; }
+  .y2-item-meta strong { font-size: 15px; }
+  .y2-item-meta span { font-size: 13px; }
 }
 
 /* Per-listing photo-count badge — sits in the visual bottom-end corner
@@ -244,6 +270,28 @@
   display: inline-flex;
   gap: 8px;
   margin-top: 6px;
+}
+
+/* Mobile: pin the import CTA + cancel to the bottom of the viewport
+   above the tab bar so the agent's primary action is always one
+   thumb-tap away while they scroll the (potentially long) review
+   list. Inline display on desktop. */
+@media (max-width: 767px) {
+  .y2-review-actions {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 100;
+    margin: 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom) + 64px);
+    background: linear-gradient(180deg, transparent 0%, var(--bg-primary) 28%);
+    display: flex;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .y2-review-actions > * { pointer-events: auto; }
+  .y2-review-actions .btn-primary { flex: 1; min-height: 50px; font-size: 15px; }
+  .y2-review-actions .btn-secondary { min-height: 50px; padding-inline: 18px; }
 }
 
 .y2-done {

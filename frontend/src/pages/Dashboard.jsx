@@ -17,6 +17,7 @@ import {
   Sun,
   PhoneCall,
   Sparkles,
+  Calculator as CalcIcon,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -583,6 +584,14 @@ function WelcomeSection() {
           <Link to="/customers/new" className="btn btn-ghost btn-lg">
             <UserPlus size={18} />
             ליד חדש
+          </Link>
+          {/* Used constantly during pricing conversations — surface
+              right next to the create-shortcuts so it's a one-tap
+              reach from the dashboard. Yad2 import is a one-time
+              setup tool, not on this row; reachable via more-sheet. */}
+          <Link to="/calculator" className="btn btn-ghost btn-lg">
+            <CalcIcon size={18} />
+            מחשבון
           </Link>
         </div>
       </div>

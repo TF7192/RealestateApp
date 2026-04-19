@@ -42,15 +42,49 @@
   padding: 8px;
 }
 
+/* Mobile-first: summary card lands ABOVE the inputs (DOM order) so the
+   live headline number — the whole reason to use the calculator — is
+   the first thing the agent sees. As they scroll into the inputs, the
+   summary stays pinned at the top of the viewport so they can watch
+   the number update with each tap. Desktop flips to the classic
+   inputs-left / summary-right layout via `order`. */
 .sc-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 12px;
+}
+
+.sc-page {
+  /* Bottom breathing room above the mobile tab bar (≈64px) + home
+     indicator. Without this the agent's last input row is covered. */
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+.sc-summary {
+  /* Sticky pinned to just below the mobile-header (≈52 + safe-top) so
+     the hero number is always one glance away while the agent scrolls
+     down through the inputs. */
+  position: sticky;
+  top: calc(52px + env(safe-area-inset-top) + 8px);
+  z-index: 5;
+  /* The card already has its own bg/border; reinforce the stack so
+     scrolled-under content doesn't show through gaps. */
+  background: var(--bg-card);
 }
 
 @media (min-width: 768px) {
   .sc-grid { grid-template-columns: 1fr 1fr; align-items: flex-start; }
-  .sc-summary { position: sticky; top: 76px; }
+  /* Desktop: classic inputs-left / summary-right; reset mobile-only
+     order + bring the sticky offset back to the desktop header height. */
+  .sc-summary { order: 0; top: 76px; }
+  .sc-inputs  { order: 0; }
+  .sc-page { padding-bottom: 16px; }
+}
+
+/* Mobile-only — explicit summary-first order. */
+@media (max-width: 767px) {
+  .sc-summary { order: -1; }
+  .sc-inputs  { order: 0; }
 }
 
 .sc-card {
@@ -233,6 +267,25 @@
   color: var(--gold);
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
+}
+
+/* Mobile sticky-card sizing — when pinned, the card eats vertical real
+   estate from every input below. Keep the breakdown collapsible so
+   only the hero number + total stay visible at the top, leaving room
+   for inputs underneath. The breakdown lives below the fold and is
+   still scrollable inside the card via overflow-y. */
+@media (max-width: 767px) {
+  .sc-summary {
+    /* Cap the sticky card height so it doesn't push inputs off-screen. */
+    max-height: 36vh;
+    overflow-y: auto;
+    padding: 14px 14px 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sc-hero { padding: 12px 14px; margin-bottom: 10px; }
+  .sc-hero-value { font-size: 32px; }
+  .sc-breakdown { gap: 4px; }
+  .sc-line { padding: 4px 2px; font-size: 13.5px; }
 }
 
 .sc-breakdown {

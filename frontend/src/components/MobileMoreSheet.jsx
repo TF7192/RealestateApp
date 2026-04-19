@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, UserCircle, Sun, Moon, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield } from 'lucide-react';
+import { User, UserCircle, Sun, Moon, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield, Calculator, Download as DownloadIcon } from 'lucide-react';
 
 const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
 import { useAuth } from '../lib/auth';
@@ -161,6 +161,26 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
             <button className="mms-row" onClick={() => go('/templates')}>
               <span className="mms-row-icon"><FileText size={18} /></span>
               <span className="mms-row-text"><strong>תבניות הודעה</strong><small>וואטסאפ אוטומטי מפרטי הנכס</small></span>
+              <span className="mms-arrow">›</span>
+            </button>
+            {/* Mobile entry to the seller calculator + Yad2 importer.
+                These exist on desktop in the sidebar; mobile users
+                discover them via the more-sheet (this) and via the
+                Dashboard quick tiles. */}
+            <button className="mms-row" onClick={() => go('/calculator')}>
+              <span className="mms-row-icon"><Calculator size={18} /></span>
+              <span className="mms-row-text">
+                <strong>מחשבון מוכר</strong>
+                <small>חישוב נטו לבעלים אחרי עמלות ומע״מ</small>
+              </span>
+              <span className="mms-arrow">›</span>
+            </button>
+            <button className="mms-row" onClick={() => go('/integrations/yad2')}>
+              <span className="mms-row-icon"><DownloadIcon size={18} /></span>
+              <span className="mms-row-text">
+                <strong>ייבוא נכסים מ-Yad2</strong>
+                <small>סריקת הסוכנות + תמונות בלחיצה</small>
+              </span>
               <span className="mms-arrow">›</span>
             </button>
           </section>
