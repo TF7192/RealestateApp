@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Archive, ArchiveRestore, Search, Send, MessageCircle, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Search, Send, MessageCircle, X, ArrowRight } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { relativeTime } from '../lib/time';
+import { useViewportMobile } from '../hooks/mobile';
 import './AdminChats.css';
 
 const ADMIN_EMAILS = new Set([
@@ -26,6 +27,7 @@ export default function AdminChats() {
   const [loading, setLoading] = useState(true);
   const listRef = useRef(null);
   const wsRef = useRef(null);
+  const isMobile = useViewportMobile(820);
 
   // Admin gate — if not admin, kick out.
   useEffect(() => {
@@ -53,6 +55,25 @@ export default function AdminChats() {
       await api.adminChatRead(id).catch(() => {});
       setItems((cur) => cur.map((c) => c.id === id ? { ...c, unread: 0 } : c));
     } catch { /* ignore */ }
+  }, []);
+
+  // Task 5 — pin to newest message whenever the message list grows or
+  // the thread first opens. Without this, the thread renders the
+  // oldest message at the top of the visible area and the admin has to
+  // manually scroll down to see what they're replying to.
+  useEffect(() => {
+    if (!listRef.current) return;
+    requestAnimationFrame(() => {
+      if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+    });
+  }, [messages.length, selectedId]);
+
+  // Task 5 — mobile master-detail back. Clearing selectedId returns
+  // the layout to the conversations-list view.
+  const closeThread = useCallback(() => {
+    setSelectedId(null);
+    setThread(null);
+    setMessages([]);
   }, []);
 
   // WebSocket — append new messages / update read receipts live
@@ -145,8 +166,16 @@ export default function AdminChats() {
     setItems((cur) => cur.map((c) => c.id === id ? { ...c, status: 'OPEN' } : c));
   };
 
+  // Task 5 — mobile master-detail. Show ONE pane at a time:
+  //   • no selection → list (full screen)
+  //   • selection    → thread (full screen, with back button)
+  // Desktop unaffected — both panes render side-by-side.
+  const showList   = !isMobile || !selectedId;
+  const showThread = !isMobile || !!selectedId;
+
   return (
-    <div className="ac-page">
+    <div className={`ac-page ${selectedId ? 'has-selection' : ''}`}>
+      {showList && (
       <aside className="ac-list">
         <header className="ac-list-head">
           <h2><MessageCircle size={18} /> שיחות</h2>
@@ -206,7 +235,9 @@ export default function AdminChats() {
           ))}
         </div>
       </aside>
+      )}
 
+      {showThread && (
       <main className="ac-thread">
         {!thread ? (
           <div className="ac-thread-empty">
@@ -216,7 +247,17 @@ export default function AdminChats() {
         ) : (
           <>
             <header className="ac-thread-head">
-              <div>
+              {/* Task 5 mobile back — clears selection so the list
+                  shows again. Desktop hides this via CSS. */}
+              <button
+                className="ac-thread-back"
+                onClick={closeThread}
+                aria-label="חזרה לרשימת השיחות"
+                type="button"
+              >
+                <ArrowRight size={18} />
+              </button>
+              <div className="ac-thread-head-meta">
                 <strong>{thread.user?.displayName || 'משתמש'}</strong>
                 <span>{thread.user?.email || ''}</span>
               </div>
@@ -263,6 +304,7 @@ export default function AdminChats() {
           </>
         )}
       </main>
+      )}
     </div>
   );
 }
