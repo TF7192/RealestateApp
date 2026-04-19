@@ -416,44 +416,76 @@ img.agent-avatar {
   display: none;
   position: fixed;
   top: 0;
-  /* Logical-property full-bleed for explicit RTL */
-  inset-inline: 0;
+  /* Two physical anchors — Safari's `inset-inline` shorthand had a
+     period of partial support; physical left+right is bulletproof and
+     "left/right both = 0" means full width regardless of writing mode. */
+  left: 0;
+  right: 0;
   z-index: 90;
-  /* Min-height instead of fixed height so the bar can grow to fit
-     three icon buttons (search + chat + profile) without crushing them. */
+  /* Min-height keeps the bar tall enough for tap targets but lets it
+     grow if the header gains a second row in some future layout. */
   min-height: calc(52px + env(safe-area-inset-top));
-  /* Pro-Max fix — Dynamic-Island iPhones in the Capacitor app have a
-     non-zero env(safe-area-inset-left/right) for the rounded corners.
-     Hard-coding 8px clipped the visual-leftmost button (profile in RTL)
-     under the rounded corner. max() keeps the 10px design padding on
-     non-notched devices and lifts to the safe-area when present. */
-  padding-block-start: env(safe-area-inset-top);
-  padding-block-end: 0;
-  padding-inline: max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-right));
+  /* Honor the Dynamic-Island/rounded-corner safe areas on Pro-class
+     iPhones — without max() the leftmost button got clipped under the
+     rounded corner in the Capacitor WKWebView. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: 0;
+  padding-left: max(10px, env(safe-area-inset-left));
+  padding-right: max(10px, env(safe-area-inset-right));
   background: rgba(247, 243, 236, 0.94);
   border-bottom: 1px solid rgba(30, 26, 20, 0.08);
   backdrop-filter: saturate(180%) blur(28px);
   -webkit-backdrop-filter: saturate(180%) blur(28px);
+  /* CSS Grid in RTL with `grid-template-columns: auto 1fr auto` had a
+     real WebKit bug where the third (auto) column collapsed and the
+     trailing slot's children overflowed off the visual-left edge —
+     reproducible on iPhone Pro Max in the Capacitor WKWebView even
+     though Chrome at the same width rendered fine. Flex with
+     `justify-content: space-between` has no equivalent ambiguity:
+     the two side slots hug their respective edges, the title spacer
+     fills the middle, and the writing-mode handles RTL flipping
+     uniformly. */
+  display: flex;
   align-items: center;
-  grid-template-columns: auto 1fr auto;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.mobile-header { display: grid; }
+/* (was display:grid; intentionally removed — flex header above) */
 
 @media (min-width: 1025px) { .mobile-header { display: none !important; } }
 
 .mh-side {
   display: inline-flex;
   align-items: center;
-  /* Pro-Max fix — was 4px which let the row swell to 140px. With
-     three buttons in the trailing slot (search + chat + profile),
-     2px keeps them visually distinct without crowding the screen
-     edge on the smallest devices. */
+  /* Don't grow, don't shrink — render at the natural width of the
+     buttons inside. The title (.mh-title-wrap or .mobile-logo) is
+     the only flex-grow element so it fills the remaining width. */
+  flex: 0 0 auto;
   gap: 2px;
 }
 
-.mh-leading { justify-content: flex-end; }
-.mh-trailing { justify-content: flex-start; }
+/* Side-slot ordering is handled by the writing direction — in RTL,
+   the FIRST DOM child (.mh-leading) renders on the visual-RIGHT,
+   the LAST (.mh-trailing) on the visual-LEFT. No grid-column reversal
+   needed. justify-content on each slot keeps internal alignment
+   consistent between LTR and RTL. */
+.mh-leading,
+.mh-trailing {
+  /* min-width prevents the slot from collapsing to 0 on a flex layout
+     that's competing with a long centered title. */
+  min-width: 0;
+}
+
+.mh-title-wrap,
+.mobile-header > .mobile-logo {
+  /* The middle slot — center the title, take the leftover width. */
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
 
 /* S21 mobile global search button — matches the profile button's
    pill silhouette (44×44, ghost), just an icon. */

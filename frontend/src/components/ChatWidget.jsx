@@ -3,6 +3,7 @@ import { MessageCircle, X, Send } from 'lucide-react';
 import Portal from './Portal';
 import { useChat } from '../hooks/chat';
 import { useAuth } from '../lib/auth';
+import { useViewportMobile } from '../hooks/mobile';
 import { relativeTime } from '../lib/time';
 import './ChatWidget.css';
 
@@ -14,6 +15,7 @@ const ADMIN_EMAILS = new Set([
 
 export default function ChatWidget() {
   const { user } = useAuth();
+  const isMobile = useViewportMobile(820);
   const [open, setOpen] = useState(false);
   const { messages, loading, unread, send, markRead } = useChat({ autoLoad: !!user });
   const [draft, setDraft] = useState('');
@@ -55,15 +57,23 @@ export default function ChatWidget() {
 
   return (
     <>
-      <button
-        className={`chatw-btn ${unread > 0 ? 'has-dot' : ''}`}
-        onClick={() => setOpen((o) => !o)}
-        aria-label={open ? 'סגור צ׳אט' : 'פתח צ׳אט'}
-        aria-expanded={open}
-      >
-        <MessageCircle size={20} />
-        {unread > 0 && <span className="chatw-dot" aria-hidden />}
-      </button>
+      {/* Standalone floating chat button — DESKTOP ONLY. On mobile the
+          launcher lives inside the header trailing slot (Layout.jsx
+          `.mh-chat-btn`). Returning null instead of relying on a CSS
+          display:none keeps stale CSS bundles from accidentally
+          surfacing the old position — there's literally no DOM node
+          to render. */}
+      {!isMobile && (
+        <button
+          className={`chatw-btn ${unread > 0 ? 'has-dot' : ''}`}
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? 'סגור צ׳אט' : 'פתח צ׳אט'}
+          aria-expanded={open}
+        >
+          <MessageCircle size={20} />
+          {unread > 0 && <span className="chatw-dot" aria-hidden />}
+        </button>
+      )}
 
       {open && (
         <Portal>
