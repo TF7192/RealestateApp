@@ -646,8 +646,13 @@ img.agent-avatar {
 
   @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
 
+  /* THIS is the actual winning rule on mobile — was overriding the
+     base flex layout with grid (left over from when grid was the
+     header strategy). Now matches base: flex, side slots hug edges,
+     title fills the middle. Keep the rule so explicit specificity
+     beats anything else inside this @media block. */
   .mobile-header {
-    display: grid;
+    display: flex;
   }
 
   .main-content {
