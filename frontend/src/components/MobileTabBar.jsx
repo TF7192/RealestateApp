@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Building2, Users, Handshake, Plus, X, Home, UserPlus } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, Handshake, Plus, X, Home, UserPlus, Calculator } from 'lucide-react';
 import haptics from '../lib/haptics';
 import './MobileTabBar.css';
 
@@ -30,6 +30,12 @@ export default function MobileTabBar() {
     haptics.tap();
     setAddOpen(false);
     navigate('/customers/new');
+  };
+
+  const openCalculator = () => {
+    haptics.tap();
+    setAddOpen(false);
+    navigate('/calculator');
   };
 
   return (
@@ -94,6 +100,14 @@ export default function MobileTabBar() {
               <span className="mtb-add-text">
                 <strong>ליד חדש</strong>
                 <small>הוספת לקוח פוטנציאלי</small>
+              </span>
+              <span className="mtb-add-arrow">›</span>
+            </button>
+            <button className="mtb-add-row" onClick={openCalculator}>
+              <span className="mtb-add-icon calc"><Calculator size={18} /></span>
+              <span className="mtb-add-text">
+                <strong>מחשבון מוכר</strong>
+                <small>חישוב מהיר של עמלות ונטו לבעלים</small>
               </span>
               <span className="mtb-add-arrow">›</span>
             </button>

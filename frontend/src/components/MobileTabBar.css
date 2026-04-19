@@ -219,6 +219,11 @@
   color: var(--info);
 }
 
+.mtb-add-icon.calc {
+  background: color-mix(in srgb, var(--gold-dim, #b48b4c) 18%, transparent);
+  color: var(--gold-dim, #b48b4c);
+}
+
 .mtb-add-text {
   display: flex;
   flex-direction: column;

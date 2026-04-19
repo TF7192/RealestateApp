@@ -269,23 +269,96 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Mobile sticky-card sizing — when pinned, the card eats vertical real
-   estate from every input below. Keep the breakdown collapsible so
-   only the hero number + total stay visible at the top, leaving room
-   for inputs underneath. The breakdown lives below the fold and is
-   still scrollable inside the card via overflow-y. */
+/* Mobile redesign — bigger headline number, bigger inputs, more
+   thumbable steppers. The summary is sticky-pinned at top + cap'd
+   so inputs always have room. */
 @media (max-width: 767px) {
   .sc-summary {
     /* Cap the sticky card height so it doesn't push inputs off-screen. */
-    max-height: 36vh;
+    max-height: 42vh;
     overflow-y: auto;
     padding: 14px 14px 12px;
     -webkit-overflow-scrolling: touch;
   }
-  .sc-hero { padding: 12px 14px; margin-bottom: 10px; }
-  .sc-hero-value { font-size: 32px; }
+  .sc-hero {
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border-radius: 16px;
+    /* Make the hero feel like the answer the agent reads OUT LOUD. */
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold-glow) 40%, transparent);
+  }
+  .sc-hero-label {
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .sc-hero-value {
+    /* Substantially bigger — the wow-number, not a form output */
+    font-size: 38px;
+    line-height: 1.05;
+    margin-top: 2px;
+  }
   .sc-breakdown { gap: 4px; }
-  .sc-line { padding: 4px 2px; font-size: 13.5px; }
+  .sc-line { padding: 5px 2px; font-size: 13.5px; }
+  .sc-line-emphasis .sc-line-value { font-size: 16px; }
+
+  /* Inputs: bigger padding + bigger hero amount input */
+  .sc-input { padding: 14px 16px; min-height: 50px; border-radius: 12px; }
+  .sc-input-amount {
+    /* The amount is the agent's primary keystroke. Big, readable. */
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+  }
+
+  /* Mode toggle: full-width, taller */
+  .sc-mode { padding: 6px; border-radius: 14px; }
+
+  /* Percent steppers: 32 → 44pt */
+  .sc-step { width: 44px; height: 44px; border-radius: 10px; }
+  .sc-percent { padding: 4px; border-radius: 12px; }
+  .sc-input-pct { width: 86px; padding: 8px 4px; font-size: 18px; min-height: auto; }
+
+  /* Toggles: bump checkbox + label so they don't read as decoration */
+  .sc-toggle { font-size: 13px; padding: 4px 0; }
+  .sc-toggle input { transform: scale(1.2); }
+
+  /* Row vertical breathing room */
+  .sc-row { margin-bottom: 18px; }
+}
+
+/* Share-to-seller CTA — pre-builds a wa.me URL with the breakdown.
+   Big gold pill, full-width on mobile so the thumb finds it. */
+.sc-share-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.sc-share-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+  color: #1a1409;
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  transition: filter 0.14s ease, transform 0.1s ease;
+  min-height: 48px;
+}
+
+.sc-share-cta:hover { filter: brightness(1.05); }
+.sc-share-cta:active { transform: scale(0.97); }
+
+@media (max-width: 767px) {
+  .sc-share-cta { font-size: 15px; min-height: 52px; }
 }
 
 .sc-breakdown {

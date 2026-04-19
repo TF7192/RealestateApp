@@ -8,9 +8,11 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  Share2,
 } from 'lucide-react';
 import { sellerCalc } from '../lib/sellerCalc';
 import { NumberField, Segmented } from '../components/SmartFields';
+import { useViewportMobile } from '../hooks/mobile';
 import './SellerCalculator.css';
 
 // Formatting helpers — IL locale, ₪ prefix, no fractional shekel.
@@ -70,6 +72,7 @@ const INITIAL = {
 export default function SellerCalculator() {
   const [s, setS] = useState(INITIAL);
   const update = useCallback((k, v) => setS((p) => ({ ...p, [k]: v })), []);
+  const isMobile = useViewportMobile(820);
 
   // Debounced inputs feed into the pure calc — keeps the live count-up
   // smooth while typing without thrashing on every keystroke.
@@ -290,6 +293,28 @@ export default function SellerCalculator() {
                   emphasis
                 />
               </ul>
+
+              {/* Share-to-seller — pre-builds a clean WhatsApp message
+                  with the breakdown so the agent can send the seller
+                  the exact numbers they just walked them through. The
+                  most common follow-up step after a pricing chat. */}
+              {result.net > 0 && (
+                <div className="sc-share-row">
+                  <a
+                    href={buildShareUrl({ result, mode: s.mode, isMobile })}
+                    target={isMobile ? '_self' : '_blank'}
+                    rel="noopener noreferrer"
+                    className="sc-share-cta"
+                    onClick={(e) => {
+                      // On non-Capacitor desktop the wa.me link opens in a
+                      // new tab; nothing else to do here.
+                    }}
+                  >
+                    <Share2 size={16} />
+                    שתף לבעלים בוואטסאפ
+                  </a>
+                </div>
+              )}
             </>
           )}
         </section>
@@ -335,6 +360,34 @@ function Line({ label, value, sub, emphasis }) {
       <span className="sc-line-value">{value}</span>
     </li>
   );
+}
+
+// Build a wa.me URL with a clean Hebrew breakdown the agent can send
+// the seller. The text mirrors the on-screen breakdown so there are no
+// "wait, what was that number?" moments. Plain text — wa.me URL-decodes
+// the body so newlines + numbers come through cleanly.
+function buildShareUrl({ result, mode, isMobile }) {
+  if (!result || result.error || !result.net) return '#';
+  const isFwd = mode === 'forward';
+  const lines = [
+    isFwd ? 'סיכום עמלות מהמכירה:' : 'מחיר רישום מומלץ:',
+    '',
+    isFwd
+      ? `מחיר מכירה: ₪${Math.round(result.listingPrice).toLocaleString('he-IL')}`
+      : `מחיר רישום: ₪${Math.round(result.listingPrice).toLocaleString('he-IL')}`,
+    `עמלת תיווך: ₪${Math.round(result.brokerage).toLocaleString('he-IL')}`,
+    `שכ"ט עו"ד: ₪${Math.round(result.lawyer).toLocaleString('he-IL')}`,
+  ];
+  if (result.additional > 0) {
+    lines.push(`עלויות נוספות: ₪${Math.round(result.additional).toLocaleString('he-IL')}`);
+  }
+  lines.push('—');
+  lines.push(`יישאר לבעלים: ₪${Math.round(result.net).toLocaleString('he-IL')}`);
+  const text = lines.join('\n');
+  // wa.me works on web (opens web.whatsapp.com) and on the native app
+  // when WhatsApp is installed. No phone — the user picks a contact
+  // inside WhatsApp.
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
 function Tooltip({ children }) {
