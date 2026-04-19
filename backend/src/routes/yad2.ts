@@ -1,29 +1,40 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import path from 'node:path';
+import { promises as fs } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { getUser } from '../middleware/auth.js';
+import { crawlAgency, mapSectionToAssetClass, type Yad2Listing } from '../lib/yad2-crawler.js';
 
 /**
- * Yad2 import — POC.
+ * Yad2 import — agency-wide.
  *
- * Two endpoints behind FEATURE_YAD2_IMPORT:
- *   POST /preview { url }       → server fetches the page, returns extracted listings (no DB writes)
- *   POST /import  { listings }  → creates Property rows, idempotent per Yad2 sourceId
+ * Endpoints (all gated by FEATURE_YAD2_IMPORT in env, default off):
+ *   POST /preview             — single page (legacy / kept for back-compat)
+ *   POST /import              — single-page import (legacy / back-compat)
+ *   POST /agency/preview      — full agency crawl across forsale + rent +
+ *                                commercial × all pages, returns flat list +
+ *                                per-section diagnostics. Polite throttling
+ *                                in the crawler.
+ *   POST /agency/import       — accept the agreed listing array, create
+ *                                Property rows, re-host the cover image
+ *                                server-side (downloads img.yad2.co.il →
+ *                                /uploads/properties/<id>/yad2-cover.jpg).
  *
- * Idempotency without a schema change: each imported row stores a marker
- * `[yad2:<id>]` inside `notes`. Re-import finds that token in any of the
- * agent's existing properties and skips. When this graduates from POC
- * we'll add a dedicated `sourceId` column with a unique index.
+ * Idempotency: each created Property carries `[yad2:<token>]` in its
+ * notes field; re-import skips if the token is already present in any
+ * of the agent's existing properties.
  *
- * Caveats (also documented in routes/yad2.README.md):
- *   - Yad2 HTML structure can change; the parser hits __NEXT_DATA__
- *     first (more durable than DOM) and falls back to a small DOM
- *     extractor.
- *   - Respect rate limits — single fetch per preview, identifying UA.
+ * Caveats — see routes/yad2.README.md.
  */
 
 const FEATURE_FLAG = (process.env.FEATURE_YAD2_IMPORT ?? '').toLowerCase() === 'true';
+const UPLOADS_DIR  = path.resolve(process.env.UPLOADS_DIR || './uploads');
 
+// Old single-page endpoints kept around — agency endpoints are the main
+// path going forward but the simpler version is harmless and useful for
+// power-users with a non-agency Yad2 URL (e.g. private seller).
 const PreviewQ = z.object({
   url: z.string().url().refine(
     (u) => /(^https?:\/\/(www\.)?yad2\.co\.il)/.test(u),
@@ -31,80 +42,101 @@ const PreviewQ = z.object({
   ),
 });
 
-const ImportQ = z.object({
-  listings: z.array(z.object({
-    sourceId: z.string().min(1).max(120),
-    title: z.string().max(400).optional(),
-    street: z.string().max(120),
-    city: z.string().max(80),
-    rooms: z.number().nullable().optional(),
-    sqm: z.number().nullable().optional(),
-    floor: z.number().nullable().optional(),
-    price: z.number().nonnegative().nullable().optional(),
-    photos: z.array(z.string().url()).max(40).optional(),
-    description: z.string().max(4000).optional(),
-  })).min(1).max(50),
+// /agency/preview accepts EITHER an agency URL or a bare agency id
+// (purely an ergonomic convenience — the frontend always sends URLs).
+const AgencyPreviewQ = z.object({
+  url:       z.string().url().optional(),
+  agencyId:  z.string().regex(/^\d+$/).optional(),
+}).refine((v) => !!v.url || !!v.agencyId, { message: 'url or agencyId required' });
+
+const ImportListingZ = z.object({
+  sourceId: z.string().min(1).max(120),
+  section:  z.enum(['forsale', 'rent', 'commercial']),
+  title: z.string().max(400).optional(),
+  street: z.string().max(120),
+  city: z.string().max(80),
+  region: z.string().max(120).optional(),
+  rooms: z.number().nullable().optional(),
+  sqm: z.number().nullable().optional(),
+  floor: z.number().nullable().optional(),
+  price: z.number().nonnegative().nullable().optional(),
+  type: z.string().max(60).optional(),
+  coverImage: z.string().url().optional(),
+  tags: z.array(z.string()).optional(),
+  description: z.string().max(4000).optional(),
 });
+
+const ImportQ = z.object({
+  listings: z.array(ImportListingZ).min(1).max(100),
+});
+
+function extractAgencyId(input: { url?: string; agencyId?: string }): string | null {
+  if (input.agencyId) return input.agencyId;
+  if (!input.url) return null;
+  const m = input.url.match(/\/realestate\/agency\/(\d+)/);
+  return m ? m[1] : null;
+}
 
 export const registerYad2Routes: FastifyPluginAsync = async (app) => {
   if (!FEATURE_FLAG) {
-    // Feature flag off — register a stub that explains the disabled state.
-    app.post('/preview', async (_req, reply) => {
-      return reply.code(404).send({ error: { message: 'Yad2 import not enabled in this environment' } });
-    });
-    app.post('/import', async (_req, reply) => {
-      return reply.code(404).send({ error: { message: 'Yad2 import not enabled in this environment' } });
-    });
+    const stub = async (_req: any, reply: any) =>
+      reply.code(404).send({ error: { message: 'Yad2 import not enabled in this environment' } });
+    app.post('/preview',         stub);
+    app.post('/import',          stub);
+    app.post('/agency/preview',  stub);
+    app.post('/agency/import',   stub);
     return;
   }
 
+  // ── Legacy single-page preview (left intact for back-compat) ──────
   app.post('/preview', { onRequest: [app.requireAuth] }, async (req, reply) => {
     const parsed = PreviewQ.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: { message: 'Invalid Yad2 URL' } });
     }
     const { url } = parsed.data;
-
-    let html: string;
-    try {
-      const r = await fetch(url, {
-        headers: {
-          // Identify ourselves clearly. Bot-detection systems are more
-          // forgiving when you don't lie about what you are.
-          'User-Agent': 'EstiaImporter/1.0 (https://estia.tripzio.xyz; +mailto:talfuks1234@gmail.com)',
-          'Accept': 'text/html,application/xhtml+xml',
-          'Accept-Language': 'he-IL,he;q=0.9,en;q=0.5',
-        },
-        // Don't follow infinite redirects; one hop max.
-        redirect: 'follow',
-      });
-      if (r.status === 429 || r.status === 403) {
-        req.log.warn({ status: r.status, url }, 'yad2 rate-limited / blocked');
-        return reply.code(503).send({
-          error: { message: 'Yad2 חסם את הבקשה — נסה שוב בעוד מספר דקות' },
-        });
-      }
-      if (!r.ok) {
-        return reply.code(502).send({ error: { message: `Yad2 returned ${r.status}` } });
-      }
-      html = await r.text();
-    } catch (err: any) {
-      req.log.warn({ err }, 'yad2 fetch failed');
-      return reply.code(504).send({ error: { message: 'Yad2 לא הגיב — נסה שוב' } });
+    // If this is an agency URL, defer to the agency endpoint.
+    const agencyId = extractAgencyId({ url });
+    if (agencyId) {
+      const report = await crawlAgency(agencyId);
+      return { listings: report.listings, agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone }, sections: report.sections, truncated: report.truncated };
     }
-
-    const listings = parseYad2Listings(html);
-    if (listings.length === 0) {
-      // Log raw HTML excerpt (capped) so we know to update selectors when Yad2 changes layout.
-      req.log.warn({ excerpt: html.slice(0, 600) }, 'yad2 parser returned 0 listings');
-      return reply.code(422).send({
-        error: { message: 'לא נמצאו נכסים בדף — בדוק שהקישור נכון או נסה שוב מאוחר יותר' },
-      });
-    }
-    return { listings };
+    return reply.code(400).send({ error: { message: 'נא להדביק כתובת של דף סוכנות (yad2.co.il/realestate/agency/...)' } });
   });
 
-  app.post('/import', { onRequest: [app.requireAuth] }, async (req, reply) => {
+  // ── Agency-wide preview ──────────────────────────────────────────
+  app.post('/agency/preview', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const parsed = AgencyPreviewQ.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: { message: 'נא להדביק כתובת של דף סוכנות (yad2.co.il/realestate/agency/...)' } });
+    }
+    const agencyId = extractAgencyId(parsed.data);
+    if (!agencyId) {
+      return reply.code(400).send({ error: { message: 'לא נמצא מזהה סוכנות בכתובת' } });
+    }
+    try {
+      const report = await crawlAgency(agencyId);
+      if (report.listings.length === 0) {
+        // Log enough to debug structural changes without leaking per-listing PII
+        req.log.warn({ agencyId, sections: report.sections }, 'yad2 agency crawl returned 0 listings');
+        return reply.code(422).send({
+          error: { message: 'לא נמצאו נכסים בסוכנות זו — בדוק את הקישור או נסה שוב מאוחר יותר' },
+        });
+      }
+      return {
+        listings: report.listings,
+        agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone },
+        sections: report.sections,
+        truncated: report.truncated,
+      };
+    } catch (err: any) {
+      req.log.warn({ err, agencyId }, 'yad2 agency crawl threw');
+      return reply.code(504).send({ error: { message: 'הסוכנות לא הגיבה — נסה שוב' } });
+    }
+  });
+
+  // ── Agency import — server-side image re-host ────────────────────
+  app.post('/agency/import', { onRequest: [app.requireAuth] }, async (req, reply) => {
     const parsed = ImportQ.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: { message: 'Invalid import payload' } });
@@ -112,7 +144,8 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     const u = getUser(req);
     if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
 
-    // Find which sourceIds this agent already has (from notes marker).
+    // Skip listings the agent already has via the [yad2:<token>] marker
+    // in their existing properties' notes.
     const markers = parsed.data.listings.map((l) => `[yad2:${l.sourceId}]`);
     const existing = await prisma.property.findMany({
       where: {
@@ -127,9 +160,9 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
       if (m) existingSet.add(m[1]);
     }
 
-    const created: any[] = [];
+    const created: { sourceId: string; id: string }[] = [];
     const skipped: { sourceId: string; reason: string }[] = [];
-    const failed: { sourceId: string; reason: string }[] = [];
+    const failed:  { sourceId: string; reason: string }[] = [];
 
     for (const l of parsed.data.listings) {
       if (existingSet.has(l.sourceId)) {
@@ -137,34 +170,54 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
         continue;
       }
       try {
-        const created_one = await prisma.property.create({
+        const map = mapSectionToAssetClass(l as Yad2Listing);
+        const noteParts = [
+          `[yad2:${l.sourceId}]`,
+          `https://www.yad2.co.il/realestate/item/${l.sourceId}`,
+          l.title ? `כותרת מ-Yad2: ${l.title}` : null,
+          l.tags?.length ? `תגיות: ${l.tags.join(' · ')}` : null,
+          l.region ? `אזור: ${l.region}` : null,
+          l.description || null,
+        ].filter(Boolean) as string[];
+
+        const property = await prisma.property.create({
           data: {
             agentId: u.id,
-            assetClass: 'RESIDENTIAL',
-            category: 'SALE',
-            type: 'דירה',
-            street: l.street,
-            city: l.city,
+            assetClass: map.assetClass,
+            category: map.category,
+            type: l.type || 'דירה',
+            street: l.street || '—',
+            city: l.city || '—',
             owner: 'בעלים מ-Yad2',
             ownerPhone: '',
             marketingPrice: l.price ?? 0,
             sqm: l.sqm ?? 0,
-            floor: l.floor ?? null,
             rooms: l.rooms ?? null,
-            notes: [
-              `[yad2:${l.sourceId}]`,
-              l.title ? `כותרת מ-Yad2: ${l.title}` : null,
-              l.description || null,
-            ].filter(Boolean).join('\n'),
-            // Image hot-linking is intentional for the POC. A real
-            // version would fetch + re-upload to /uploads/. Marked in
-            // the README.
-            images: l.photos?.length
-              ? { create: l.photos.map((url, i) => ({ url, sortOrder: i })) }
-              : undefined,
+            floor: l.floor ?? null,
+            notes: noteParts.join('\n'),
           },
         });
-        created.push({ sourceId: l.sourceId, id: created_one.id });
+
+        // Re-host the cover image: download from img.yad2.co.il and
+        // write to uploads/properties/<propertyId>/yad2-cover-<uuid>.jpg.
+        // Hot-link is fragile (Yad2 may rotate CDN paths or block
+        // referrer-less requests later) — better to own the bytes.
+        if (l.coverImage) {
+          try {
+            const url = await rehostImage(l.coverImage, property.id);
+            await prisma.propertyImage.create({
+              data: { propertyId: property.id, url, sortOrder: 0 },
+            });
+          } catch (imgErr: any) {
+            req.log.warn({ err: imgErr, propertyId: property.id, src: l.coverImage }, 'yad2 image rehost failed');
+            // Fall back to hot-link so the property still has a photo
+            await prisma.propertyImage.create({
+              data: { propertyId: property.id, url: l.coverImage, sortOrder: 0 },
+            });
+          }
+        }
+
+        created.push({ sourceId: l.sourceId, id: property.id });
       } catch (err: any) {
         failed.push({ sourceId: l.sourceId, reason: err?.message || 'create_failed' });
       }
@@ -172,110 +225,100 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
 
     return { created, skipped, failed };
   });
+
+  // ── Legacy single-page import (kept for back-compat) ─────────────
+  // Same shape, but no section field. Maps everything to RES+SALE.
+  const LegacyImportQ = z.object({
+    listings: z.array(z.object({
+      sourceId: z.string().min(1).max(120),
+      title: z.string().max(400).optional(),
+      street: z.string().max(120),
+      city: z.string().max(80),
+      rooms: z.number().nullable().optional(),
+      sqm: z.number().nullable().optional(),
+      floor: z.number().nullable().optional(),
+      price: z.number().nonnegative().nullable().optional(),
+      photos: z.array(z.string().url()).max(40).optional(),
+      description: z.string().max(4000).optional(),
+    })).min(1).max(50),
+  });
+  app.post('/import', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const parsed = LegacyImportQ.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: { message: 'Invalid import payload' } });
+    const u = getUser(req);
+    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+
+    const markers = parsed.data.listings.map((l) => `[yad2:${l.sourceId}]`);
+    const existing = await prisma.property.findMany({
+      where: { agentId: u.id, OR: markers.map((m) => ({ notes: { contains: m } })) },
+      select: { notes: true },
+    });
+    const existingSet = new Set<string>();
+    for (const p of existing) {
+      const m = p.notes?.match(/\[yad2:([^\]]+)\]/);
+      if (m) existingSet.add(m[1]);
+    }
+
+    const created: { sourceId: string; id: string }[] = [];
+    const skipped: { sourceId: string; reason: string }[] = [];
+    const failed:  { sourceId: string; reason: string }[] = [];
+
+    for (const l of parsed.data.listings) {
+      if (existingSet.has(l.sourceId)) {
+        skipped.push({ sourceId: l.sourceId, reason: 'already_imported' });
+        continue;
+      }
+      try {
+        const property = await prisma.property.create({
+          data: {
+            agentId: u.id,
+            assetClass: 'RESIDENTIAL',
+            category: 'SALE',
+            type: 'דירה',
+            street: l.street, city: l.city,
+            owner: 'בעלים מ-Yad2', ownerPhone: '',
+            marketingPrice: l.price ?? 0,
+            sqm: l.sqm ?? 0,
+            floor: l.floor ?? null,
+            rooms: l.rooms ?? null,
+            notes: [`[yad2:${l.sourceId}]`, l.title, l.description].filter(Boolean).join('\n'),
+            images: l.photos?.length
+              ? { create: l.photos.map((url, i) => ({ url, sortOrder: i })) }
+              : undefined,
+          },
+        });
+        created.push({ sourceId: l.sourceId, id: property.id });
+      } catch (err: any) {
+        failed.push({ sourceId: l.sourceId, reason: err?.message || 'create_failed' });
+      }
+    }
+    return { created, skipped, failed };
+  });
 };
 
-// ── Parser ────────────────────────────────────────────────────────
-// Tries __NEXT_DATA__ first (Yad2 is a Next.js app — that JSON has the
-// listings as proper data). Falls back to a small DOM extractor if
-// the JSON shape isn't what we expect.
-
-interface ExtractedListing {
-  sourceId: string;
-  title?: string;
-  street: string;
-  city: string;
-  rooms?: number | null;
-  sqm?: number | null;
-  floor?: number | null;
-  price?: number | null;
-  photos?: string[];
-  description?: string;
-}
-
-export function parseYad2Listings(html: string): ExtractedListing[] {
-  // Strategy 1: __NEXT_DATA__ inline JSON
-  const next = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/);
-  if (next) {
-    try {
-      const data = JSON.parse(next[1]);
-      const found = walkForListings(data);
-      if (found.length > 0) return found;
-    } catch {
-      // fall through to DOM
-    }
-  }
-
-  // Strategy 2: light DOM scrape — extract anything that looks like a
-  // listing card. Enough for the POC review screen even if some fields
-  // are missing.
-  const items: ExtractedListing[] = [];
-  const cardRegex = /<a[^>]+href=["']\/(item|s\/realestate)\/(\d+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let m;
-  while ((m = cardRegex.exec(html)) !== null) {
-    const sourceId = m[2];
-    const inner = m[3];
-    const title = (inner.match(/<h2[^>]*>([\s\S]*?)<\/h2>/) || [])[1] || '';
-    const text = stripHtml(inner);
-    items.push({
-      sourceId,
-      title: stripHtml(title) || undefined,
-      street: '',
-      city: '',
-      description: text.slice(0, 200),
-    });
-  }
-  return items;
-}
-
-function walkForListings(data: any, out: ExtractedListing[] = []): ExtractedListing[] {
-  if (!data || typeof data !== 'object') return out;
-  // Heuristic: any object with an `id` (numeric or string) AND
-  // (`address` || `price`) is probably a listing card.
-  if (
-    (typeof data.id === 'string' || typeof data.id === 'number') &&
-    (data.address || data.price || data.realestate || data.item_type)
-  ) {
-    const sourceId = String(data.id);
-    if (sourceId && out.findIndex((x) => x.sourceId === sourceId) === -1) {
-      out.push({
-        sourceId,
-        title: data.title || data.subtitle || undefined,
-        street: pickStr(data.address?.street?.text, data.address?.street, data.street) || '',
-        city:   pickStr(data.address?.city?.text, data.address?.city, data.city) || '',
-        rooms:  pickNum(data.additionalDetails?.rooms, data.rooms, data.room),
-        sqm:    pickNum(data.additionalDetails?.square_meter, data.sqm, data.size),
-        floor:  pickNum(data.address?.house?.floor, data.floor),
-        price:  pickNum(data.price, data.priceValue, data.metaData?.price),
-        photos: Array.isArray(data.metaData?.coverImage) ? [data.metaData.coverImage]
-              : Array.isArray(data.metaData?.images) ? data.metaData.images
-              : [],
-        description: data.description || undefined,
-      });
-    }
-  }
-  for (const key of Object.keys(data)) {
-    const v = (data as any)[key];
-    if (v && typeof v === 'object') walkForListings(v, out);
-  }
-  return out;
-}
-
-function pickStr(...vals: any[]): string | undefined {
-  for (const v of vals) {
-    if (typeof v === 'string' && v.trim()) return v.trim();
-  }
-  return undefined;
-}
-function pickNum(...vals: any[]): number | null {
-  for (const v of vals) {
-    if (typeof v === 'number' && Number.isFinite(v)) return v;
-    if (typeof v === 'string') {
-      const n = Number(v.replace(/[^\d.-]/g, ''));
-      if (Number.isFinite(n) && n !== 0) return n;
-    }
-  }
-  return null;
-}
-function stripHtml(s: string): string {
-  return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+// ── Image re-host helper ─────────────────────────────────────────
+// Downloads the Yad2 image bytes and writes them under UPLOADS_DIR
+// using the same /uploads/properties/<id>/<uuid>.jpg convention the
+// PropertyPhotoManager uploader uses. Returns the public URL.
+async function rehostImage(srcUrl: string, propertyId: string): Promise<string> {
+  const r = await fetch(srcUrl, {
+    headers: {
+      // Yad2 image CDN doesn't enforce referrer or UA but be consistent.
+      'User-Agent': 'EstiaImporter/1.0 (https://estia.tripzio.xyz)',
+      'Accept': 'image/jpeg,image/png,image/webp,*/*;q=0.5',
+    },
+  });
+  if (!r.ok) throw new Error(`image fetch ${r.status}`);
+  const ct = (r.headers.get('content-type') || '').toLowerCase();
+  if (!ct.startsWith('image/')) throw new Error(`not an image: ${ct}`);
+  const ext =
+    ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' :
+    ct.includes('png')  ? 'png' :
+    ct.includes('webp') ? 'webp' : 'jpg';
+  const buf = Buffer.from(await r.arrayBuffer());
+  const dir = path.join(UPLOADS_DIR, 'properties', propertyId);
+  await fs.mkdir(dir, { recursive: true });
+  const filename = `yad2-cover-${randomUUID()}.${ext}`;
+  await fs.writeFile(path.join(dir, filename), buf);
+  return `/uploads/properties/${propertyId}/${filename}`;
 }

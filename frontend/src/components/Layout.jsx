@@ -21,6 +21,8 @@ import {
   Shield,
   Search,
   MessageCircle,
+  Calculator,
+  Download as DownloadIcon,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
@@ -42,6 +44,8 @@ const navItems = [
   { path: '/deals', icon: Handshake, label: 'עסקאות' },
   { path: '/transfers', icon: ArrowLeftRight, label: 'העברות' },
   { path: '/templates', icon: FileText, label: 'תבניות הודעה' },
+  { path: '/calculator', icon: Calculator, label: 'מחשבון מוכר' },
+  { path: '/integrations/yad2', icon: DownloadIcon, label: 'ייבוא מ-Yad2' },
 ];
 
 const quickActions = [
