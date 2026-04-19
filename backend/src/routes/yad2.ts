@@ -116,6 +116,8 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     if (!agencyId) {
       return reply.code(400).send({ error: { message: 'לא נמצא מזהה סוכנות בכתובת' } });
     }
+    const u = getUser(req);
+    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
     try {
       const report = await crawlAgency(agencyId);
       if (report.listings.length === 0) {
@@ -125,11 +127,19 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
           error: { message: 'לא נמצאו נכסים בסוכנות זו — בדוק את הקישור או נסה שוב מאוחר יותר' },
         });
       }
+      // Build the alreadyImported map: { sourceId → propertyId } for any
+      // listing in this preview that the agent already has in their
+      // catalog (matched by the [yad2:<token>] marker in notes). The
+      // frontend uses this to mute already-imported rows + link straight
+      // to the existing property page.
+      const alreadyImported = await findAlreadyImported(u.id, report.listings.map((l) => l.sourceId));
+
       return {
         listings: report.listings,
         agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone },
         sections: report.sections,
         truncated: report.truncated,
+        alreadyImported,
       };
     } catch (err: any) {
       req.log.warn({ err, agencyId }, 'yad2 agency crawl threw');
@@ -147,20 +157,10 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
 
     // Skip listings the agent already has via the [yad2:<token>] marker
-    // in their existing properties' notes.
-    const markers = parsed.data.listings.map((l) => `[yad2:${l.sourceId}]`);
-    const existing = await prisma.property.findMany({
-      where: {
-        agentId: u.id,
-        OR: markers.map((m) => ({ notes: { contains: m } })),
-      },
-      select: { notes: true },
-    });
-    const existingSet = new Set<string>();
-    for (const p of existing) {
-      const m = p.notes?.match(/\[yad2:([^\]]+)\]/);
-      if (m) existingSet.add(m[1]);
-    }
+    // in their existing properties' notes. Same helper the preview
+    // endpoint uses so the "already imported" surface stays consistent.
+    const existingMap = await findAlreadyImported(u.id, parsed.data.listings.map((l) => l.sourceId));
+    const existingSet = new Set<string>(Object.keys(existingMap));
 
     const created: { sourceId: string; id: string }[] = [];
     const skipped: { sourceId: string; reason: string }[] = [];
@@ -255,16 +255,8 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     const u = getUser(req);
     if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
 
-    const markers = parsed.data.listings.map((l) => `[yad2:${l.sourceId}]`);
-    const existing = await prisma.property.findMany({
-      where: { agentId: u.id, OR: markers.map((m) => ({ notes: { contains: m } })) },
-      select: { notes: true },
-    });
-    const existingSet = new Set<string>();
-    for (const p of existing) {
-      const m = p.notes?.match(/\[yad2:([^\]]+)\]/);
-      if (m) existingSet.add(m[1]);
-    }
+    const existingMap = await findAlreadyImported(u.id, parsed.data.listings.map((l) => l.sourceId));
+    const existingSet = new Set<string>(Object.keys(existingMap));
 
     const created: { sourceId: string; id: string }[] = [];
     const skipped: { sourceId: string; reason: string }[] = [];
@@ -312,6 +304,41 @@ function uniqueOrdered<T>(arr: T[]): T[] {
     if (seen.has(x)) continue;
     seen.add(x);
     out.push(x);
+  }
+  return out;
+}
+
+// Given an agent + list of Yad2 source tokens, returns a {sourceId →
+// propertyId} map for every token that's already imported. Used by
+// the preview endpoint (to mute already-imported rows + link to the
+// existing property) AND by the import endpoint (to skip duplicates).
+//
+// Match strategy: each imported property carries `[yad2:<token>]` in
+// its notes field. Postgres LIKE on notes is fine at this scale —
+// an agent typically has tens to low-hundreds of properties.
+async function findAlreadyImported(agentId: string, sourceIds: string[]): Promise<Record<string, string>> {
+  if (sourceIds.length === 0) return {};
+  const props = await prisma.property.findMany({
+    where: {
+      agentId,
+      OR: sourceIds.map((id) => ({ notes: { contains: `[yad2:${id}]` } })),
+    },
+    select: { id: true, notes: true },
+  });
+  const out: Record<string, string> = {};
+  for (const p of props) {
+    if (!p.notes) continue;
+    // A property's notes COULD theoretically carry multiple yad2
+    // markers (re-import edge case) — match all of them.
+    for (const m of p.notes.matchAll(/\[yad2:([^\]]+)\]/g)) {
+      const token = m[1];
+      // Only keep if this token was in the request set — defensive
+      // against unrelated `[yad2:*]` tokens already on the agent's
+      // properties.
+      if (sourceIds.includes(token)) {
+        out[token] = p.id;
+      }
+    }
   }
   return out;
 }

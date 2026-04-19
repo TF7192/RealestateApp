@@ -169,6 +169,17 @@
 
 @media (max-width: 820px) {
   .au-search { min-width: 0; flex: 1; }
+  /* Make the table horizontally scrollable on mobile rather than
+     squeezing every column into 360px — the data is dense, scroll is
+     the right answer. -webkit-overflow-scrolling: touch keeps inertia
+     working in WKWebView. */
+  .au-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .au-table { min-width: 720px; }
   .au-table th, .au-table td { padding: 10px 8px; font-size: 12.5px; }
   .au-email { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Keep the page bottom clear of the mobile tab-bar */
+  .au-page { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 }

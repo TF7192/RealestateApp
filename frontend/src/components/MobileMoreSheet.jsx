@@ -121,14 +121,24 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
               </span>
             </button>
             {ADMIN_EMAILS.has((user?.email || '').toLowerCase()) && (
-              <button className="mms-row" onClick={() => go('/admin/chats')}>
-                <span className="mms-row-icon"><Shield size={18} /></span>
-                <span className="mms-row-text">
-                  <strong>מרכז שיחות</strong>
-                  <small>פאנל אדמין — כל שיחות המשתמשים</small>
-                </span>
-                <span className="mms-arrow">›</span>
-              </button>
+              <>
+                <button className="mms-row" onClick={() => go('/admin/chats')}>
+                  <span className="mms-row-icon"><Shield size={18} /></span>
+                  <span className="mms-row-text">
+                    <strong>מרכז שיחות</strong>
+                    <small>פאנל אדמין — כל שיחות המשתמשים</small>
+                  </span>
+                  <span className="mms-arrow">›</span>
+                </button>
+                <button className="mms-row" onClick={() => go('/admin/users')}>
+                  <span className="mms-row-icon"><Shield size={18} /></span>
+                  <span className="mms-row-text">
+                    <strong>משתמשים</strong>
+                    <small>פאנל אדמין — כל המשתמשים, נכסים, לידים</small>
+                  </span>
+                  <span className="mms-arrow">›</span>
+                </button>
+              </>
             )}
           </section>
 

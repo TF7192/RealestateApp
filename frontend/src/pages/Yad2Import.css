@@ -129,6 +129,87 @@
 }
 .y2-item.on { border-color: var(--gold-border); background: var(--gold-glow); }
 
+/* Already-imported variant — muted card, no checkbox, becomes a Link
+   that navigates to the existing property. The agent shouldn't be
+   able to "re-pick" it; if they want to update they go through the
+   property detail's edit flow. */
+.y2-item-imported {
+  border-style: dashed;
+  border-color: var(--gold-border);
+  background: color-mix(in srgb, var(--gold-glow) 35%, transparent);
+  opacity: 0.78;
+  transition: opacity 0.18s ease;
+}
+.y2-item-imported:hover { opacity: 1; }
+
+.y2-item-imported-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.y2-item-imported .y2-thumb {
+  filter: saturate(0.65);
+}
+
+.y2-imported-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #1a1409;
+  font-size: 11px;
+  font-weight: 700;
+  width: max-content;
+}
+
+/* Header summary metas — render the new-vs-imported counts as
+   distinct chips so the agent's eye lands on each at a glance. */
+.y2-review-meta {
+  display: inline-flex;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.y2-review-meta-new,
+.y2-review-meta-imported {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.y2-review-meta-new {
+  background: var(--gold);
+  color: #1a1409;
+}
+
+.y2-review-meta-imported {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.y2-review-meta-new small,
+.y2-review-meta-imported small {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
 .y2-item label {
   display: flex;
   align-items: flex-start;

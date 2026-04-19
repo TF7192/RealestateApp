@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Download, ArrowRight, AlertCircle, Check, Loader2, Building2, Store, Home as HomeIcon } from 'lucide-react';
+import { Download, ArrowRight, AlertCircle, Check, Loader2, Building2, Store, Home as HomeIcon, ExternalLink } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../lib/toast';
 import { formatFloor } from '../lib/formatFloor';
@@ -30,6 +30,10 @@ export default function Yad2Import() {
   const [sections, setSections] = useState([]);
   const [truncated, setTruncated] = useState(false);
   const [result, setResult] = useState(null);
+  // { sourceId → propertyId } for listings the agent already imported
+  // (server populates from the [yad2:<token>] notes-marker). Keyset on
+  // the frontend for O(1) "is this already imported?" lookups.
+  const [alreadyImported, setAlreadyImported] = useState({});
 
   // Group listings by section so the review screen reads as
   // "מכירה (12), השכרה (5), מסחרי (2)" — clearer than a flat list.
@@ -68,7 +72,17 @@ export default function Yad2Import() {
       setAgency(res.agency || null);
       setSections(res.sections || []);
       setTruncated(!!res.truncated);
-      setPicked(new Set((res.listings || []).map((l) => l.sourceId))); // all by default
+      const already = res.alreadyImported || {};
+      setAlreadyImported(already);
+      // Default-select every listing EXCEPT ones already imported —
+      // re-importing them would just bump the [yad2:<token>] dedupe
+      // skip on the server. Saves the agent from manually un-checking
+      // 30+ rows on every re-scan.
+      setPicked(new Set(
+        (res.listings || [])
+          .filter((l) => !already[l.sourceId])
+          .map((l) => l.sourceId),
+      ));
       setStep('review');
     } catch (e) {
       setErr(e.message || 'הטעינה נכשלה');
@@ -150,7 +164,16 @@ export default function Yad2Import() {
             <div>
               <strong>{extracted.length} נכסים נמצאו</strong>
               {agency?.name && <span className="y2-agency">· {agency.name}</span>}
-              <span> · {picked.size} נבחרו לייבוא</span>
+            </div>
+            <div className="y2-review-meta">
+              <span className="y2-review-meta-new">
+                {picked.size} <small>חדשים לייבוא</small>
+              </span>
+              {Object.keys(alreadyImported).length > 0 && (
+                <span className="y2-review-meta-imported">
+                  {Object.keys(alreadyImported).length} <small>כבר במערכת</small>
+                </span>
+              )}
             </div>
             {truncated && (
               <div className="y2-trunc">הוצגו עד 100 נכסים — הסוכנות עשויה להכיל עוד.</div>
@@ -195,6 +218,43 @@ export default function Yad2Import() {
                 <ul className="y2-list">
                   {list.map((l) => {
                     const chosen = picked.has(l.sourceId);
+                    const importedPropertyId = alreadyImported[l.sourceId];
+                    const isImported = !!importedPropertyId;
+                    // Already-imported listings render in a special variant:
+                    // muted, checkbox disabled, gold "כבר במערכת" pill that
+                    // links to the existing property. The agent can't accidentally
+                    // re-pick it; if they want to update it they go through the
+                    // property's own edit flow.
+                    if (isImported) {
+                      return (
+                        <li key={l.sourceId} className="y2-item y2-item-imported">
+                          <Link to={`/properties/${importedPropertyId}`} className="y2-item-imported-row">
+                            {l.coverImage && (
+                              <div className="y2-thumb-wrap">
+                                <img className="y2-thumb" src={l.coverImage} alt="" loading="lazy" decoding="async" />
+                              </div>
+                            )}
+                            <div className="y2-item-meta">
+                              <strong>
+                                {l.title || `${l.street || ''}${l.city ? `, ${l.city}` : ''}`.trim() || 'נכס מ-Yad2'}
+                              </strong>
+                              <span>
+                                {[
+                                  l.type,
+                                  l.rooms ? `${l.rooms} חד׳` : null,
+                                  l.sqm ? `${l.sqm} מ״ר` : null,
+                                  l.price ? `₪${Number(l.price).toLocaleString('he-IL')}` : null,
+                                ].filter(Boolean).join(' · ')}
+                              </span>
+                              <span className="y2-imported-pill">
+                                <Check size={11} /> כבר במערכת — פתח כרטיס
+                                <ExternalLink size={11} />
+                              </span>
+                            </div>
+                          </Link>
+                        </li>
+                      );
+                    }
                     return (
                       <li key={l.sourceId} className={`y2-item ${chosen ? 'on' : ''}`}>
                         <label>
