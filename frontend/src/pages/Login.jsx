@@ -196,6 +196,10 @@ export default function Login() {
                     <label className="form-label">שם מלא</label>
                     <input
                       type="text"
+                      autoComplete="name"
+                      autoCapitalize="words"
+                      autoCorrect="off"
+                      enterKeyHint="next"
                       className="form-input"
                       placeholder="יוסי כהן"
                       value={form.displayName}
@@ -207,6 +211,10 @@ export default function Login() {
                     <label className="form-label">טלפון (אופציונלי)</label>
                     <input
                       type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      enterKeyHint="next"
+                      dir="ltr"
                       className="form-input"
                       placeholder="050-1234567"
                       value={form.phone}
@@ -220,6 +228,13 @@ export default function Login() {
                 <label className="form-label">אימייל</label>
                 <input
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  enterKeyHint="next"
+                  dir="ltr"
                   className="form-input"
                   placeholder="you@example.com"
                   value={form.email}
@@ -236,6 +251,8 @@ export default function Login() {
                 </label>
                 <input
                   type="password"
+                  autoComplete={flow === 'email-signup' ? 'new-password' : 'current-password'}
+                  enterKeyHint="go"
                   className="form-input"
                   placeholder="••••••••"
                   value={form.password}

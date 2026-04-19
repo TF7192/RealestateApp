@@ -363,6 +363,9 @@ export default function NewLead() {
               className="form-textarea"
               placeholder="הערות נוספות על הלקוח..."
               rows={4}
+              dir="auto"
+              autoCapitalize="sentences"
+              enterKeyHint="enter"
               value={form.notes}
               onChange={(e) => update('notes', e.target.value)}
             />

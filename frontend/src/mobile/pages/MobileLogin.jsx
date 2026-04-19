@@ -123,7 +123,7 @@ export default function MobileLogin() {
               <label className="m-label">שם מלא</label>
               <div className="m-input-wrap">
                 <User size={16} />
-                <input className="m-input" value={form.displayName} onChange={(e) => u('displayName', e.target.value)} required autoFocus />
+                <input className="m-input" value={form.displayName} onChange={(e) => u('displayName', e.target.value)} required autoFocus autoComplete="name" autoCapitalize="words" enterKeyHint="next" />
               </div>
             </div>
           )}
@@ -132,7 +132,7 @@ export default function MobileLogin() {
             <label className="m-label">אימייל</label>
             <div className="m-input-wrap">
               <Mail size={16} />
-              <input type="email" className="m-input" value={form.email} onChange={(e) => u('email', e.target.value)} required dir="ltr" style={{ textAlign: 'right' }} />
+              <input type="email" inputMode="email" autoComplete="email" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="next" className="m-input" value={form.email} onChange={(e) => u('email', e.target.value)} required dir="ltr" style={{ textAlign: 'right' }} />
             </div>
           </div>
 
@@ -140,7 +140,7 @@ export default function MobileLogin() {
             <div className="m-field">
               <label className="m-label">טלפון</label>
               <div className="m-input-wrap">
-                <input type="tel" className="m-input" value={form.phone} onChange={(e) => u('phone', e.target.value)} dir="ltr" style={{ textAlign: 'right' }} />
+                <input type="tel" inputMode="tel" autoComplete="tel" enterKeyHint="next" className="m-input" value={form.phone} onChange={(e) => u('phone', e.target.value)} dir="ltr" style={{ textAlign: 'right' }} />
               </div>
             </div>
           )}
@@ -149,7 +149,7 @@ export default function MobileLogin() {
             <label className="m-label">סיסמה</label>
             <div className="m-input-wrap">
               <Lock size={16} />
-              <input type="password" className="m-input" value={form.password} onChange={(e) => u('password', e.target.value)} required minLength={6} />
+              <input type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} enterKeyHint="go" className="m-input" value={form.password} onChange={(e) => u('password', e.target.value)} required minLength={6} />
             </div>
           </div>
 

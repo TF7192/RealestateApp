@@ -114,14 +114,14 @@ export default function MobileNewProperty() {
             <label className="m-label">שם בעלים</label>
             <div className="m-input-wrap">
               <User size={16} />
-              <input className="m-input" value={form.owner} onChange={(e) => u('owner', e.target.value)} required />
+              <input className="m-input" value={form.owner} onChange={(e) => u('owner', e.target.value)} autoComplete="name" enterKeyHint="next" required />
             </div>
           </div>
           <div className="m-field">
             <label className="m-label">טלפון בעלים</label>
             <div className="m-input-wrap">
               <Phone size={16} />
-              <input type="tel" className="m-input" value={form.ownerPhone} onChange={(e) => u('ownerPhone', e.target.value)} dir="ltr" style={{ textAlign: 'right' }} />
+              <input type="tel" inputMode="tel" autoComplete="tel" enterKeyHint="next" className="m-input" value={form.ownerPhone} onChange={(e) => u('ownerPhone', e.target.value)} dir="ltr" style={{ textAlign: 'right' }} />
             </div>
           </div>
         </div>
@@ -130,24 +130,24 @@ export default function MobileNewProperty() {
           <label className="m-label">מחיר שיווק</label>
           <div className="m-input-wrap">
             <DollarSign size={16} />
-            <input type="number" className="m-input" placeholder="₪" value={form.marketingPrice} onChange={(e) => u('marketingPrice', e.target.value)} required />
+            <input type="text" inputMode="numeric" pattern="[0-9]*" className="m-input" placeholder="₪" value={form.marketingPrice} onChange={(e) => u('marketingPrice', e.target.value)} enterKeyHint="next" required />
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
           <div className="m-field">
             <label className="m-label">שטח (מ״ר)</label>
-            <input type="number" className="m-input" value={form.sqm} onChange={(e) => u('sqm', e.target.value)} />
+            <input type="text" inputMode="numeric" pattern="[0-9]*" className="m-input" value={form.sqm} onChange={(e) => u('sqm', e.target.value)} enterKeyHint="next" />
           </div>
           {form.assetClass === 'residential' && (
             <div className="m-field">
               <label className="m-label">חדרים</label>
-              <input type="number" className="m-input" value={form.rooms} onChange={(e) => u('rooms', e.target.value)} step="0.5" />
+              <input type="text" inputMode="decimal" pattern="[0-9.]*" className="m-input" value={form.rooms} onChange={(e) => u('rooms', e.target.value)} enterKeyHint="next" />
             </div>
           )}
           <div className="m-field">
             <label className="m-label">קומה</label>
-            <input type="number" className="m-input" value={form.floor} onChange={(e) => u('floor', e.target.value)} />
+            <input type="text" inputMode="numeric" pattern="-?[0-9]*" className="m-input" value={form.floor} onChange={(e) => u('floor', e.target.value)} enterKeyHint="next" />
           </div>
         </div>
 
@@ -164,7 +164,7 @@ export default function MobileNewProperty() {
 
         <div className="m-field">
           <label className="m-label">הערות</label>
-          <textarea className="m-textarea" placeholder="כיווני אוויר, נוף, שכונה..."
+          <textarea className="m-textarea" placeholder="כיווני אוויר, נוף, שכונה..." dir="auto" enterKeyHint="enter"
             value={form.notes} onChange={(e) => u('notes', e.target.value)} />
         </div>
 

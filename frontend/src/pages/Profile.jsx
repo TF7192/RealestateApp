@@ -208,6 +208,9 @@ export default function Profile() {
             </Field>
             <Field label="תפקיד" icon={IdCard}>
               <input
+                autoCapitalize="words"
+                autoCorrect="off"
+                enterKeyHint="next"
                 className="form-input"
                 value={form.title}
                 onChange={(e) => update('title', e.target.value)}
@@ -216,6 +219,9 @@ export default function Profile() {
             </Field>
             <Field label="סוכנות" icon={Building2}>
               <input
+                autoCapitalize="words"
+                autoCorrect="off"
+                enterKeyHint="next"
                 className="form-input"
                 value={form.agency}
                 onChange={(e) => update('agency', e.target.value)}
@@ -243,6 +249,9 @@ export default function Profile() {
             className="profile-bio"
             rows={6}
             maxLength={500}
+            dir="auto"
+            autoCapitalize="sentences"
+            enterKeyHint="enter"
             value={form.bio}
             onChange={(e) => update('bio', e.target.value)}
             placeholder="ספר/י על עצמך בכמה משפטים — ניסיון, אזורי פעילות, גישה..."

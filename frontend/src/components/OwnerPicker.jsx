@@ -130,7 +130,12 @@ export default function OwnerPicker({ open, onClose, onPick }) {
               <Search size={16} />
               <input
                 ref={inputRef}
-                type="text"
+                type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 placeholder="חפש לפי שם או טלפון"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}

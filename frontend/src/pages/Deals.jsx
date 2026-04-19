@@ -440,7 +440,12 @@ function DealEditModal({ deal, mode, onClose, onSaved }) {
             <div className="form-group">
               <label className="form-label">מחיר שיווק</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                enterKeyHint="next"
+                dir="ltr"
+                style={{ textAlign: 'right' }}
                 className="form-input"
                 value={form.marketingPrice}
                 onChange={(e) => update('marketingPrice', e.target.value)}
@@ -449,7 +454,12 @@ function DealEditModal({ deal, mode, onClose, onSaved }) {
             <div className="form-group">
               <label className="form-label">הצעה</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                enterKeyHint="next"
+                dir="ltr"
+                style={{ textAlign: 'right' }}
                 className="form-input"
                 value={form.offer}
                 onChange={(e) => update('offer', e.target.value)}
@@ -458,7 +468,12 @@ function DealEditModal({ deal, mode, onClose, onSaved }) {
             <div className="form-group">
               <label className="form-label">מחיר סגירה</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                enterKeyHint="next"
+                dir="ltr"
+                style={{ textAlign: 'right' }}
                 className="form-input"
                 value={form.closedPrice}
                 onChange={(e) => update('closedPrice', e.target.value)}
@@ -467,7 +482,12 @@ function DealEditModal({ deal, mode, onClose, onSaved }) {
             <div className="form-group">
               <label className="form-label">עמלה</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                enterKeyHint="next"
+                dir="ltr"
+                style={{ textAlign: 'right' }}
                 className="form-input"
                 value={form.commission}
                 onChange={(e) => update('commission', e.target.value)}

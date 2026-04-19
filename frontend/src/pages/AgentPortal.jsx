@@ -161,7 +161,12 @@ export default function AgentPortal() {
         <div className="ap-search">
           <Search size={16} />
           <input
-            type="text"
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             placeholder="חיפוש לפי רחוב, עיר, סוג..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -225,7 +230,12 @@ export default function AgentPortal() {
             <div>
               <label>עיר</label>
               <input
-                type="text"
+                type="search"
+                inputMode="search"
+                enterKeyHint="next"
+                autoCorrect="off"
+                autoCapitalize="words"
+                spellCheck={false}
                 value={adv.city}
                 onChange={(e) => setAdv({ ...adv, city: e.target.value })}
                 placeholder="לדוגמה: רמלה"
@@ -234,7 +244,11 @@ export default function AgentPortal() {
             <div>
               <label>מחיר מ-</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                enterKeyHint="next"
+                dir="ltr"
                 value={adv.minPrice}
                 onChange={(e) => setAdv({ ...adv, minPrice: e.target.value })}
                 placeholder="₪"
@@ -243,7 +257,11 @@ export default function AgentPortal() {
             <div>
               <label>מחיר עד</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                enterKeyHint="next"
+                dir="ltr"
                 value={adv.maxPrice}
                 onChange={(e) => setAdv({ ...adv, maxPrice: e.target.value })}
                 placeholder="₪"
@@ -252,7 +270,11 @@ export default function AgentPortal() {
             <div>
               <label>חדרים מ-</label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9.]*"
+                enterKeyHint="next"
+                dir="ltr"
                 value={adv.minRooms}
                 onChange={(e) => setAdv({ ...adv, minRooms: e.target.value })}
               />
@@ -260,7 +282,11 @@ export default function AgentPortal() {
             <div>
               <label>חדרים עד</label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9.]*"
+                enterKeyHint="search"
+                dir="ltr"
                 value={adv.maxRooms}
                 onChange={(e) => setAdv({ ...adv, maxRooms: e.target.value })}
               />

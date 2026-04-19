@@ -234,7 +234,12 @@ export default function CustomerPortal({ onLogout, isPublic }) {
           <div className="cp-search-bar">
             <Search size={20} />
             <input
-              type="text"
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               placeholder="חפש לפי כתובת, עיר או סוג נכס..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -284,7 +289,12 @@ export default function CustomerPortal({ onLogout, isPublic }) {
               <div className="cp-location-input">
                 <Navigation size={18} />
                 <input
-                  type="text"
+                  type="search"
+                  inputMode="search"
+                  enterKeyHint="search"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   placeholder="הזן מיקום (עיר) לחיפוש לפי קרבה..."
                   value={locationQuery}
                   onChange={(e) => setLocationQuery(e.target.value)}
@@ -331,27 +341,27 @@ export default function CustomerPortal({ onLogout, isPublic }) {
               </div>
               <div className="form-group">
                 <label className="form-label">מחיר מ-</label>
-                <input type="number" className="form-input" placeholder="₪" value={filters.minPrice} onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })} />
+                <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" placeholder="₪" value={filters.minPrice} onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">מחיר עד</label>
-                <input type="number" className="form-input" placeholder="₪" value={filters.maxPrice} onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })} />
+                <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" placeholder="₪" value={filters.maxPrice} onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">שטח מ- (מ״ר)</label>
-                <input type="number" className="form-input" value={filters.minSqm} onChange={(e) => setFilters({ ...filters, minSqm: e.target.value })} />
+                <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" value={filters.minSqm} onChange={(e) => setFilters({ ...filters, minSqm: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">שטח עד (מ״ר)</label>
-                <input type="number" className="form-input" value={filters.maxSqm} onChange={(e) => setFilters({ ...filters, maxSqm: e.target.value })} />
+                <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" value={filters.maxSqm} onChange={(e) => setFilters({ ...filters, maxSqm: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">קומה מ-</label>
-                <input type="number" className="form-input" value={filters.minFloor} onChange={(e) => setFilters({ ...filters, minFloor: e.target.value })} />
+                <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" value={filters.minFloor} onChange={(e) => setFilters({ ...filters, minFloor: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">קומה עד</label>
-                <input type="number" className="form-input" value={filters.maxFloor} onChange={(e) => setFilters({ ...filters, maxFloor: e.target.value })} />
+                <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" value={filters.maxFloor} onChange={(e) => setFilters({ ...filters, maxFloor: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">מעלית</label>
@@ -370,15 +380,15 @@ export default function CustomerPortal({ onLogout, isPublic }) {
                 <div className="cp-filters-grid">
                   <div className="form-group">
                     <label className="form-label">חדרים מ-</label>
-                    <input type="number" className="form-input" value={filters.minRooms} onChange={(e) => setFilters({ ...filters, minRooms: e.target.value })} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" value={filters.minRooms} onChange={(e) => setFilters({ ...filters, minRooms: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">חדרים עד</label>
-                    <input type="number" className="form-input" value={filters.maxRooms} onChange={(e) => setFilters({ ...filters, maxRooms: e.target.value })} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" value={filters.maxRooms} onChange={(e) => setFilters({ ...filters, maxRooms: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">מרפסת מ- (מ״ר)</label>
-                    <input type="number" className="form-input" value={filters.minBalcony} onChange={(e) => setFilters({ ...filters, minBalcony: e.target.value })} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" value={filters.minBalcony} onChange={(e) => setFilters({ ...filters, minBalcony: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">מגזר</label>
@@ -409,7 +419,7 @@ export default function CustomerPortal({ onLogout, isPublic }) {
                 <div className="cp-filters-grid">
                   <div className="form-group">
                     <label className="form-label">מ״ר ארנונה מ-</label>
-                    <input type="number" className="form-input" value={filters.minSqmArnona} onChange={(e) => setFilters({ ...filters, minSqmArnona: e.target.value })} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" className="form-input" value={filters.minSqmArnona} onChange={(e) => setFilters({ ...filters, minSqmArnona: e.target.value })} />
                   </div>
                 </div>
               </>

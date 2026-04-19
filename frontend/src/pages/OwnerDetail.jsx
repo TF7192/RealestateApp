@@ -16,6 +16,7 @@ import WhatsAppIcon from '../components/WhatsAppIcon';
 import ConfirmDialog from '../components/ConfirmDialog';
 import StickyActionBar from '../components/StickyActionBar';
 import { PhoneField, SelectField } from '../components/SmartFields';
+import { inputPropsForName, inputPropsForEmail, inputPropsForNotes } from '../lib/inputProps';
 import { useToast } from '../lib/toast';
 import { useViewportMobile } from '../hooks/mobile';
 import { telUrl } from '../lib/waLink';
@@ -300,6 +301,7 @@ function OwnerEditForm({ owner, onSaved, toast, isMobile }) {
           <div className="form-group">
             <label className="form-label">שם מלא</label>
             <input
+              {...inputPropsForName()}
               className="form-input"
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
@@ -312,7 +314,7 @@ function OwnerEditForm({ owner, onSaved, toast, isMobile }) {
           <div className="form-group">
             <label className="form-label">אימייל</label>
             <input
-              type="email"
+              {...inputPropsForEmail()}
               className="form-input"
               value={form.email}
               onChange={(e) => update('email', e.target.value)}
@@ -331,6 +333,7 @@ function OwnerEditForm({ owner, onSaved, toast, isMobile }) {
           <div className="form-group form-group-wide">
             <label className="form-label">הערות</label>
             <textarea
+              {...inputPropsForNotes()}
               className="form-textarea"
               rows={4}
               value={form.notes}

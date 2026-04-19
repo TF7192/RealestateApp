@@ -270,19 +270,19 @@ export default function MobileProperties() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
           <div className="m-field">
             <label className="m-label">מחיר מ-</label>
-            <input type="number" className="m-input" placeholder="₪" value={adv.minPrice} onChange={(e) => setAdv({ ...adv, minPrice: e.target.value })} />
+            <input type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="next" dir="ltr" style={{ textAlign: 'right' }} className="m-input" placeholder="₪" value={adv.minPrice} onChange={(e) => setAdv({ ...adv, minPrice: e.target.value })} />
           </div>
           <div className="m-field">
             <label className="m-label">מחיר עד</label>
-            <input type="number" className="m-input" placeholder="₪" value={adv.maxPrice} onChange={(e) => setAdv({ ...adv, maxPrice: e.target.value })} />
+            <input type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="next" dir="ltr" style={{ textAlign: 'right' }} className="m-input" placeholder="₪" value={adv.maxPrice} onChange={(e) => setAdv({ ...adv, maxPrice: e.target.value })} />
           </div>
           <div className="m-field">
             <label className="m-label">חדרים מ-</label>
-            <input type="number" className="m-input" value={adv.minRooms} onChange={(e) => setAdv({ ...adv, minRooms: e.target.value })} />
+            <input type="text" inputMode="decimal" pattern="[0-9.]*" enterKeyHint="next" dir="ltr" style={{ textAlign: 'right' }} className="m-input" value={adv.minRooms} onChange={(e) => setAdv({ ...adv, minRooms: e.target.value })} />
           </div>
           <div className="m-field">
             <label className="m-label">שטח מ- (מ״ר)</label>
-            <input type="number" className="m-input" value={adv.minSqm} onChange={(e) => setAdv({ ...adv, minSqm: e.target.value })} />
+            <input type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="search" dir="ltr" style={{ textAlign: 'right' }} className="m-input" value={adv.minSqm} onChange={(e) => setAdv({ ...adv, minSqm: e.target.value })} />
           </div>
         </div>
 

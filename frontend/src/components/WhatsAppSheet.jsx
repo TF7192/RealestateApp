@@ -62,6 +62,9 @@ export default function WhatsAppSheet({
             <textarea
               className="was-textarea"
               rows={12}
+              dir="auto"
+              autoCapitalize="sentences"
+              enterKeyHint="enter"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="ערוך את ההודעה לפני השליחה..."

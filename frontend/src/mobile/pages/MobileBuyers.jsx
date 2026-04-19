@@ -24,6 +24,11 @@ export default function MobileBuyers() {
         <Search size={18} />
         <input
           type="search"
+          inputMode="search"
+          enterKeyHint="search"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           placeholder="חפש לפי שם, עיר..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}

@@ -119,6 +119,9 @@ export default function ChatWidget() {
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder="כתבו הודעה…"
                   rows={2}
+                  dir="auto"
+                  autoCapitalize="sentences"
+                  enterKeyHint="send"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(e); }
                   }}

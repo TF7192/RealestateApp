@@ -623,7 +623,12 @@ export default function Properties() {
           <div className="search-box">
             <Search size={18} />
             <input
-              type="text"
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               placeholder="חיפוש לפי כתובת, עיר או בעל נכס..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -676,7 +681,12 @@ export default function Properties() {
             <div className="agent-proximity-input">
               <Navigation size={18} />
               <input
-                type="text"
+                type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 placeholder="הזן רחוב או עיר לחיפוש לפי קרבה..."
                 value={locationQuery}
                 onChange={(e) => setLocationQuery(e.target.value)}

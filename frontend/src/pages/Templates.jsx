@@ -707,6 +707,11 @@ function VariableSheet({ kind, variables, onClose, onPick }) {
         </header>
         <input
           type="search"
+          inputMode="search"
+          enterKeyHint="search"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           className="tpl-sheet-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

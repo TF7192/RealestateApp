@@ -172,6 +172,9 @@ export default function MarketingActionDialog({
                 <textarea
                   className="ma-textarea"
                   rows={2}
+                  dir="auto"
+                  autoCapitalize="sentences"
+                  enterKeyHint="enter"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="הערות על הקובץ שהועלה"
@@ -188,6 +191,13 @@ export default function MarketingActionDialog({
                     <Link2 size={14} />
                     <input
                       type="url"
+                      inputMode="url"
+                      autoComplete="url"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      enterKeyHint="go"
+                      dir="ltr"
                       className="ma-input"
                       placeholder="https://..."
                       value={link}
@@ -211,6 +221,9 @@ export default function MarketingActionDialog({
                 <textarea
                   className="ma-textarea"
                   rows={2}
+                  dir="auto"
+                  autoCapitalize="sentences"
+                  enterKeyHint="enter"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="למשל: תאריך פרסום, אסטרטגיית מחיר..."
@@ -231,6 +244,9 @@ export default function MarketingActionDialog({
                 <textarea
                   className="ma-textarea"
                   rows={4}
+                  dir="auto"
+                  autoCapitalize="sentences"
+                  enterKeyHint="enter"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={config.hint}

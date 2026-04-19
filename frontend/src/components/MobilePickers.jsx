@@ -171,6 +171,9 @@ export function SuggestPicker({
                   type="search"
                   inputMode="search"
                   enterKeyHint="search"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="חפש…"

@@ -3,6 +3,13 @@ import { X, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import Portal from './Portal';
 import { NumberField, PhoneField, SelectField, Segmented } from './SmartFields';
+import {
+  inputPropsForName,
+  inputPropsForEmail,
+  inputPropsForCity,
+  inputPropsForAddress,
+  inputPropsForRooms,
+} from '../lib/inputProps';
 
 export default function CustomerEditDialog({ lead, onClose, onSaved }) {
   const [form, setForm] = useState({
@@ -87,12 +94,12 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
             {err && <div className="agreement-error"><AlertCircle size={14} />{err}</div>}
 
             <div className="deal-form-grid">
-              <div className="form-group"><label className="form-label">שם</label><input className="form-input" value={form.name} onChange={(e) => update('name', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">שם</label><input {...inputPropsForName()} className="form-input" value={form.name} onChange={(e) => update('name', e.target.value)} /></div>
               <div className="form-group">
                 <label className="form-label">טלפון</label>
                 <PhoneField value={form.phone} onChange={(v) => update('phone', v)} />
               </div>
-              <div className="form-group"><label className="form-label">אימייל</label><input className="form-input" value={form.email} onChange={(e) => update('email', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">אימייל</label><input {...inputPropsForEmail()} className="form-input" value={form.email} onChange={(e) => update('email', e.target.value)} /></div>
               <div className="form-group">
                 <label className="form-label">סטטוס</label>
                 <Segmented
@@ -130,10 +137,10 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                   ariaLabel="קנייה או שכירות"
                 />
               </div>
-              <div className="form-group"><label className="form-label">עיר</label><input className="form-input" value={form.city} onChange={(e) => update('city', e.target.value)} /></div>
-              <div className="form-group"><label className="form-label">רחוב</label><input className="form-input" value={form.street} onChange={(e) => update('street', e.target.value)} /></div>
-              <div className="form-group"><label className="form-label">חדרים</label><input className="form-input" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} /></div>
-              <div className="form-group"><label className="form-label">טווח מחיר (טקסט)</label><input className="form-input" value={form.priceRangeLabel} onChange={(e) => update('priceRangeLabel', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">עיר</label><input {...inputPropsForCity()} className="form-input" value={form.city} onChange={(e) => update('city', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">רחוב</label><input {...inputPropsForAddress()} className="form-input" value={form.street} onChange={(e) => update('street', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">חדרים</label><input {...inputPropsForRooms()} className="form-input" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">טווח מחיר (טקסט)</label><input dir="auto" autoCapitalize="off" autoCorrect="off" enterKeyHint="next" className="form-input" value={form.priceRangeLabel} onChange={(e) => update('priceRangeLabel', e.target.value)} /></div>
               <div className="form-group">
                 <label className="form-label">תקציב</label>
                 <NumberField
@@ -161,10 +168,10 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                   options={['עד 200 מטר', 'עד 500 מטר', 'הליכה', 'עד ק״מ']}
                 />
               </div>
-              <div className="form-group"><label className="form-label">מקור</label><input className="form-input" value={form.source} onChange={(e) => update('source', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">מקור</label><input dir="auto" autoCapitalize="words" autoCorrect="off" enterKeyHint="next" className="form-input" value={form.source} onChange={(e) => update('source', e.target.value)} /></div>
               <div className="form-group form-group-wide">
                 <label className="form-label">הערות</label>
-                <textarea className="form-textarea" rows={3} value={form.notes} onChange={(e) => update('notes', e.target.value)} />
+                <textarea className="form-textarea" rows={3} dir="auto" autoCapitalize="sentences" enterKeyHint="enter" value={form.notes} onChange={(e) => update('notes', e.target.value)} />
               </div>
             </div>
 

@@ -18,6 +18,14 @@ import {
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
+import {
+  inputPropsForName,
+  inputPropsForEmail,
+  inputPropsForCity,
+  inputPropsForAddress,
+  inputPropsForRooms,
+  inputPropsForNotes,
+} from '../lib/inputProps';
 import { useToast } from '../lib/toast';
 import { relativeDate } from '../lib/relativeDate';
 import { relativeTime, absoluteTime } from '../lib/time';
@@ -289,7 +297,7 @@ function CustomerEditForm({ lead, onSaved, toast }) {
         <div className="deal-form-grid">
           <div className="form-group">
             <label className="form-label">שם</label>
-            <input className="form-input" value={form.name} onChange={(e) => update('name', e.target.value)} />
+            <input {...inputPropsForName()} className="form-input" value={form.name} onChange={(e) => update('name', e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label">טלפון</label>
@@ -297,7 +305,7 @@ function CustomerEditForm({ lead, onSaved, toast }) {
           </div>
           <div className="form-group">
             <label className="form-label">אימייל</label>
-            <input className="form-input" value={form.email} onChange={(e) => update('email', e.target.value)} />
+            <input {...inputPropsForEmail()} className="form-input" value={form.email} onChange={(e) => update('email', e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label">סטטוס</label>
@@ -338,19 +346,19 @@ function CustomerEditForm({ lead, onSaved, toast }) {
           </div>
           <div className="form-group">
             <label className="form-label">עיר</label>
-            <input className="form-input" value={form.city} onChange={(e) => update('city', e.target.value)} />
+            <input {...inputPropsForCity()} className="form-input" value={form.city} onChange={(e) => update('city', e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label">רחוב</label>
-            <input className="form-input" value={form.street} onChange={(e) => update('street', e.target.value)} />
+            <input {...inputPropsForAddress()} className="form-input" value={form.street} onChange={(e) => update('street', e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label">חדרים</label>
-            <input className="form-input" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} />
+            <input {...inputPropsForRooms()} className="form-input" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label">טווח מחיר (טקסט)</label>
-            <input className="form-input" value={form.priceRangeLabel} onChange={(e) => update('priceRangeLabel', e.target.value)} />
+            <input dir="auto" autoCapitalize="off" autoCorrect="off" enterKeyHint="next" className="form-input" value={form.priceRangeLabel} onChange={(e) => update('priceRangeLabel', e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label">תקציב</label>
@@ -381,11 +389,12 @@ function CustomerEditForm({ lead, onSaved, toast }) {
           </div>
           <div className="form-group">
             <label className="form-label">מקור</label>
-            <input className="form-input" value={form.source} onChange={(e) => update('source', e.target.value)} />
+            <input dir="auto" autoCapitalize="words" enterKeyHint="next" autoCorrect="off" className="form-input" value={form.source} onChange={(e) => update('source', e.target.value)} />
           </div>
           <div className="form-group form-group-wide">
             <label className="form-label">הערות</label>
             <textarea
+              {...inputPropsForNotes()}
               className="form-textarea"
               rows={3}
               value={form.notes}

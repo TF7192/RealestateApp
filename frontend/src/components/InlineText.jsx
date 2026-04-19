@@ -63,6 +63,15 @@ export default function InlineText({
     setEditing(false);
   };
 
+  // For numeric fields the caller passes type="number". Keep iOS-friendly:
+  // emit type="text" + inputMode="numeric" instead so the page doesn't
+  // auto-zoom and the spinner doesn't fight the comma-formatting.
+  const isNumeric = type === 'number';
+  const inputType = isNumeric ? 'text' : type;
+  const inputMode = isNumeric ? 'numeric' : (type === 'tel' ? 'tel' : type === 'email' ? 'email' : 'text');
+  const enterKeyHint = multiline ? 'enter' : 'done';
+  const dirAttr = type === 'email' || type === 'tel' || isNumeric ? 'ltr' : 'auto';
+
   if (editing) {
     return multiline ? (
       <textarea
@@ -73,16 +82,26 @@ export default function InlineText({
         onKeyDown={onKeyDown}
         className={`inline-text-input ${className}`}
         rows={3}
+        dir={dirAttr}
+        autoCapitalize="sentences"
+        enterKeyHint={enterKeyHint}
       />
     ) : (
       <input
         ref={ref}
-        type={type}
+        type={inputType}
+        inputMode={inputMode}
+        pattern={isNumeric ? '[0-9]*' : undefined}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={revertOnBlur}
         onKeyDown={onKeyDown}
         className={`inline-text-input ${className}`}
+        dir={dirAttr}
+        enterKeyHint={enterKeyHint}
+        autoCapitalize={type === 'email' ? 'off' : 'sentences'}
+        autoCorrect={type === 'email' ? 'off' : undefined}
+        spellCheck={type === 'email' ? false : undefined}
       />
     );
   }

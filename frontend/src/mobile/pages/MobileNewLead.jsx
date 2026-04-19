@@ -83,14 +83,14 @@ export default function MobileNewLead() {
             <label className="m-label">חדרים</label>
             <div className="m-input-wrap">
               <Home size={16} />
-              <input className="m-input" placeholder="4" value={form.rooms} onChange={(e) => u('rooms', e.target.value)} />
+              <input type="text" inputMode="decimal" pattern="[0-9.]*" enterKeyHint="next" dir="ltr" style={{ textAlign: 'right' }} className="m-input" placeholder="4" value={form.rooms} onChange={(e) => u('rooms', e.target.value)} />
             </div>
           </div>
           <div className="m-field">
             <label className="m-label">תקציב</label>
             <div className="m-input-wrap">
               <DollarSign size={16} />
-              <input type="number" className="m-input" placeholder="₪" value={form.budget} onChange={(e) => u('budget', e.target.value)} />
+              <input type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="done" dir="ltr" style={{ textAlign: 'right' }} className="m-input" placeholder="₪" value={form.budget} onChange={(e) => u('budget', e.target.value)} />
             </div>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function MobileNewLead() {
 
         <div className="m-field">
           <label className="m-label">הערות</label>
-          <textarea className="m-textarea" placeholder="למשל: מחפש קרוב לבית ספר, גמיש במחיר..."
+          <textarea className="m-textarea" placeholder="למשל: מחפש קרוב לבית ספר, גמיש במחיר..." dir="auto" enterKeyHint="enter"
             value={form.notes} onChange={(e) => u('notes', e.target.value)} />
         </div>
       </form>

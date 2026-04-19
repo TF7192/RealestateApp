@@ -42,7 +42,12 @@ export default function Buyers() {
         <div className="search-box">
           <Search size={18} />
           <input
-            type="text"
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             placeholder="חיפוש לפי שם, עיר, טלפון..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}

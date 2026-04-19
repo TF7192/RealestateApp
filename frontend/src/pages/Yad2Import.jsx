@@ -135,9 +135,14 @@ export default function Yad2Import() {
           <label className="y2-label" htmlFor="y2-url">קישור לדף הסוכנות שלך ב-Yad2</label>
           <input
             id="y2-url"
+            type="url"
             className="y2-input"
             inputMode="url"
             enterKeyHint="go"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            autoComplete="off"
             placeholder="https://www.yad2.co.il/realestate/agency/7098700/forsale"
             value={url}
             onChange={(e) => setUrl(e.target.value)}

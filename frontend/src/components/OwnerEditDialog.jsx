@@ -3,6 +3,7 @@ import { X, AlertCircle, Save, UserCircle } from 'lucide-react';
 import api from '../lib/api';
 import Portal from './Portal';
 import { PhoneField, SelectField } from './SmartFields';
+import { inputPropsForName, inputPropsForEmail, inputPropsForNotes } from '../lib/inputProps';
 import './OwnerEditDialog.css';
 
 const RELATIONSHIP_OPTIONS = [
@@ -87,6 +88,7 @@ export default function OwnerEditDialog({ owner, onClose, onSaved }) {
               <div className="form-group">
                 <label className="form-label">שם מלא</label>
                 <input
+                  {...inputPropsForName()}
                   className="form-input"
                   value={form.name}
                   onChange={(e) => update('name', e.target.value)}
@@ -104,8 +106,8 @@ export default function OwnerEditDialog({ owner, onClose, onSaved }) {
               <div className="form-group">
                 <label className="form-label">אימייל</label>
                 <input
+                  {...inputPropsForEmail()}
                   className="form-input"
-                  type="email"
                   value={form.email}
                   onChange={(e) => update('email', e.target.value)}
                   placeholder="name@example.com"
@@ -123,6 +125,7 @@ export default function OwnerEditDialog({ owner, onClose, onSaved }) {
               <div className="form-group form-group-wide">
                 <label className="form-label">הערות</label>
                 <textarea
+                  {...inputPropsForNotes()}
                   className="form-textarea"
                   rows={3}
                   value={form.notes}

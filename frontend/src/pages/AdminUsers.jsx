@@ -131,6 +131,9 @@ export default function AdminUsers() {
               type="search"
               inputMode="search"
               enterKeyHint="search"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="חפש לפי שם או אימייל…"

@@ -135,7 +135,12 @@ export default function Owners() {
             <div className="search-box owners-search">
               <Search size={18} />
               <input
-                type="text"
+                type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 placeholder="חיפוש לפי שם, טלפון או אימייל…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

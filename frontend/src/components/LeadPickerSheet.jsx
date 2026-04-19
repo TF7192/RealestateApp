@@ -115,7 +115,9 @@ export default function LeadPickerSheet({
                 onChange={(e) => setText(e.target.value)}
                 placeholder="כתוב את הודעתך…"
                 spellCheck={false}
-                dir="rtl"
+                dir="auto"
+                autoCapitalize="sentences"
+                enterKeyHint="enter"
               />
               <span className="lps-bubble-meta">
                 {nowHHMM()} <span className="lps-bubble-ticks">✓✓</span>
@@ -132,10 +134,15 @@ export default function LeadPickerSheet({
           <Search size={14} />
           <input
             type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="חפש לפי שם, עיר או טלפון"
-            autoComplete="off"
           />
         </div>
 

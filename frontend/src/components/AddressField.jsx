@@ -217,6 +217,9 @@ export default function AddressField({
         autoComplete="street-address"
         inputMode="search"
         enterKeyHint="search"
+        autoCorrect="off"
+        autoCapitalize="words"
+        spellCheck={false}
         autoFocus={autoFocus}
         aria-label={ariaLabel || 'כתובת'}
         aria-autocomplete="list"

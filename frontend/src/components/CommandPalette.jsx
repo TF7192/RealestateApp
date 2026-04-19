@@ -88,7 +88,12 @@ export default function CommandPalette({ open, onClose }) {
             <Search size={16} />
             <input
               ref={inputRef}
-              type="text"
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               placeholder="חפש לקוח, נכס או מסך… (⌘K)"
               value={q}
               onChange={(e) => { setQ(e.target.value); setIndex(0); }}

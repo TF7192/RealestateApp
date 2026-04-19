@@ -107,6 +107,9 @@ export default function AgreementDialog({ lead, onClose, onChange }) {
               <textarea
                 className="agreement-textarea"
                 rows={2}
+                dir="auto"
+                autoCapitalize="sentences"
+                enterKeyHint="enter"
                 placeholder="לדוגמה: הסכם תיווך אי-בלעדי ל-6 חודשים"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}

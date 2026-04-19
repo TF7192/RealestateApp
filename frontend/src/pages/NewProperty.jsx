@@ -879,7 +879,11 @@ export default function NewProperty() {
                 <input
                   type="email"
                   inputMode="email"
+                  autoComplete="email"
+                  autoCorrect="off"
                   autoCapitalize="off"
+                  spellCheck={false}
+                  enterKeyHint="next"
                   className="form-input"
                   value={form.ownerEmail || ''}
                   onChange={(e) => update('ownerEmail', e.target.value)}
@@ -1086,6 +1090,9 @@ export default function NewProperty() {
               <div className="form-group">
                 <label className="form-label">שכונה</label>
                 <input
+                  autoCapitalize="words"
+                  autoCorrect="off"
+                  enterKeyHint="next"
                   className="form-input"
                   value={form.neighborhood}
                   onChange={(e) => update('neighborhood', e.target.value)}
@@ -1095,11 +1102,15 @@ export default function NewProperty() {
               <div className="form-group">
                 <label className="form-label">גוש</label>
                 <input
+                  type="text"
                   className="form-input"
                   value={form.gush}
                   onChange={(e) => update('gush', e.target.value)}
                   placeholder="6118"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  enterKeyHint="next"
+                  autoComplete="off"
                   dir="ltr"
                   style={{ textAlign: 'right' }}
                 />
@@ -1107,11 +1118,15 @@ export default function NewProperty() {
               <div className="form-group">
                 <label className="form-label">חלקה</label>
                 <input
+                  type="text"
                   className="form-input"
                   value={form.helka}
                   onChange={(e) => update('helka', e.target.value)}
                   placeholder="212"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  enterKeyHint="next"
+                  autoComplete="off"
                   dir="ltr"
                   style={{ textAlign: 'right' }}
                 />
@@ -1245,7 +1260,7 @@ export default function NewProperty() {
               />
             )}
             <div className="form-group">
-              <textarea className="form-textarea" rows={3} placeholder="הערות נוספות על הנכס..." value={form.notes} onChange={(e) => update('notes', e.target.value)} />
+              <textarea className="form-textarea" rows={3} dir="auto" autoCapitalize="sentences" enterKeyHint="enter" placeholder="הערות נוספות על הנכס..." value={form.notes} onChange={(e) => update('notes', e.target.value)} />
             </div>
           </div>
 

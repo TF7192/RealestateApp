@@ -180,6 +180,9 @@ export default function TransferPropertyDialog({ property, onClose, onDone }) {
 
                 <label className="tpd-label">הערה (אופציונלי)</label>
                 <textarea
+                  dir="auto"
+                  autoCapitalize="sentences"
+                  enterKeyHint="enter"
                   className="tpd-textarea"
                   rows={3}
                   placeholder="למשל: עוזב את האזור, העלה את הנכס שלי…"
@@ -197,6 +200,9 @@ export default function TransferPropertyDialog({ property, onClose, onDone }) {
                 </p>
                 <label className="tpd-label">ההודעה שתישלח</label>
                 <textarea
+                  dir="auto"
+                  autoCapitalize="sentences"
+                  enterKeyHint="enter"
                   className="tpd-textarea"
                   rows={11}
                   value={waText}

@@ -198,6 +198,11 @@ export default function AdminChats() {
             <Search size={14} />
             <input
               type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="חפש שם/אימייל/טקסט…"
@@ -293,6 +298,9 @@ export default function AdminChats() {
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="כתוב תשובה…"
                 rows={2}
+                dir="auto"
+                autoCapitalize="sentences"
+                enterKeyHint="send"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(e); }
                 }}
