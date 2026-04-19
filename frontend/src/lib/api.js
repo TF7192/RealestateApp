@@ -211,6 +211,11 @@ export const api = {
   // Task 3 · forward-geocode autocomplete for AddressField. `city` is an
   // optional bias hint — when the agent already picked a city the server
   // appends it to the query so Photon ranks local matches first.
+  // Task 4 — Yad2 import POC. Both endpoints 404 when the feature flag
+  // is off in the deployment environment.
+  yad2Preview: (url) => request('/integrations/yad2/preview', { method: 'POST', body: { url } }),
+  yad2Import:  (listings) => request('/integrations/yad2/import',  { method: 'POST', body: { listings } }),
+
   // Task 2 — admin users table.
   adminUsers: (params = {}) => {
     const qs = new URLSearchParams();

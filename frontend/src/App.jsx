@@ -22,6 +22,8 @@ import Transfers from './pages/Transfers';
 const Templates = lazy(() => import('./pages/Templates'));
 const AdminChats = lazy(() => import('./pages/AdminChats'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
+const SellerCalculator = lazy(() => import('./pages/SellerCalculator'));
+const Yad2Import = lazy(() => import('./pages/Yad2Import'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import { AuthProvider, useAuth } from './lib/auth';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
@@ -151,6 +153,8 @@ function AppRoutes() {
             <Route path="/templates" element={<Templates />} />
             <Route path="/admin/chats" element={<AdminChats />} />
             <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/calculator" element={<SellerCalculator />} />
+            <Route path="/integrations/yad2" element={<Yad2Import />} />
             {/* Legacy routes — redirect */}
             <Route path="/leads" element={<Navigate to="/customers" replace />} />
             <Route path="/leads/new" element={<Navigate to="/customers/new" replace />} />
