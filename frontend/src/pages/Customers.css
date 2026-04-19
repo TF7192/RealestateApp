@@ -1566,7 +1566,21 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 14px;
-  align-items: center;
+  /* Top-aligned so when the right column stacks chips vertically
+     (preapproval + stale-lead pill), the avatar + headline don't
+     get vertically shoved by the taller column. */
+  align-items: start;
+  /* Header section never shrinks — the body (notes) absorbs slack
+     via flex:1 above. */
+  flex-shrink: 0;
+}
+
+/* Right-column children stack with consistent gaps when there's
+   more than one (preapproval + stale-lead pill). */
+.cc-v2-right {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 
 .cc-v2-left {
@@ -1656,12 +1670,23 @@
 .cc-v2-notes {
   border-top: 1px dashed var(--border);
   padding-top: 8px;
+  /* Notes section grows to fill the slack between header and footer
+     so cards with short notes stretch out and cards with long notes
+     stay capped — every card's footer lands on the same baseline. */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
+/* The v2 footer was explicitly overriding margin-top:auto from
+   .customer-card-footer, which is what pins the action row to the
+   bottom. Without that, every card's footer floated at the height of
+   its content — visible jaggedness across a grid of cards. Reinherit
+   the auto so the footer sits flush with the bottom edge regardless
+   of notes height. */
 .cc-v2-footer {
   border-top: 1px dashed var(--border);
   padding-top: 8px;
-  margin-top: 0;
+  margin-top: auto;
 }
 
 @media (max-width: 700px) {
