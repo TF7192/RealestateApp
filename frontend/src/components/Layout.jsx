@@ -20,6 +20,7 @@ import {
   FileText,
   Shield,
   Search,
+  MessageCircle,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
@@ -197,6 +198,26 @@ export default function Layout({ onLogout }) {
           >
             <Search size={20} />
           </button>
+          {/* Task 1 · chat launcher inside the mobile header. The
+              standalone .chatw-btn (position:fixed top-right) used to
+              sit on top of the profile pill — same corner — clipping
+              the avatar visually and floating outside the header's
+              flex row. Hidden on mobile via ChatWidget.css; this
+              button dispatches the open event ChatWidget listens for.
+              Hidden for admins (they use /admin/chats). */}
+          {!ADMIN_EMAILS.has((user?.email || '').toLowerCase()) && (
+            <button
+              className="btn-ghost mh-chat-btn"
+              onClick={() => {
+                haptics.tap();
+                window.dispatchEvent(new Event('estia:open-chat'));
+              }}
+              aria-label="צ׳אט עם המפתחים"
+              type="button"
+            >
+              <MessageCircle size={20} />
+            </button>
+          )}
           <button
             className="btn-ghost mh-profile-btn"
             onClick={() => { haptics.tap(); setMoreOpen(true); }}

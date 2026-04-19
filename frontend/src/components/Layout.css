@@ -416,17 +416,26 @@ img.agent-avatar {
   display: none;
   position: fixed;
   top: 0;
-  right: 0;
-  left: 0;
+  /* Task 1 — logical-property full-bleed instead of right:0 / left:0
+     so RTL stays explicit. */
+  inset-inline: 0;
   z-index: 90;
-  height: calc(52px + env(safe-area-inset-top));
+  /* Task 1 — height set by content, not fixed, so a row of three
+     icon buttons (search + chat + profile) doesn't get vertically
+     squeezed and the avatar can't render below its intrinsic 32px.
+     Min-height keeps the bar tall enough for tap targets. */
+  min-height: calc(52px + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) 8px 0;
   background: rgba(247, 243, 236, 0.94);
   border-bottom: 1px solid rgba(30, 26, 20, 0.08);
   backdrop-filter: saturate(180%) blur(28px);
   -webkit-backdrop-filter: saturate(180%) blur(28px);
   align-items: center;
-  grid-template-columns: 48px 1fr 48px;
+  /* Task 1 — was 48px 1fr 48px which clipped the trailing slot the
+     instant a second icon was added (search + profile = 80px+ in a
+     48px column). auto-sized side slots size to their actual button
+     row; the title gets the rest. */
+  grid-template-columns: auto 1fr auto;
 }
 
 .mobile-header { display: grid; }
@@ -446,16 +455,19 @@ img.agent-avatar {
 
 /* S21 mobile global search button — matches the profile button's
    pill silhouette (40×40, ghost), just an icon. */
-.mh-search-btn {
+.mh-search-btn,
+.mh-chat-btn {
   color: var(--text-secondary);
 }
 
-.mh-search-btn:hover {
+.mh-search-btn:hover,
+.mh-chat-btn:hover {
   color: var(--text-primary);
   background: var(--bg-elevated);
 }
 
-.mh-search-btn:active {
+.mh-search-btn:active,
+.mh-chat-btn:active {
   transform: scale(0.94);
 }
 
@@ -465,8 +477,13 @@ img.agent-avatar {
 }
 
 .mobile-header .btn-ghost {
-  width: 40px;
-  height: 40px;
+  /* Task 1 — Apple HIG min tap target. Avatar img stays 32×32 inside;
+     only the hit area grew. With three buttons in the trailing slot
+     (search + chat + profile) at 44 each + 4px gaps, the row is
+     ~140px wide — fits comfortably on every iPhone width because the
+     header grid now uses auto for the side columns. */
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;

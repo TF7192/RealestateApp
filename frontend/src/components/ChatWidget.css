@@ -19,16 +19,17 @@
   transition: color 0.15s, border-color 0.15s, transform 0.1s, background 0.15s;
 }
 
-/* On mobile the sidebar isn't visible and the MobileTabBar lives at
-   the bottom — put the chat button at the top-right instead (visual
-   right in RTL = inset-inline-start), where the user asked for it
-   and where it doesn't collide with the tab bar. */
+/* Task 1 — On mobile the standalone fixed chat button used to sit on
+   top of the mobile-header's profile pill (same top-right corner),
+   visually clipping the avatar AND drifting out of vertical alignment
+   because it wasn't part of the header's flex row. The mobile entry
+   point is now rendered inside the header trailing slot in Layout.jsx
+   (next to search + profile), so the standalone button hides at ≤820px.
+   The panel itself still mounts here via Portal — only the launcher
+   moves. */
 @media (max-width: 820px) {
   .chatw-btn {
-    top: calc(12px + env(safe-area-inset-top));
-    bottom: auto;
-    inset-inline-end: auto;
-    inset-inline-start: 14px;
+    display: none !important;
   }
 }
 .chatw-btn:hover  { color: var(--gold); border-color: var(--gold-border); background: var(--gold-glow); }

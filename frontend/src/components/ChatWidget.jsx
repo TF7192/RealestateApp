@@ -36,6 +36,15 @@ export default function ChatWidget() {
     if (open && unread > 0) markRead();
   }, [open, unread, markRead]);
 
+  // Task 1 · the mobile header's chat button dispatches this event since
+  // the standalone .chatw-btn is hidden on mobile (it used to overlap
+  // the profile pill in the header).
+  useEffect(() => {
+    const onOpen = () => setOpen((o) => !o);
+    window.addEventListener('estia:open-chat', onOpen);
+    return () => window.removeEventListener('estia:open-chat', onOpen);
+  }, []);
+
   const onSubmit = async (e) => {
     e.preventDefault();
     const text = draft.trim();
