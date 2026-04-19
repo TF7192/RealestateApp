@@ -212,6 +212,34 @@
   border-color: var(--gold-border);
 }
 
+/* Owner-card secondary action (החלף בעלים) lives next to the primary
+   "פתח כרטיס" — pair them in a small flex row so the card header
+   doesn't break to a new line. */
+.dc-cta-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-inline-start: auto;
+}
+
+.dc-cta-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
+.dc-cta-ghost:hover {
+  border-color: var(--gold-border);
+  color: var(--gold);
+  background: var(--gold-glow);
+}
+
+.dc-cta-ghost:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .dc-body {
   display: flex;
   flex-direction: column;

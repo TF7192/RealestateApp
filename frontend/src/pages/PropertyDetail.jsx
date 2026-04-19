@@ -32,6 +32,7 @@ import MarketingActionDialog from '../components/MarketingActionDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PropertyPhotoManager from '../components/PropertyPhotoManager';
 import PropertyVideoManager from '../components/PropertyVideoManager';
+import OwnerPicker from '../components/OwnerPicker';
 import WhatsAppSheet from '../components/WhatsAppSheet';
 import TransferPropertyDialog from '../components/TransferPropertyDialog';
 import LeadPickerSheet from '../components/LeadPickerSheet';
@@ -191,6 +192,9 @@ export default function PropertyDetail() {
   const [dragOver, setDragOver] = useState(false);
   // Active sliding panel: 'marketing' | 'owner' | 'photos' | 'exclusivity' | 'notes' | 'map' | null
   const [panel, setPanel] = useState(null);
+  // OwnerPicker for swapping the linked Owner without leaving the page.
+  const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
+  const [ownerSaving, setOwnerSaving] = useState(false);
 
   useEffect(() => {
     api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
@@ -650,10 +654,22 @@ export default function PropertyDetail() {
           icon={<User size={16} />}
           title="בעל הנכס"
           action={(
-            <button className="dc-cta" onClick={() => setPanel('owner')}>
-              {linkedOwner?.id ? 'פתח כרטיס' : 'פרטים'}
-              <ChevronLeft size={14} />
-            </button>
+            <div className="dc-cta-row">
+              <button
+                className="dc-cta dc-cta-ghost"
+                onClick={() => setOwnerPickerOpen(true)}
+                disabled={ownerSaving}
+                title="החלף את בעל הנכס המקושר"
+                type="button"
+              >
+                <Pencil size={12} />
+                {ownerSaving ? 'שומר…' : (linkedOwner?.id ? 'החלף' : 'הוסף')}
+              </button>
+              <button className="dc-cta" onClick={() => setPanel('owner')} type="button">
+                {linkedOwner?.id ? 'פתח כרטיס' : 'פרטים'}
+                <ChevronLeft size={14} />
+              </button>
+            </div>
           )}
         >
           {ownerName ? (
@@ -1137,6 +1153,29 @@ export default function PropertyDetail() {
           onDone={() => load()}
         />
       )}
+
+      {/* Swap or set the linked Owner without leaving the page. Picker
+          handles BOTH "pick existing" and "create new owner inline" via
+          OwnerEditDialog. After a pick we PATCH the property and reload
+          so the dashboard reflects the change instantly. */}
+      <OwnerPicker
+        open={ownerPickerOpen}
+        onClose={() => setOwnerPickerOpen(false)}
+        onPick={async (o) => {
+          if (!o?.id) return;
+          setOwnerSaving(true);
+          try {
+            await api.updateProperty(property.id, { propertyOwnerId: o.id });
+            await load();
+            toast?.success?.(`בעל הנכס עודכן ל${o.name}`);
+          } catch (e) {
+            toast?.error?.(e?.message || 'עדכון בעל הנכס נכשל');
+          } finally {
+            setOwnerSaving(false);
+            setOwnerPickerOpen(false);
+          }
+        }}
+      />
 
       {pickerOpen && (
         <LeadPickerSheet

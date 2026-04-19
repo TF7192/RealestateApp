@@ -10,7 +10,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { sellerCalc } from '../lib/sellerCalc';
-import { Segmented } from '../components/SmartFields';
+import { NumberField, Segmented } from '../components/SmartFields';
 import './SellerCalculator.css';
 
 // Formatting helpers — IL locale, ₪ prefix, no fractional shekel.
@@ -53,14 +53,17 @@ function useDebounced(value, ms = 150) {
 
 const INITIAL = {
   mode: 'forward',
-  amountText: '',
+  // Currency fields are NUMBERS (rendered with comma-separators by
+  // NumberField). Percent fields stay strings because they accept
+  // decimal input and the optional "%" suffix.
+  amount: null,
   commissionPctText: '2',
   commissionVatIncluded: false,
   lawyerMode: 'percent',
   lawyerPctText: '0.5',
-  lawyerAmountText: '',
+  lawyerAmount: null,
   lawyerVatIncluded: false,
-  additionalText: '',
+  additional: null,
   advancedOpen: false,
 };
 
@@ -74,14 +77,14 @@ export default function SellerCalculator() {
 
   const result = useMemo(() => sellerCalc({
     mode: debounced.mode,
-    amount: parseCurrency(debounced.amountText),
+    amount: debounced.amount,
     commissionRate: (parsePercent(debounced.commissionPctText) ?? 0) / 100,
     commissionVatIncluded: debounced.commissionVatIncluded,
     lawyerMode: debounced.lawyerMode,
     lawyerRate: (parsePercent(debounced.lawyerPctText) ?? 0) / 100,
-    lawyerAmount: parseCurrency(debounced.lawyerAmountText) || 0,
+    lawyerAmount: debounced.lawyerAmount || 0,
     lawyerVatIncluded: debounced.lawyerVatIncluded,
-    additional: parseCurrency(debounced.additionalText) || 0,
+    additional: debounced.additional || 0,
   }), [debounced]);
 
   const isForward = s.mode === 'forward';
@@ -119,14 +122,18 @@ export default function SellerCalculator() {
             <label className="sc-label" htmlFor="sc-amount">
               {isForward ? 'מחיר מכירה (₪)' : 'הסכום שאת/ה רוצה לקבל ביד (₪)'}
             </label>
-            <input
+            {/* NumberField formats the value with IL thousand separators
+                live as you type — 280000 → 280,000 — and preserves caret
+                position across format ticks. */}
+            <NumberField
               id="sc-amount"
-              className="sc-input sc-input-amount"
-              inputMode="decimal"
-              enterKeyHint="done"
-              value={s.amountText}
-              onChange={(e) => update('amountText', e.target.value)}
-              placeholder={isForward ? 'לדוגמה: 2,800,000' : 'לדוגמה: 2,700,000'}
+              value={s.amount}
+              onChange={(v) => update('amount', v)}
+              unit="₪"
+              placeholder={isForward ? '2,800,000' : '2,700,000'}
+              inputClassName="sc-input-amount"
+              aria-label={isForward ? 'מחיר מכירה' : 'סכום נטו'}
+              autoFocus
             />
           </div>
 
@@ -167,12 +174,12 @@ export default function SellerCalculator() {
                 onChange={(v) => update('lawyerPctText', v)}
               />
             ) : (
-              <input
-                className="sc-input"
-                inputMode="decimal"
-                value={s.lawyerAmountText}
-                onChange={(e) => update('lawyerAmountText', e.target.value)}
-                placeholder="₪ 5,000"
+              <NumberField
+                value={s.lawyerAmount}
+                onChange={(v) => update('lawyerAmount', v)}
+                unit="₪"
+                placeholder="5,000"
+                aria-label="שכר טרחה (סכום קבוע)"
               />
             )}
             <label className="sc-toggle">
@@ -204,12 +211,12 @@ export default function SellerCalculator() {
                     כי הוא תלוי בפטורים — מלא/י כאן את האומדן שלך.
                   </Tooltip>
                 </label>
-                <input
-                  className="sc-input"
-                  inputMode="decimal"
-                  value={s.additionalText}
-                  onChange={(e) => update('additionalText', e.target.value)}
+                <NumberField
+                  value={s.additional}
+                  onChange={(v) => update('additional', v)}
+                  unit="₪"
                   placeholder="0"
+                  aria-label="עלויות נוספות"
                 />
               </div>
             </div>
@@ -243,7 +250,7 @@ export default function SellerCalculator() {
               <ul className="sc-breakdown">
                 <Line
                   label={isForward ? 'מחיר מכירה' : 'מחיר רישום מחושב'}
-                  value={formatILS(isForward ? parseCurrency(s.amountText) || 0 : result.listingPrice)}
+                  value={formatILS(isForward ? (s.amount || 0) : result.listingPrice)}
                   emphasis
                 />
                 <Line

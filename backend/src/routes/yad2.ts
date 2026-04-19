@@ -1,10 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import path from 'node:path';
-import { promises as fs } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { getUser } from '../middleware/auth.js';
+import { putUpload } from '../lib/storage.js';
 import { crawlAgency, mapSectionToAssetClass, type Yad2Listing } from '../lib/yad2-crawler.js';
 
 /**
@@ -30,7 +29,6 @@ import { crawlAgency, mapSectionToAssetClass, type Yad2Listing } from '../lib/ya
  */
 
 const FEATURE_FLAG = (process.env.FEATURE_YAD2_IMPORT ?? '').toLowerCase() === 'true';
-const UPLOADS_DIR  = path.resolve(process.env.UPLOADS_DIR || './uploads');
 
 // Old single-page endpoints kept around — agency endpoints are the main
 // path going forward but the simpler version is harmless and useful for
@@ -297,9 +295,16 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
 };
 
 // ── Image re-host helper ─────────────────────────────────────────
-// Downloads the Yad2 image bytes and writes them under UPLOADS_DIR
-// using the same /uploads/properties/<id>/<uuid>.jpg convention the
-// PropertyPhotoManager uploader uses. Returns the public URL.
+// Downloads the Yad2 image bytes and persists them via the storage
+// abstraction — putUpload() routes to S3 in production (UPLOADS_BACKEND=s3)
+// and to local disk in dev. The returned URL is the same /uploads/<key>
+// shape regardless, so /uploads/* serving (S3 redirect or fastifyStatic)
+// finds the bytes either way.
+//
+// Bug history: the first version wrote with fs.writeFile to UPLOADS_DIR
+// directly. On production (S3) that put the bytes on the ephemeral
+// container disk while the /uploads/<key> route looked them up in S3 —
+// every Yad2-imported property displayed an unresolvable photo URL.
 async function rehostImage(srcUrl: string, propertyId: string): Promise<string> {
   const r = await fetch(srcUrl, {
     headers: {
@@ -315,10 +320,10 @@ async function rehostImage(srcUrl: string, propertyId: string): Promise<string> 
     ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' :
     ct.includes('png')  ? 'png' :
     ct.includes('webp') ? 'webp' : 'jpg';
+  const mime =
+    ext === 'png'  ? 'image/png'  :
+    ext === 'webp' ? 'image/webp' : 'image/jpeg';
   const buf = Buffer.from(await r.arrayBuffer());
-  const dir = path.join(UPLOADS_DIR, 'properties', propertyId);
-  await fs.mkdir(dir, { recursive: true });
-  const filename = `yad2-cover-${randomUUID()}.${ext}`;
-  await fs.writeFile(path.join(dir, filename), buf);
-  return `/uploads/properties/${propertyId}/${filename}`;
+  const key = `properties/${propertyId}/yad2-cover-${randomUUID()}.${ext}`;
+  return putUpload(key, buf, mime);
 }
