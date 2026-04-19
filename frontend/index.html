@@ -47,10 +47,32 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
+      // We previously registered /sw.js for "PWA installability" but never
+      // used it for offline. Net effect: every CSS-affecting deploy required
+      // the user to force-quit because the SW served stale CSS for hours
+      // until iOS WKWebView re-checked the SW script. Cost > benefit.
+      //
+      // This block runs on EVERY page load. On the first load after this
+      // ships, it (a) unregisters every existing SW, (b) wipes every
+      // cache the SW created, (c) one-shot-reloads so the next paint
+      // runs free of SW interception. The sessionStorage flag prevents
+      // an infinite reload loop.
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js');
-        });
+        navigator.serviceWorker.getRegistrations().then(function(regs){
+          if (!regs || regs.length === 0) return;
+          var unregs = regs.map(function(r){ return r.unregister().catch(function(){ return false; }); });
+          var cachesGone = (typeof caches !== 'undefined')
+            ? caches.keys().then(function(keys){ return Promise.all(keys.map(function(k){ return caches.delete(k).catch(function(){ return false; }); })); }).catch(function(){})
+            : Promise.resolve();
+          Promise.all([Promise.all(unregs), cachesGone]).then(function(){
+            try {
+              if (!sessionStorage.getItem('estia-sw-purged')) {
+                sessionStorage.setItem('estia-sw-purged', '1');
+                location.reload();
+              }
+            } catch (_) { /* ignore */ }
+          });
+        }).catch(function(){});
       }
     </script>
   </body>
