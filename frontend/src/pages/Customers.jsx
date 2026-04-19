@@ -25,6 +25,7 @@ import {
   Home,
   Briefcase,
   CheckCircle2,
+  User,
 } from 'lucide-react';
 import api from '../lib/api';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -984,6 +985,16 @@ export default function Customers() {
         onClose={() => setOverflowLead(null)}
         title={overflowLead ? overflowLead.name : ''}
         actions={overflowLead ? [
+          {
+            // Task 6 — top-billed: open the full customer profile.
+            // Mobile rows previously had no path to /customers/:id —
+            // only the inline expand. Adding this action makes the
+            // detail page reachable in 2 taps from any list row.
+            icon: User,
+            label: 'פתח כרטיס לקוח',
+            description: 'היסטוריה, התאמות, עריכה מלאה',
+            onClick: () => navigate(`/customers/${overflowLead.id}`),
+          },
           {
             icon: Phone,
             label: 'התקשר',
