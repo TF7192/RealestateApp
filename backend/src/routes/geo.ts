@@ -174,7 +174,7 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const features = Array.isArray(data?.features) ? data.features : [];
-    const items = features
+    const mapped = features
       // Filter to Israel — Photon doesn't accept country filter params so
       // we do it here. Accept both "IL" and missing countrycode for
       // features that straddle borders but look Israeli by locality.
@@ -194,6 +194,22 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
         const localityName =
           p.city || p.town || p.village || p.municipality || p.county || '';
         const labelParts = [streetFull, localityName].filter(Boolean);
+        // Photon classifies features by osm_value (highway/place/building/...).
+        // Anything with a housenumber is a "house"; otherwise we surface
+        // whether it's a street, locality, or POI so the UI can show a
+        // badge and the agent knows whether they need to type the number.
+        const osmKind = (p.osm_value || p.osm_key || '').toLowerCase();
+        const STREET_KINDS = new Set([
+          'primary', 'secondary', 'tertiary', 'residential', 'unclassified',
+          'living_street', 'pedestrian', 'service', 'street', 'road',
+          'trunk', 'motorway',
+        ]);
+        const PLACE_KINDS = new Set(['city', 'town', 'village', 'suburb', 'neighbourhood']);
+        let kind: 'house' | 'street' | 'place' | 'poi';
+        if (houseNumber) kind = 'house';
+        else if (STREET_KINDS.has(osmKind)) kind = 'street';
+        else if (PLACE_KINDS.has(osmKind)) kind = 'place';
+        else kind = 'poi';
         return {
           // OSM id is unique when combined with osm_type (W/R/N). Store the
           // tuple so we can re-query later if needed.
@@ -205,13 +221,24 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
           lat,
           lng,
           label: labelParts.join(', '),
-          // Raw kind so the UI can render different icons for
-          // "street" vs "city" vs "poi" suggestions.
-          kind: p.osm_value || p.osm_key || null,
+          kind,
         };
       })
       // Drop entries with neither street nor city — not useful to pick.
       .filter((x: any) => x.street || x.city);
+
+    // De-duplicate: OSM frequently has multiple street segments for the
+    // same logical road (one per intersection-to-intersection chunk). The
+    // agent doesn't care which segment — they care about the road. Collapse
+    // by (kind, street, city) keeping the first occurrence so the dropdown
+    // doesn't list "שדרות הרצל, רמלה" three times in a row.
+    const seen = new Set<string>();
+    const items = mapped.filter((it) => {
+      const k = `${it.kind}|${it.street}|${it.city}|${it.houseNumber || ''}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
 
     return { items };
   });

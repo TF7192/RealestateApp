@@ -743,19 +743,13 @@ export default function NewProperty() {
                     blocks with a Hebrew validation message below. */}
                 <AddressField
                   value={form.street}
-                  onChange={(v) => {
-                    setForm((p) => ({
-                      ...p,
-                      street: v,
-                      // Typing invalidates the previous pick. Lat/lng are
-                      // also cleared so the map / directions don't point to
-                      // the old address.
-                      placeId: null,
-                      formattedAddress: null,
-                      lat: null,
-                      lng: null,
-                    }));
-                  }}
+                  // Plain street-text edits — DON'T blow away the pick on
+                  // every keystroke. Many Israeli streets have no per-house
+                  // OSM record, so the agent legitimately needs to add a
+                  // house number after picking the street row. AddressField
+                  // tracks the picked label and only fires onClear when the
+                  // typed text actually diverges from it.
+                  onChange={(v) => setForm((p) => ({ ...p, street: v }))}
                   onPick={(r) => {
                     setForm((p) => ({
                       ...p,
@@ -765,6 +759,18 @@ export default function NewProperty() {
                       formattedAddress: r.formattedAddress,
                       lat: r.lat,
                       lng: r.lng,
+                    }));
+                  }}
+                  onClear={() => {
+                    // Fired only when the agent diverges from the picked
+                    // label — invalidate the validated metadata so save
+                    // blocks until they pick (or use-current-location).
+                    setForm((p) => ({
+                      ...p,
+                      placeId: null,
+                      formattedAddress: null,
+                      lat: null,
+                      lng: null,
                     }));
                   }}
                   city={form.city}

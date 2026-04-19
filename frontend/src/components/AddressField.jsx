@@ -30,6 +30,7 @@ export default function AddressField({
   value = '',
   onChange,
   onPick,
+  onClear,
   city,
   placeholder = 'התחל להקליד כתובת…',
   invalid = false,
@@ -48,13 +49,22 @@ export default function AddressField({
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
   const reqIdRef = useRef(0);
+  // Snapshot of the street label the agent picked, so we can tell later
+  // whether they're EXTENDING it (e.g., "הרצל" → "הרצל 15", which is still
+  // the same validated address with a manually-typed house number) or
+  // DIVERGING (e.g., "הרצל" → "ז'בוטינסקי", a different street that
+  // invalidates the previous lat/lng).
+  const pickedLabelRef = useRef('');
 
   // Keep local in sync when the parent replaces the value externally
   // (e.g., legacy edit loading an existing record). An external change
   // always invalidates the "picked from list" marker.
   useEffect(() => {
     setLocal(value ?? '');
-    if ((value ?? '') === '') setPicked(false);
+    if ((value ?? '') === '') {
+      setPicked(false);
+      pickedLabelRef.current = '';
+    }
   }, [value]);
 
   // Debounced Photon query. Aborts stale responses by bumping reqId.
@@ -92,14 +102,41 @@ export default function AddressField({
   }, [local, city, picked]);
 
   const handlePick = (item) => {
-    const label = item.street || item.label || '';
+    const isStreetOnly = item.kind === 'street' && !item.houseNumber;
+    // For street-only picks, append a space so the cursor lands ready for
+    // the agent to type the house number. OSM coverage in Israel is sparse
+    // for residential housenumbers — many streets only have a couple of
+    // mapped buildings, so most picks naturally land on the "street" row
+    // and the agent has to add the number manually. Appending the space
+    // makes that the obvious next action instead of a hidden affordance.
+    const baseLabel = item.street || item.label || '';
+    const label = isStreetOnly ? `${baseLabel} ` : baseLabel;
     setLocal(label);
     setPicked(true);
-    setOpen(false);
+    // The picked-label snapshot stores the trimmed street so trailing
+    // edits (typing a number, then editing it) all stay "extending the
+    // pick" rather than diverging.
+    pickedLabelRef.current = baseLabel;
     setActiveIndex(-1);
-    onChange?.(label);
+    if (isStreetOnly) {
+      // Keep dropdown context — the agent might type a number that
+      // matches a numbered house entry in OSM, in which case we want
+      // those new suggestions to appear.
+      setOpen(true);
+      // Re-focus the input and put the cursor at the end so the next
+      // keypress lands after the space we just appended.
+      requestAnimationFrame(() => {
+        const el = inputRef.current;
+        if (el) {
+          el.focus();
+          try { el.setSelectionRange(label.length, label.length); } catch { /* ignore */ }
+        }
+      });
+    } else {
+      setOpen(false);
+    }
     onPick?.({
-      street: item.street || item.label || '',
+      street: baseLabel,
       houseNumber: item.houseNumber || null,
       city: item.city || '',
       lat: item.lat ?? null,
@@ -131,13 +168,11 @@ export default function AddressField({
   const clear = () => {
     setLocal('');
     setPicked(false);
+    pickedLabelRef.current = '';
     setResults([]);
     setOpen(false);
     onChange?.('');
-    onPick?.({
-      street: '', houseNumber: null, city: '',
-      lat: null, lng: null, placeId: null, formattedAddress: null,
-    });
+    onClear?.();
     inputRef.current?.focus();
   };
 
@@ -153,9 +188,27 @@ export default function AddressField({
         className="addr-field-input form-input"
         value={local}
         onChange={(e) => {
-          setLocal(e.target.value);
-          setPicked(false);
-          onChange?.(e.target.value);
+          const next = e.target.value;
+          setLocal(next);
+          // Decide whether the new text still represents the picked
+          // address. If it's an extension of the picked street label
+          // (e.g. typing "15" after "הרצל" → "הרצל 15"), the lat/lng/
+          // placeId from the pick are still correct — many Israeli
+          // streets don't have per-house OSM entries, so forcing the
+          // agent to re-pick after typing the number was the bug they
+          // reported. If they wiped the picked text or replaced it with
+          // a different street, the prior validation no longer holds:
+          // fire onClear so the parent drops placeId + lat + lng and
+          // hasValidatedAddress goes back to false until they re-pick.
+          const prev = pickedLabelRef.current;
+          const stillExtends =
+            picked && prev && next.trim().startsWith(prev.trim());
+          if (!stillExtends && picked) {
+            setPicked(false);
+            pickedLabelRef.current = '';
+            onClear?.();
+          }
+          onChange?.(next);
         }}
         onFocus={() => { if (results.length) setOpen(true); }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
@@ -189,26 +242,39 @@ export default function AddressField({
               <SearchIcon size={12} /> {err}
             </li>
           )}
-          {results.map((item, i) => (
-            <li
-              key={item.id || `${item.street}-${i}`}
-              role="option"
-              aria-selected={i === activeIndex}
-              className={`addr-field-item ${i === activeIndex ? 'is-active' : ''}`}
-              // Use onMouseDown instead of onClick so the input's onBlur
-              // doesn't close the list before the click registers.
-              onMouseDown={(e) => { e.preventDefault(); handlePick(item); }}
-              onMouseEnter={() => setActiveIndex(i)}
-            >
-              <span className="addr-field-item-icon" aria-hidden="true">
-                <MapPin size={12} />
-              </span>
-              <span className="addr-field-item-text">
-                <strong>{item.street || item.label}</strong>
-                {item.city && <small>{item.city}</small>}
-              </span>
-            </li>
-          ))}
+          {results.map((item, i) => {
+            // Tell the agent at a glance whether this row is a numbered
+            // address (immediate save) or a street row (will need a house
+            // number typed after picking). OSM in Israel is street-row-
+            // heavy, so this badge is the difference between "I picked
+            // and it didn't add the number" → "oh I need to type it".
+            const badge =
+              item.kind === 'house' ? null :
+              item.kind === 'street' ? 'הוסף מספר' :
+              item.kind === 'place' ? 'יישוב' :
+              null;
+            return (
+              <li
+                key={item.id || `${item.street}-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
+                className={`addr-field-item addr-field-item-${item.kind || 'poi'} ${i === activeIndex ? 'is-active' : ''}`}
+                // Use onMouseDown instead of onClick so the input's onBlur
+                // doesn't close the list before the click registers.
+                onMouseDown={(e) => { e.preventDefault(); handlePick(item); }}
+                onMouseEnter={() => setActiveIndex(i)}
+              >
+                <span className="addr-field-item-icon" aria-hidden="true">
+                  <MapPin size={12} />
+                </span>
+                <span className="addr-field-item-text">
+                  <strong>{item.street || item.label}</strong>
+                  {item.city && <small>{item.city}</small>}
+                </span>
+                {badge && <span className="addr-field-item-badge">{badge}</span>}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

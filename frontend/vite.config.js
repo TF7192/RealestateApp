@@ -9,6 +9,10 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_API_PROXY || 'http://localhost:6002',
         changeOrigin: true,
+        // Forward WebSocket upgrades (chat widget hits /api/chat/ws). Without
+        // this, the upgrade request lands on vite-dev and returns 404, and
+        // the frontend reconnect loop spams the console every 3s.
+        ws: true,
       },
       '/uploads': {
         target: process.env.VITE_API_PROXY || 'http://localhost:6002',
