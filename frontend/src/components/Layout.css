@@ -416,25 +416,25 @@ img.agent-avatar {
   display: none;
   position: fixed;
   top: 0;
-  /* Task 1 — logical-property full-bleed instead of right:0 / left:0
-     so RTL stays explicit. */
+  /* Logical-property full-bleed for explicit RTL */
   inset-inline: 0;
   z-index: 90;
-  /* Task 1 — height set by content, not fixed, so a row of three
-     icon buttons (search + chat + profile) doesn't get vertically
-     squeezed and the avatar can't render below its intrinsic 32px.
-     Min-height keeps the bar tall enough for tap targets. */
+  /* Min-height instead of fixed height so the bar can grow to fit
+     three icon buttons (search + chat + profile) without crushing them. */
   min-height: calc(52px + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) 8px 0;
+  /* Pro-Max fix — Dynamic-Island iPhones in the Capacitor app have a
+     non-zero env(safe-area-inset-left/right) for the rounded corners.
+     Hard-coding 8px clipped the visual-leftmost button (profile in RTL)
+     under the rounded corner. max() keeps the 10px design padding on
+     non-notched devices and lifts to the safe-area when present. */
+  padding-block-start: env(safe-area-inset-top);
+  padding-block-end: 0;
+  padding-inline: max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-right));
   background: rgba(247, 243, 236, 0.94);
   border-bottom: 1px solid rgba(30, 26, 20, 0.08);
   backdrop-filter: saturate(180%) blur(28px);
   -webkit-backdrop-filter: saturate(180%) blur(28px);
   align-items: center;
-  /* Task 1 — was 48px 1fr 48px which clipped the trailing slot the
-     instant a second icon was added (search + profile = 80px+ in a
-     48px column). auto-sized side slots size to their actual button
-     row; the title gets the rest. */
   grid-template-columns: auto 1fr auto;
 }
 
@@ -445,19 +445,30 @@ img.agent-avatar {
 .mh-side {
   display: inline-flex;
   align-items: center;
-  /* S21 — trailing slot can hold both search + profile, give them
-     a small gap so taps don't merge. */
-  gap: 4px;
+  /* Pro-Max fix — was 4px which let the row swell to 140px. With
+     three buttons in the trailing slot (search + chat + profile),
+     2px keeps them visually distinct without crowding the screen
+     edge on the smallest devices. */
+  gap: 2px;
 }
 
 .mh-leading { justify-content: flex-end; }
 .mh-trailing { justify-content: flex-start; }
 
 /* S21 mobile global search button — matches the profile button's
-   pill silhouette (40×40, ghost), just an icon. */
+   pill silhouette (44×44, ghost), just an icon. */
 .mh-search-btn,
 .mh-chat-btn {
   color: var(--text-secondary);
+}
+
+/* Pro-Max fix — lucide MessageCircle has slightly more visual mass
+   in its lower half (the speech-bubble tail), so a vertically-centred
+   bounding box reads as low. A 1px negative top tweak optically
+   centres the glyph without shifting the tap target. */
+.mh-chat-btn svg {
+  position: relative;
+  top: -1px;
 }
 
 .mh-search-btn:hover,
