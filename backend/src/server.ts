@@ -152,8 +152,16 @@ async function build() {
     const anonId = (req.headers['x-posthog-distinct-id'] as string | undefined)?.slice(0, 200);
     const userId = u?.id || anonId || null;
     const route = (req as any).routeOptions?.url || req.url;
-    // Skip health and static uploads to keep event volume low
-    if (req.url === '/api/health' || req.url.startsWith('/uploads/')) return;
+    // Skip health, static uploads, and the chat WebSocket route to keep
+    // event volume low. /api/chat/ws fires every time a tab reconnects
+    // (including failure-retry loops) and was drowning the PostHog feed
+    // — none of those events are useful for product analytics.
+    if (
+      req.url === '/api/health' ||
+      req.url.startsWith('/uploads/') ||
+      req.url === '/api/chat/ws' ||
+      req.url.startsWith('/api/chat/ws?')
+    ) return;
     phTrack('api_request', userId, {
       request_id: reqId,
       method: req.method,

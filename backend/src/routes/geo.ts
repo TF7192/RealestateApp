@@ -233,7 +233,7 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
     // by (kind, street, city) keeping the first occurrence so the dropdown
     // doesn't list "שדרות הרצל, רמלה" three times in a row.
     const seen = new Set<string>();
-    const items = mapped.filter((it) => {
+    const items = mapped.filter((it: { kind: string; street: string; city: string; houseNumber: string | null }) => {
       const k = `${it.kind}|${it.street}|${it.city}|${it.houseNumber || ''}`;
       if (seen.has(k)) return false;
       seen.add(k);
