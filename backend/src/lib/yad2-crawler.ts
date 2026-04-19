@@ -77,7 +77,11 @@ export interface CrawlReport {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-async function fetchPage(url: string): Promise<{ ok: boolean; html?: string; status?: number }> {
+// `blocked` is true when Yad2's bot WAF (Reblaze) intercepted us.
+// We can detect this even on a 200 response by looking for the
+// challenge JS markers — Reblaze sometimes returns a 200 + JS
+// challenge body instead of redirecting.
+async function fetchPage(url: string): Promise<{ ok: boolean; html?: string; status?: number; blocked?: boolean }> {
   try {
     const r = await fetch(url, {
       headers: {
@@ -87,8 +91,11 @@ async function fetchPage(url: string): Promise<{ ok: boolean; html?: string; sta
       },
       redirect: 'follow',
     });
-    if (!r.ok) return { ok: false, status: r.status };
     const html = await r.text();
+    // Reblaze fingerprint markers in the response body
+    const blocked = /__uzdbm_\d|validate\.perfdrive\.com|shieldsquare/i.test(html);
+    if (blocked) return { ok: false, status: r.status, html, blocked: true };
+    if (!r.ok) return { ok: false, status: r.status };
     return { ok: true, html };
   } catch {
     return { ok: false };
@@ -163,8 +170,17 @@ async function crawlSection(
     if (page > 1) await sleep(POLITE_GAP_MS);
     const r = await fetchPage(url);
     if (!r.ok) {
-      // 404 on page 2+ → no more pages, that's fine. 429/403 → stop.
+      // 404 on page 2+ → no more pages, that's fine.
       if (r.status === 404 && page > 1) break;
+      // Reblaze bot challenge — distinct, actionable Hebrew error.
+      if (r.blocked) {
+        return {
+          listings: out,
+          pagesFetched,
+          totalPages,
+          error: 'Yad2 חוסם את השרת שלנו (אימות-בוט). נא לנסות שוב מאוחר יותר או לפנות לתמיכה.',
+        };
+      }
       return {
         listings: out,
         pagesFetched,

@@ -121,10 +121,17 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     try {
       const report = await crawlAgency(agencyId);
       if (report.listings.length === 0) {
-        // Log enough to debug structural changes without leaking per-listing PII
-        req.log.warn({ agencyId, sections: report.sections }, 'yad2 agency crawl returned 0 listings');
-        return reply.code(422).send({
-          error: { message: 'לא נמצאו נכסים בסוכנות זו — בדוק את הקישור או נסה שוב מאוחר יותר' },
+        // Distinguish "Yad2 blocked us" from "agency genuinely has no
+        // listings". A WAF block leaves an `error` on every section
+        // report; we surface the most informative one.
+        const blocked = report.sections.find((s) => s.error?.includes('אימות-בוט'));
+        const sectionErr = report.sections.find((s) => s.error)?.error;
+        req.log.warn({ agencyId, sections: report.sections }, blocked ? 'yad2 WAF blocked' : 'yad2 returned 0 listings');
+        return reply.code(blocked ? 503 : 422).send({
+          error: {
+            message: sectionErr
+              || 'לא נמצאו נכסים בסוכנות זו — בדוק את הקישור או נסה שוב מאוחר יותר',
+          },
         });
       }
       // Build the alreadyImported map: { sourceId → propertyId } for any
