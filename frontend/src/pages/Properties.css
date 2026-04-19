@@ -907,3 +907,213 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ──────────────────────────────────────────────────────────────
+ * Bulk-select mode
+ * ──────────────────────────────────────────────────────────────
+ * When the agent enters selection mode, the page softens — non-
+ * selected cards desaturate slightly, selected cards get a gold
+ * gradient sweep + a check badge. A floating action bar appears
+ * at the bottom thumb zone with the count + Delete + Cancel.
+ *
+ * Long-press on a card also enters selection mode (iOS pattern).
+ */
+
+/* Cards in selection mode — kill hover ambitions, dampen children */
+.property-card.is-selectable {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.property-card.is-selectable .property-card-link,
+.property-card.is-selectable .pc-compact-link {
+  /* prevent the inner Link from feeling "live" while in select mode */
+  cursor: pointer;
+}
+
+.property-card.is-selectable:not(.is-selected) {
+  filter: saturate(0.85);
+  opacity: 0.92;
+}
+
+/* The selection sweep — left-to-right (RTL: visually right-to-left)
+   gold gradient overlay that fades in. Uses ::before so the card's
+   own background art (image, badges) keeps painting underneath. */
+.property-card.is-selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-glow), 0 12px 28px rgba(180, 139, 76, 0.18);
+  transform: translateY(-1px);
+  transition: border-color 0.18s ease, box-shadow 0.22s ease, transform 0.18s ease;
+}
+
+.property-card.is-selected::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--gold) 18%, transparent) 0%,
+    transparent 55%
+  );
+  pointer-events: none;
+  z-index: 1;
+  animation: pc-sweep 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes pc-sweep {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Property cards are position:relative-by-default for badges; if any
+   card variant isn't, scope this. */
+.property-card { position: relative; }
+
+/* Pick badge inside compact mobile row — sits at the leading edge */
+.pc-pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  flex-shrink: 0;
+  color: var(--gold);
+  z-index: 2;
+}
+
+/* Pick badge for desktop card — overlays the top-leading corner of
+   the photo so it doesn't fight the existing badges. */
+.pc-pick-desktop {
+  position: absolute;
+  top: 12px;
+  inset-inline-start: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  color: var(--gold);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+/* ── Floating bulk action bar ────────────────────────────────── */
+.bulk-bar {
+  position: fixed;
+  inset-inline: 0;
+  /* Sits above the mobile tab-bar (≈64px) + safe area on notched
+     devices. Desktop has no bottom tab bar so 18px is fine. */
+  bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+  z-index: 800;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  animation: bulk-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (min-width: 821px) {
+  .bulk-bar { bottom: calc(24px + env(safe-area-inset-bottom)); }
+}
+
+@keyframes bulk-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.bulk-bar-inner {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px 10px 18px;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-border);
+  box-shadow:
+    0 18px 44px rgba(30, 26, 20, 0.22),
+    0 0 0 4px color-mix(in srgb, var(--gold-glow) 60%, transparent);
+  font-family: var(--font-body);
+  max-width: calc(100vw - 24px);
+}
+
+.bulk-bar-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bulk-bar-count strong {
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  margin-inline-end: 2px;
+}
+
+.bulk-bar-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.bulk-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: none;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease, color 0.15s ease;
+  min-height: 40px;
+}
+
+.bulk-bar-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.bulk-bar-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.bulk-bar-danger {
+  background: var(--danger, #c0392b);
+  color: #fff;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--danger, #c0392b) 35%, transparent);
+}
+
+.bulk-bar-danger:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.bulk-bar-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.bulk-bar-ghost:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* The "בחר" toolbar button gets a quiet active state when on. */
+.btn-ghost.is-active {
+  background: var(--gold-glow);
+  color: var(--gold);
+  border-color: var(--gold-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bulk-bar,
+  .property-card.is-selected,
+  .property-card.is-selected::before {
+    animation: none !important;
+  }
+}

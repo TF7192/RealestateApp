@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -17,6 +17,8 @@ import {
   Share2,
   ArrowLeftRight,
   Phone,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
@@ -36,6 +38,7 @@ import { pageCache } from '../lib/pageCache';
 import { shareSheet, openWhatsApp, shareWithPhotos } from '../native/share';
 import { telUrl, wazeUrl } from '../lib/waLink';
 import haptics from '../lib/haptics';
+import { useToast } from '../lib/toast';
 import {
   buildVariables as tplBuildVars,
   renderTemplate as tplRender,
@@ -144,6 +147,7 @@ export default function Properties() {
   // paints the previous result INSTANTLY — no empty-page flash while
   // the background fetch runs. First visit: cache is null so we fall
   // back to empty + show skeleton.
+  const toast = useToast();
   const _cached = pageCache.get('properties');
   const [items, setItems] = useState(_cached || []);
   const [loading, setLoading] = useState(!_cached);
@@ -166,6 +170,93 @@ export default function Properties() {
   });
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Bulk selection mode. When `selectMode` is true, card taps toggle
+  // membership in `selectedIds` instead of navigating to the detail page.
+  // Long-press anywhere on a card also enters selection mode + selects.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(null); // { done, total }
+
+  const exitSelect = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const toggleSelect = useCallback((id) => {
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Press-and-hold on a card enters selection mode + selects that card.
+  // Mirrors iOS native pattern. Touch + mouse handled together via the
+  // custom hook below; the timer resets on early move/up so a normal
+  // tap or scroll doesn't accidentally trigger select.
+  const longPressBind = useCallback((id) => ({
+    onTouchStart: () => {
+      const t = setTimeout(() => {
+        haptics.press();
+        setSelectMode(true);
+        setSelectedIds((cur) => {
+          const next = new Set(cur); next.add(id); return next;
+        });
+      }, 450);
+      const cancel = () => clearTimeout(t);
+      const root = document;
+      root.addEventListener('touchmove', cancel, { once: true, passive: true });
+      root.addEventListener('touchend',  cancel, { once: true, passive: true });
+      root.addEventListener('touchcancel', cancel, { once: true, passive: true });
+    },
+  }), []);
+
+  // ESC exits selection mode on desktop.
+  useEffect(() => {
+    if (!selectMode) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') exitSelect(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectMode, exitSelect]);
+
+  const bulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    setBulkProgress({ done: 0, total: ids.length });
+    let done = 0;
+    let failed = 0;
+    // Sequential — for typical 1-20 selections the latency is fine,
+    // and serial keeps server pressure bounded if a future bulk op
+    // does meaningful per-item work (e.g., S3 cleanup of photos).
+    for (const id of ids) {
+      try {
+        await api.deleteProperty(id);
+        done++;
+      } catch {
+        failed++;
+      } finally {
+        setBulkProgress({ done: done + failed, total: ids.length });
+      }
+    }
+    setBulkBusy(false);
+    setBulkProgress(null);
+    setBulkConfirm(false);
+    exitSelect();
+    await load();
+    if (failed === 0) {
+      toast?.success?.(`נמחקו ${done} נכסים`);
+      haptics.success();
+    } else if (done === 0) {
+      toast?.error?.('המחיקה נכשלה');
+      haptics.error();
+    } else {
+      toast?.warning?.(`נמחקו ${done} מתוך ${ids.length} — ${failed} נכשלו`);
+    }
+  };
   const [waShare, setWaShare] = useState(null); // { text, title }
   const [templates, setTemplates] = useState(null);
   const [leads, setLeads] = useState([]);
@@ -491,6 +582,15 @@ export default function Properties() {
           </div>
           <div className="page-header-actions">
             <button
+              type="button"
+              className={`btn btn-ghost ${selectMode ? 'is-active' : ''}`}
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              title="בחירה מרובה לפעולות (מחיקה וכו׳)"
+            >
+              <CheckSquare size={18} />
+              {selectMode ? 'יציאה מבחירה' : 'בחר'}
+            </button>
+            <button
               className={`btn btn-secondary ${copiedLink ? 'btn-copied' : ''}`}
               onClick={handleGenerateLink}
               title="יצירת קישור לשיתוף עם הלקוח — כולל כל הסינונים הפעילים"
@@ -729,14 +829,29 @@ export default function Properties() {
             if (isMobile) {
               // ── Compact 96px mobile row ─────────────────────────────
               const matchCount = matchesByProp.get(prop.id)?.length || 0;
+              const isPicked = selectedIds.has(prop.id);
+              const handleCardTap = (e) => {
+                if (selectMode) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  haptics.tap();
+                  toggleSelect(prop.id);
+                }
+              };
               return (
                 <div
                   key={prop.id}
-                  className={`property-card property-card-compact animate-in ${delayClass}`}
+                  className={`property-card property-card-compact animate-in ${delayClass} ${selectMode ? 'is-selectable' : ''} ${isPicked ? 'is-selected' : ''}`}
+                  {...longPressBind(prop.id)}
                 >
-                  <SwipeRow actions={swipeActions}>
+                  <SwipeRow actions={selectMode ? [] : swipeActions}>
                     <div className="pc-compact-inner">
-                      <Link to={`/properties/${prop.id}`} className="pc-compact-link">
+                      <Link to={`/properties/${prop.id}`} className="pc-compact-link" onClick={handleCardTap}>
+                        {selectMode && (
+                          <span className="pc-pick" aria-hidden="true">
+                            {isPicked ? <CheckSquare size={20} /> : <Square size={20} />}
+                          </span>
+                        )}
                         <div className="pc-compact-thumb">
                           {thumb ? (
                             <img
@@ -847,9 +962,27 @@ export default function Properties() {
 
             // ── Desktop richer card ────────────────────────────────
             const matchCount = matchesByProp.get(prop.id)?.length || 0;
+            const isPicked = selectedIds.has(prop.id);
+            const handleCardTap = (e) => {
+              if (selectMode) {
+                e.preventDefault();
+                e.stopPropagation();
+                haptics.tap();
+                toggleSelect(prop.id);
+              }
+            };
             return (
-              <div key={prop.id} className={`property-card animate-in ${delayClass}`}>
-                <Link to={`/properties/${prop.id}`} className="property-card-link">
+              <div
+                key={prop.id}
+                className={`property-card animate-in ${delayClass} ${selectMode ? 'is-selectable' : ''} ${isPicked ? 'is-selected' : ''}`}
+                {...longPressBind(prop.id)}
+              >
+                {selectMode && (
+                  <span className="pc-pick pc-pick-desktop" aria-hidden="true">
+                    {isPicked ? <CheckSquare size={22} /> : <Square size={22} />}
+                  </span>
+                )}
+                <Link to={`/properties/${prop.id}`} className="property-card-link" onClick={handleCardTap}>
                   <div className="property-image">
                     <img
                       src={prop.images?.[0] || 'https://via.placeholder.com/800x450'}
@@ -990,6 +1123,54 @@ export default function Properties() {
         />
       )}
 
+      {bulkConfirm && (
+        <ConfirmDialog
+          title="מחיקה מרובה"
+          message={`למחוק ${selectedIds.size} נכסים? הפעולה אינה הפיכה.`}
+          confirmLabel={`מחק ${selectedIds.size}`}
+          onConfirm={bulkDelete}
+          onClose={() => setBulkConfirm(false)}
+          busy={bulkBusy}
+        />
+      )}
+
+      {/* Floating bulk action bar — slides up from the bottom thumb
+          zone the moment selection mode kicks in. Empty state shows
+          "בחר נכסים…" hint so the agent doesn't think the screen is
+          frozen. Action button stays disabled until ≥1 picked. */}
+      {selectMode && (
+        <div className="bulk-bar" role="region" aria-label="פעולות על מספר נכסים">
+          <div className="bulk-bar-inner">
+            <span className="bulk-bar-count">
+              {selectedIds.size > 0
+                ? <><strong>{selectedIds.size}</strong> נבחרו</>
+                : 'בחר נכסים'}
+            </span>
+            <div className="bulk-bar-actions">
+              <button
+                type="button"
+                className="bulk-bar-btn bulk-bar-danger"
+                disabled={selectedIds.size === 0 || bulkBusy}
+                onClick={() => { haptics.press(); setBulkConfirm(true); }}
+              >
+                <Trash2 size={16} />
+                {bulkBusy && bulkProgress
+                  ? `מוחק ${bulkProgress.done}/${bulkProgress.total}…`
+                  : 'מחק'}
+              </button>
+              <button
+                type="button"
+                className="bulk-bar-btn bulk-bar-ghost"
+                onClick={exitSelect}
+                disabled={bulkBusy}
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {waShare && (
         <WhatsAppSheet
           title={waShare.title}
@@ -1060,6 +1241,12 @@ export default function Properties() {
         onClose={() => setPageOverflowOpen(false)}
         title="נכסים"
         actions={[
+          {
+            label: selectMode ? 'יציאה מבחירה מרובה' : 'בחירה מרובה',
+            description: selectMode ? null : 'מחק כמה נכסים בבת אחת',
+            icon: CheckSquare,
+            onClick: () => (selectMode ? exitSelect() : setSelectMode(true)),
+          },
           {
             label: copiedLink ? 'הקישור הועתק' : 'קישור ללקוח',
             icon: copiedLink ? Check : LinkIcon,
