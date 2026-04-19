@@ -1,21 +1,35 @@
-// Yad2 agency crawler. Fetches the agency listings page (one URL per
-// section + page), parses the inline __NEXT_DATA__ JSON, and returns a
-// flat list of normalized listings across forsale + rent + commercial.
+// Yad2 agency crawler. Two-phase:
 //
-// The agency listings JSON contains everything we need: address (region/
-// city/street/floor), price, rooms, sqm, property type, tags, and a
-// cover image URL (img.yad2.co.il/Pic/...). The per-listing detail page
-// has more photos but is gated by Yad2's bot-detection challenge so we
-// can't fetch it server-side. Cover image only is the durable scope.
+//   1. Listings phase. Fetch each agency section page (forsale / rent /
+//      commercial) × N pages with a Safari iOS UA, parse the inline
+//      __NEXT_DATA__ JSON, walk agencyData.feed for the per-listing
+//      summary (address, price, rooms, sqm, cover image, tags).
+//
+//   2. Detail phase. For each listing token, fetch
+//      /realestate/item/<token> with the same Safari UA and extract
+//      the FULL images[] array from
+//      pageProps.dehydratedState.queries[0].state.data.metaData.images.
+//      Also pulls description and any other fields the listings JSON
+//      didn't carry.
+//
+// Yad2 fronts the detail page with a JS bot challenge that fires for
+// naive UAs ("EstiaImporter/1.0" → 302 to challenge). A real Safari
+// iOS UA passes through unchallenged, so we use that for ALL fetches
+// — the agency listings page works either way; the detail page demands
+// it. We're identifying as a real client either way; treat the rate
+// limit accordingly with the same 800ms polite gap.
 //
 // Polite by design: 800ms gap between requests, hard cap 10 pages per
 // section, hard cap 100 listings per agency. If Yad2 returns 429/403 we
 // stop early and return what we have so far.
 
-const UA = 'EstiaImporter/1.0 (https://estia.tripzio.xyz; +mailto:talfuks1234@gmail.com)';
+const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 const POLITE_GAP_MS = 800;
 const MAX_PAGES_PER_SECTION = 10;
 const MAX_LISTINGS_TOTAL = 100;
+// Hard cap on detail-page enrichment — even if a Pro plan agency has
+// 80 listings we won't hold the request open for 16 minutes.
+const MAX_DETAIL_FETCHES = 50;
 
 export type Yad2Section = 'forsale' | 'rent' | 'commercial';
 
@@ -31,7 +45,12 @@ export interface Yad2Listing {
   floor?: number | null;
   price?: number | null;
   type?: string;          // "דירה", "פנטהאוז", etc.
-  coverImage?: string;    // https://img.yad2.co.il/Pic/...
+  coverImage?: string;    // https://img.yad2.co.il/Pic/... (first image)
+  // Phase-2 enrichment: full gallery from the detail page. May be empty
+  // if the detail fetch failed or was skipped (we cap at 50 details per
+  // agency to keep request times sane).
+  images?: string[];
+  description?: string;
   tags?: string[];
   // Source mapping hints
   categoryId?: number;
@@ -175,6 +194,34 @@ async function crawlSection(
   return { listings: out, pagesFetched, totalPages };
 }
 
+// ── Detail-page enrichment ───────────────────────────────────────
+// Fetch /realestate/item/<token>, extract the full images[] array
+// + description. Returns null if the page didn't load or didn't
+// contain the expected JSON shape — caller falls back to the
+// listings-page cover.
+async function fetchListingDetails(token: string): Promise<{ images: string[]; description?: string } | null> {
+  const url = `https://www.yad2.co.il/realestate/item/${encodeURIComponent(token)}`;
+  const r = await fetchPage(url);
+  if (!r.ok || !r.html) return null;
+  const data = extractNextData(r.html);
+  if (!data) return null;
+  // The dehydrated react-query state is an array of { state: { data } }.
+  // The single item-detail query lives in queries[0]; we do a defensive
+  // walk in case the order changes between Yad2 deploys.
+  const queries = data?.props?.pageProps?.dehydratedState?.queries;
+  if (!Array.isArray(queries)) return null;
+  for (const q of queries) {
+    const meta = q?.state?.data?.metaData;
+    if (!meta) continue;
+    const imgs = Array.isArray(meta.images) ? meta.images.filter((u: any) => typeof u === 'string') : [];
+    const description = typeof q?.state?.data?.additionalInfo?.description === 'string'
+      ? q.state.data.additionalInfo.description
+      : (typeof q?.state?.data?.description === 'string' ? q.state.data.description : undefined);
+    if (imgs.length > 0 || description) return { images: imgs, description };
+  }
+  return null;
+}
+
 export async function crawlAgency(agencyId: string): Promise<CrawlReport> {
   const sections: Yad2Section[] = ['forsale', 'rent', 'commercial'];
   const allListings: Yad2Listing[] = [];
@@ -223,6 +270,29 @@ export async function crawlAgency(agencyId: string): Promise<CrawlReport> {
   }
 
   if (allListings.length >= MAX_LISTINGS_TOTAL) truncated = true;
+
+  // ── Detail enrichment ───────────────────────────────────────────
+  // Per-listing fetch of the item-detail page to pull the FULL gallery
+  // (the listings JSON only carries one cover image). Capped at
+  // MAX_DETAIL_FETCHES so a giant agency doesn't push the request past
+  // a minute. Sequential with the same polite gap. Failures are
+  // swallowed — the listing keeps its cover image only.
+  const targets = allListings.slice(0, MAX_DETAIL_FETCHES);
+  for (let i = 0; i < targets.length; i++) {
+    const l = targets[i];
+    await sleep(POLITE_GAP_MS);
+    try {
+      const details = await fetchListingDetails(l.sourceId);
+      if (details) {
+        if (details.images.length > 0) l.images = details.images;
+        if (details.description && !l.description) l.description = details.description;
+      }
+    } catch { /* keep cover-only */ }
+  }
+  // Listings beyond MAX_DETAIL_FETCHES still get their cover image;
+  // mark a flag for the UI in case we want to surface "+30 listings
+  // shown with cover image only".
+  if (allListings.length > MAX_DETAIL_FETCHES) truncated = true;
 
   return {
     agencyId,

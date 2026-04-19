@@ -135,7 +135,7 @@ export default function Yad2Import() {
             onClick={fetchPreview}
           >
             {busy ? <Loader2 size={14} className="y2-spin" /> : <Download size={14} />}
-            {busy ? 'סורק את הסוכנות — עד דקה…' : 'סרוק את כל הנכסים'}
+            {busy ? 'סורק וסופר תמונות — עד דקה וחצי…' : 'סרוק את כל הנכסים'}
           </button>
           <p className="y2-hint">
             כל אחת משלושת הקטגוריות (מכירה / השכרה / מסחרי) נסרקת בנפרד, כולל כל העמודים בכל קטגוריה.
@@ -204,7 +204,16 @@ export default function Yad2Import() {
                             onChange={() => togglePick(l.sourceId)}
                           />
                           {l.coverImage && (
-                            <img className="y2-thumb" src={l.coverImage} alt="" loading="lazy" decoding="async" />
+                            <div className="y2-thumb-wrap">
+                              <img className="y2-thumb" src={l.coverImage} alt="" loading="lazy" decoding="async" />
+                              {/* Detail-phase enrichment count — when the
+                                  detail-page fetch landed extra photos,
+                                  show "+N תמונות" so the agent knows the
+                                  import will pull more than the cover. */}
+                              {(l.images?.length || 0) > 1 && (
+                                <span className="y2-thumb-count">{l.images.length} תמונות</span>
+                              )}
+                            </div>
                           )}
                           <div className="y2-item-meta">
                             <strong>

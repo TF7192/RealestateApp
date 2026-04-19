@@ -60,6 +60,10 @@ const ImportListingZ = z.object({
   price: z.number().nonnegative().nullable().optional(),
   type: z.string().max(60).optional(),
   coverImage: z.string().url().optional(),
+  // Full gallery from the detail-page enrichment phase. Up to 40 images
+  // is plenty for a residential property; cap stops a malicious or
+  // weird payload from spawning a runaway upload job.
+  images: z.array(z.string().url()).max(40).optional(),
   tags: z.array(z.string()).optional(),
   description: z.string().max(4000).optional(),
 });
@@ -196,21 +200,26 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
           },
         });
 
-        // Re-host the cover image: download from img.yad2.co.il and
-        // write to uploads/properties/<propertyId>/yad2-cover-<uuid>.jpg.
-        // Hot-link is fragile (Yad2 may rotate CDN paths or block
-        // referrer-less requests later) — better to own the bytes.
-        if (l.coverImage) {
+        // Re-host every image from the detail-page gallery (or just the
+        // cover if the detail fetch didn't enrich). Order is preserved
+        // so the agent's "cover" stays the cover. Per-image failures
+        // fall back to hot-link rather than skipping silently.
+        const sourceUrls = uniqueOrdered(
+          (l.images && l.images.length ? l.images : []).concat(l.coverImage ? [l.coverImage] : [])
+        );
+        for (let i = 0; i < sourceUrls.length; i++) {
+          const src = sourceUrls[i];
           try {
-            const url = await rehostImage(l.coverImage, property.id);
+            const url = await rehostImage(src, property.id);
             await prisma.propertyImage.create({
-              data: { propertyId: property.id, url, sortOrder: 0 },
+              data: { propertyId: property.id, url, sortOrder: i },
             });
           } catch (imgErr: any) {
-            req.log.warn({ err: imgErr, propertyId: property.id, src: l.coverImage }, 'yad2 image rehost failed');
-            // Fall back to hot-link so the property still has a photo
+            req.log.warn({ err: imgErr, propertyId: property.id, src }, 'yad2 image rehost failed');
+            // Hot-link fallback so the slot isn't lost — better one ugly
+            // referrer-less link than a missing photo.
             await prisma.propertyImage.create({
-              data: { propertyId: property.id, url: l.coverImage, sortOrder: 0 },
+              data: { propertyId: property.id, url: src, sortOrder: i },
             });
           }
         }
@@ -293,6 +302,19 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     return { created, skipped, failed };
   });
 };
+
+// De-dupe an array preserving first-occurrence order. Yad2 sometimes
+// repeats the cover URL inside the gallery; we don't want it twice.
+function uniqueOrdered<T>(arr: T[]): T[] {
+  const seen = new Set<T>();
+  const out: T[] = [];
+  for (const x of arr) {
+    if (seen.has(x)) continue;
+    seen.add(x);
+    out.push(x);
+  }
+  return out;
+}
 
 // ── Image re-host helper ─────────────────────────────────────────
 // Downloads the Yad2 image bytes and persists them via the storage
