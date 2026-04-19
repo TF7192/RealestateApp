@@ -18,9 +18,10 @@
 }
 
 .mpk-chip {
+  /* Polish T-1: bumped from 40px → 44px to match Apple HIG min tap. */
   min-width: 48px;
-  min-height: 40px;
-  padding: 8px 14px;
+  min-height: 44px;
+  padding: 10px 14px;
   border-radius: 99px;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
@@ -29,7 +30,7 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.14s;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.1s ease;
 }
 
 .mpk-chip:active { transform: scale(0.94); }

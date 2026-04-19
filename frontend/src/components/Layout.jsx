@@ -19,6 +19,7 @@ import {
   ArrowLeftRight,
   FileText,
   Shield,
+  Search,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
@@ -180,6 +181,22 @@ export default function Layout({ onLogout }) {
           </Link>
         )}
         <div className="mh-side mh-trailing">
+          {/* S21: mobile global search — opens the same CommandPalette
+              the desktop ⌘K shortcut launches. Dispatched as a window
+              event so this Layout component doesn't need to share state
+              with App.jsx. Two-tap reach to any property/customer/owner
+              from anywhere in the app. */}
+          <button
+            className="btn-ghost mh-search-btn"
+            onClick={() => {
+              haptics.tap();
+              window.dispatchEvent(new Event('estia:open-palette'));
+            }}
+            aria-label="חיפוש"
+            type="button"
+          >
+            <Search size={20} />
+          </button>
           <button
             className="btn-ghost mh-profile-btn"
             onClick={() => { haptics.tap(); setMoreOpen(true); }}

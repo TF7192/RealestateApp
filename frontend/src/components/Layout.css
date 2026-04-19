@@ -436,10 +436,28 @@ img.agent-avatar {
 .mh-side {
   display: inline-flex;
   align-items: center;
+  /* S21 — trailing slot can hold both search + profile, give them
+     a small gap so taps don't merge. */
+  gap: 4px;
 }
 
 .mh-leading { justify-content: flex-end; }
 .mh-trailing { justify-content: flex-start; }
+
+/* S21 mobile global search button — matches the profile button's
+   pill silhouette (40×40, ghost), just an icon. */
+.mh-search-btn {
+  color: var(--text-secondary);
+}
+
+.mh-search-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.mh-search-btn:active {
+  transform: scale(0.94);
+}
 
 [data-theme="dark"] .mobile-header {
   background: rgba(13, 15, 20, 0.9);

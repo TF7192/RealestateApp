@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import Portal from './Portal';
+import haptics from '../lib/haptics';
 import './ConfirmDialog.css';
 
 export default function ConfirmDialog({
@@ -12,6 +14,19 @@ export default function ConfirmDialog({
   onClose,
   busy = false,
 }) {
+  // Polish H-3: medium-impact haptic when a destructive confirm dialog
+  // appears so the agent registers the moment the modal is presented,
+  // not just when they read it. Press is medium-weight (vs. tap = light)
+  // so it feels heavier than a normal navigation.
+  useEffect(() => {
+    if (danger) haptics.press();
+  }, [danger]);
+
+  const handleConfirm = () => {
+    if (danger) haptics.warning(); // an extra confirm-the-doom beat
+    onConfirm?.();
+  };
+
   return (
     <Portal>
     <div className="confirm-backdrop" onClick={onClose}>
@@ -31,7 +46,7 @@ export default function ConfirmDialog({
         <div className="confirm-actions">
           <button
             className={danger ? 'btn btn-danger' : 'btn btn-primary'}
-            onClick={onConfirm}
+            onClick={handleConfirm}
             disabled={busy}
           >
             {busy ? '...' : confirmLabel}

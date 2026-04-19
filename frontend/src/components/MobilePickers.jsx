@@ -169,6 +169,8 @@ export function SuggestPicker({
                 <Search size={14} />
                 <input
                   type="search"
+                  inputMode="search"
+                  enterKeyHint="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="חפש…"

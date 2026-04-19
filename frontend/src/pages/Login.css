@@ -111,7 +111,7 @@
 .login-container.fade-out {
   opacity: 0;
   transform: scale(0.98);
-  transition: all 0.3s ease;
+  transition: background 0.3s, color 0.3s, border-color 0.3s, box-shadow 0.3s, transform 0.3s ease;
 }
 
 .login-container.fade-in {
@@ -276,7 +276,7 @@
   font-size: 12px;
   font-weight: 600;
   width: fit-content;
-  transition: all 0.5s;
+  transition: background 0.5s, color 0.5s, border-color 0.5s, box-shadow 0.5s, transform 0.5s;
   animation: slideUp 0.8s ease-out;
 }
 
@@ -398,7 +398,7 @@
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.25s;
+  transition: background 0.25s, color 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.25s;
 }
 
 .auth-method-btn.google {
@@ -416,7 +416,7 @@
   border: 1px solid var(--border-light);
   color: var(--text-primary);
   background: var(--bg-elevated);
-  transition: all 0.25s;
+  transition: background 0.25s, color 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.25s;
 }
 
 .mode-agent .auth-method-btn.phone-btn:hover {
@@ -608,7 +608,7 @@
   font-weight: 700;
   color: var(--text-primary);
   background: var(--bg-input);
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
 .code-box.filled {

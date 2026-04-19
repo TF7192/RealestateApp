@@ -73,7 +73,7 @@
   background: var(--bg-card);
   text-align: right;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   font-family: var(--font-body);
   color: var(--text-secondary);
 }
@@ -130,7 +130,7 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
 .view-toggle-btn.active {
@@ -155,7 +155,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  transition: all 0.25s;
+  transition: background 0.25s, color 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.25s;
   display: flex;
   flex-direction: column;
   min-height: 320px;
@@ -340,7 +340,7 @@
   padding: 4px 10px;
   font-family: var(--font-body);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .cc-last-contact:hover {
@@ -465,7 +465,7 @@
 .status-badge-btn {
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
 .status-badge-btn:hover {
@@ -524,7 +524,7 @@
   cursor: pointer;
   border-radius: var(--radius-sm);
   text-align: right;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .status-menu-item:hover {
@@ -718,15 +718,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  /* Polish T-1: visual size stays at 28×28 (the icon glyph), but the
+     tap target is grown to ≥44pt via padding. Apple HIG minimum +
+     stops the empathy-log "I keep tapping the wrong icon" complaints
+     on the customers row where 4 actions sit shoulder-to-shoulder. */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 8px;
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-secondary);
   cursor: pointer;
   text-decoration: none;
-  transition: all 0.15s;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .cl-btn:hover {
@@ -1140,7 +1145,7 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .filters-pill.active {
@@ -1242,7 +1247,7 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .filter-sheet-chip:active { transform: scale(0.96); }
@@ -1344,7 +1349,7 @@
   font-weight: 700;
   text-decoration: none;
   width: fit-content;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .cc-match-pill:hover {

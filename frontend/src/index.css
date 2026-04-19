@@ -359,15 +359,18 @@ input, textarea, select {
 }
 
 .animate-in {
-  animation: fadeIn 0.5s ease-out forwards;
+  /* Polish A-4: was 0.5s — felt laggy on dashboards with 6+ staggered
+     stat cards because the last card finished animating ~900ms after
+     the page paint. Capped at 220ms with shorter staggers. */
+  animation: fadeIn 0.22s ease-out forwards;
   opacity: 0;
 }
 
-.animate-in-delay-1 { animation-delay: 0.1s; }
-.animate-in-delay-2 { animation-delay: 0.2s; }
-.animate-in-delay-3 { animation-delay: 0.3s; }
-.animate-in-delay-4 { animation-delay: 0.4s; }
-.animate-in-delay-5 { animation-delay: 0.5s; }
+.animate-in-delay-1 { animation-delay: 0.04s; }
+.animate-in-delay-2 { animation-delay: 0.08s; }
+.animate-in-delay-3 { animation-delay: 0.12s; }
+.animate-in-delay-4 { animation-delay: 0.16s; }
+.animate-in-delay-5 { animation-delay: 0.20s; }
 
 /* Typography */
 h1, h2, h3, h4, h5 {
@@ -397,8 +400,22 @@ a:hover {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.25s ease;
+  /* Polish P-1: targeted props instead of `transition: all` so each
+     hover/state change doesn't re-diff every computed property on the
+     button + its children. */
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+    box-shadow 0.18s ease, transform 0.12s ease;
   white-space: nowrap;
+  /* Polish T-1: every interactive button gets at least the Apple HIG
+     44pt minimum tap area. Visual size stays the same — padding-Y
+     bump only kicks in when min-height would otherwise be < 44px. */
+  min-height: 44px;
+}
+
+/* Polish T-3: every plain .btn gets the same press-feedback the
+   primary CTA already had. Subtle, < 100ms, doesn't trigger layout. */
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .btn-primary {

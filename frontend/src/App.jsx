@@ -56,6 +56,16 @@ function AppRoutes() {
     onOpenHelp:    () => setHelpOpen(true),
   });
 
+  // S21 — mobile global search. The mobile header button dispatches an
+  // 'estia:open-palette' event from anywhere in the tree; we listen here
+  // and toggle the same palette state desktop's ⌘K uses. Decoupled so
+  // the Layout component doesn't need a reference to App's setter.
+  useEffect(() => {
+    const onOpen = () => setPaletteOpen(true);
+    window.addEventListener('estia:open-palette', onOpen);
+    return () => window.removeEventListener('estia:open-palette', onOpen);
+  }, []);
+
   // Tie the logged-in user to PostHog so session replay + funnels are
   // per-agent. On sign-out, reset so a new anonymous session starts.
   useEffect(() => {
