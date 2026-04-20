@@ -30,6 +30,7 @@ import ShortcutsOverlay from './components/ShortcutsOverlay';
 import OfflineBanner from './components/OfflineBanner';
 import OnboardingTour from './components/OnboardingTour';
 import ChatWidget from './components/ChatWidget';
+import Yad2ScanBanner from './components/Yad2ScanBanner';
 import { useScrollRestore } from './hooks/mobile';
 import { useDocumentTitle, useGlobalShortcuts } from './hooks/shortcuts';
 import { usePageviewTracking } from './hooks/analytics';
@@ -181,6 +182,7 @@ function AppRoutes() {
       <ShortcutsOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
       <OnboardingTour />
       <ChatWidget />
+      <Yad2ScanBanner />
     </>
   );
 }

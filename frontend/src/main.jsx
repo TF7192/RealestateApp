@@ -51,15 +51,26 @@ if (typeof window !== 'undefined') {
 
 // iOS keyboard handling + zoom guards.
 //
-// When a text input gains focus iOS raises the keyboard, which usually hides
-// the field. We:
-//   1. Subscribe to Capacitor's Keyboard plugin (native app only) to get the
-//      exact keyboard height and expose it as a CSS var (--kb-h) so pages can
-//      add bottom padding while the keyboard is up.
-//   2. In both native and web, always scroll the focused element into view
-//      after a frame so nothing is hidden.
+// Design goal: the page MUST NOT jump when the user focuses / blurs an
+// input. Previously we called `scrollIntoView({ block: 'center' })` on
+// focus which repositioned the whole page, and iOS WKWebView's built-in
+// scroll-assist doubled-down on it — blurring often landed at a
+// different scroll than where the user tapped. Now:
+//   1. Subscribe to Capacitor's Keyboard plugin (native app only) to get
+//      the exact keyboard height and expose it as a CSS var (--kb-h) so
+//      pages can add bottom padding while the keyboard is up.
+//   2. Disable WKWebView's built-in scroll-assist (Keyboard.setScroll).
+//      We handle scroll manually below.
+//   3. On focusin, capture window.scrollY. After the keyboard is up, if
+//      and only if the focused field is hidden behind the keyboard, we
+//      scroll by the minimum delta needed (scrollBy, not scrollIntoView
+//      block:center — that would drag the whole page).
+//   4. On focusout, restore the captured scrollY UNLESS focus is moving
+//      to another input — in which case we leave the page where it is so
+//      the next input doesn't provoke a second hop.
 if (typeof window !== 'undefined') {
   let kbHeight = 0;
+  let preFocusScrollY = null;
   const setKb = (h) => {
     kbHeight = h || 0;
     document.documentElement.style.setProperty('--kb-h', `${kbHeight}px`);
@@ -75,39 +86,81 @@ if (typeof window !== 'undefined') {
       Keyboard.addListener('keyboardDidShow',  (info) => setKb(info.keyboardHeight));
       Keyboard.addListener('keyboardWillHide', () => setKb(0));
       Keyboard.addListener('keyboardDidHide',  () => setKb(0));
+      // Stop WKWebView from trying to scroll on our behalf — our focusin
+      // handler does it more conservatively and, crucially, restores on
+      // blur.
+      Keyboard.setScroll?.({ isDisabled: true }).catch(() => {});
+      // Hide the iOS "Previous / Next / Done" accessory bar; it takes
+      // extra vertical space and causes cascading re-layouts on inputs.
+      Keyboard.setAccessoryBarVisible?.({ isVisible: false }).catch(() => {});
     }).catch(() => {});
   }).catch(() => {});
 
-  // Scroll focused input into view — on both native and web. Uses the
-  // VisualViewport when available (mobile Safari) to measure the actual
-  // visible area after the keyboard opens.
-  const bringIntoView = (el) => {
+  const isTextInput = (el) => {
+    if (!el || el === document.body) return false;
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'select') return true;
+    if (tag === 'input') {
+      const t = (el.getAttribute('type') || 'text').toLowerCase();
+      // `button`/`checkbox`/`submit`/etc. don't open the keyboard — skip.
+      return ['text', 'search', 'email', 'tel', 'url', 'password', 'number', 'date', 'datetime-local', 'time', 'month', 'week'].includes(t);
+    }
+    if (tag === 'textarea') return true;
+    if (el.isContentEditable) return true;
+    return false;
+  };
+
+  // Scroll just enough to bring the focused input above the keyboard —
+  // NOT centered. Centering drags the page up unnecessarily and is the
+  // main cause of the "page jumps on focus" complaint.
+  const nudgeIntoView = (el) => {
     if (!el) return;
     const vv = window.visualViewport;
-    const rect = el.getBoundingClientRect();
-    const margin = 24; // small buffer so the field isn't flush with the keyboard
     const viewportH = vv?.height ?? window.innerHeight;
-    if (rect.bottom > viewportH - margin || rect.top < margin) {
-      try {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } catch { /* ignore */ }
+    const rect = el.getBoundingClientRect();
+    const buffer = 24;
+    if (rect.bottom > viewportH - buffer) {
+      const delta = Math.ceil(rect.bottom - (viewportH - buffer));
+      window.scrollBy({ top: delta, behavior: 'smooth' });
+    } else if (rect.top < buffer) {
+      window.scrollBy({ top: rect.top - buffer, behavior: 'smooth' });
     }
+    // If the field was ALREADY visible, do nothing — page stays put.
   };
+
   document.addEventListener('focusin', (e) => {
     const t = e.target;
-    if (!t) return;
-    const tag = (t.tagName || '').toLowerCase();
-    if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return;
-    // Wait for the keyboard animation to finish before measuring
-    setTimeout(() => bringIntoView(t), 320);
-    setTimeout(() => bringIntoView(t), 650);
+    if (!isTextInput(t)) return;
+    // Capture the pre-focus scroll position once per focus "session" —
+    // moving between several inputs keeps the first snapshot so a
+    // subsequent blur restores to the true original position.
+    if (preFocusScrollY == null) preFocusScrollY = window.scrollY;
+    // Wait for the keyboard animation to complete before measuring.
+    setTimeout(() => nudgeIntoView(t), 320);
   });
-  // Re-run on visualViewport resize (keyboard opens/closes)
+
+  document.addEventListener('focusout', (e) => {
+    if (!isTextInput(e.target)) return;
+    // Focus could be moving to ANOTHER input (e.g. tab/next-field). In
+    // that case we don't restore — the next focusin will handle things.
+    // We check on the next tick because focusin for the new target fires
+    // after this focusout.
+    setTimeout(() => {
+      const active = document.activeElement;
+      if (isTextInput(active)) return;
+      if (preFocusScrollY != null) {
+        window.scrollTo({ top: preFocusScrollY, behavior: 'smooth' });
+        preFocusScrollY = null;
+      }
+    }, 50);
+  });
+
+  // Visual-viewport resize fires when the keyboard slides up or down.
+  // Only nudge if the active input is now hidden — we no longer call
+  // scrollIntoView on every resize (which was the old "page hops" bug).
   window.visualViewport?.addEventListener('resize', () => {
     const el = document.activeElement;
-    if (!el) return;
-    const tag = (el.tagName || '').toLowerCase();
-    if (tag === 'input' || tag === 'textarea') bringIntoView(el);
+    if (isTextInput(el)) nudgeIntoView(el);
   });
 
   // Belt-and-suspenders: block multi-touch pinch-zoom + double-tap zoom.

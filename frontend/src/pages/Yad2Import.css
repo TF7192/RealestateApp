@@ -419,3 +419,26 @@
   color: var(--danger);
 }
 .y2-quota-stop strong { color: var(--danger); }
+
+/* Cached-result card — shown on the paste step when the store already
+   has a finished scan. "You left mid-flow; here's where to pick up." */
+.y2-cached {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--gold-border);
+  background: color-mix(in srgb, var(--gold-glow) 55%, transparent);
+  margin-bottom: 6px;
+}
+.y2-cached-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.y2-cached-body strong { font-size: 13.5px; color: var(--text-primary); font-weight: 700; }
+.y2-cached-body span { font-size: 12px; color: var(--text-secondary); }
+.y2-cached .btn { flex-shrink: 0; white-space: nowrap; }

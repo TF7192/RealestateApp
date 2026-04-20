@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Download, ArrowRight, AlertCircle, Check, Loader2, Building2, Store, Home as HomeIcon, ExternalLink, Clock, Lock } from 'lucide-react';
+import { Download, ArrowRight, AlertCircle, Check, Loader2, Building2, Store, Home as HomeIcon, ExternalLink, Clock, Lock, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../lib/toast';
 import { formatFloor } from '../lib/formatFloor';
+import { getScanState, subscribeScan, startScan, clearScan, setScanQuota } from '../lib/yad2ScanStore';
 import './Yad2Import.css';
 
 // Yad2 agency-wide importer. Paste an agency URL like:
@@ -13,6 +14,11 @@ import './Yad2Import.css';
 // screen lets the agent pick which to import — the import call then
 // downloads each cover image to /uploads/properties/.../yad2-cover.jpg
 // and creates a Property row.
+//
+// Scan lifecycle lives in yad2ScanStore (module-level) so:
+//   - the agent can navigate away mid-scan and get notified on completion
+//   - returning to this page still shows the last scan's results until
+//     they explicitly start a new one
 
 const SECTION_LABEL = { forsale: 'מכירה', rent: 'השכרה', commercial: 'מסחרי' };
 const SECTION_ICON  = { forsale: HomeIcon, rent: Building2, commercial: Store };
@@ -20,27 +26,43 @@ const SECTION_ICON  = { forsale: HomeIcon, rent: Building2, commercial: Store };
 export default function Yad2Import() {
   const navigate = useNavigate();
   const toast = useToast();
-  const [url, setUrl] = useState('');
-  const [step, setStep] = useState('paste'); // paste | review | done
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
-  const [extracted, setExtracted] = useState([]);
-  const [picked, setPicked] = useState(new Set());
-  const [agency, setAgency] = useState(null);
-  const [sections, setSections] = useState([]);
-  const [truncated, setTruncated] = useState(false);
-  const [result, setResult] = useState(null);
-  // { sourceId → propertyId } for listings the agent already imported
-  // (server populates from the [yad2:<token>] notes-marker). Keyset on
-  // the frontend for O(1) "is this already imported?" lookups.
-  const [alreadyImported, setAlreadyImported] = useState({});
-  // Sliding-window quota: { limit, remaining, used, resetAt, msUntilReset }.
-  // Loaded on mount, refreshed after every scrape attempt so the UI
-  // always reflects the server's view of the bucket.
-  const [quota, setQuota] = useState(null);
+  const [scan, setScan] = useState(getScanState());
+  useEffect(() => subscribeScan(setScan), []);
 
+  const [url, setUrl] = useState(scan.url || '');
+  const [step, setStep] = useState(scan.result ? 'review' : 'paste');
+  const [busyImport, setBusyImport] = useState(false);
+  const [importErr, setImportErr] = useState(null);
+  const [result, setResult] = useState(null); // import outcome (done step)
+  const [picked, setPicked] = useState(new Set());
+  const initPickedRef = useRef(false);
+
+  // Derived: pull the scan result into the shape the review UI expects.
+  const extracted       = scan.result?.listings ?? [];
+  const agency          = scan.result?.agency ?? null;
+  const sections        = scan.result?.sections ?? [];
+  const truncated       = !!scan.result?.truncated;
+  const alreadyImported = scan.result?.alreadyImported ?? {};
+  const quota           = scan.quota ?? null;
+
+  // Initialize `picked` once per distinct scan result so the agent's
+  // manual de-selects are preserved if they leave & come back mid-review.
   useEffect(() => {
-    api.yad2Quota().then(setQuota).catch(() => { /* non-critical */ });
+    if (!scan.result) return;
+    if (initPickedRef.current) return;
+    initPickedRef.current = true;
+    setPicked(new Set(
+      extracted
+        .filter((l) => !alreadyImported[l.sourceId])
+        .map((l) => l.sourceId),
+    ));
+    setStep('review');
+  }, [scan.result]);
+
+  // Fetch the quota fresh on mount so the chip is accurate even when
+  // the store has a stale quota from an older scan.
+  useEffect(() => {
+    api.yad2Quota().then(setScanQuota).catch(() => {});
   }, []);
 
   // Group listings by section so the review screen reads as
@@ -71,45 +93,29 @@ export default function Yad2Import() {
     });
   };
 
-  const fetchPreview = async () => {
-    setErr(null);
-    setBusy(true);
-    try {
-      const res = await api.yad2AgencyPreview(url.trim());
-      setExtracted(res.listings || []);
-      setAgency(res.agency || null);
-      setSections(res.sections || []);
-      setTruncated(!!res.truncated);
-      const already = res.alreadyImported || {};
-      setAlreadyImported(already);
-      // Default-select every listing EXCEPT ones already imported —
-      // re-importing them would just bump the [yad2:<token>] dedupe
-      // skip on the server. Saves the agent from manually un-checking
-      // 30+ rows on every re-scan.
-      setPicked(new Set(
-        (res.listings || [])
-          .filter((l) => !already[l.sourceId])
-          .map((l) => l.sourceId),
-      ));
-      // Server returns the post-attempt quota inline so we don't need a
-      // second roundtrip to update the chip.
-      if (res.quota) setQuota(res.quota);
-      setStep('review');
-    } catch (e) {
-      setErr(e.message || 'הטעינה נכשלה');
-      // 429 / 504 paths echo the quota inside the error envelope; pull
-      // it if present so the chip updates after a denied attempt too.
-      const inlineQuota = e?.data?.error?.quota;
-      if (inlineQuota) setQuota(inlineQuota);
-      else api.yad2Quota().then(setQuota).catch(() => {});
-    } finally {
-      setBusy(false);
-    }
+  const beginScan = () => {
+    if (!url.trim()) return;
+    if (quota && quota.remaining === 0) return;
+    initPickedRef.current = false;
+    setStep('paste'); // keep the user on paste while scan is running
+    // startScan fires-and-forgets — the store updates flow back via the
+    // subscription, so the agent can navigate away freely.
+    startScan(url.trim()).catch(() => { /* handled via store */ });
+    toast.info?.('הסריקה החלה — תוכל/י להמשיך לעבוד. תקבל/י התראה בסיום.');
+  };
+
+  const resetAndRescan = () => {
+    clearScan();
+    initPickedRef.current = false;
+    setPicked(new Set());
+    setStep('paste');
+    setResult(null);
+    setImportErr(null);
   };
 
   const importPicked = async () => {
-    setErr(null);
-    setBusy(true);
+    setImportErr(null);
+    setBusyImport(true);
     try {
       const toImport = extracted.filter((l) => picked.has(l.sourceId));
       const res = await api.yad2AgencyImport(toImport);
@@ -117,11 +123,14 @@ export default function Yad2Import() {
       setStep('done');
       toast.success(`יובאו ${res.created.length} נכסים`);
     } catch (e) {
-      setErr(e.message || 'הייבוא נכשל');
+      setImportErr(e.message || 'הייבוא נכשל');
     } finally {
-      setBusy(false);
+      setBusyImport(false);
     }
   };
+
+  const isRunning = scan.status === 'running';
+  const err = importErr || (scan.status === 'error' ? scan.error : null);
 
   return (
     <div className="y2-page" dir="rtl">
@@ -149,6 +158,25 @@ export default function Yad2Import() {
       {step === 'paste' && (
         <section className="y2-card">
           <QuotaChip quota={quota} />
+
+          {/* Cached-result card — when the agent returns mid-session we
+              keep the last scan visible so they can jump back into review
+              without re-scanning. */}
+          {scan.status === 'done' && scan.result && (
+            <div className="y2-cached">
+              <div className="y2-cached-body">
+                <strong>סריקה אחרונה שמורה</strong>
+                <span>
+                  {scan.result.listings?.length ?? 0} נכסים · {agency?.name || 'סוכנות'} ·{' '}
+                  לפני {relativeMinutes(scan.finishedAt)}
+                </span>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={() => setStep('review')}>
+                המשך לבחירה
+              </button>
+            </div>
+          )}
+
           <label className="y2-label" htmlFor="y2-url">קישור לדף הסוכנות שלך ב-Yad2</label>
           <input
             id="y2-url"
@@ -164,29 +192,29 @@ export default function Yad2Import() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && url.trim() && !(quota && quota.remaining === 0)) fetchPreview();
+              if (e.key === 'Enter' && url.trim() && !isRunning && !(quota && quota.remaining === 0)) beginScan();
             }}
           />
           <button
             className="btn btn-primary"
-            disabled={!url.trim() || busy || (quota && quota.remaining === 0)}
-            onClick={fetchPreview}
+            disabled={!url.trim() || isRunning || (quota && quota.remaining === 0)}
+            onClick={beginScan}
           >
-            {busy ? <Loader2 size={14} className="y2-spin" /> : <Download size={14} />}
-            {busy
-              ? 'סורק וסופר תמונות — עד דקה וחצי…'
+            {isRunning ? <Loader2 size={14} className="y2-spin" /> : <Download size={14} />}
+            {isRunning
+              ? 'סורק ברקע — ניתן להמשיך לעבוד'
               : (quota && quota.remaining === 0
                   ? 'הגעת למכסה השעתית'
                   : 'סרוק את כל הנכסים')}
           </button>
           <p className="y2-hint">
             כל אחת משלושת הקטגוריות (מכירה / השכרה / מסחרי) נסרקת בנפרד, כולל כל העמודים בכל קטגוריה.
-            ניתן להעתיק קישור לכל אחת מהן — אנחנו נזהה את הסוכנות אוטומטית.
+            הסריקה רצה ברקע — אפשר לעזוב את העמוד; תתקבל התראה כשהיא תסתיים.
           </p>
         </section>
       )}
 
-      {step === 'review' && (
+      {step === 'review' && scan.result && (
         <section className="y2-card">
           <header className="y2-review-head">
             <div>
@@ -248,11 +276,6 @@ export default function Yad2Import() {
                     const chosen = picked.has(l.sourceId);
                     const importedPropertyId = alreadyImported[l.sourceId];
                     const isImported = !!importedPropertyId;
-                    // Already-imported listings render in a special variant:
-                    // muted, checkbox disabled, gold "כבר במערכת" pill that
-                    // links to the existing property. The agent can't accidentally
-                    // re-pick it; if they want to update it they go through the
-                    // property's own edit flow.
                     if (isImported) {
                       return (
                         <li key={l.sourceId} className="y2-item y2-item-imported">
@@ -294,10 +317,6 @@ export default function Yad2Import() {
                           {l.coverImage && (
                             <div className="y2-thumb-wrap">
                               <img className="y2-thumb" src={l.coverImage} alt="" loading="lazy" decoding="async" />
-                              {/* Detail-phase enrichment count — when the
-                                  detail-page fetch landed extra photos,
-                                  show "+N תמונות" so the agent knows the
-                                  import will pull more than the cover. */}
                               {(l.images?.length || 0) > 1 && (
                                 <span className="y2-thumb-count">{l.images.length} תמונות</span>
                               )}
@@ -332,13 +351,16 @@ export default function Yad2Import() {
           <div className="y2-review-actions">
             <button
               className="btn btn-primary"
-              disabled={picked.size === 0 || busy}
+              disabled={picked.size === 0 || busyImport}
               onClick={importPicked}
             >
-              {busy ? <Loader2 size={14} className="y2-spin" /> : <Check size={14} />}
-              {busy ? 'מייבא ומוריד תמונות…' : `ייבא ${picked.size} נכסים`}
+              {busyImport ? <Loader2 size={14} className="y2-spin" /> : <Check size={14} />}
+              {busyImport ? 'מייבא ומוריד תמונות…' : `ייבא ${picked.size} נכסים`}
             </button>
-            <button className="btn btn-secondary" onClick={() => setStep('paste')}>חזור</button>
+            <button className="btn btn-secondary" onClick={resetAndRescan}>
+              <RefreshCw size={13} />
+              סריקה חדשה
+            </button>
           </div>
         </section>
       )}
@@ -358,7 +380,7 @@ export default function Yad2Import() {
           </ul>
           <div className="y2-done-actions">
             <button className="btn btn-primary" onClick={() => navigate('/properties')}>הצג את הנכסים</button>
-            <button className="btn btn-secondary" onClick={() => { setStep('paste'); setUrl(''); setResult(null); }}>
+            <button className="btn btn-secondary" onClick={resetAndRescan}>
               ייבא סוכנות נוספת
             </button>
           </div>
@@ -368,13 +390,19 @@ export default function Yad2Import() {
   );
 }
 
+function relativeMinutes(ts) {
+  if (!ts) return 'רגע';
+  const mins = Math.max(0, Math.round((Date.now() - ts) / 60_000));
+  if (mins === 0) return 'פחות מדקה';
+  if (mins === 1) return 'דקה';
+  return `${mins} דק׳`;
+}
+
 // Quota chip — sits above the URL input. Two visual states:
 //   - has slots: gold pill, "X/3 ייבואים נותרו השעה הקרובה"
 //   - exhausted: muted card, live countdown to the moment the oldest
 //     attempt expires out of the window
 function QuotaChip({ quota }) {
-  // Re-render every 30s so the countdown stays roughly accurate without
-  // burning frames. Granularity is "minutes" so 30s is more than enough.
   const [, setTick] = useState(0);
   useEffect(() => {
     if (!quota || quota.remaining > 0) return undefined;

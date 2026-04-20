@@ -13,6 +13,7 @@ import {
 import { sellerCalc } from '../lib/sellerCalc';
 import { NumberField, Segmented } from '../components/SmartFields';
 import { useViewportMobile } from '../hooks/mobile';
+import MobileSellerCalculator from '../mobile/pages/MobileSellerCalculator';
 import './SellerCalculator.css';
 
 // Formatting helpers — IL locale, ₪ prefix, no fractional shekel.
@@ -70,9 +71,18 @@ const INITIAL = {
 };
 
 export default function SellerCalculator() {
+  const isMobile = useViewportMobile(820);
+  // The iPhone app gets a purpose-built visual — dark charcoal canvas,
+  // gold hero number, stacked receipt-style cards. The web layout
+  // stays unchanged so existing desktop muscle memory is preserved.
+  if (isMobile) return <MobileSellerCalculator />;
+  return <DesktopSellerCalculator />;
+}
+
+function DesktopSellerCalculator() {
   const [s, setS] = useState(INITIAL);
   const update = useCallback((k, v) => setS((p) => ({ ...p, [k]: v })), []);
-  const isMobile = useViewportMobile(820);
+  const isMobile = false;
 
   // Debounced inputs feed into the pure calc — keeps the live count-up
   // smooth while typing without thrashing on every keystroke.
