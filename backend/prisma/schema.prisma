@@ -180,6 +180,19 @@ model Session {
   @@index([expiresAt])
 }
 
+// Sliding-window quota for Yad2 agency-wide imports — each Playwright
+// crawl is expensive (60-120s + bot-tax against Yad2's WAF), so each
+// agent gets a soft cap of 3 attempts per rolling 60 minutes. Rows are
+// pruned when a new attempt is recorded; the table is therefore capped
+// at ~3 rows per agent at steady state.
+model Yad2ImportAttempt {
+  id          String   @id @default(cuid())
+  agentId     String
+  attemptedAt DateTime @default(now())
+
+  @@index([agentId, attemptedAt])
+}
+
 // ─── Domain ────────────────────────────────────────────────────────────────
 model Property {
   id                         String                     @id @default(cuid())

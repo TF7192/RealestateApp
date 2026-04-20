@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Download, ArrowRight, AlertCircle, Check, Loader2, Building2, Store, Home as HomeIcon, ExternalLink } from 'lucide-react';
+import { Download, ArrowRight, AlertCircle, Check, Loader2, Building2, Store, Home as HomeIcon, ExternalLink, Clock, Lock } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../lib/toast';
 import { formatFloor } from '../lib/formatFloor';
@@ -34,6 +34,14 @@ export default function Yad2Import() {
   // (server populates from the [yad2:<token>] notes-marker). Keyset on
   // the frontend for O(1) "is this already imported?" lookups.
   const [alreadyImported, setAlreadyImported] = useState({});
+  // Sliding-window quota: { limit, remaining, used, resetAt, msUntilReset }.
+  // Loaded on mount, refreshed after every scrape attempt so the UI
+  // always reflects the server's view of the bucket.
+  const [quota, setQuota] = useState(null);
+
+  useEffect(() => {
+    api.yad2Quota().then(setQuota).catch(() => { /* non-critical */ });
+  }, []);
 
   // Group listings by section so the review screen reads as
   // "מכירה (12), השכרה (5), מסחרי (2)" — clearer than a flat list.
@@ -83,9 +91,17 @@ export default function Yad2Import() {
           .filter((l) => !already[l.sourceId])
           .map((l) => l.sourceId),
       ));
+      // Server returns the post-attempt quota inline so we don't need a
+      // second roundtrip to update the chip.
+      if (res.quota) setQuota(res.quota);
       setStep('review');
     } catch (e) {
       setErr(e.message || 'הטעינה נכשלה');
+      // 429 / 504 paths echo the quota inside the error envelope; pull
+      // it if present so the chip updates after a denied attempt too.
+      const inlineQuota = e?.data?.error?.quota;
+      if (inlineQuota) setQuota(inlineQuota);
+      else api.yad2Quota().then(setQuota).catch(() => {});
     } finally {
       setBusy(false);
     }
@@ -132,6 +148,7 @@ export default function Yad2Import() {
 
       {step === 'paste' && (
         <section className="y2-card">
+          <QuotaChip quota={quota} />
           <label className="y2-label" htmlFor="y2-url">קישור לדף הסוכנות שלך ב-Yad2</label>
           <input
             id="y2-url"
@@ -146,15 +163,21 @@ export default function Yad2Import() {
             placeholder="https://www.yad2.co.il/realestate/agency/7098700/forsale"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && url.trim()) fetchPreview(); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && url.trim() && !(quota && quota.remaining === 0)) fetchPreview();
+            }}
           />
           <button
             className="btn btn-primary"
-            disabled={!url.trim() || busy}
+            disabled={!url.trim() || busy || (quota && quota.remaining === 0)}
             onClick={fetchPreview}
           >
             {busy ? <Loader2 size={14} className="y2-spin" /> : <Download size={14} />}
-            {busy ? 'סורק וסופר תמונות — עד דקה וחצי…' : 'סרוק את כל הנכסים'}
+            {busy
+              ? 'סורק וסופר תמונות — עד דקה וחצי…'
+              : (quota && quota.remaining === 0
+                  ? 'הגעת למכסה השעתית'
+                  : 'סרוק את כל הנכסים')}
           </button>
           <p className="y2-hint">
             כל אחת משלושת הקטגוריות (מכירה / השכרה / מסחרי) נסרקת בנפרד, כולל כל העמודים בכל קטגוריה.
@@ -340,6 +363,51 @@ export default function Yad2Import() {
             </button>
           </div>
         </section>
+      )}
+    </div>
+  );
+}
+
+// Quota chip — sits above the URL input. Two visual states:
+//   - has slots: gold pill, "X/3 ייבואים נותרו השעה הקרובה"
+//   - exhausted: muted card, live countdown to the moment the oldest
+//     attempt expires out of the window
+function QuotaChip({ quota }) {
+  // Re-render every 30s so the countdown stays roughly accurate without
+  // burning frames. Granularity is "minutes" so 30s is more than enough.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!quota || quota.remaining > 0) return undefined;
+    const t = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, [quota?.remaining, quota?.resetAt]);
+
+  if (!quota) return null;
+  const exhausted = quota.remaining === 0;
+  const minutesLeft = quota.resetAt
+    ? Math.max(0, Math.ceil((new Date(quota.resetAt).getTime() - Date.now()) / 60_000))
+    : 0;
+
+  return (
+    <div className={`y2-quota ${exhausted ? 'y2-quota-stop' : ''}`}>
+      {exhausted ? (
+        <>
+          <Lock size={14} />
+          <div>
+            <strong>הגעת למכסה השעתית</strong>
+            <span>הסלוט הבא יתפנה בעוד {minutesLeft} דק׳</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <Clock size={14} />
+          <div>
+            <strong>
+              {quota.remaining} / {quota.limit} ייבואים נותרו
+            </strong>
+            <span>המכסה מתאפסת על בסיס שעה גולשת — שלוש סריקות לכל שעה.</span>
+          </div>
+        </>
       )}
     </div>
   );

@@ -219,6 +219,10 @@ export const api = {
   // pages × server-side image re-host on import.
   yad2AgencyPreview: (url) => request('/integrations/yad2/agency/preview', { method: 'POST', body: { url } }),
   yad2AgencyImport:  (listings) => request('/integrations/yad2/agency/import',  { method: 'POST', body: { listings } }),
+  // Sliding-window quota — { limit, remaining, used, resetAt, msUntilReset }.
+  // The Yad2 import screen calls this on mount + after each preview to
+  // render the "X/3 left this hour, resets in Y min" chip.
+  yad2Quota:         () => request('/integrations/yad2/quota'),
 
   // Task 2 — admin users table.
   adminUsers: (params = {}) => {

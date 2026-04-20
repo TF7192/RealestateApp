@@ -79,6 +79,74 @@ function extractAgencyId(input: { url?: string; agencyId?: string }): string | n
   return m ? m[1] : null;
 }
 
+// ── Per-agent quota ──────────────────────────────────────────────
+// Sliding window: 3 agency-wide imports per rolling 60 minutes per
+// agent. Each Playwright crawl is ~60-120s and runs through Yad2's
+// WAF — a soft cap protects both our IP reputation AND a misbehaving
+// client that would otherwise re-trigger the crawl in a tight loop.
+//
+// The window is computed against the OLDEST attempt in the bucket: if
+// you've used your 3 and the oldest was 12min ago, you get one slot
+// back at +48min. The frontend renders a countdown to that timestamp.
+const YAD2_QUOTA_LIMIT = 3;
+const YAD2_QUOTA_WINDOW_MS = 60 * 60 * 1000;
+
+interface QuotaSnapshot {
+  limit: number;
+  remaining: number;
+  used: number;
+  // Wall-clock ISO time when the next slot becomes available. null
+  // when remaining > 0 (no need to wait).
+  resetAt: string | null;
+  // Convenience for the UI: ms until reset (0 when no wait).
+  msUntilReset: number;
+}
+
+async function getYad2Quota(agentId: string): Promise<QuotaSnapshot> {
+  const since = new Date(Date.now() - YAD2_QUOTA_WINDOW_MS);
+  const attempts = await prisma.yad2ImportAttempt.findMany({
+    where: { agentId, attemptedAt: { gt: since } },
+    orderBy: { attemptedAt: 'asc' },
+    select: { attemptedAt: true },
+    take: YAD2_QUOTA_LIMIT + 1, // +1 so we know if the bucket is over
+  });
+  const used = attempts.length;
+  const remaining = Math.max(0, YAD2_QUOTA_LIMIT - used);
+  // Reset = the moment the OLDEST attempt falls out of the window.
+  // Only meaningful when the agent has hit the cap.
+  const oldest = attempts[0]?.attemptedAt;
+  const resetAtMs = oldest ? oldest.getTime() + YAD2_QUOTA_WINDOW_MS : 0;
+  const msUntilReset = remaining === 0 ? Math.max(0, resetAtMs - Date.now()) : 0;
+  return {
+    limit: YAD2_QUOTA_LIMIT,
+    remaining,
+    used,
+    resetAt: remaining === 0 ? new Date(resetAtMs).toISOString() : null,
+    msUntilReset,
+  };
+}
+
+async function recordYad2Attempt(agentId: string): Promise<void> {
+  await prisma.yad2ImportAttempt.create({ data: { agentId } });
+  // Self-cleanup so the table never grows past ~3 rows per agent. Done
+  // best-effort; a stray row doesn't hurt correctness because getYad2Quota
+  // already filters by the window.
+  prisma.yad2ImportAttempt.deleteMany({
+    where: { agentId, attemptedAt: { lt: new Date(Date.now() - YAD2_QUOTA_WINDOW_MS) } },
+  }).catch(() => { /* ignore */ });
+}
+
+function quotaExceededReply(reply: any, quota: QuotaSnapshot) {
+  const minutesLeft = Math.ceil(quota.msUntilReset / 60_000);
+  return reply.code(429).send({
+    error: {
+      message: `הגעת למכסה השעתית (${quota.limit} ייבואים). מתחדש בעוד ${minutesLeft} דק׳.`,
+      code: 'quota_exceeded',
+      quota,
+    },
+  });
+}
+
 export const registerYad2Routes: FastifyPluginAsync = async (app) => {
   if (!FEATURE_FLAG) {
     const stub = async (_req: any, reply: any) =>
@@ -90,6 +158,14 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     return;
   }
 
+  // ── Quota — read-only snapshot for the UI to render the "X/3 left
+  // this hour, resets in Y min" chip on the import screen.
+  app.get('/quota', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const u = getUser(req);
+    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    return await getYad2Quota(u.id);
+  });
+
   // ── Legacy single-page preview (left intact for back-compat) ──────
   app.post('/preview', { onRequest: [app.requireAuth] }, async (req, reply) => {
     const parsed = PreviewQ.safeParse(req.body);
@@ -100,8 +176,14 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     // If this is an agency URL, defer to the agency endpoint.
     const agencyId = extractAgencyId({ url });
     if (agencyId) {
+      const u = getUser(req);
+      if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+      const quota = await getYad2Quota(u.id);
+      if (quota.remaining === 0) return quotaExceededReply(reply, quota);
+      await recordYad2Attempt(u.id);
       const report = await crawlAgency(agencyId);
-      return { listings: report.listings, agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone }, sections: report.sections, truncated: report.truncated };
+      const after = await getYad2Quota(u.id);
+      return { listings: report.listings, agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone }, sections: report.sections, truncated: report.truncated, quota: after };
     }
     return reply.code(400).send({ error: { message: 'נא להדביק כתובת של דף סוכנות (yad2.co.il/realestate/agency/...)' } });
   });
@@ -118,6 +200,12 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     }
     const u = getUser(req);
     if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    // Quota check BEFORE the expensive crawl. We deliberately count the
+    // attempt up-front (not on success) so a flaky Yad2 / WAF burst
+    // doesn't let the agent retry their way around the limit.
+    const quotaBefore = await getYad2Quota(u.id);
+    if (quotaBefore.remaining === 0) return quotaExceededReply(reply, quotaBefore);
+    await recordYad2Attempt(u.id);
     try {
       const report = await crawlAgency(agencyId);
       if (report.listings.length === 0) {
@@ -140,6 +228,7 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
       // frontend uses this to mute already-imported rows + link straight
       // to the existing property page.
       const alreadyImported = await findAlreadyImported(u.id, report.listings.map((l) => l.sourceId));
+      const quotaAfter = await getYad2Quota(u.id);
 
       return {
         listings: report.listings,
@@ -147,10 +236,12 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
         sections: report.sections,
         truncated: report.truncated,
         alreadyImported,
+        quota: quotaAfter,
       };
     } catch (err: any) {
       req.log.warn({ err, agencyId }, 'yad2 agency crawl threw');
-      return reply.code(504).send({ error: { message: 'הסוכנות לא הגיבה — נסה שוב' } });
+      const quotaAfter = await getYad2Quota(u.id);
+      return reply.code(504).send({ error: { message: 'הסוכנות לא הגיבה — נסה שוב', quota: quotaAfter } });
     }
   });
 
