@@ -1,20 +1,19 @@
-// Sprint 2 / MLS parity — frontend-only copy of the Hebrew label
-// maps that Nadlan One uses. The backend equivalent lives in
-// backend/src/lib/mls-labels.ts; keep these in sync when adding new
-// enum values. Backend is the source of truth — this file exists so
-// the UI doesn't have to import from the backend package (we don't
-// share code across the server / client boundary in this repo).
+// Hebrew labels for MLS-parity enum values.
 //
-// Keep flat (data-only) so it stays greppable.
+// Mirrors backend/src/lib/mls-labels.ts. Kept as a separate frontend
+// file so we don't import across the backend/frontend boundary (TS → JS,
+// backend bundles pull in pino/etc.). Keep the two files in sync when
+// values are added — the unit test in tests/unit/frontend/mlsLabels.test.js
+// asserts the maps cover every enum value the app renders.
 
-// Lead heat — thermal status.
+// ── Lead heat — thermal status ──────────────────────────────────────
 export const LEAD_HEAT_LABELS = {
   HOT:  'חם',
   WARM: 'חמים',
   COLD: 'קר',
 };
 
-// Customer lifecycle (Nadlan "סטטוס לקוח").
+// ── Customer lifecycle (Nadlan "סטטוס לקוח") ────────────────────────
 export const CUSTOMER_STATUS_LABELS = {
   ACTIVE:    'פעיל',
   INACTIVE:  'לא פעיל',
@@ -25,7 +24,7 @@ export const CUSTOMER_STATUS_LABELS = {
   RENTED:    'שכר',
 };
 
-// Quick-lead status (Nadlan "LeadStatusID").
+// ── Quick-lead status (Nadlan "LeadStatusID") ───────────────────────
 export const QUICK_LEAD_STATUS_LABELS = {
   NEW:                      'חדש',
   INTENT_TO_CALL:           'בכוונת התקשרות',
@@ -38,7 +37,7 @@ export const QUICK_LEAD_STATUS_LABELS = {
   ARCHIVED:                 'ארכיון',
 };
 
-// Seriousness (shared: Lead + Property.sellerSeriousness).
+// ── Seriousness (shared: Lead + Property.sellerSeriousness) ─────────
 export const SERIOUSNESS_LABELS = {
   NONE:    'ללא',
   SORT_OF: 'סוג של',
@@ -46,8 +45,16 @@ export const SERIOUSNESS_LABELS = {
   VERY:    'מאוד',
 };
 
-// Interest / property kind. Not from Nadlan but used in the filter
-// drawer so we keep the label list centralized.
+// ── Customer purpose ────────────────────────────────────────────────
+export const CUSTOMER_PURPOSE_LABELS = {
+  INVESTMENT:   'השקעה',
+  RESIDENCE:    'מגורים',
+  COMMERCIAL:   'מסחרי',
+  COMBINATION:  'משולב',
+};
+
+// ── Interest / property kind (filter drawer on Customers page) ──────
+// Not from Nadlan; centralized here so the label list has one home.
 export const PROPERTY_TYPE_LABELS = {
   residential: 'מגורים',
   commercial:  'מסחרי',
@@ -57,7 +64,20 @@ export const PROPERTY_TYPE_LABELS = {
   parking:     'חניה',
 };
 
-// Small convenience: return [{value, label}] pairs for <select>/chip grids.
-export function labelOptions(map) {
+// ── Helpers ─────────────────────────────────────────────────────────
+// Turn a {VALUE: 'תווית'} map into the options array shape the
+// SelectField/Segmented components accept ([{value, label}, …]).
+export function labelsToOptions(map) {
   return Object.entries(map).map(([value, label]) => ({ value, label }));
+}
+
+// Back-compat alias — earlier callers imported `labelOptions`.
+export const labelOptions = labelsToOptions;
+
+// Look up a label with a safe fallback so raw enum values never leak
+// to the UI when the map is out of date. Returns the original string
+// when no entry exists rather than throwing.
+export function labelFor(map, value) {
+  if (value == null || value === '') return '';
+  return map[value] ?? String(value);
 }

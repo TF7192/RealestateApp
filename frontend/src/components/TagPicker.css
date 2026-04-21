@@ -1,0 +1,115 @@
+/* TagPicker — scoped styles. Layout is chips + a "+ הוסף" trailing
+   button that opens a small popover. RTL-first. */
+
+.tag-picker {
+  display: block;
+}
+
+.tag-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.tag-picker-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.tag-chip-label { font-weight: 500; }
+
+.tag-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-inline-start: 2px;
+}
+.tag-chip-remove:hover { background: var(--bg-hover, rgba(0, 0, 0, 0.05)); }
+.tag-chip-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.tag-picker-add-wrap {
+  position: relative;
+}
+
+.tag-picker-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.tag-picker-add:hover { color: var(--text-primary); border-color: var(--gold); }
+.tag-picker-add:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.tag-picker-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  inset-inline-start: 0;
+  min-width: 180px;
+  max-width: 260px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.12));
+  z-index: 20;
+  padding: 4px;
+}
+.tag-picker-pop ul { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+.tag-picker-pop-empty { padding: 8px 10px; color: var(--text-muted); font-size: 12px; }
+
+.tag-picker-pop-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+  text-align: start;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.tag-picker-pop-item:hover { background: var(--bg-hover, rgba(0, 0, 0, 0.04)); }
+
+.tag-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
