@@ -111,7 +111,7 @@ export default function TransferPropertyDialog({ property, onClose, onDone }) {
               <h3>העברת נכס</h3>
               <p>{property.street}, {property.city}</p>
             </div>
-            <button className="btn-ghost" onClick={onClose}><X size={18} /></button>
+            <button className="btn-ghost" onClick={onClose} aria-label="סגור"><X size={18} /></button>
           </header>
 
           <div className="tpd-tabs">

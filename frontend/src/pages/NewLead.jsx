@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Save, Clipboard, X } from 'lucide-react';
 import { cityNames, streetNames } from '../data/mockData';
 import { useToast } from '../lib/toast';
+import useBeforeUnload from '../hooks/useBeforeUnload';
 import StickyActionBar from '../components/StickyActionBar';
 import { RoomsChips, SuggestPicker } from '../components/MobilePickers';
 import { useDraftAutosave, readDraft, useClipboardPhone } from '../hooks/mobile';
@@ -46,6 +47,10 @@ export default function NewLead() {
   const toast = useToast();
   const [form, setForm] = useState(INITIAL_FORM);
   const [draftBanner, setDraftBanner] = useState(null);
+
+  // F-5.5 — dirty guard on create only.
+  const isDirty = !!(form.name || form.phone || form.email || form.city || form.notes);
+  useBeforeUnload(isDirty, 'יש שינויים שלא נשמרו בליד — לעזוב?');
   const [clipboardSuggestion, setClipboardSuggestion] = useState(null);
   const [clipboardDismissed, setClipboardDismissed] = useState(false);
   const peekedRef = useRef(false);

@@ -145,12 +145,38 @@ function buildShareUrl(filters) {
 }
 
 export default function Properties() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const isMobile = useViewportMobile(820);
   // F-6.3 — preserve scroll when the agent goes deep into a property
   // card and pops back. Critical for 500-row lists on desktop.
   useRouteScrollRestore();
+
+  // F-6.5 — write filters back to the URL so refresh / share link /
+  // back-forward all land on the same view. Use `replace` to avoid
+  // piling up history entries while typing.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (search)                     next.set('q', search);
+    if (filter !== 'all')           next.set('cat', filter);
+    if (assetClassFilter !== 'all') next.set('ac', assetClassFilter);
+    if (showAdvanced)               next.set('adv', '1');
+    if (locationQuery)              next.set('near', locationQuery);
+    if (locationRadius !== 5)       next.set('km', String(locationRadius));
+    if (advFilters.city)            next.set('city', advFilters.city);
+    if (advFilters.minPrice)        next.set('minP', String(advFilters.minPrice));
+    if (advFilters.maxPrice)        next.set('maxP', String(advFilters.maxPrice));
+    if (advFilters.minRooms)        next.set('minR', String(advFilters.minRooms));
+    if (advFilters.maxRooms)        next.set('maxR', String(advFilters.maxRooms));
+    if (advFilters.minSqm)          next.set('minS', String(advFilters.minSqm));
+    if (advFilters.maxSqm)          next.set('maxS', String(advFilters.maxSqm));
+    const nextStr = next.toString();
+    const curStr = searchParams.toString();
+    if (nextStr !== curStr) {
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, filter, assetClassFilter, showAdvanced, locationQuery, locationRadius, advFilters]);
   // Seed state from the in-memory pageCache so a return to this tab
   // paints the previous result INSTANTLY — no empty-page flash while
   // the background fetch runs. First visit: cache is null so we fall
@@ -160,22 +186,25 @@ export default function Properties() {
   const [items, setItems] = useState(_cached || []);
   const [loading, setLoading] = useState(!_cached);
   const showPropsSkel = useDelayedFlag(loading, 220);
-  const [filter, setFilter] = useState('all');
-  const [assetClassFilter, setAssetClassFilter] = useState('all');
-  const [search, setSearch] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  // F-6.5 — filters live in URL so they survive refresh and are
+  // shareable. Seed each piece of state from `searchParams`; writes
+  // flow back via setSearchParams below.
+  const [filter, setFilter] = useState(() => searchParams.get('cat') || 'all');
+  const [assetClassFilter, setAssetClassFilter] = useState(() => searchParams.get('ac') || 'all');
+  const [search, setSearch] = useState(() => searchParams.get('q') || '');
+  const [showAdvanced, setShowAdvanced] = useState(() => searchParams.get('adv') === '1');
   const [copiedLink, setCopiedLink] = useState(false);
-  const [locationQuery, setLocationQuery] = useState('');
-  const [locationRadius, setLocationRadius] = useState(5);
-  const [advFilters, setAdvFilters] = useState({
-    city: '',
-    minPrice: null,
-    maxPrice: null,
-    minRooms: '',
-    maxRooms: '',
-    minSqm: null,
-    maxSqm: null,
-  });
+  const [locationQuery, setLocationQuery] = useState(() => searchParams.get('near') || '');
+  const [locationRadius, setLocationRadius] = useState(() => Number(searchParams.get('km')) || 5);
+  const [advFilters, setAdvFilters] = useState(() => ({
+    city:     searchParams.get('city') || '',
+    minPrice: searchParams.get('minP') || null,
+    maxPrice: searchParams.get('maxP') || null,
+    minRooms: searchParams.get('minR') || '',
+    maxRooms: searchParams.get('maxR') || '',
+    minSqm:   searchParams.get('minS') || null,
+    maxSqm:   searchParams.get('maxS') || null,
+  }));
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 

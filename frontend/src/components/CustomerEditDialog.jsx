@@ -87,7 +87,7 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
               <h3>עריכת לקוח</h3>
               <p>{lead.name}</p>
             </div>
-            <button className="btn-ghost" onClick={onClose}><X size={18} /></button>
+            <button className="btn-ghost" onClick={onClose} aria-label="סגור"><X size={18} /></button>
           </header>
 
           <div className="agreement-body">

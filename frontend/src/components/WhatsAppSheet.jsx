@@ -54,7 +54,7 @@ export default function WhatsAppSheet({
               <h3>{title || 'שליחה בוואטסאפ'}</h3>
               {subtitle && <p>{subtitle}</p>}
             </div>
-            <button className="btn-ghost" onClick={onClose}><X size={18} /></button>
+            <button className="btn-ghost" onClick={onClose} aria-label="סגור"><X size={18} /></button>
           </header>
 
           <div className="was-body">

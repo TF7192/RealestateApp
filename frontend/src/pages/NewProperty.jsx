@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
+import useBeforeUnload from '../hooks/useBeforeUnload';
 import { cityNames, streetNames } from '../data/mockData';
 import StickyActionBar from '../components/StickyActionBar';
 import OwnerPicker from '../components/OwnerPicker';
@@ -169,6 +170,16 @@ export default function NewProperty() {
   const [existingMeta, setExistingMeta] = useState(null); // { street, city, imageCount }
 
   const [form, setForm] = useState(INITIAL_FORM);
+
+  // F-5.5 — dirty-form guard. Only arms in create mode; edit mode
+  // doesn't need the prompt because unsaved edits are not "new" data
+  // (they're on a persisted record and the draft-banner path can
+  // recover them anyway).
+  const isDirty = !isEdit && (
+    !!form.street || !!form.city || !!form.marketingPrice || !!form.owner ||
+    !!form.ownerPhone || !!form.notes
+  );
+  useBeforeUnload(isDirty, 'יש שינויים שלא נשמרו בנכס — לעזוב?');
 
   // ── Draft autosave + restore banner ────────────────────────────────
   // In edit mode we explicitly skip autosave: the draft recovery UX

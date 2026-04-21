@@ -42,7 +42,7 @@ export default function ShareCatalogDialog({
             <h3>שיתוף הקטלוג האישי</h3>
             <p>זה מה שהלקוח יראה כשילחץ על הקישור</p>
           </div>
-          <button className="btn-ghost" onClick={onClose}><X size={18} /></button>
+          <button className="btn-ghost" onClick={onClose} aria-label="סגור"><X size={18} /></button>
         </header>
 
         <div className="scd-body">
