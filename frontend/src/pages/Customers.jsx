@@ -27,6 +27,7 @@ import {
   Briefcase,
   CheckCircle2,
   User,
+  Star,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useRouteScrollRestore } from '../hooks/useScrollRestore';
@@ -48,7 +49,39 @@ import { relativeTime, absoluteTime } from '../lib/time';
 import { relativeDate } from '../lib/relativeDate';
 import { waUrl, telUrl } from '../lib/waLink';
 import { leadMatchesProperty } from './Properties';
+import CustomerFiltersPanel from '../components/CustomerFiltersPanel';
+import SavedSearchMenu from '../components/SavedSearchMenu';
+import FavoriteStar from '../components/FavoriteStar';
 import './Customers.css';
+
+// Sprint 2 C2 — translate a UI filter object into the array-of-pairs
+// shape that api.listLeads → URLSearchParams understands for the
+// backend's repeated-key array params (`cities=A&cities=B`). Empty /
+// null values are dropped so we don't send `?minPrice=`.
+function filtersToQuery(filters) {
+  const pairs = [];
+  for (const [k, v] of Object.entries(filters || {})) {
+    if (v === null || v === undefined || v === '' || v === false) continue;
+    if (Array.isArray(v)) {
+      for (const item of v) if (item != null && item !== '') pairs.push([k, String(item)]);
+    } else if (v === true) {
+      pairs.push([k, '1']);
+    } else {
+      pairs.push([k, String(v)]);
+    }
+  }
+  return pairs;
+}
+
+// Count the top-level filter groups that are "active" — shown on the
+// filter trigger button as a summary chip. Arrays contribute 1 per
+// non-empty group; scalars / booleans contribute 1 when set.
+function countActiveFilters(filters) {
+  return Object.entries(filters || {}).filter(([, v]) => {
+    if (Array.isArray(v)) return v.length > 0;
+    return v !== null && v !== undefined && v !== '' && v !== false;
+  }).length;
+}
 
 function statusIcon(status) {
   switch (status) {
@@ -159,17 +192,35 @@ export default function Customers() {
   });
   const cardRefs = useRef({});
 
+  // Sprint 2 C2 + Sprint 7 B3/B4 — server-side Nadlan-parity filters,
+  // saved searches, and favorite toggle.
+  //
+  // `serverFilters` holds the object produced by <CustomerFiltersPanel>
+  // and is echoed into api.listLeads via filtersToQuery. Separate from
+  // the in-memory `lookingForFilter` / `interestFilter` / `statusFilter`
+  // chips above which filter the already-fetched array client-side.
+  const [serverFilters, setServerFilters] = useState({});
+  const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState(() => new Set());
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+
   const changeView = (v) => {
     setView(v);
     try { localStorage.setItem('estia-customers-view', v); } catch { /* ignore */ }
   };
 
-  const loadLeads = useCallback(async () => {
-    const r = await api.listLeads();
+  const loadLeads = useCallback(async (overrideFilters) => {
+    // Sprint 2 C2 — honor the advanced filter drawer by passing its
+    // object into api.listLeads. Array values become repeated keys
+    // (?cities=A&cities=B). When no filter is set we fall back to a
+    // bare call so URLSearchParams doesn't echo empty `?` noise.
+    const f = overrideFilters ?? serverFilters;
+    const params = Object.keys(f || {}).length ? filtersToQuery(f) : undefined;
+    const r = await api.listLeads(params);
     const next = r.items || [];
     setLeads(next);
     pageCache.set('customers', next);
-  }, []);
+  }, [serverFilters]);
 
   useEffect(() => {
     loadLeads().finally(() => setLoading(false));
@@ -181,6 +232,15 @@ export default function Customers() {
         pageCache.set('properties', next);
       })
       .catch(() => { /* ignore — pills simply hide */ });
+    // Sprint 7 B4 — seed the favorites set so each row's star reflects
+    // the current state without waiting for the first toggle. Empty
+    // set on failure is fine; each row just shows an empty star.
+    api.listFavorites('LEAD')
+      .then((r) => {
+        const ids = new Set((r?.items || []).map((f) => f.entityId));
+        setFavoriteIds(ids);
+      })
+      .catch(() => { /* ignore */ });
   }, [loadLeads]);
 
   // P3-D1: precompute match counts keyed by lead id
@@ -250,6 +310,8 @@ export default function Customers() {
         const days = (now - new Date(l.lastContact).getTime()) / DAY;
         if (days < inactiveFilter) return false;
       }
+      // Sprint 7 B4 — "רק מועדפים" toggle narrows to the starred set.
+      if (onlyFavorites && !favoriteIds.has(l.id)) return false;
       if (!debouncedSearch) return true;
       const s = debouncedSearch.toLowerCase();
       return (
@@ -258,7 +320,7 @@ export default function Customers() {
         l.phone?.includes(s)
       );
     });
-  }, [leads, lookingForFilter, interestFilter, statusFilter, inactiveFilter, debouncedSearch]);
+  }, [leads, lookingForFilter, interestFilter, statusFilter, inactiveFilter, debouncedSearch, onlyFavorites, favoriteIds]);
 
   const handleWhatsApp = (lead) => {
     primeContactBump(lead.id);
@@ -330,6 +392,48 @@ export default function Customers() {
 
   const handleStatusChange = (lead, newStatus) =>
     patchLead(lead.id, { status: newStatus }, { success: `סטטוס עודכן ל-${newStatus === 'HOT' ? 'חם' : newStatus === 'WARM' ? 'חמים' : 'קר'}` });
+
+  // Sprint 7 B4 — toggle a lead's favorite state. We update the local
+  // set optimistically before awaiting the API so the star flips as
+  // soon as the agent taps. A failure rolls back + surfaces a toast.
+  const handleToggleFavorite = async (leadId, nextActive) => {
+    setFavoriteIds((cur) => {
+      const copy = new Set(cur);
+      if (nextActive) copy.add(leadId);
+      else copy.delete(leadId);
+      return copy;
+    });
+    try {
+      if (nextActive) {
+        await api.addFavorite({ entityType: 'LEAD', entityId: leadId });
+      } else {
+        await api.removeFavorite('LEAD', leadId);
+      }
+    } catch (e) {
+      // Rollback
+      setFavoriteIds((cur) => {
+        const copy = new Set(cur);
+        if (nextActive) copy.delete(leadId);
+        else copy.add(leadId);
+        return copy;
+      });
+      toast.error(e?.message || 'שינוי המועדפים נכשל');
+    }
+  };
+
+  // Sprint 2 C2 — the advanced-filter drawer commits here. We store
+  // the new server filter set and immediately re-fetch.
+  const handleApplyServerFilters = async (nextFilters) => {
+    setServerFilters(nextFilters);
+    try {
+      await loadLeads(nextFilters);
+    } catch { /* toast handled by api layer */ }
+  };
+
+  const serverFilterCount = useMemo(
+    () => countActiveFilters(serverFilters),
+    [serverFilters],
+  );
 
   const confirmDeleteLead = async () => {
     if (!deleteTarget) return;
@@ -429,6 +533,42 @@ export default function Customers() {
           <p>{filtered.length} מתוך {leads.length} לקוחות</p>
         </div>
         <div className="page-header-actions">
+          {/* Sprint 2 C2 + Sprint 7 B3/B4 — advanced filter drawer,
+              saved-search menu, and "only favorites" toggle sit here
+              between the view switch and the primary "ליד חדש" CTA. */}
+          <button
+            type="button"
+            className={`btn btn-ghost btn-sm ${serverFilterCount > 0 ? 'is-active' : ''}`}
+            onClick={() => setAdvancedFilterOpen(true)}
+            aria-label={`סינון מתקדם${serverFilterCount > 0 ? ` (${serverFilterCount})` : ''}`}
+            title="סינון מתקדם"
+          >
+            <SlidersHorizontal size={14} aria-hidden="true" />
+            <span>סינון מתקדם</span>
+            {serverFilterCount > 0 && (
+              <span className="cust-filter-count" aria-hidden="true">{serverFilterCount}</span>
+            )}
+          </button>
+          <SavedSearchMenu
+            entityType="LEAD"
+            currentFilters={serverFilters}
+            onLoad={handleApplyServerFilters}
+          />
+          <button
+            type="button"
+            className={`btn btn-ghost btn-sm ${onlyFavorites ? 'is-active' : ''}`}
+            onClick={() => setOnlyFavorites((v) => !v)}
+            aria-pressed={onlyFavorites}
+            aria-label="רק מועדפים"
+            title="הצג רק מועדפים"
+          >
+            <Star
+              size={14}
+              aria-hidden="true"
+              fill={onlyFavorites ? 'currentColor' : 'none'}
+            />
+            <span>רק מועדפים</span>
+          </button>
           <div className="view-toggle" role="group" aria-label="תצוגה">
             <button
               className={`view-toggle-btn ${view === 'cards' ? 'active' : ''}`}
@@ -572,6 +712,8 @@ export default function Customers() {
           cardRefs={cardRefs}
           isMobile={isMobile}
           matchCountByLead={matchCountByLead}
+          favoriteIds={favoriteIds}
+          onToggleFavorite={handleToggleFavorite}
           onStatusChange={handleStatusChange}
           onEdit={setEditDialog}
           onDelete={setDeleteTarget}
@@ -640,6 +782,13 @@ export default function Customers() {
                         <div className="ccm-mid">
                           <div className="ccm-name-row">
                             <strong className="ccm-name">{lead.name}</strong>
+                            {/* Sprint 7 B4 — favorite toggle; stop
+                                propagation is handled inside FavoriteStar. */}
+                            <FavoriteStar
+                              active={favoriteIds.has(lead.id)}
+                              onToggle={(next) => handleToggleFavorite(lead.id, next)}
+                              className="fav-star-sm"
+                            />
                             {/* P2-M17: status reason pill inline next to name */}
                             <span className={`ccm-reason-pill ${reasonStatusClass}`} title={lead.statusExplanation || ''}>
                               <span className="ccm-reason-emoji" aria-hidden="true">{reason.emoji}</span>
@@ -881,9 +1030,16 @@ export default function Customers() {
                 <div className="cc-v2-left">
                   <div className="customer-avatar">{lead.name.charAt(0)}</div>
                   <div className="cc-v2-name">
-                    <Link to={`/customers/${lead.id}`} className="customer-name-link">
-                      <strong>{lead.name}</strong>
-                    </Link>
+                    <div className="cc-v2-name-row">
+                      <Link to={`/customers/${lead.id}`} className="customer-name-link">
+                        <strong>{lead.name}</strong>
+                      </Link>
+                      {/* Sprint 7 B4 — favorite toggle inline with the name. */}
+                      <FavoriteStar
+                        active={favoriteIds.has(lead.id)}
+                        onToggle={(next) => handleToggleFavorite(lead.id, next)}
+                      />
+                    </div>
                     <StatusPicker lead={lead} onChange={handleStatusChange} />
                   </div>
                 </div>
@@ -1118,6 +1274,16 @@ export default function Customers() {
           onClose={() => setFilterSheetOpen(false)}
         />
       )}
+
+      {/* Sprint 2 C2 — Nadlan-parity advanced filter drawer. Opens
+          from the "סינון מתקדם" button in the header; apply re-fetches
+          /api/leads with the selected filters. */}
+      <CustomerFiltersPanel
+        open={advancedFilterOpen}
+        filters={serverFilters}
+        onApply={handleApplyServerFilters}
+        onClose={() => setAdvancedFilterOpen(false)}
+      />
     </div>
     </PullRefresh>
   );
@@ -1131,6 +1297,8 @@ function CustomerList({
   cardRefs,
   isMobile,
   matchCountByLead = {},
+  favoriteIds,
+  onToggleFavorite,
   onStatusChange,
   onEdit,
   onDelete,
@@ -1243,6 +1411,17 @@ function CustomerList({
                   title={`פתח כרטיס לקוח של ${lead.name}`}
                 >
                   <td className="cl-td cl-td-name">
+                    {/* Sprint 7 B4 — star sits on the row so agents can
+                        flag a lead without opening the detail page. */}
+                    {onToggleFavorite && (
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <FavoriteStar
+                          active={favoriteIds?.has(lead.id) || false}
+                          onToggle={(next) => onToggleFavorite(lead.id, next)}
+                          className="fav-star-sm"
+                        />
+                      </span>
+                    )}
                     <span className="cl-avatar">{lead.name.charAt(0)}</span>
                     <span className="cl-name-text">
                       <strong>{lead.name}</strong>
@@ -1347,6 +1526,13 @@ function CustomerList({
             className={`customer-list-row ${highlightId === lead.id ? 'highlight' : ''}`}
           >
             <span className="cl-name">
+              {onToggleFavorite && (
+                <FavoriteStar
+                  active={favoriteIds?.has(lead.id) || false}
+                  onToggle={(next) => onToggleFavorite(lead.id, next)}
+                  className="fav-star-sm"
+                />
+              )}
               <span className="cl-avatar">{lead.name.charAt(0)}</span>
               <span className="cl-name-text">
                 <strong>{lead.name}</strong>
