@@ -1,0 +1,198 @@
+/* Sprint 2 / MLS parity — C2. Right-side drawer for the Customers
+ * filter panel. Backdrop darkens the page, panel slides in from the
+ * start edge (RTL: right side) and occupies a fixed width on desktop,
+ * full width on mobile. */
+
+.cfp-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 90;
+  display: flex;
+  justify-content: flex-start;
+  animation: cfp-fade-in 160ms ease;
+}
+
+@keyframes cfp-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.cfp-panel {
+  width: min(420px, 100vw);
+  max-width: 100vw;
+  height: 100vh;
+  background: var(--surface, #fff);
+  color: inherit;
+  box-shadow: -12px 0 24px rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+  animation: cfp-slide-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes cfp-slide-in {
+  from { transform: translateX(12%); opacity: 0.85; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+
+.cfp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+}
+
+.cfp-head-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cfp-head-title h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cfp-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--gold, #d4a017);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cfp-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cfp-close:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+}
+
+.cfp-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.cfp-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #55555d);
+}
+
+.cfp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cfp-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.14));
+  border-radius: 999px;
+  background: var(--surface-muted, #fafafa);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.25;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.cfp-chip:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.cfp-chip.sel {
+  background: var(--gold-soft, rgba(212, 160, 23, 0.15));
+  border-color: var(--gold, #d4a017);
+  color: var(--gold-strong, #b8890f);
+  font-weight: 600;
+}
+
+.cfp-chip:focus-visible {
+  outline: 2px solid var(--focus-ring, #7a6cff);
+  outline-offset: 1px;
+}
+
+.cfp-tag {
+  border-left: 3px solid var(--tag-color, var(--border, rgba(0, 0, 0, 0.14)));
+  padding-inline-start: 10px;
+}
+
+.cfp-range-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cfp-range-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted, #55555d);
+}
+
+.cfp-range-cap {
+  font-weight: 600;
+}
+
+.cfp-mini-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cfp-mini-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted, #55555d);
+}
+
+.cfp-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  background: var(--surface, #fff);
+}
+
+.cfp-foot .btn-primary,
+.cfp-foot .btn-ghost {
+  flex: 1;
+}
+
+/* Mobile: full-screen drawer feels better than a right pane on
+ * narrow viewports. */
+@media (max-width: 600px) {
+  .cfp-panel {
+    width: 100vw;
+  }
+}
