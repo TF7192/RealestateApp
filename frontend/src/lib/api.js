@@ -386,6 +386,15 @@ export const api = {
   deleteOwner:       (id) => request(`/owners/${id}`, { method: 'DELETE' }),
   searchOwners:      (q) => request(`/owners/search?q=${encodeURIComponent(q)}`),
 
+  // Owner phones (J8 multi-phone)
+  listOwnerPhones:   (ownerId) => request(`/owners/${ownerId}/phones`),
+  addOwnerPhone:     (ownerId, body) =>
+    request(`/owners/${ownerId}/phones`, { method: 'POST', body }),
+  updateOwnerPhone:  (id, body) =>
+    request(`/owner-phones/${id}`, { method: 'PATCH', body }),
+  deleteOwnerPhone:  (id) =>
+    request(`/owner-phones/${id}`, { method: 'DELETE' }),
+
   // Message templates
   listTemplates: () => request('/templates'),
   saveTemplate: (kind, body) =>

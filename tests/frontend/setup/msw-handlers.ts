@@ -54,6 +54,29 @@ export const defaultHandlers = [
   ),
   http.get('/api/owners/search', () => HttpResponse.json({ items: [] })),
 
+  // Owner phones (J8 multi-phone)
+  http.get('/api/owners/:id/phones', () => HttpResponse.json({ items: [] })),
+  http.post('/api/owners/:id/phones', async ({ request }) => {
+    const body: any = await request.json().catch(() => ({}));
+    return HttpResponse.json({
+      phone: {
+        id: `ph_${Date.now()}`,
+        ownerId: 'owner-1',
+        phone: body.phone ?? '',
+        kind: body.kind ?? 'primary',
+        label: body.label ?? null,
+        sortOrder: body.sortOrder ?? 0,
+      },
+    });
+  }),
+  http.patch('/api/owner-phones/:id', async ({ params, request }) => {
+    const body: any = await request.json().catch(() => ({}));
+    return HttpResponse.json({
+      phone: { id: params.id, ownerId: 'owner-1', ...body },
+    });
+  }),
+  http.delete('/api/owner-phones/:id', () => HttpResponse.json({ ok: true })),
+
   // Deals
   http.get('/api/deals', () => HttpResponse.json({ items: [] })),
 
