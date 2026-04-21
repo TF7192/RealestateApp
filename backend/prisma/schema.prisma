@@ -554,9 +554,26 @@ model Owner {
   updatedAt    DateTime @updatedAt
 
   properties Property[]
+  phones     OwnerPhone[]
 
   @@index([agentId])
   @@index([phone])
+}
+
+/// J8 multi-phone. One row per phone number; the legacy `Owner.phone`
+/// column above is kept as the denormalized "primary" for back-compat.
+model OwnerPhone {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  phone     String
+  kind      String   @default("primary") // primary|secondary|spouse|work|fax|other
+  label     String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
 }
 
 enum TransferStatus {
