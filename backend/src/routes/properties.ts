@@ -32,7 +32,11 @@ const listQuery = z.object({
 const propertyInput = z.object({
   assetClass: z.enum(['RESIDENTIAL', 'COMMERCIAL']),
   category: z.enum(['SALE', 'RENT']),
-  status: z.enum(['ACTIVE', 'PAUSED', 'SOLD', 'RENTED', 'ARCHIVED']).optional(),
+  // Sprint 1 / MLS parity — Task J9. Extended life-cycle values:
+  // INACTIVE (לא אקטואלי), CANCELLED (מבוטל), IN_DEAL (עיסקה).
+  status: z
+    .enum(['ACTIVE', 'PAUSED', 'SOLD', 'RENTED', 'ARCHIVED', 'INACTIVE', 'CANCELLED', 'IN_DEAL'])
+    .optional(),
   type: z.string().min(1).max(60),
   street: z.string().min(1).max(120),
   city: z.string().min(1).max(80),
@@ -116,6 +120,22 @@ const propertyInput = z.object({
   marketingStartDate: z.string().datetime().nullable().optional(),
   // Exclusivity agreement is set via its own upload endpoint, not here.
   marketingReminderFrequency: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).optional(),
+  // Sprint 1 / MLS parity — Task J9. Pipeline admin block.
+  stage: z
+    .enum([
+      'WATCHING', 'PRE_ACQUISITION', 'IN_PROGRESS',
+      'SIGNED_NON_EXCLUSIVE', 'SIGNED_EXCLUSIVE',
+      'EXCLUSIVITY_ENDED', 'REFUSED_BROKERAGE', 'REMOVED',
+    ])
+    .nullable()
+    .optional(),
+  // Accepts percentages (e.g. 2, 2.5). Commission is opt-in so leaving
+  // it off doesn't force a value on legacy rows.
+  agentCommissionPct: z.number().min(0).max(100).nullable().optional(),
+  primaryAgentId: z.string().nullable().optional(),
+  exclusivityExpire: z.string().datetime().nullable().optional(),
+  sellerSeriousness: z.enum(['NONE', 'SORT_OF', 'MEDIUM', 'VERY']).nullable().optional(),
+  brokerNotes: z.string().max(4000).nullable().optional(),
   images: z.array(z.string().url()).optional(),
 });
 
@@ -638,6 +658,10 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
   delete data.propertyOwnerId;
   if (data.exclusiveStart) data.exclusiveStart = new Date(data.exclusiveStart);
   if (data.exclusiveEnd) data.exclusiveEnd = new Date(data.exclusiveEnd);
+  // Sprint 1 / MLS parity — Task J9. `exclusivityExpire` is orthogonal
+  // to `exclusiveStart/End` (the latter is the mid-deal exclusivity
+  // window; the former is the broader broker-exclusivity expiry).
+  if (data.exclusivityExpire) data.exclusivityExpire = new Date(data.exclusivityExpire);
   // 1.3 marketingStartDate arrives as an ISO string; materialize it to a
   // Date so Prisma accepts it. `null` stays null (explicitly wipe).
   if (data.marketingStartDate) data.marketingStartDate = new Date(data.marketingStartDate);

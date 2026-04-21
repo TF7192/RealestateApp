@@ -40,6 +40,48 @@ enum PropertyStatus {
   SOLD
   RENTED
   ARCHIVED
+  // Sprint 1 / MLS parity — Task J9. Nadlan's `StatusID` exposes three
+  // extra life-cycle values that we need for conversion parity. UI
+  // labels: אקטואלי (ACTIVE) · לא אקטואלי (INACTIVE) · מוקפא (PAUSED)
+  // · נמכר (SOLD) · הושכר (RENTED) · מבוטל (CANCELLED) · עיסקה
+  // (IN_DEAL). ARCHIVED stays for the existing soft-delete UX.
+  INACTIVE
+  CANCELLED
+  IN_DEAL
+}
+
+// Sprint 1 / MLS parity — Task J9. Pipeline stage is *orthogonal* to
+// status: a property can be `ACTIVE` (listed) at many different stages
+// of its relationship with the office (watching / in-progress / signed
+// non-exclusive / signed exclusive / exclusivity ended / refused
+// brokerage / removed). Hebrew UI labels per the Nadlan form:
+//   WATCHING             → במעקב
+//   PRE_ACQUISITION      → טרום גיוס
+//   IN_PROGRESS          → נכס בטיפול              (default for legacy rows)
+//   SIGNED_NON_EXCLUSIVE → נכס חתום בהסכמה
+//   SIGNED_EXCLUSIVE     → נכס חתום בלעדי
+//   EXCLUSIVITY_ENDED    → בלעדיות הסתיימה
+//   REFUSED_BROKERAGE    → לא מעוניין בתיווך
+//   REMOVED              → הסר מנכסים בטיפול
+enum PropertyStage {
+  WATCHING
+  PRE_ACQUISITION
+  IN_PROGRESS
+  SIGNED_NON_EXCLUSIVE
+  SIGNED_EXCLUSIVE
+  EXCLUSIVITY_ENDED
+  REFUSED_BROKERAGE
+  REMOVED
+}
+
+// Sprint 1 / MLS parity — Task J9. Owner-side seriousness rating (how
+// serious the *seller* is, not the buyer lead). Nadlan's `SeriousID`
+// Hebrew labels: לא (NONE) · די (SORT_OF) · בינוני (MEDIUM) · מאד (VERY).
+enum Seriousness {
+  NONE
+  SORT_OF
+  MEDIUM
+  VERY
 }
 
 enum LeadStatus {
@@ -186,6 +228,10 @@ model User {
   prospects         Prospect[]
   leadMeetings      LeadMeeting[]      @relation("AgentMeetings")
   tags              Tag[]              @relation("AgentTags")
+  // Sprint 1 / MLS parity — Task J9. Properties for which this user is
+  // the primary assignee. Separate from `AgentProperties` because a row
+  // can be owned by one agent and assigned to another inside the office.
+  primaryForProperties Property[]       @relation("PrimaryAgent")
 
   @@index([role])
   @@index([officeId])
@@ -340,6 +386,22 @@ model Property {
   lastContact                DateTime?
   lastContactNotes           String?
   marketingReminderFrequency MarketingReminderFrequency @default(WEEKLY)
+
+  // Sprint 1 / MLS parity — Task J9. Pipeline stage (see PropertyStage
+  // comment), commission %, primary assignee, exclusivity expiry, and
+  // seller-side seriousness. `status` stays the life-cycle flag; the
+  // two axes are orthogonal.
+  stage                PropertyStage? @default(IN_PROGRESS)
+  agentCommissionPct   Float?
+  // Primary assignee ("סוכן מטפל"). Defaults to the row's `agentId`;
+  // set explicitly when the office owner reassigns without transferring
+  // ownership. Nullable so legacy rows stay clean.
+  primaryAgentId       String?
+  primaryAgent         User?          @relation("PrimaryAgent", fields: [primaryAgentId], references: [id], onDelete: SetNull)
+  exclusivityExpire    DateTime?
+  sellerSeriousness    Seriousness?
+  brokerNotes          String?
+
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
 
