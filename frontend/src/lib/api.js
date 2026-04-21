@@ -416,6 +416,13 @@ export const api = {
   updateOffice:        (body) => request('/office', { method: 'PATCH', body }),
   addOfficeMember:     (body) => request('/office/members', { method: 'POST', body }),
   removeOfficeMember:  (id) => request(`/office/members/${id}`, { method: 'DELETE' }),
+  // A1 fill-in — email-based invites. The server returns a surrogate
+  // inviteUrl ({origin}/accept-invite?token=<id>) that the owner can
+  // copy/share manually; the invite resolves automatically when the
+  // invitee logs in or signs up.
+  createOfficeInvite:  (body) => request('/office/invites', { method: 'POST', body }),
+  listOfficeInvites:   () => request('/office/invites'),
+  revokeOfficeInvite:  (id) => request(`/office/invites/${id}`, { method: 'DELETE' }),
 
   // Tags (A2)
   listTags:            () => request('/tags'),

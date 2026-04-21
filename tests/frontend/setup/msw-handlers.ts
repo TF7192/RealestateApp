@@ -124,6 +124,27 @@ export const defaultHandlers = [
     HttpResponse.json({ member: { id: 'm1', userId: 'u1', role: 'MEMBER' } })
   ),
   http.delete('/api/office/members/:id', () => HttpResponse.json({ ok: true })),
+  // A1 fill-in — email invites.
+  http.get('/api/office/invites', () => HttpResponse.json({ items: [] })),
+  http.post('/api/office/invites', async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as { email?: string };
+    const id = 'invite-1';
+    return HttpResponse.json({
+      invite: {
+        id,
+        officeId: 'office-1',
+        email: body?.email ?? '',
+        invitedById: 'test-agent-1',
+        acceptedAt: null,
+        acceptedById: null,
+        revokedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        inviteUrl: `http://localhost:5174/accept-invite?token=${id}`,
+      },
+    });
+  }),
+  http.delete('/api/office/invites/:id', () => HttpResponse.json({ ok: true })),
 
   // Tags (A2)
   http.get('/api/tags', () => HttpResponse.json({ items: [] })),
