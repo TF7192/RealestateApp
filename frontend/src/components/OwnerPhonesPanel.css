@@ -1,0 +1,86 @@
+/* OwnerPhonesPanel — J8 multi-phone editor for Owner. */
+
+.opp-root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.opp-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.opp-hint {
+  color: var(--text-muted, #757575);
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.opp-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opp-item {
+  display: grid;
+  grid-template-columns: auto 1fr 140px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-subtle, #f7f7f8);
+  border: 1px solid var(--border-subtle, #e2e2e6);
+}
+
+.opp-item-icon {
+  color: var(--text-muted, #757575);
+}
+
+.opp-item-label {
+  min-width: 0;
+}
+
+.opp-item-remove {
+  padding: 6px 10px;
+}
+
+@media (max-width: 640px) {
+  .opp-item {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "icon phone remove"
+      ".    kind  kind"
+      ".    label label";
+    row-gap: 6px;
+  }
+  .opp-item-icon { grid-area: icon; }
+  .opp-item-label { grid-area: label; }
+}
+
+.opp-add {
+  border-top: 1px solid var(--border-subtle, #e2e2e6);
+  padding-top: 12px;
+}
+
+.opp-add-row {
+  display: grid;
+  grid-template-columns: 1fr 150px 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.opp-add-submit {
+  margin-block-start: 0;
+}
+
+@media (max-width: 640px) {
+  .opp-add-row {
+    grid-template-columns: 1fr;
+  }
+}
