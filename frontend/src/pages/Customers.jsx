@@ -945,6 +945,17 @@ export default function Customers() {
                           </div>
                         </div>
 
+                        <div className="customer-description" onClick={(e) => e.stopPropagation()}>
+                          <DescriptionInline
+                            value={lead.description || ''}
+                            onCommit={(v) => patchLead(
+                              lead.id,
+                              { description: v || null },
+                              { success: 'תיאור עודכן' },
+                            )}
+                          />
+                        </div>
+
                         <div className="customer-notes">
                           <InlineText
                             value={lead.notes || ''}
@@ -1119,6 +1130,17 @@ export default function Customers() {
                     );
                   })()}
                 </div>
+              </div>
+
+              <div className="customer-description cc-v2-description">
+                <DescriptionInline
+                  value={lead.description || ''}
+                  onCommit={(v) => patchLead(
+                    lead.id,
+                    { description: v || null },
+                    { success: 'תיאור עודכן' },
+                  )}
+                />
               </div>
 
               <div className="customer-notes cc-v2-notes">
@@ -2025,5 +2047,98 @@ function SeriousnessPicker({ lead, onChange }) {
         </Portal>
       )}
     </>
+  );
+}
+
+// Phase 4 Lane 3 / Task L3 — inline description edit. Shows the
+// description as a clickable span (with a muted placeholder when
+// empty); a click swaps it for a textarea that commits on blur or
+// Enter. Different from InlineText because L3 explicitly wants
+// blur-to-save (InlineText's S17 policy reverts on blur).
+//
+// Max length is 500 chars (matches backend validation for the Lead
+// description field).
+function DescriptionInline({ value, onCommit, maxLength = 500 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || '');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!editing) setDraft(value || '');
+  }, [value, editing]);
+
+  useEffect(() => {
+    if (editing) {
+      setTimeout(() => {
+        ref.current?.focus();
+        try { ref.current?.setSelectionRange?.(draft.length, draft.length); } catch { /* jsdom */ }
+      }, 10);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  const commit = () => {
+    const next = (draft || '').trim();
+    setEditing(false);
+    if (next !== (value || '')) {
+      try {
+        onCommit?.(next);
+      } catch { /* host surfaces toast */ }
+    }
+  };
+
+  const cancel = () => {
+    setDraft(value || '');
+    setEditing(false);
+  };
+
+  const onKeyDown = (e) => {
+    // Enter commits (without shift so shift+Enter allows multi-line
+    // content while the agent is still typing).
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      commit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancel();
+    }
+  };
+
+  if (editing) {
+    return (
+      <textarea
+        ref={ref}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value.slice(0, maxLength))}
+        onBlur={commit}
+        onKeyDown={onKeyDown}
+        className="lead-description-input"
+        rows={2}
+        dir="auto"
+        maxLength={maxLength}
+        aria-label="תיאור"
+        placeholder="הוסף תיאור קצר"
+      />
+    );
+  }
+
+  const empty = !value;
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      className={`lead-description ${empty ? 'is-empty' : ''}`}
+      onClick={() => setEditing(true)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setEditing(true);
+        }
+      }}
+      dir="auto"
+      title="לחץ לעריכת תיאור"
+    >
+      {empty ? 'הוסף תיאור קצר' : value}
+    </span>
   );
 }

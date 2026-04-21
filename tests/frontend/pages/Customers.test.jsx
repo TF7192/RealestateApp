@@ -245,6 +245,57 @@ describe('<Customers> filter + saved-search + favorite', () => {
     });
   });
 
+  // ── Phase 4 Lane 3 / Task L3 — inline description edit ─────────────
+  // Each lead card shows the free-text `description` field. Empty values
+  // render a muted placeholder; clicking opens an inline textarea that
+  // commits on blur/Enter via api.updateLead({ description }).
+  describe('inline description edit (L3)', () => {
+    const leadsWithDesc = [
+      { ...sampleLeads[0], description: 'חיפוש דחוף — ליד איכותי' },
+      { ...sampleLeads[1], description: '' },
+    ];
+
+    it('renders the existing description text on each card', async () => {
+      mountLeads(leadsWithDesc);
+      render(<Customers />, { route: '/customers' });
+      await screen.findByText('דנה אבני');
+      expect(screen.getByText('חיפוש דחוף — ליד איכותי')).toBeInTheDocument();
+    });
+
+    it('shows a muted placeholder when the lead has no description', async () => {
+      mountLeads(leadsWithDesc);
+      render(<Customers />, { route: '/customers' });
+      await screen.findByText('רון כהן');
+      // The placeholder is the visible string the agent taps to open
+      // the editor. Present at least once (one lead without description).
+      expect(screen.getAllByText('הוסף תיאור קצר').length).toBeGreaterThan(0);
+    });
+
+    it('editing + committing PATCHes the lead with the new description', async () => {
+      const user = userEvent.setup({ delay: null });
+      mountLeads(leadsWithDesc);
+      let patchedBody = null;
+      server.use(
+        http.patch('/api/leads/:id', async ({ request, params }) => {
+          patchedBody = await request.json();
+          return HttpResponse.json({
+            lead: { id: params.id, ...leadsWithDesc[1], ...patchedBody },
+          });
+        }),
+      );
+      render(<Customers />, { route: '/customers' });
+      await screen.findByText('רון כהן');
+      // Click the placeholder on the empty-description lead (רון כהן).
+      await user.click(screen.getAllByText('הוסף תיאור קצר')[0]);
+      // A textarea appears and receives focus. Type + press Enter to commit.
+      const input = await screen.findByRole('textbox', { name: /תיאור/ });
+      await user.type(input, 'קונה לדירה ראשונה{Enter}');
+      await waitFor(() => {
+        expect(patchedBody).toMatchObject({ description: expect.stringContaining('קונה לדירה ראשונה') });
+      });
+    });
+  });
+
   it('loading a saved search applies its filters and re-fetches', async () => {
     const user = userEvent.setup({ delay: null });
     const requests = [];

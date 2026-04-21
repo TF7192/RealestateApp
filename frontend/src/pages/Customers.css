@@ -1910,3 +1910,48 @@
   font-weight: 700;
 }
 
+/* ─── Phase 4 Lane 3 / L3 — inline lead description edit ───────── */
+
+.customer-description,
+.customer-description.cc-v2-description {
+  margin-top: 8px;
+}
+.lead-description {
+  display: inline-block;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  cursor: text;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lead-description:hover,
+.lead-description:focus-visible {
+  background: var(--bg-card-hover);
+  outline: none;
+}
+.lead-description.is-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.lead-description-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.lead-description-input:focus-visible {
+  outline: 2px solid var(--gold, #d4a017);
+  outline-offset: 1px;
+}
+
