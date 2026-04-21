@@ -1,0 +1,48 @@
+/* Sprint 7 / MLS parity — B4. Minimal visual for the reusable favorite
+ * toggle. Tone: amber-gold when active; neutral outline when not. No
+ * new btn-* classes — this is a bare icon button. */
+
+.fav-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #8a8a93);
+  cursor: pointer;
+  transition: color 120ms ease, transform 120ms ease, background-color 120ms ease;
+}
+
+.fav-star:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  color: var(--gold, #d4a017);
+}
+
+.fav-star:focus-visible {
+  outline: 2px solid var(--focus-ring, #7a6cff);
+  outline-offset: 2px;
+}
+
+.fav-star.is-active {
+  color: var(--gold, #d4a017);
+}
+
+.fav-star.is-active:hover {
+  color: var(--gold-strong, #b8890f);
+}
+
+.fav-star[data-busy] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Very small star variant for dense table rows. */
+.fav-star.fav-star-sm {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}

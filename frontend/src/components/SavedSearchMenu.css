@@ -1,0 +1,137 @@
+/* Sprint 7 / MLS parity — B3. Saved-search dropdown popover.
+ * Anchored below its trigger, slight shadow, fixed max-height so long
+ * lists scroll rather than push surrounding content. */
+
+.ss-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.ss-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ss-chev {
+  transition: transform 150ms ease;
+}
+
+.ss-chev.open {
+  transform: rotate(180deg);
+}
+
+.ss-menu-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  inset-inline-start: 0;
+  min-width: 280px;
+  max-width: 360px;
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  padding: 10px;
+  z-index: 40;
+  animation: ss-menu-in 140ms ease;
+}
+
+@keyframes ss-menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ss-menu-save-row {
+  display: flex;
+  gap: 6px;
+  padding-block-end: 8px;
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+}
+
+.ss-menu-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  background: var(--surface-muted, #fafafa);
+  font-size: 13px;
+  color: inherit;
+}
+
+.ss-menu-input:focus-visible {
+  outline: 2px solid var(--focus-ring, #7a6cff);
+  outline-offset: 1px;
+}
+
+.ss-menu-list {
+  padding-block-start: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ss-menu-hint {
+  padding: 12px 10px;
+  color: var(--text-muted, #8a8a93);
+  font-size: 12px;
+  text-align: center;
+}
+
+.ss-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  transition: background-color 120ms ease;
+}
+
+.ss-menu-row:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.ss-menu-load {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: start;
+}
+
+.ss-menu-load:focus-visible {
+  outline: 2px solid var(--focus-ring, #7a6cff);
+  outline-offset: 1px;
+}
+
+.ss-menu-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #8a8a93);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.ss-menu-del:hover {
+  background: var(--danger-soft, rgba(211, 47, 47, 0.08));
+  color: var(--danger, #d32f2f);
+}
+
+.ss-menu-del:focus-visible {
+  outline: 2px solid var(--focus-ring, #7a6cff);
+  outline-offset: 1px;
+}
