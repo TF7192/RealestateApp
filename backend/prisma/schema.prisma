@@ -317,6 +317,9 @@ model User {
   propertyAssignments  PropertyAssignee[] @relation("PropertyAssigneeUser")
   // Sprint 6 / MLS parity — Task F1.
   adverts              Advert[]           @relation("AgentAdverts")
+  // Sprint 7 / MLS parity — Tasks B3, B4.
+  savedSearches        SavedSearch[]      @relation("AgentSavedSearches")
+  favorites            Favorite[]         @relation("AgentFavorites")
 
   @@index([role])
   @@index([officeId])
@@ -984,6 +987,59 @@ model Reminder {
   @@index([leadId])
   @@index([propertyId])
   @@index([customerId])
+}
+
+// Sprint 7 / MLS parity — Task G1. Canonical city+neighborhood
+// lookup. Properties keep storing the free-text `neighborhood` column
+// for back-compat; this table is the dictionary that powers
+// autocomplete and hygiene. Aliases capture historical spellings
+// (e.g. רמת-אביב vs רמת אביב) without a migration per variant.
+model Neighborhood {
+  id        String   @id @default(cuid())
+  city      String
+  name      String
+  aliases   String[] @default([])
+  createdAt DateTime @default(now())
+
+  @@unique([city, name])
+  @@index([city])
+}
+
+// Sprint 7 / MLS parity — Task B3. Named filter snapshots.
+enum SavedSearchEntity {
+  PROPERTY
+  LEAD
+}
+
+model SavedSearch {
+  id         String            @id @default(cuid())
+  agentId    String
+  agent      User              @relation("AgentSavedSearches", fields: [agentId], references: [id], onDelete: Cascade)
+  entityType SavedSearchEntity
+  name       String
+  filters    Json
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([agentId])
+}
+
+// Sprint 7 / MLS parity — Task B4. Cross-entity pinboard.
+enum FavoriteEntity {
+  PROPERTY
+  LEAD
+  OWNER
+}
+
+model Favorite {
+  id         String         @id @default(cuid())
+  agentId    String
+  agent      User           @relation("AgentFavorites", fields: [agentId], references: [id], onDelete: Cascade)
+  entityType FavoriteEntity
+  entityId   String
+  createdAt  DateTime       @default(now())
+
+  @@unique([agentId, entityType, entityId])
 }
 
 // Sprint 6 / MLS parity — Task F1. Per-channel marketing advert
