@@ -1,0 +1,137 @@
+name: Build + publish images
+
+# Builds the backend + frontend container images on GH-hosted runners
+# (not on the small EC2) and pushes them to GHCR tagged by commit SHA
+# plus `main` for the default branch. The prod EC2 then just `docker
+# compose pull`s — no building on the host, no rsync of source.
+#
+# Triggers:
+#   • push to main    — auto-publish every merged commit so deploy-prod
+#                       has images ready the moment you dispatch it.
+#   • workflow_call   — deploy-prod.yml calls this when you deploy a
+#                       non-main ref or before an image is known to exist.
+#   • workflow_dispatch — manual republish (e.g. to rebuild after a
+#                         base-image CVE patch).
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose*.yml'
+      - '.github/workflows/build-images.yml'
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to build from
+        required: true
+        type: string
+    outputs:
+      sha:
+        description: Short SHA images are tagged with
+        value: ${{ jobs.build.outputs.sha }}
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build from
+        required: false
+        default: main
+
+concurrency:
+  group: images-${{ github.workflow }}-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write              # needed to push to ghcr.io
+
+jobs:
+  build:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+          - service: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - id: meta
+        name: Compute image metadata
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${OWNER_LC}/estia-${{ matrix.service }}"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Build → ${{ matrix.service }}"
+            echo ""
+            echo "- **Ref:** \`${{ inputs.ref || github.ref_name }}\`"
+            echo "- **SHA:** \`$SHA\`"
+            echo "- **Image:** \`$IMAGE:$SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.image }}:main
+          # GHA layer cache — every run reuses layers that didn't change,
+          # so incremental rebuilds are fast. `mode=max` caches
+          # intermediate layers too (larger cache, more hits).
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          provenance: false        # keep the image manifest clean — we'll
+                                   # add SLSA attestations when we adopt
+                                   # cosign properly.
+          # Frontend needs the VITE_POSTHOG_* values baked in at build
+          # time; ignored by the backend build.
+          build-args: |
+            VITE_POSTHOG_KEY=${{ secrets.POSTHOG_PROJECT_API_KEY }}
+            VITE_POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
+            VITE_POSTHOG_ENABLED=true
+
+  summary:
+    name: Publish summary
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Write run-wide summary
+        run: |
+          {
+            echo "## Images published"
+            echo ""
+            echo "- \`ghcr.io/tf7192/estia-backend:${{ needs.build.outputs.sha }}\`"
+            echo "- \`ghcr.io/tf7192/estia-frontend:${{ needs.build.outputs.sha }}\`"
+            echo ""
+            echo "Deploy with: \`gh workflow run deploy-prod.yml -f ref=${{ inputs.ref || github.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
