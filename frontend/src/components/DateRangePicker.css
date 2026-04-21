@@ -1,0 +1,69 @@
+/* E2 — DateRangePicker: two native date inputs plus quick-range chips. */
+
+.drp-root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drp-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.drp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+  flex: 1;
+}
+
+.drp-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.drp-input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.drp-input:focus {
+  outline: 2px solid var(--gold, #c9a14a);
+  outline-offset: 1px;
+}
+
+.drp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.drp-chip {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elevated, transparent);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.drp-chip:hover {
+  background: var(--bg-card);
+  border-color: var(--gold, #c9a14a);
+}
+
+.drp-chip-clear {
+  color: var(--text-secondary);
+}
