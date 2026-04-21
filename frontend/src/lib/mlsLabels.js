@@ -37,6 +37,29 @@ export const QUICK_LEAD_STATUS_LABELS = {
   ARCHIVED:                 'ארכיון',
 };
 
+// ── Property lifecycle (Nadlan "שלב הנכס") ─────────────────────────
+export const PROPERTY_STAGE_LABELS = {
+  WATCHING:              'במעקב',
+  PRE_ACQUISITION:       'טרום-קליטה',
+  IN_PROGRESS:           'בתהליך',
+  SIGNED_NON_EXCLUSIVE:  'חתום — לא בלעדי',
+  SIGNED_EXCLUSIVE:      'חתום — בלעדי',
+  EXCLUSIVITY_ENDED:     'סיום בלעדיות',
+  REFUSED_BROKERAGE:     'סירב לתיווך',
+  REMOVED:               'הוסר',
+};
+
+// ── Property condition (J4) ────────────────────────────────────────
+export const PROPERTY_CONDITION_LABELS = {
+  NEW:               'חדש מקבלן',
+  AS_NEW:            'כחדש',
+  RENOVATED:         'משופצת',
+  PRESERVED:         'שמורה',
+  NEEDS_RENOVATION:  'דרוש שיפוץ',
+  NEEDS_TLC:         'דרוש רענון',
+  RAW:               'מעטפת',
+};
+
 // ── Seriousness (shared: Lead + Property.sellerSeriousness) ─────────
 export const SERIOUSNESS_LABELS = {
   NONE:    'ללא',
@@ -62,6 +85,42 @@ export const PROPERTY_TYPE_LABELS = {
   office:      'משרד',
   storage:     'מחסן',
   parking:     'חניה',
+};
+
+// ── Heating types (J6) ─────────────────────────────────────────────
+export const HEATING_TYPE_LABELS = {
+  gas:      'גז',
+  electric: 'חשמל',
+  solar:    'שמש',
+  floor:    'רצפתי',
+  central:  'מרכזי',
+};
+
+// ── Advert channels (F1) ───────────────────────────────────────────
+export const ADVERT_CHANNEL_LABELS = {
+  YAD2:      'יד2',
+  ONMAP:     'on map',
+  MADLAN:    'מדלן',
+  FACEBOOK:  'פייסבוק',
+  WHATSAPP:  'וואטסאפ',
+  INSTAGRAM: 'אינסטגרם',
+  WEBSITE:   'אתר',
+  OTHER:     'אחר',
+};
+
+// ── Advert statuses (F1) ───────────────────────────────────────────
+export const ADVERT_STATUS_LABELS = {
+  DRAFT:     'טיוטה',
+  PUBLISHED: 'פורסם',
+  PAUSED:    'מושהה',
+  EXPIRED:   'פג תוקף',
+  REMOVED:   'הוסר',
+};
+
+// ── Property assignee roles (J10) ──────────────────────────────────
+export const ASSIGNEE_ROLE_LABELS = {
+  CO_AGENT: 'שותף',
+  OBSERVER: 'צופה',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
