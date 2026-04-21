@@ -294,7 +294,7 @@
 .ppm-action-chip.danger {
   background: rgba(185, 28, 28, 0.92);
   color: #fff;
-  margin-right: auto; /* push to the right in RTL */
+  margin-inline-start: auto; /* push to the right in RTL */
   align-self: flex-end;
 }
 

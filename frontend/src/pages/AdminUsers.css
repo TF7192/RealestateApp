@@ -92,7 +92,7 @@
 .au-table th,
 .au-table td {
   padding: 12px 14px;
-  text-align: right;
+  text-align: end;
   border-bottom: 1px solid var(--border);
 }
 
