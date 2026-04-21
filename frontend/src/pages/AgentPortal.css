@@ -127,6 +127,12 @@
   flex-wrap: wrap;
 }
 
+/* F5 — vCard QR slot. Sits below the contact row on desktop, drops to a
+ * column on mobile along with the rest of the hero. */
+.ap-vcard-slot {
+  margin-block-start: 14px;
+}
+
 .ap-contact-chip {
   display: inline-flex;
   align-items: center;

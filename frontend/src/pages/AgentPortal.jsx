@@ -14,6 +14,7 @@ import {
   Briefcase,
 } from 'lucide-react';
 import api from '../lib/api';
+import VCardQr from '../components/VCardQr';
 import './AgentPortal.css';
 
 function formatPrice(price) {
@@ -153,6 +154,11 @@ export default function AgentPortal() {
               )}
             </div>
           )}
+          {/* F5 — QR + vCard download so customers can save the agent
+           *  into their address book with one scan. */}
+          <div className="ap-vcard-slot">
+            <VCardQr agent={agent} />
+          </div>
         </div>
       </header>
 
