@@ -1,0 +1,152 @@
+.office-page {
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.office-header { display: flex; flex-direction: column; gap: 4px; }
+
+.office-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.office-title h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.office-subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.office-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.office-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.office-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.office-form-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.office-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+}
+
+.office-field-grow { flex: 1; }
+
+.office-field span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.office-field input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.office-field input:focus {
+  outline: 2px solid var(--gold, #c9a14a);
+  outline-offset: 1px;
+}
+
+.office-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.office-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated, transparent);
+}
+
+.office-member-body { flex: 1; min-width: 0; }
+
+.office-member-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.office-member-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--gold, #c9a14a);
+  color: var(--bg-primary, #fff);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.office-member-email {
+  font-size: 12px;
+  color: var(--text-secondary);
+  direction: ltr;
+  text-align: start;
+}
+
+.office-remove {
+  color: var(--danger, #c0392b);
+}
+
+.office-skel {
+  height: 200px;
+  background: linear-gradient(90deg, var(--bg-elevated, #eee), var(--bg-card), var(--bg-elevated, #eee));
+  background-size: 200% 100%;
+  animation: office-shimmer 1.4s infinite linear;
+  border-radius: 14px;
+}
+
+@keyframes office-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
