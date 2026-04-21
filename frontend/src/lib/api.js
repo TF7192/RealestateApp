@@ -505,6 +505,14 @@ export const api = {
   listNeighborhoods:   (params = {}) => request(`/neighborhoods${qsFrom(params)}`),
   createNeighborhood:  (body) => request('/neighborhoods', { method: 'POST', body }),
 
+  // Neighborhood groups (G2) — OWNER-curated marketable areas that
+  // bundle G1 neighborhoods. Public read, OWNER-only mutations (the
+  // backend rejects non-OWNER POST/PATCH/DELETE with 403).
+  listNeighborhoodGroups:   (params = {}) => request(`/neighborhood-groups${qsFrom(params)}`),
+  createNeighborhoodGroup:  (body) => request('/neighborhood-groups', { method: 'POST', body }),
+  updateNeighborhoodGroup:  (id, body) => request(`/neighborhood-groups/${id}`, { method: 'PATCH', body }),
+  deleteNeighborhoodGroup:  (id) => request(`/neighborhood-groups/${id}`, { method: 'DELETE' }),
+
   // Saved searches (B3)
   listSavedSearches:   (entityType) => {
     const qs = entityType ? `?${new URLSearchParams({ entityType }).toString()}` : '';
