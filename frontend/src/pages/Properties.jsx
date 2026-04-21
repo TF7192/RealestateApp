@@ -153,31 +153,6 @@ export default function Properties() {
   // card and pops back. Critical for 500-row lists on desktop.
   useRouteScrollRestore();
 
-  // F-6.5 — write filters back to the URL so refresh / share link /
-  // back-forward all land on the same view. Use `replace` to avoid
-  // piling up history entries while typing.
-  useEffect(() => {
-    const next = new URLSearchParams();
-    if (search)                     next.set('q', search);
-    if (filter !== 'all')           next.set('cat', filter);
-    if (assetClassFilter !== 'all') next.set('ac', assetClassFilter);
-    if (showAdvanced)               next.set('adv', '1');
-    if (locationQuery)              next.set('near', locationQuery);
-    if (locationRadius !== 5)       next.set('km', String(locationRadius));
-    if (advFilters.city)            next.set('city', advFilters.city);
-    if (advFilters.minPrice)        next.set('minP', String(advFilters.minPrice));
-    if (advFilters.maxPrice)        next.set('maxP', String(advFilters.maxPrice));
-    if (advFilters.minRooms)        next.set('minR', String(advFilters.minRooms));
-    if (advFilters.maxRooms)        next.set('maxR', String(advFilters.maxRooms));
-    if (advFilters.minSqm)          next.set('minS', String(advFilters.minSqm));
-    if (advFilters.maxSqm)          next.set('maxS', String(advFilters.maxSqm));
-    const nextStr = next.toString();
-    const curStr = searchParams.toString();
-    if (nextStr !== curStr) {
-      setSearchParams(next, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, filter, assetClassFilter, showAdvanced, locationQuery, locationRadius, advFilters]);
   // Seed state from the in-memory pageCache so a return to this tab
   // paints the previous result INSTANTLY — no empty-page flash while
   // the background fetch runs. First visit: cache is null so we fall
@@ -208,6 +183,36 @@ export default function Properties() {
   }));
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // F-6.5 — write filters back to the URL so refresh / share link /
+  // back-forward all land on the same view. MUST sit after the state
+  // declarations it depends on — in the minified prod bundle, putting
+  // this effect ABOVE the useStates it references triggers a TDZ
+  // ("Cannot access 'v' before initialization") that crashes the
+  // /properties route inside RootErrorBoundary. Dev mode doesn't mind;
+  // the rolldown minifier reorders aggressively.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (search)                     next.set('q', search);
+    if (filter !== 'all')           next.set('cat', filter);
+    if (assetClassFilter !== 'all') next.set('ac', assetClassFilter);
+    if (showAdvanced)               next.set('adv', '1');
+    if (locationQuery)              next.set('near', locationQuery);
+    if (locationRadius !== 5)       next.set('km', String(locationRadius));
+    if (advFilters.city)            next.set('city', advFilters.city);
+    if (advFilters.minPrice)        next.set('minP', String(advFilters.minPrice));
+    if (advFilters.maxPrice)        next.set('maxP', String(advFilters.maxPrice));
+    if (advFilters.minRooms)        next.set('minR', String(advFilters.minRooms));
+    if (advFilters.maxRooms)        next.set('maxR', String(advFilters.maxRooms));
+    if (advFilters.minSqm)          next.set('minS', String(advFilters.minSqm));
+    if (advFilters.maxSqm)          next.set('maxS', String(advFilters.maxSqm));
+    const nextStr = next.toString();
+    const curStr = searchParams.toString();
+    if (nextStr !== curStr) {
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, filter, assetClassFilter, showAdvanced, locationQuery, locationRadius, advFilters]);
 
   // Bulk selection mode. When `selectMode` is true, card taps toggle
   // membership in `selectedIds` instead of navigating to the detail page.
