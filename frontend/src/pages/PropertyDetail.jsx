@@ -32,7 +32,9 @@ import {
   Activity,
   Target,
   Printer,
+  Maximize2,
 } from 'lucide-react';
+import { popoutCurrentRoute } from '../lib/popout';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
 import { useAuth } from '../lib/auth';
@@ -623,6 +625,10 @@ export default function PropertyDetail() {
           <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title="הדפס">
             <Printer size={14} />
             <span>הדפס</span>
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => popoutCurrentRoute()} title="פתח בחלון חדש">
+            <Maximize2 size={14} />
+            <span>פתח בחלון חדש</span>
           </button>
           <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={14} />

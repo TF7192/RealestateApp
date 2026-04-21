@@ -11,7 +11,9 @@ import {
   Building2,
   UserCircle,
   Printer,
+  Maximize2,
 } from 'lucide-react';
+import { popoutCurrentRoute } from '../lib/popout';
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -163,6 +165,10 @@ export default function OwnerDetail() {
           <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title="הדפס">
             <Printer size={14} />
             הדפס
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => popoutCurrentRoute()} title="פתח בחלון חדש">
+            <Maximize2 size={14} />
+            פתח בחלון חדש
           </button>
           <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={14} />

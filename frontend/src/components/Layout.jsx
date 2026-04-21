@@ -36,6 +36,7 @@ import { useTheme } from '../lib/theme';
 import api from '../lib/api';
 import MobileTabBar from './MobileTabBar';
 import MobileMoreSheet from './MobileMoreSheet';
+import { isPopoutWindow } from '../lib/popout';
 
 // Mirrors backend ADMIN_EMAILS default — anyone in this list sees the
 // admin chat link in the sidebar and the admin page loads for them.
@@ -211,6 +212,20 @@ export default function Layout({ onLogout }) {
 
   const isCustomerPage = location.pathname.startsWith('/p/');
   if (isCustomerPage) return <Outlet />;
+
+  // B7 — when the current tab was opened as a popout (?popout=1), skip
+  // all app chrome and just render the page content. The class on
+  // <html> is available for any extra styling pages might want to add.
+  if (isPopoutWindow()) {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.add('is-popout');
+    }
+    return (
+      <main className="main-content is-popout-main">
+        <Outlet />
+      </main>
+    );
+  }
 
   const handleShareCatalog = () => {
     if (!user?.id) return;
