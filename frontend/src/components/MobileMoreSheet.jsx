@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, UserCircle, Sun, Moon, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield, Calculator, Download as DownloadIcon } from 'lucide-react';
+import { User, UserCircle, Sun, Moon, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield, Calculator, Download as DownloadIcon, BarChart2, Activity as ActivityIcon, Bell, Tag, Building2 } from 'lucide-react';
 
 const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
 import { useAuth } from '../lib/auth';
@@ -108,6 +108,40 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
               <span className="mms-chevron">›</span>
             </div>
           </header>
+
+          {/* Sprint 4 reporting surfaces + Sprint 1 A2 tag-settings +
+              Sprint 7 A1 office (OWNER-only). Desktop has these in the
+              "כלי ניהול" sidebar group; on mobile they live here so the
+              bottom tab bar stays at 5 slots. */}
+          <section className="mms-section">
+            <button className="mms-row" onClick={() => go('/reports')}>
+              <span className="mms-row-icon"><BarChart2 size={18} /></span>
+              <span className="mms-row-text"><strong>דוחות</strong><small>ביצועים, עסקאות, נכסים</small></span>
+              <span className="mms-arrow">›</span>
+            </button>
+            <button className="mms-row" onClick={() => go('/activity')}>
+              <span className="mms-row-icon"><ActivityIcon size={18} /></span>
+              <span className="mms-row-text"><strong>פעילות</strong><small>פיד כל השינויים במערכת</small></span>
+              <span className="mms-arrow">›</span>
+            </button>
+            <button className="mms-row" onClick={() => go('/reminders')}>
+              <span className="mms-row-icon"><Bell size={18} /></span>
+              <span className="mms-row-text"><strong>תזכורות</strong><small>מטלות ותזכורות עם מועד</small></span>
+              <span className="mms-arrow">›</span>
+            </button>
+            <button className="mms-row" onClick={() => go('/settings/tags')}>
+              <span className="mms-row-icon"><Tag size={18} /></span>
+              <span className="mms-row-text"><strong>ניהול תגיות</strong><small>תיוג לקוחות, נכסים, עסקאות</small></span>
+              <span className="mms-arrow">›</span>
+            </button>
+            {user?.role === 'OWNER' && (
+              <button className="mms-row" onClick={() => go('/office')}>
+                <span className="mms-row-icon"><Building2 size={18} /></span>
+                <span className="mms-row-text"><strong>המשרד שלי</strong><small>חברי משרד ותפקידים</small></span>
+                <span className="mms-arrow">›</span>
+              </button>
+            )}
+          </section>
 
           <section className="mms-section">
             <button className="mms-row primary" onClick={copyCatalog}>
