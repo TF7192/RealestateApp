@@ -687,6 +687,8 @@ model Lead {
   // assignee stays `agentId` on Lead; the join table lets the office
   // share a lead across multiple agents.
   extraAgents     LeadAgent[]
+  // Sprint 2 / MLS parity — Task K4. Repeatable "הנכס המבוקש" profiles.
+  searchProfiles  LeadSearchProfile[]
 
   @@index([agentId])
   @@index([status])
@@ -945,4 +947,48 @@ model Reminder {
   @@index([leadId])
   @@index([propertyId])
   @@index([customerId])
+}
+
+// Sprint 2 / MLS parity — Task K4. Repeatable "הנכס המבוקש" profile on
+// a lead. A lead can have multiple profiles (e.g. one for a residence
+// in Tel Aviv, another for an investment in Haifa) so matching hits
+// all of them. The flat single-value criteria fields on Lead
+// (`rooms`, `budget`, `city`, `sector`, the *Required booleans) stay
+// for back-compat during rollout.
+model LeadSearchProfile {
+  id              String             @id @default(cuid())
+  leadId          String
+  lead            Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // Optional user-facing label like "השקעה בתל אביב".
+  label           String?
+  domain          AssetClass?
+  dealType        PropertyCategory?
+  // PG text arrays keep the form wiring simple; frontend sends each as
+  // a multi-select and backend stores without extra join tables.
+  propertyTypes   String[]           @default([])
+  cities          String[]           @default([])
+  neighborhoods   String[]           @default([])
+  streets         String[]           @default([])
+  minRoom         Float?
+  maxRoom         Float?
+  minPrice        Int?
+  maxPrice        Int?
+  minPricePerSqm  Int?
+  maxPricePerSqm  Int?
+  minFloor        Int?
+  maxFloor        Int?
+  minBuilt        Int?
+  maxBuilt        Int?
+  minPlot         Int?
+  maxPlot         Int?
+  parkingReq      Boolean            @default(false)
+  elevatorReq     Boolean            @default(false)
+  balconyReq      Boolean            @default(false)
+  furnitureReq    Boolean            @default(false)
+  mamadReq        Boolean            @default(false)
+  storeroomReq    Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([leadId])
 }
