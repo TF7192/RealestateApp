@@ -639,8 +639,10 @@ export default function Properties() {
       // address/price before the duplicate goes live.
       navigate(`/properties/${created.id}/edit?duplicated=1`);
     } catch (err) {
-      // Swallow — the toast system is wired elsewhere in this page.
-      console.error(err);
+      // Surface the failure through the shared toast system (the project
+      // convention — no console.log/error in shipped code). Falls back to
+      // a generic Hebrew message when the server didn't send one.
+      toast.error(err?.message || 'שכפול הנכס נכשל');
     } finally {
       setDuplicating(null);
     }
