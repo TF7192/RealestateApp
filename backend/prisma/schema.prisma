@@ -110,6 +110,35 @@ enum LeadLookingFor {
   RENT
 }
 
+// Sprint 1 / MLS parity — Task K2. Customer-facing life-cycle status
+// (Nadlan `CustomerStatusID`). Distinct from LeadStatus (HOT/WARM/COLD),
+// which stays as the thermal temperature rating. Hebrew labels:
+//   ACTIVE    → אקטואלי
+//   INACTIVE  → לא אקטואלי
+//   CANCELLED → מבוטל
+//   PAUSED    → מוקפא
+//   IN_DEAL   → עיסקה
+//   BOUGHT    → קנה
+//   RENTED    → שכר
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
+  PAUSED
+  IN_DEAL
+  BOUGHT
+  RENTED
+}
+
+// Sprint 1 / MLS parity — Task K2. Purpose of search, multi-select.
+// Nadlan `PurposeList` Hebrew labels: השקעה · מגורים · מסחרי · קומבינציה.
+enum CustomerPurpose {
+  INVESTMENT
+  RESIDENCE
+  COMMERCIAL
+  COMBINATION
+}
+
 enum DealStatus {
   NEGOTIATING
   WAITING_MORTGAGE
@@ -245,6 +274,8 @@ model User {
   // Sprint 1 / MLS parity — Task D1.
   reminders            Reminder[]       @relation("AgentReminders")
   reminderAnchors      Reminder[]       @relation("ReminderCustomer")
+  // Sprint 1 / MLS parity — Task K2.
+  leadAssignments      LeadAgent[]      @relation("LeadAssignments")
 
   @@index([role])
   @@index([officeId])
@@ -582,11 +613,22 @@ model Lead {
   storageRequired    Boolean          @default(false)
   schoolProximity    String?
   source             String?
+  // `status` is the thermal temperature rating (HOT/WARM/COLD). New in
+  // Sprint 1 / MLS parity Task K2: `customerStatus` is the separate
+  // life-cycle flag (אקטואלי / לא אקטואלי / etc.). Kept orthogonal.
   status             LeadStatus       @default(WARM)
   notes              String?
   brokerageSignedAt  DateTime?
   brokerageExpiresAt DateTime?
   lastContact        DateTime?
+
+  // Sprint 1 / MLS parity — Task K2. Customer admin block.
+  customerStatus      CustomerStatus?
+  commissionPct       Float?
+  isPrivate           Boolean           @default(false)
+  purposes            CustomerPurpose[] @default([])
+  seriousnessOverride Seriousness?
+
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
@@ -595,10 +637,28 @@ model Lead {
   agreements      Agreement[]
   meetings        LeadMeeting[]
   reminders       Reminder[]
+  // Sprint 1 / MLS parity — Task K2. Additional assignees. Primary
+  // assignee stays `agentId` on Lead; the join table lets the office
+  // share a lead across multiple agents.
+  extraAgents     LeadAgent[]
 
   @@index([agentId])
   @@index([status])
+  @@index([customerStatus])
   @@index([city])
+}
+
+// Sprint 1 / MLS parity — Task K2. Composite-PK join table for
+// multi-agent lead assignment.
+model LeadAgent {
+  leadId     String
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agentId    String
+  agent      User     @relation("LeadAssignments", fields: [agentId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@id([leadId, agentId])
+  @@index([agentId])
 }
 
 model Deal {

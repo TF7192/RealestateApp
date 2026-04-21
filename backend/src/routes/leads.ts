@@ -30,6 +30,19 @@ const leadInput = z.object({
   brokerageSignedAt: z.string().nullable().optional(),
   brokerageExpiresAt: z.string().nullable().optional(),
   lastContact: z.string().nullable().optional(),
+
+  // Sprint 1 / MLS parity — Task K2. Customer admin block.
+  // `status` (above) stays thermal; `customerStatus` is the life-cycle.
+  customerStatus: z
+    .enum(['ACTIVE', 'INACTIVE', 'CANCELLED', 'PAUSED', 'IN_DEAL', 'BOUGHT', 'RENTED'])
+    .nullable()
+    .optional(),
+  commissionPct: z.number().min(0).max(100).nullable().optional(),
+  isPrivate: z.boolean().optional(),
+  purposes: z
+    .array(z.enum(['INVESTMENT', 'RESIDENCE', 'COMMERCIAL', 'COMBINATION']))
+    .optional(),
+  seriousnessOverride: z.enum(['NONE', 'SORT_OF', 'MEDIUM', 'VERY']).nullable().optional(),
 });
 
 // Suggest HOT/WARM/COLD status from activity signals.
