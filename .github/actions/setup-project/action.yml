@@ -41,21 +41,16 @@ runs:
       shell: bash
       run: npm install -g npm@11.6.0
 
-    - name: Install root deps
+    # Single root-level install in full npm-workspaces mode. The root
+    # package-lock.json knows where every workspace's deps belong:
+    #   • frontend deps hoisted to node_modules/* when unique
+    #   • backend deps kept under backend/node_modules/* (argon2, prisma)
+    # Earlier iterations did extra `cd backend && npm ci --no-workspaces`
+    # steps which rewrote backend/node_modules into a standalone tree and
+    # broke the `react` hoist the frontend vitest project relies on.
+    - name: Install root deps (workspaces)
       shell: bash
       run: npm ci --no-audit --no-fund
-
-    # Per-workspace installs. --no-workspaces forces npm to treat the
-    # directory as standalone and install the full tree into its own
-    # node_modules, which is what the build steps + vitest need. Without
-    # the flag, npm detects the parent workspace layout and may reroute
-    # installs to root/node_modules, leaving backend/node_modules empty
-    # and causing tsc to fail with "Cannot find module 'fastify'" etc.
-    - name: Install backend deps
-      if: inputs.install-backend == 'true'
-      shell: bash
-      working-directory: backend
-      run: npm ci --no-audit --no-fund --no-workspaces
 
     - name: Prisma generate
       if: inputs.install-backend == 'true' && inputs.prisma-generate == 'true'
@@ -63,30 +58,27 @@ runs:
       working-directory: backend
       run: npx prisma generate
 
-    - name: Install frontend deps
-      if: inputs.install-frontend == 'true'
-      shell: bash
-      working-directory: frontend
-      run: npm ci --no-audit --no-fund --no-workspaces
-
     - name: Sanity-check workspace installs
       if: inputs.install-backend == 'true' || inputs.install-frontend == 'true'
       shell: bash
       run: |
+        fail=0
         if [ "${{ inputs.install-backend }}" = "true" ]; then
-          if [ ! -d backend/node_modules/fastify ]; then
-            echo "::error::backend/node_modules/fastify missing after install"
-            echo "--- backend/node_modules contents ---"
-            ls backend/node_modules 2>&1 | head -20
-            exit 1
+          if [ ! -d backend/node_modules/fastify ] && [ ! -d node_modules/fastify ]; then
+            echo "::error::fastify not installed (checked backend/node_modules + root)"
+            fail=1
           fi
         fi
         if [ "${{ inputs.install-frontend }}" = "true" ]; then
-          if [ ! -d frontend/node_modules/react ]; then
-            echo "::error::frontend/node_modules/react missing after install"
-            echo "--- frontend/node_modules contents ---"
-            ls frontend/node_modules 2>&1 | head -20
-            exit 1
+          if [ ! -d node_modules/react ] && [ ! -d frontend/node_modules/react ]; then
+            echo "::error::react not installed (checked root + frontend/node_modules)"
+            fail=1
           fi
+        fi
+        if [ "$fail" = "1" ]; then
+          echo "--- root node_modules (top) ---"; ls node_modules 2>/dev/null | head -30
+          echo "--- backend/node_modules (top) ---"; ls backend/node_modules 2>/dev/null | head -30
+          echo "--- frontend/node_modules (top) ---"; ls frontend/node_modules 2>/dev/null | head -30
+          exit 1
         fi
         echo "workspace installs OK"
