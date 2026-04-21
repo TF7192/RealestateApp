@@ -28,6 +28,17 @@ const CSV_KINDS = [
   { kind: 'deals',      label: 'עסקאות',  Icon: Handshake },
 ];
 
+// Lane 6 — the viewings + marketing-actions CSV endpoints don't exist
+// on the backend yet. Rather than ship buttons that 404, surface them
+// as disabled with a tooltip so agents see the feature is planned
+// without hitting dead links ("no dead UI" rule).
+const PLANNED_CSV_KINDS = [
+  { kind: 'viewings',          label: 'צפיות',          Icon: CalendarDays },
+  { kind: 'marketing-actions', label: 'פעולות שיווק',   Icon: Megaphone },
+];
+
+const PLANNED_CSV_TOOLTIP = 'ייצוא CSV בפיתוח — נוסף בקרוב';
+
 const STATUS_LABELS = {
   OPEN:      'פתוחה',
   PENDING:   'בהמתנה',
@@ -171,6 +182,21 @@ export default function Reports() {
               <Download size={16} aria-hidden="true" />
               <span>ייצוא {c.label}</span>
             </a>
+          ))}
+          {PLANNED_CSV_KINDS.map((c) => (
+            <button
+              key={c.kind}
+              type="button"
+              className="btn btn-secondary"
+              disabled
+              aria-disabled="true"
+              title={PLANNED_CSV_TOOLTIP}
+              aria-label={`ייצוא ${c.label} — ${PLANNED_CSV_TOOLTIP}`}
+              data-testid={`csv-${c.kind}`}
+            >
+              <Download size={16} aria-hidden="true" />
+              <span>ייצוא {c.label}</span>
+            </button>
           ))}
         </div>
       </section>

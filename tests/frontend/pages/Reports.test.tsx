@@ -78,4 +78,23 @@ describe('<Reports>', () => {
     expect(dealsA.getAttribute('href')).toBe('/api/reports/export/deals.csv');
     expect(propsA).toHaveAttribute('download');
   });
+
+  it('viewings + marketing-actions CSV buttons render disabled with an in-progress tooltip', () => {
+    render(<Reports />);
+    const viewings = screen.getByTestId('csv-viewings') as HTMLButtonElement;
+    const marketing = screen.getByTestId('csv-marketing-actions') as HTMLButtonElement;
+    // Disabled state avoids shipping dead links — the backend endpoints
+    // don't exist yet.
+    expect(viewings.tagName).toBe('BUTTON');
+    expect(marketing.tagName).toBe('BUTTON');
+    expect(viewings).toBeDisabled();
+    expect(marketing).toBeDisabled();
+    expect(viewings).toHaveAttribute('aria-disabled', 'true');
+    expect(marketing).toHaveAttribute('aria-disabled', 'true');
+    expect(viewings.getAttribute('title')).toContain('בפיתוח');
+    expect(marketing.getAttribute('title')).toContain('בפיתוח');
+    // Visible label still says "ייצוא X" so the feature is recognisable.
+    expect(viewings.textContent).toContain('צפיות');
+    expect(marketing.textContent).toContain('פעולות שיווק');
+  });
 });
