@@ -112,7 +112,9 @@ function explainStatus(lead: any, suggested: string): string {
 export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const q = req.query as any;
-    const where: any = { agentId: requireUser(req).id };
+    const uid = requireUser(req).id;
+    const where: any = { agentId: uid };
+    // Legacy single-value filters.
     if (q.status) where.status = q.status;
     if (q.lookingFor) where.lookingFor = q.lookingFor;
     if (q.interestType) where.interestType = q.interestType;
@@ -124,13 +126,105 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
         { city: { contains: s, mode: 'insensitive' } },
       ];
     }
+
+    // Sprint 2 / MLS parity — Task C2. Nadlan-parity filter panel.
+    // Query params arrive as either a single string or an array (Fastify
+    // auto-parses `?cities=A&cities=B`); `toList` normalizes both shapes.
+    const toList = (v: unknown): string[] => {
+      if (v == null) return [];
+      return (Array.isArray(v) ? v : [v]).map((x) => String(x)).filter(Boolean);
+    };
+    const cities = toList(q.cities);
+    if (cities.length) where.city = { in: cities };
+    const leadStatus = toList(q.leadStatus);
+    if (leadStatus.length) where.leadStatus = { in: leadStatus };
+    const customerStatus = toList(q.customerStatus);
+    if (customerStatus.length) where.customerStatus = { in: customerStatus };
+    const seriousness = toList(q.seriousness);
+    if (seriousness.length) where.seriousnessOverride = { in: seriousness };
+    const types = toList(q.types); // apartment / house / ...
+    // Lead.type is a free-form hint; we match via searchProfiles when
+    // supplied AND also accept exact match on the flat field for back-compat.
+    if (q.minPrice != null || q.maxPrice != null) {
+      const min = q.minPrice != null ? Number(q.minPrice) : undefined;
+      const max = q.maxPrice != null ? Number(q.maxPrice) : undefined;
+      where.budget = {};
+      if (Number.isFinite(min!)) where.budget.gte = min;
+      if (Number.isFinite(max!)) where.budget.lte = max;
+    }
+    // Requirement booleans — flags on the lead itself.
+    for (const k of [
+      'balconyRequired', 'parkingRequired', 'elevatorRequired',
+      'safeRoomRequired', 'acRequired', 'storageRequired',
+    ] as const) {
+      if (q[k] === '1' || q[k] === 'true' || q[k] === true) where[k] = true;
+    }
+    // Keyword (Nadlan `Keyword`): broad text match across name/notes/city.
+    if (q.keyword) {
+      const s = String(q.keyword);
+      where.AND = [...(where.AND || []), {
+        OR: [
+          { name:   { contains: s, mode: 'insensitive' } },
+          { notes:  { contains: s, mode: 'insensitive' } },
+          { city:   { contains: s, mode: 'insensitive' } },
+          { street: { contains: s, mode: 'insensitive' } },
+          { description: { contains: s, mode: 'insensitive' } },
+        ],
+      }];
+    }
+    // Flag = Tag filter (server-side join via TagAssignment).
+    const tagIds = toList(q.tags);
+    if (tagIds.length) {
+      const assigned = await prisma.tagAssignment.findMany({
+        where: { tagId: { in: tagIds }, entityType: 'LEAD' },
+        select: { entityId: true },
+      });
+      const leadIds = Array.from(new Set(assigned.map((a) => a.entityId)));
+      where.AND = [...(where.AND || []), { id: { in: leadIds.length ? leadIds : ['__none__'] } }];
+    }
+
     const items = await prisma.lead.findMany({
       where,
-      include: { viewings: true, agreements: true },
+      include: { viewings: true, agreements: true, searchProfiles: true },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Post-filter on search-profile fields (rooms / floor / types / hoods)
+    // — doing this in Prisma requires either a raw join or a nested
+    // `some: { ... }` per field, and mixing them in one where-clause gets
+    // hairy. The result set is already owner-scoped (bounded) so an
+    // in-memory filter is safe and keeps the query readable.
+    const hoods    = toList(q.neighborhoods);
+    const minRoom  = q.minRoom  != null ? Number(q.minRoom)  : null;
+    const maxRoom  = q.maxRoom  != null ? Number(q.maxRoom)  : null;
+    const minFloor = q.minFloor != null ? Number(q.minFloor) : null;
+    const maxFloor = q.maxFloor != null ? Number(q.maxFloor) : null;
+    const hasProfileFilters =
+      hoods.length || types.length ||
+      minRoom != null || maxRoom != null ||
+      minFloor != null || maxFloor != null;
+
+    const filtered = !hasProfileFilters ? items : items.filter((l: any) => {
+      const profiles = l.searchProfiles || [];
+      // A lead passes if ANY of its profiles matches every constraint.
+      // Leads with no profiles fall back to flat `rooms`/`city` fields.
+      const candidates = profiles.length ? profiles : [{
+        neighborhoods: [], propertyTypes: [],
+        minRoom:  null, maxRoom:  null,
+        minFloor: null, maxFloor: null,
+      }];
+      return candidates.some((p: any) => {
+        if (hoods.length && !(p.neighborhoods || []).some((h: string) => hoods.includes(h))) return false;
+        if (types.length && !(p.propertyTypes || []).some((t: string) => types.includes(t))) return false;
+        if (minRoom != null && (p.maxRoom != null && p.maxRoom < minRoom)) return false;
+        if (maxRoom != null && (p.minRoom != null && p.minRoom > maxRoom)) return false;
+        if (minFloor != null && (p.maxFloor != null && p.maxFloor < minFloor)) return false;
+        if (maxFloor != null && (p.minFloor != null && p.minFloor > maxFloor)) return false;
+        return true;
+      });
+    });
     // Decorate with computed heat suggestion + explanation
-    const withSuggest = items.map((l: any) => {
+    const withSuggest = filtered.map((l: any) => {
       const suggestedStatus = suggestStatus(l);
       return {
         ...l,
