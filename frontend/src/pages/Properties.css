@@ -1134,3 +1134,34 @@
     animation: none !important;
   }
 }
+
+/* Sprint 7 B4 — favorite star, top-left of the card (visual).
+ * In RTL the visual left is the logical END edge, so
+ * `inset-inline-end` is correct. z-index above the image + badges,
+ * below modals. Circular chip matches `.property-overflow-btn` so the
+ * two corner controls look part of the same family. */
+.property-fav-star {
+  position: absolute;
+  top: 10px;
+  inset-inline-end: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  z-index: 3;
+}
+
+[data-theme="dark"] .property-fav-star {
+  background: rgba(30, 26, 20, 0.75);
+}
+
+.property-fav-star-compact {
+  top: 6px;
+  inset-inline-end: 6px;
+  width: 30px;
+  height: 30px;
+}
+

@@ -56,6 +56,8 @@ import {
   allLocationNames,
 } from '../data/mockData';
 import { PriceRange, NumberField, SelectField } from '../components/SmartFields';
+import FavoriteStar from '../components/FavoriteStar';
+import SavedSearchMenu from '../components/SavedSearchMenu';
 import './Properties.css';
 
 function formatPrice(price) {
@@ -341,10 +343,70 @@ export default function Properties() {
   const [pageOverflowOpen, setPageOverflowOpen] = useState(false); // P1-M16
   const [matchesPickerFor, setMatchesPickerFor] = useState(null); // P3-M8: { prop, leads }
 
+  // Sprint 7 B4 — favorites for properties. Seed the id set once so each
+  // card's star reflects the current state without waiting for the first
+  // toggle. Empty set on failure is fine; the star just starts inactive.
+  const [favoriteIds, setFavoriteIds] = useState(() => new Set());
+
   useEffect(() => {
     api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
     api.listLeads().then((r) => setLeads(r.items || r.leads || [])).catch(() => {});
+    api.listFavorites('PROPERTY')
+      .then((r) => {
+        const ids = new Set((r?.items || []).map((f) => f.entityId));
+        setFavoriteIds(ids);
+      })
+      .catch(() => { /* ignore — empty set is the safe default */ });
   }, []);
+
+  // Sprint 7 B4 — optimistic toggle. Flip the set immediately; roll back
+  // and surface a toast if the API call fails.
+  const handleToggleFavorite = async (propertyId, nextActive) => {
+    setFavoriteIds((cur) => {
+      const copy = new Set(cur);
+      if (nextActive) copy.add(propertyId);
+      else copy.delete(propertyId);
+      return copy;
+    });
+    try {
+      if (nextActive) {
+        await api.addFavorite({ entityType: 'PROPERTY', entityId: propertyId });
+      } else {
+        await api.removeFavorite('PROPERTY', propertyId);
+      }
+    } catch (e) {
+      setFavoriteIds((cur) => {
+        const copy = new Set(cur);
+        if (nextActive) copy.delete(propertyId);
+        else copy.add(propertyId);
+        return copy;
+      });
+      toast?.error?.(e?.message || 'שינוי המועדפים נכשל');
+    }
+  };
+
+  // Sprint 7 B3 — snapshot the current filter set as a plain object the
+  // SavedSearchMenu can persist, and apply a loaded snapshot back to
+  // local state. Keys match the `?assetClass=…&category=…&city=…&search=…`
+  // URL contract so saved searches double as shareable links.
+  const currentSavedFilters = useMemo(() => ({
+    assetClass: assetClassFilter,
+    category: filter,
+    city: advFilters.city || '',
+    search: search || '',
+  }), [assetClassFilter, filter, advFilters.city, search]);
+
+  const handleLoadSavedSearch = (filters) => {
+    const f = filters || {};
+    setAssetClassFilter(f.assetClass || 'all');
+    setFilter(f.category || 'all');
+    setAdvFilters((prev) => ({ ...prev, city: f.city || '' }));
+    setSearch(f.search || '');
+    // The URL-sync effect above writes these state changes back to
+    // searchParams on the next tick; the properties list already reacts
+    // to `filter`/`assetClassFilter`/`advFilters.city`/`search` via the
+    // `filtered` memo, so no explicit refetch is needed here.
+  };
 
   const load = async () => {
     try {
@@ -715,6 +777,12 @@ export default function Properties() {
             {/* F-4 — canonical header: primary rightmost, secondaries demoted.
                 Bulk-select and share-link move behind the ⋯ overflow so the
                 primary CTA ("קליטת נכס חדש") wins the visual hierarchy. */}
+            {/* Sprint 7 B3 — saved-search menu for the current filter set. */}
+            <SavedSearchMenu
+              entityType="PROPERTY"
+              currentFilters={currentSavedFilters}
+              onLoad={handleLoadSavedSearch}
+            />
             <button
               type="button"
               className="btn btn-ghost"
@@ -991,6 +1059,12 @@ export default function Properties() {
                 >
                   <SwipeRow actions={selectMode ? [] : swipeActions}>
                     <div className="pc-compact-inner">
+                      {/* Sprint 7 B4 — favorite star, top-left of the row. */}
+                      <FavoriteStar
+                        className="property-fav-star property-fav-star-compact"
+                        active={favoriteIds.has(prop.id)}
+                        onToggle={(next) => handleToggleFavorite(prop.id, next)}
+                      />
                       <Link to={`/properties/${prop.id}`} className="pc-compact-link" onClick={handleCardTap}>
                         {selectMode && (
                           <span className="pc-pick" aria-hidden="true">
@@ -1127,6 +1201,15 @@ export default function Properties() {
                     {isPicked ? <CheckSquare size={22} /> : <Square size={22} />}
                   </span>
                 )}
+                {/* Sprint 7 B4 — favorite toggle pinned to the visual
+                    top-left of the card. Lives outside the Link so taps
+                    never navigate; FavoriteStar stops its own propagation. */}
+                <FavoriteStar
+                  className="property-fav-star"
+                  active={favoriteIds.has(prop.id)}
+                  onToggle={(next) => handleToggleFavorite(prop.id, next)}
+                />
+
                 <Link to={`/properties/${prop.id}`} className="property-card-link" onClick={handleCardTap}>
                   <div className="property-image">
                     <img
