@@ -84,6 +84,16 @@ enum Seriousness {
   VERY
 }
 
+// Sprint 1 / MLS parity — Task D1. Standalone reminder ("תזכורת").
+// Orthogonal to LeadMeeting (which is a calendar-synced meeting with a
+// lead). A reminder can float (no anchor) or attach to a lead /
+// property / customer for quick navigation.
+enum ReminderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
 enum LeadStatus {
   HOT
   WARM
@@ -232,6 +242,9 @@ model User {
   // the primary assignee. Separate from `AgentProperties` because a row
   // can be owned by one agent and assigned to another inside the office.
   primaryForProperties Property[]       @relation("PrimaryAgent")
+  // Sprint 1 / MLS parity — Task D1.
+  reminders            Reminder[]       @relation("AgentReminders")
+  reminderAnchors      Reminder[]       @relation("ReminderCustomer")
 
   @@index([role])
   @@index([officeId])
@@ -414,6 +427,7 @@ model Property {
   agreements       Agreement[]
   transfers        PropertyTransfer[]
   prospects        Prospect[]
+  reminders        Reminder[]
 
   @@unique([agentId, slug])
   @@index([agentId])
@@ -580,6 +594,7 @@ model Lead {
   customerProfile CustomerProfile?
   agreements      Agreement[]
   meetings        LeadMeeting[]
+  reminders       Reminder[]
 
   @@index([agentId])
   @@index([status])
@@ -792,4 +807,36 @@ model TagAssignment {
 
   @@unique([tagId, entityType, entityId])
   @@index([entityType, entityId])
+}
+
+// Sprint 1 / MLS parity — Task D1. Standalone reminder. The dashboard
+// merges these with LeadMeetings for the "מתוכננות/ארכיון" panel.
+model Reminder {
+  id          String         @id @default(cuid())
+  agentId     String
+  agent       User           @relation("AgentReminders", fields: [agentId], references: [id], onDelete: Cascade)
+  title       String
+  notes       String?
+  dueAt       DateTime
+  status      ReminderStatus @default(PENDING)
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  leadId     String?
+  lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  // A `customerId` here is a User id (the customer-side login). Most
+  // reminders anchor to a lead instead; this is for the rarer case of a
+  // reminder tied to a confirmed customer.
+  customerId String?
+  customer   User?     @relation("ReminderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentId, status, dueAt])
+  @@index([leadId])
+  @@index([propertyId])
+  @@index([customerId])
 }

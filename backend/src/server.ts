@@ -32,6 +32,7 @@ import { registerPublicRoutes } from './routes/public.js';
 import { registerOwnerRoutes } from './routes/owners.js';
 import { registerOfficeRoutes } from './routes/office.js';
 import { registerTagRoutes } from './routes/tags.js';
+import { registerReminderRoutes } from './routes/reminders.js';
 import { storageBackend, resolveUpload } from './lib/storage.js';
 import { track as phTrack, captureException as phCapture, shutdownAnalytics } from './lib/analytics.js';
 import { getUser } from './middleware/auth.js';
@@ -219,6 +220,7 @@ export async function build() {
   await app.register(registerCalendarRoutes, { prefix: '/api/integrations/calendar' });
   await app.register(registerOfficeRoutes, { prefix: '/api/office' });
   await app.register(registerTagRoutes, { prefix: '/api/tags' });
+  await app.register(registerReminderRoutes, { prefix: '/api/reminders' });
 
   // Request lifecycle observability — assigns a request_id, logs
   // method/route/status/duration, and sends an api_request event to
