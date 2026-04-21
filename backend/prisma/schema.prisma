@@ -185,6 +185,7 @@ model User {
   sentMessages      Message[]          @relation("SentMessages")
   prospects         Prospect[]
   leadMeetings      LeadMeeting[]      @relation("AgentMeetings")
+  tags              Tag[]              @relation("AgentTags")
 
   @@index([role])
   @@index([officeId])
@@ -680,4 +681,53 @@ model LeadMeeting {
   @@index([leadId])
   @@index([agentId])
   @@index([startsAt])
+}
+
+// ─── Tags ──────────────────────────────────────────────────────────────────
+// Sprint 1 / MLS parity — Task A2. Nadlan calls these "מדבקות" (stickers /
+// labels). A single `Tag` can target properties, leads, customers, or any
+// mix (via `scope`). `TagAssignment` is a per-entity attach-point so we
+// don't have to add a FK on every model. Join is manually-keyed rather
+// than using a polymorphic column trick — keeps Prisma queries simple.
+enum TagScope {
+  PROPERTY
+  LEAD
+  CUSTOMER
+  ALL
+}
+
+enum TagEntity {
+  PROPERTY
+  LEAD
+  CUSTOMER
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  agentId   String
+  agent     User     @relation("AgentTags", fields: [agentId], references: [id], onDelete: Cascade)
+  name      String
+  // Stored as a 7-char hex string (e.g. "#C9A14B"). No enum — callers
+  // pick from the design-system palette client-side.
+  color     String   @default("#C9A14B")
+  scope     TagScope @default(ALL)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments TagAssignment[]
+
+  @@unique([agentId, name])
+  @@index([agentId, scope])
+}
+
+model TagAssignment {
+  id         String    @id @default(cuid())
+  tagId      String
+  tag        Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  entityType TagEntity
+  entityId   String
+  createdAt  DateTime  @default(now())
+
+  @@unique([tagId, entityType, entityId])
+  @@index([entityType, entityId])
 }
