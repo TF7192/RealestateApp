@@ -5,6 +5,7 @@ import { useChat } from '../hooks/chat';
 import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
 import { relativeTime } from '../lib/time';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './ChatWidget.css';
 
 // Admin allowlist is mirrored on the client so the admin user sees the
@@ -77,64 +78,83 @@ export default function ChatWidget() {
       )}
 
       {open && (
-        <Portal>
-          <div className="chatw-panel-wrap" role="dialog" aria-label="צ׳אט עם המפתחים">
-            <div className="chatw-panel">
-              <header className="chatw-head">
-                <div>
-                  <strong>שיחה עם המפתחים</strong>
-                  <span>זמין רוב הזמן — נחזור אליך במהירות</span>
-                </div>
-                <button className="chatw-close" onClick={() => setOpen(false)} aria-label="סגור">
-                  <X size={18} />
-                </button>
-              </header>
-
-              {messages.length === 0 && !loading && (
-                <div className="chatw-welcome">
-                  <p>
-                    יש לכם שאלה? דברו ישירות עם המפתחים של הפלטפורמה.
-                    השאירו הודעה ונחזור אליכם.
-                  </p>
-                </div>
-              )}
-
-              <div className="chatw-list" ref={listRef}>
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`chatw-msg ${m.senderRole === 'admin' ? 'is-admin' : 'is-me'}`}
-                  >
-                    <div className="chatw-bubble">{m.body}</div>
-                    <div className="chatw-meta">
-                      <time>{relativeTime(m.createdAt)}</time>
-                      {m.senderRole === 'user' && m.readAt && <span> · נקרא</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <form className="chatw-compose" onSubmit={onSubmit}>
-                <textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="כתבו הודעה…"
-                  rows={2}
-                  dir="auto"
-                  autoCapitalize="sentences"
-                  enterKeyHint="send"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(e); }
-                  }}
-                />
-                <button type="submit" disabled={!draft.trim()} aria-label="שלח">
-                  <Send size={16} />
-                </button>
-              </form>
-            </div>
-          </div>
-        </Portal>
+        <ChatPanel
+          onClose={() => setOpen(false)}
+          messages={messages}
+          loading={loading}
+          listRef={listRef}
+          draft={draft}
+          setDraft={setDraft}
+          onSubmit={onSubmit}
+        />
       )}
     </>
+  );
+}
+
+// Separate component so useFocusTrap's effect fires on open (it runs once
+// on mount when ref.current is already attached) and cleanup restores
+// focus to the launcher on close.
+function ChatPanel({ onClose, messages, loading, listRef, draft, setDraft, onSubmit }) {
+  const panelRef = useRef(null);
+  useFocusTrap(panelRef, { onEscape: onClose });
+  return (
+    <Portal>
+      <div className="chatw-panel-wrap" role="dialog" aria-modal="true" aria-label="צ׳אט עם המפתחים">
+        <div ref={panelRef} className="chatw-panel">
+          <header className="chatw-head">
+            <div>
+              <strong>שיחה עם המפתחים</strong>
+              <span>זמין רוב הזמן — נחזור אליך במהירות</span>
+            </div>
+            <button className="chatw-close" onClick={onClose} aria-label="סגור">
+              <X size={18} />
+            </button>
+          </header>
+
+          {messages.length === 0 && !loading && (
+            <div className="chatw-welcome">
+              <p>
+                יש לכם שאלה? דברו ישירות עם המפתחים של הפלטפורמה.
+                השאירו הודעה ונחזור אליכם.
+              </p>
+            </div>
+          )}
+
+          <div className="chatw-list" ref={listRef}>
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                className={`chatw-msg ${m.senderRole === 'admin' ? 'is-admin' : 'is-me'}`}
+              >
+                <div className="chatw-bubble">{m.body}</div>
+                <div className="chatw-meta">
+                  <time>{relativeTime(m.createdAt)}</time>
+                  {m.senderRole === 'user' && m.readAt && <span> · נקרא</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <form className="chatw-compose" onSubmit={onSubmit}>
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="כתבו הודעה…"
+              rows={2}
+              dir="auto"
+              autoCapitalize="sentences"
+              enterKeyHint="send"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(e); }
+              }}
+            />
+            <button type="submit" disabled={!draft.trim()} aria-label="שלח">
+              <Send size={16} />
+            </button>
+          </form>
+        </div>
+      </div>
+    </Portal>
   );
 }

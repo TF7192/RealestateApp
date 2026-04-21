@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import Portal from './Portal';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './PropertyPanelSheet.css';
 
 /**
@@ -23,24 +24,24 @@ export default function PropertyPanelSheet({
   width = 'md',
   children,
 }) {
+  // Lock background scroll while open. Escape + tab-trap + focus-restore
+  // are handled by useFocusTrap below.
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.();
-    };
-    window.addEventListener('keydown', onKey);
-    // Lock background scroll while open
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, []);
+
+  const panelRef = useRef(null);
+  useFocusTrap(panelRef, { onEscape: onClose });
 
   return (
     <Portal>
       <div className="pps-backdrop" onClick={onClose} role="presentation">
         <aside
+          ref={panelRef}
           className={`pps-panel pps-${width}`}
           onClick={(e) => e.stopPropagation()}
           role="dialog"

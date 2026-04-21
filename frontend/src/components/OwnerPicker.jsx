@@ -4,6 +4,7 @@ import api from '../lib/api';
 import Portal from './Portal';
 import OwnerEditDialog from './OwnerEditDialog';
 import { useViewportMobile } from '../hooks/mobile';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './OwnerPicker.css';
 
 /**
@@ -45,12 +46,9 @@ export default function OwnerPicker({ open, onClose, onPick }) {
     return () => { document.body.style.overflow = prev; };
   }, [open]);
 
-  // Focus search input shortly after opening
-  useEffect(() => {
-    if (!open) return undefined;
-    const t = setTimeout(() => inputRef.current?.focus(), 80);
-    return () => clearTimeout(t);
-  }, [open]);
+  // Focus is handled by useFocusTrap on the panel (F-6.4). The hook focuses
+  // the first tabbable child on mount — the search input sits at the top
+  // so it still gets focus.
 
   // Debounced search via API
   useEffect(() => {
@@ -83,8 +81,6 @@ export default function OwnerPicker({ open, onClose, onPick }) {
     return () => clearTimeout(debounceRef.current);
   }, [q, open, allOwners]);
 
-  const handleEsc = (e) => { if (e.key === 'Escape') onClose?.(); };
-
   const handlePick = (owner) => {
     onPick?.(owner);
     onClose?.();
@@ -96,117 +92,18 @@ export default function OwnerPicker({ open, onClose, onPick }) {
 
   return (
     <>
-      <Portal>
-        <div
-          className="owner-picker-back"
-          onClick={onClose}
-          onKeyDown={handleEsc}
-          role="dialog"
-          aria-label="בחר בעל נכסים"
-        >
-          <div className={sheetClass} onClick={(e) => e.stopPropagation()}>
-            {isMobile && <div className="owner-picker-handle" aria-hidden="true" />}
-
-            <header className="owner-picker-head">
-              <h3>בחר בעל נכסים</h3>
-              <button className="owner-picker-close btn-ghost" onClick={onClose} aria-label="סגור">
-                <X size={18} />
-              </button>
-            </header>
-
-            <button
-              type="button"
-              className="owner-picker-new"
-              onClick={() => setCreateOpen(true)}
-            >
-              <span className="owner-picker-new-icon"><UserPlus size={16} /></span>
-              <span className="owner-picker-new-text">
-                <strong>בעל נכס חדש</strong>
-                <small>צור והוסף בעל נכסים במהירות</small>
-              </span>
-            </button>
-
-            <div className="owner-picker-search">
-              <Search size={16} />
-              <input
-                ref={inputRef}
-                type="search"
-                inputMode="search"
-                enterKeyHint="search"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                placeholder="חפש לפי שם או טלפון"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
-              {q && (
-                <button
-                  type="button"
-                  className="owner-picker-clear"
-                  onClick={() => setQ('')}
-                  aria-label="נקה חיפוש"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            <div className="owner-picker-results">
-              {loading && <div className="owner-picker-empty">טוען…</div>}
-              {!loading && results.length === 0 && (
-                <div className="owner-picker-empty">
-                  {/* F-22 — if the agent typed a name, let them commit it
-                      via a single-click "create with this name" button.
-                      Previously the empty state was a dead copy line. */}
-                  {q ? (
-                    <>
-                      <p>לא נמצא בעלים עם השם "{q}".</p>
-                      <button
-                        type="button"
-                        className="owner-picker-create-with-q"
-                        onClick={() => setCreateOpen(true)}
-                      >
-                        <UserPlus size={14} /> צור בעלים חדש: <strong>{q}</strong>
-                      </button>
-                    </>
-                  ) : (
-                    'עוד אין בעלי נכסים במערכת'
-                  )}
-                </div>
-              )}
-              {!loading && results.map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  className="owner-picker-row"
-                  onClick={() => handlePick(o)}
-                >
-                  <div className="owner-picker-avatar" aria-hidden="true">
-                    {(o.name || '?').charAt(0)}
-                  </div>
-                  <div className="owner-picker-meta">
-                    <strong>{o.name}</strong>
-                    <div className="owner-picker-meta-sub">
-                      {o.phone && (
-                        <span className="owner-picker-phone"><Phone size={11} />{o.phone}</span>
-                      )}
-                      {o.email && (
-                        <span className="owner-picker-email"><Mail size={11} />{o.email}</span>
-                      )}
-                    </div>
-                  </div>
-                  <span className="owner-picker-pill" title={`${o.propertyCount || 0} נכסים`}>
-                    <Building2 size={11} />
-                    <strong>{o.propertyCount || 0}</strong>
-                    <span>נכסים</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Portal>
+      <OwnerPickerPanel
+        onClose={onClose}
+        sheetClass={sheetClass}
+        isMobile={isMobile}
+        inputRef={inputRef}
+        q={q}
+        setQ={setQ}
+        loading={loading}
+        results={results}
+        setCreateOpen={setCreateOpen}
+        handlePick={handlePick}
+      />
 
       {createOpen && (
         <OwnerEditDialog
@@ -218,5 +115,125 @@ export default function OwnerPicker({ open, onClose, onPick }) {
         />
       )}
     </>
+  );
+}
+
+// Inner panel mounts only when open so useFocusTrap's mount-time effect
+// fires with ref.current already attached (see F-6.4).
+function OwnerPickerPanel({ onClose, sheetClass, isMobile, inputRef, q, setQ, loading, results, setCreateOpen, handlePick }) {
+  const panelRef = useRef(null);
+  useFocusTrap(panelRef, { onEscape: onClose });
+  return (
+    <Portal>
+      <div
+        className="owner-picker-back"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label="בחר בעל נכסים"
+      >
+        <div ref={panelRef} className={sheetClass} onClick={(e) => e.stopPropagation()}>
+          {isMobile && <div className="owner-picker-handle" aria-hidden="true" />}
+
+          <header className="owner-picker-head">
+            <h3>בחר בעל נכסים</h3>
+            <button className="owner-picker-close btn-ghost" onClick={onClose} aria-label="סגור">
+              <X size={18} />
+            </button>
+          </header>
+
+          <button
+            type="button"
+            className="owner-picker-new"
+            onClick={() => setCreateOpen(true)}
+          >
+            <span className="owner-picker-new-icon"><UserPlus size={16} /></span>
+            <span className="owner-picker-new-text">
+              <strong>בעל נכס חדש</strong>
+              <small>צור והוסף בעל נכסים במהירות</small>
+            </span>
+          </button>
+
+          <div className="owner-picker-search">
+            <Search size={16} />
+            <input
+              ref={inputRef}
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              placeholder="חפש לפי שם או טלפון"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            {q && (
+              <button
+                type="button"
+                className="owner-picker-clear"
+                onClick={() => setQ('')}
+                aria-label="נקה חיפוש"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="owner-picker-results">
+            {loading && <div className="owner-picker-empty">טוען…</div>}
+            {!loading && results.length === 0 && (
+              <div className="owner-picker-empty">
+                {/* F-22 — if the agent typed a name, let them commit it
+                    via a single-click "create with this name" button.
+                    Previously the empty state was a dead copy line. */}
+                {q ? (
+                  <>
+                    <p>לא נמצא בעלים עם השם "{q}".</p>
+                    <button
+                      type="button"
+                      className="owner-picker-create-with-q"
+                      onClick={() => setCreateOpen(true)}
+                    >
+                      <UserPlus size={14} /> צור בעלים חדש: <strong>{q}</strong>
+                    </button>
+                  </>
+                ) : (
+                  'עוד אין בעלי נכסים במערכת'
+                )}
+              </div>
+            )}
+            {!loading && results.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className="owner-picker-row"
+                onClick={() => handlePick(o)}
+              >
+                <div className="owner-picker-avatar" aria-hidden="true">
+                  {(o.name || '?').charAt(0)}
+                </div>
+                <div className="owner-picker-meta">
+                  <strong>{o.name}</strong>
+                  <div className="owner-picker-meta-sub">
+                    {o.phone && (
+                      <span className="owner-picker-phone"><Phone size={11} />{o.phone}</span>
+                    )}
+                    {o.email && (
+                      <span className="owner-picker-email"><Mail size={11} />{o.email}</span>
+                    )}
+                  </div>
+                </div>
+                <span className="owner-picker-pill" title={`${o.propertyCount || 0} נכסים`}>
+                  <Building2 size={11} />
+                  <strong>{o.propertyCount || 0}</strong>
+                  <span>נכסים</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Portal>
   );
 }

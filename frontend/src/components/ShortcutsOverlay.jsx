@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useRef } from 'react';
 import { X, Keyboard } from 'lucide-react';
 import Portal from './Portal';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './ShortcutsOverlay.css';
 
 const SECTIONS = [
@@ -38,18 +39,20 @@ const SECTIONS = [
 ];
 
 export default function ShortcutsOverlay({ open, onClose }) {
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
   if (!open) return null;
+  return <ShortcutsPanel onClose={onClose} />;
+}
+
+// Inner panel mounts only when open so useFocusTrap's mount-time effect
+// fires with ref.current already attached, and its cleanup restores
+// focus to the trigger on close.
+function ShortcutsPanel({ onClose }) {
+  const panelRef = useRef(null);
+  useFocusTrap(panelRef, { onEscape: onClose });
   return (
     <Portal>
-      <div className="kbov-back" onClick={onClose} role="dialog" aria-label="קיצורי מקלדת">
-        <div className="kbov-card" onClick={(e) => e.stopPropagation()}>
+      <div className="kbov-back" onClick={onClose} role="dialog" aria-modal="true" aria-label="קיצורי מקלדת">
+        <div ref={panelRef} className="kbov-card" onClick={(e) => e.stopPropagation()}>
           <header className="kbov-head">
             <div>
               <span className="kbov-eyebrow"><Keyboard size={11} /> קיצורי מקלדת</span>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X,
@@ -12,6 +12,7 @@ import {
 import WhatsAppIcon from './WhatsAppIcon';
 import haptics from '../lib/haptics';
 import { isNative } from '../native/platform';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './LeadPickerSheet.css';
 
 /**
@@ -34,6 +35,9 @@ export default function LeadPickerSheet({
   const [query, setQuery] = useState('');
   const [text, setText] = useState(previewText);
   const [editorOpen, setEditorOpen] = useState(false);
+  // F-6.4 — focus trap + Esc + focus-restore for the sheet.
+  const panelRef = useRef(null);
+  useFocusTrap(panelRef, { onEscape: onClose });
 
   useEffect(() => { setText(previewText); }, [previewText]);
 
@@ -76,8 +80,8 @@ export default function LeadPickerSheet({
   // `filter`/`will-change` that would otherwise contain `position: fixed`
   // (which was making the modal sit *inside* the page area).
   return createPortal(
-    <div className="lps-back" onClick={onClose} role="dialog">
-      <div className="lps-card" onClick={(e) => e.stopPropagation()}>
+    <div className="lps-back" onClick={onClose} role="dialog" aria-modal="true">
+      <div ref={panelRef} className="lps-card" onClick={(e) => e.stopPropagation()}>
         <div className="lps-handle only-mobile" />
 
         {/* HEADER */}
