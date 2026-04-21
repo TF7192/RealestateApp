@@ -1,0 +1,196 @@
+name: Fast lane
+
+# Runs on every push. Also reusable — pr.yml and main.yml call this
+# workflow so the fast-lane jobs don't have to be duplicated.
+#
+# Budget: ≤ 5 minutes on a typical change.
+# Scope:  lint, typecheck, unit (backend + frontend), build.
+# Out of scope (lives in pr.yml):  integration tests, E2E, audits.
+
+on:
+  push:
+    branches-ignore: [ main ]   # main runs main.yml which calls this
+  workflow_call:
+    outputs:
+      frontend-dist:
+        description: Name of the uploaded frontend dist artifact
+        value: frontend-dist
+      backend-dist:
+        description: Name of the uploaded backend dist artifact
+        value: backend-dist
+
+concurrency:
+  group: fast-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Path filter: skip downstream jobs when nothing relevant changed.
+  # Docs-only pushes cost ~20s total (just this job).
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'tests/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'vitest.workspace.ts'
+              - 'vitest.config.ts'
+              - 'playwright.config.ts'
+              - 'tsconfig.test.json'
+              - '.github/workflows/**'
+              - '.github/actions/**'
+              - '.nvmrc'
+            backend:
+              - 'backend/**'
+              - 'tests/integration/**'
+              - 'tests/unit/backend/**'
+              - 'vitest.workspace.ts'
+              - 'package.json'
+              - 'package-lock.json'
+            frontend:
+              - 'frontend/**'
+              - 'tests/unit/frontend/**'
+              - 'tests/e2e/**'
+              - 'playwright.config.ts'
+
+  lint:
+    name: Lint (frontend)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { install-backend: 'false' }
+      - name: Restore ESLint cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/.eslintcache
+          key: eslint-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json', 'frontend/eslint.config.js') }}
+          restore-keys: |
+            eslint-${{ runner.os }}-
+      - working-directory: frontend
+        run: npx eslint . --cache --cache-location .eslintcache --max-warnings=0
+
+  typecheck:
+    name: Typecheck (backend)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { install-frontend: 'false', prisma-generate: 'true' }
+      - name: Restore tsbuildinfo
+        uses: actions/cache@v4
+        with:
+          path: backend/.tsbuildinfo
+          key: tsbuildinfo-${{ runner.os }}-${{ hashFiles('backend/package-lock.json', 'backend/tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            tsbuildinfo-${{ runner.os }}-${{ hashFiles('backend/package-lock.json', 'backend/tsconfig.json') }}-
+      - working-directory: backend
+        run: npx tsc --noEmit
+
+  unit-backend:
+    name: Unit (backend)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { install-frontend: 'false', prisma-generate: 'true' }
+      - run: npm run test:unit
+
+  unit-frontend:
+    name: Unit (frontend / RTL)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { install-backend: 'false' }
+      # Runs the vitest.workspace `unit-frontend` project (jsdom + RTL).
+      # Previously not exercised by CI at all.
+      - run: npx vitest run --project=unit-frontend
+
+  build:
+    name: Build
+    needs: changes
+    # Build always produces both dists when any code changed — E2E in the
+    # PR/main lanes always needs both (server + SPA), so gating each dist
+    # on its own path filter would break CI-only PRs that download both.
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { prisma-generate: 'true' }
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # Retained 1 day — this is CI plumbing, not a release artifact.
+      - name: Upload backend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: backend/dist
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  done:
+    name: Fast lane ✓
+    needs: [lint, typecheck, unit-backend, unit-frontend, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # Pass only if every needed job either succeeded or was skipped
+      # (because path filter decided it wasn't relevant).
+      - name: Verify all needed jobs succeeded or were skipped
+        run: |
+          results='${{ toJSON(needs) }}'
+          echo "$results" | python3 -c '
+          import json, sys
+          needs = json.load(sys.stdin)
+          bad = [n for n, r in needs.items() if r["result"] not in ("success", "skipped")]
+          if bad:
+              print(f"Failed/cancelled jobs: {bad}", file=sys.stderr)
+              sys.exit(1)
+          print("All fast-lane jobs passed or skipped cleanly.")
+          '

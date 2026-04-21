@@ -2,14 +2,21 @@
   "name": "estia",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.6.0",
+  "engines": {
+    "node": "20.20.2",
+    "npm": ">=11"
+  },
   "workspaces": [
     "frontend",
     "backend"
   ],
   "scripts": {
-    "test": "npm run test:unit && npm run test:integration",
+    "test": "npm run test:unit && npm run test:frontend && npm run test:integration",
     "test:unit": "vitest run --project=unit",
     "test:unit:watch": "vitest --project=unit",
+    "test:frontend": "vitest run --project=frontend --project=unit-frontend",
+    "test:frontend:watch": "vitest --project=frontend --project=unit-frontend",
     "test:integration": "vitest run --project=integration",
     "test:integration:watch": "vitest --project=integration",
     "test:e2e": "playwright test",
@@ -27,8 +34,10 @@
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/coverage-v8": "^2.1.9",
     "jsdom": "^25.0.1",
+    "msw": "^2.13.4",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "vitest-axe": "^0.1.0"
   }
 }

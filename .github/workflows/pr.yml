@@ -1,0 +1,233 @@
+name: PR lane
+
+# Runs on every pull request. Full test pyramid + dependency audit.
+# Fast-lane jobs are invoked as a reusable workflow (fast.yml).
+#
+# Budget: ≤ 12 minutes on a typical change.
+
+on:
+  pull_request:
+
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Needed so the integration job's Postgres service and cache writes work;
+  # keep the rest minimal.
+  actions: read
+
+jobs:
+  fast:
+    uses: ./.github/workflows/fast.yml
+
+  integration:
+    name: Integration (API + DB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estia
+          POSTGRES_PASSWORD: estia
+          POSTGRES_DB: estia_test
+        ports: [ '54329:5432' ]
+        options: >-
+          --health-cmd="pg_isready -U estia -d estia_test"
+          --health-interval=2s --health-timeout=2s --health-retries=30
+    env:
+      DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
+      JWT_SECRET: test-jwt-secret
+      COOKIE_SECRET: test-cookie-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { install-frontend: 'false', prisma-generate: 'true' }
+      - name: Apply migrations + seed
+        working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npm run db:seed
+      - name: Run integration suite
+        run: npm run test:integration
+
+  e2e:
+    name: E2E (Chromium, shard ${{ matrix.shard }}/${{ matrix.total }})
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 4-way shard. Adjust up if the suite grows past ~10 min/shard.
+        shard: [ 1, 2, 3, 4 ]
+        total: [ 4 ]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estia
+          POSTGRES_PASSWORD: estia
+          POSTGRES_DB: estia_test
+        ports: [ '54329:5432' ]
+        options: >-
+          --health-cmd="pg_isready -U estia -d estia_test"
+          --health-interval=2s --health-timeout=2s --health-retries=30
+    env:
+      DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
+      JWT_SECRET: test-jwt-secret
+      COOKIE_SECRET: test-cookie-secret
+      PUBLIC_URL: http://localhost:5173
+      TEST_AGENT_EMAIL: agent.demo@estia.app
+      # Seed uses estia-demo-1234; align here to match seed.ts on the test DB.
+      TEST_AGENT_PASSWORD: estia-demo-1234
+      PLAYWRIGHT_WEB_URL: http://127.0.0.1:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { prisma-generate: 'true' }
+
+      - name: Reuse frontend build from fast lane
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: Reuse backend build from fast lane
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-dist
+          path: backend/dist
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium (+ system deps if cache miss)
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Apply migrations + seed
+        working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npm run db:seed
+
+      - name: Start backend
+        working-directory: backend
+        run: node dist/server.js &
+        env:
+          NODE_ENV: test
+
+      - name: Start frontend preview
+        working-directory: frontend
+        run: npx vite preview --host 127.0.0.1 --port 5173 &
+
+      - name: Wait for servers
+        run: |
+          npx --yes wait-on http://127.0.0.1:4000/api/health http://127.0.0.1:5173 --timeout 30000
+
+      - name: Run Playwright shard ${{ matrix.shard }}/${{ matrix.total }}
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ matrix.total }} --reporter=blob
+
+      - name: Upload blob report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-blob-${{ matrix.shard }}
+          path: blob-report
+          retention-days: 7
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-traces-${{ matrix.shard }}
+          path: test-results
+          retention-days: 14
+
+  e2e-report:
+    name: E2E merged report
+    needs: e2e
+    if: always() && needs.e2e.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { install-backend: 'false', install-frontend: 'false' }
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-blob-*
+          merge-multiple: true
+          path: all-blob-reports
+      - name: Merge shard reports
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report
+          path: playwright-report
+          retention-days: 14
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # Audit each lockfile separately — npm audit in a workspace root
+      # doesn't descend into non-hoisted per-workspace lockfiles.
+      # --audit-level=high means moderate advisories don't block PRs.
+      - name: Audit root
+        run: npm audit --audit-level=high --omit=dev || (echo "::error::High/critical advisory in root" && exit 1)
+      - name: Audit backend
+        working-directory: backend
+        run: npm audit --audit-level=high --omit=dev || (echo "::error::High/critical advisory in backend" && exit 1)
+      - name: Audit frontend
+        working-directory: frontend
+        run: npm audit --audit-level=high --omit=dev || (echo "::error::High/critical advisory in frontend" && exit 1)
+
+  notify:
+    name: Slack notify
+    needs: [ fast, integration, e2e, e2e-report, audit ]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute aggregate status
+        id: agg
+        run: |
+          results='${{ toJSON(needs) }}'
+          if echo "$results" | grep -q '"result": "failure"'; then
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+            echo "title=PR checks failed on #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}" >> "$GITHUB_OUTPUT"
+          elif echo "$results" | grep -q '"result": "cancelled"'; then
+            echo "status=cancelled" >> "$GITHUB_OUTPUT"
+            echo "title=PR checks cancelled on #${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=success" >> "$GITHUB_OUTPUT"
+            echo "title=PR checks passed on #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: ./.github/actions/slack-notify
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.agg.outputs.status }}
+          title: ${{ steps.agg.outputs.title }}
+          details: |
+            *PR:* <${{ github.event.pull_request.html_url }}|#${{ github.event.pull_request.number }}>
+            *fast:* ${{ needs.fast.result }} · *integration:* ${{ needs.integration.result }} · *e2e:* ${{ needs.e2e.result }} · *audit:* ${{ needs.audit.result }}
