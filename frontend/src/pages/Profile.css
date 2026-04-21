@@ -370,7 +370,7 @@
   background: var(--bg-elevated);
   color: var(--text-primary);
   font-family: var(--font-body);
-  text-align: end;
+  text-align: start;
   cursor: pointer;
   transition: all 0.18s;
 }
