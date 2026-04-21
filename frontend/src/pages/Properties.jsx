@@ -27,6 +27,8 @@ import { formatFloor } from '../lib/formatFloor';
 import { useAuth } from '../lib/auth';
 import ConfirmDialog from '../components/ConfirmDialog';
 import QuickEditDrawer from '../components/QuickEditDrawer';
+import EmptyState from '../components/EmptyState';
+import { useRouteScrollRestore } from '../hooks/useScrollRestore';
 import WhatsAppSheet from '../components/WhatsAppSheet';
 import PullRefresh from '../components/PullRefresh';
 import LeadPickerSheet from '../components/LeadPickerSheet';
@@ -146,6 +148,9 @@ export default function Properties() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const isMobile = useViewportMobile(820);
+  // F-6.3 — preserve scroll when the agent goes deep into a property
+  // card and pops back. Critical for 500-row lists on desktop.
+  useRouteScrollRestore();
   // Seed state from the in-memory pageCache so a return to this tab
   // paints the previous result INSTANTLY — no empty-page flash while
   // the background fetch runs. First visit: cache is null so we fall
@@ -1158,12 +1163,48 @@ export default function Properties() {
         </div>
       )}
 
+      {/* F-4.1 — distinguish "first time, no properties yet" (onboarding,
+          big CTA) from "filtered to nothing" (clear-filters CTA). */}
       {!loading && filtered.length === 0 && (
-        <div className="empty-state">
-          <Building2 size={48} />
-          <h3>לא נמצאו נכסים</h3>
-          <p>נסה לשנות את הסינון או לחפש ביטוי אחר</p>
-        </div>
+        items.length === 0 ? (
+          <EmptyState
+            variant="first"
+            icon={<Building2 size={44} />}
+            title="עוד אין נכסים במערכת"
+            description="העלה/י את הנכס הראשון — שיווק מלא, סטטוס בלעדיות, שיתוף בוואטסאפ — הכל ממקום אחד."
+            action={{
+              label: 'הוסף נכס ראשון',
+              icon: <Plus size={14} />,
+              onClick: () => navigate('/properties/new'),
+            }}
+            secondary={{
+              label: 'ייבא מ-Yad2',
+              onClick: () => navigate('/integrations/yad2'),
+            }}
+          />
+        ) : (
+          <EmptyState
+            variant="filtered"
+            icon={<Building2 size={44} />}
+            title="אין תוצאות לסינון הנוכחי"
+            description="נסה/י ביטוי חיפוש אחר, או נקה/י את המסננים הפעילים."
+            action={{
+              label: 'נקה מסננים',
+              icon: <X size={14} />,
+              onClick: () => {
+                setSearch('');
+                setFilter('all');
+                setAssetClassFilter('all');
+                setAdvFilters({
+                  city: '', minRooms: '', maxRooms: '',
+                  minSqm: '', maxSqm: '', minPrice: '', maxPrice: '',
+                });
+                setShowAdvanced(false);
+                setLocationQuery('');
+              },
+            }}
+          />
+        )
       )}
 
       {toDelete && (

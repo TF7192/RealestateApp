@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Save, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { NumberField, SelectField } from './SmartFields';
 import Portal from './Portal';
 import haptics from '../lib/haptics';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './QuickEditDrawer.css';
 
 // 5.2 — Quick-edit drawer.
@@ -31,13 +32,9 @@ export default function QuickEditDrawer({ property, onClose, onSaved }) {
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
-
-  // Esc closes; works when there's no modal library.
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const panelRef = useRef(null);
+  // F-6.4 — Tab trap + Esc + focus-restore in one hook.
+  useFocusTrap(panelRef, { onEscape: onClose });
 
   const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -66,11 +63,19 @@ export default function QuickEditDrawer({ property, onClose, onSaved }) {
 
   return (
     <Portal>
-      <div className="qed-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-        <aside className="qed-panel" onClick={(e) => e.stopPropagation()} dir="rtl">
+      <div className="qed-backdrop" onClick={onClose}>
+        <aside
+          ref={panelRef}
+          className="qed-panel"
+          onClick={(e) => e.stopPropagation()}
+          dir="rtl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="qed-title"
+        >
           <header className="qed-head">
             <div className="qed-head-text">
-              <strong>עריכה מהירה</strong>
+              <strong id="qed-title">עריכה מהירה</strong>
               <span>{property.street}, {property.city}</span>
             </div>
             <button

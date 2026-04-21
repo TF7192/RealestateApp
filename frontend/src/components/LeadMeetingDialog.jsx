@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Calendar, Video, MapPin, AlertCircle, Check } from 'lucide-react';
 import api from '../lib/api';
 import Portal from './Portal';
 import haptics from '../lib/haptics';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './LeadMeetingDialog.css';
 
 // 7.2 — Schedule a meeting with a lead (brief: 30-min default,
@@ -38,6 +39,8 @@ export default function LeadMeetingDialog({ lead, onClose, onCreated }) {
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const panelRef = useRef(null);
+  useFocusTrap(panelRef, { onEscape: onClose });
 
   useEffect(() => {
     api.calendarStatus().then((s) => setCalendarConnected(!!s.connected)).catch(() => setCalendarConnected(false));
@@ -81,7 +84,14 @@ export default function LeadMeetingDialog({ lead, onClose, onCreated }) {
   return (
     <Portal>
       <div className="lmd-backdrop" onClick={onClose}>
-        <div className="lmd-panel" onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div
+          ref={panelRef}
+          className="lmd-panel"
+          onClick={(e) => e.stopPropagation()}
+          dir="rtl"
+          role="dialog"
+          aria-modal="true"
+        >
           <header className="lmd-head">
             <div>
               <strong>תזמון פגישה</strong>

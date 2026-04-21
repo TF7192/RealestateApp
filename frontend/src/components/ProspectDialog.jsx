@@ -3,6 +3,7 @@ import { X, Check, Pen, Link2, QrCode, Trash2, Send, AlertCircle, UserPlus } fro
 import api from '../lib/api';
 import Portal from './Portal';
 import haptics from '../lib/haptics';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './ProspectDialog.css';
 
 // 1.5 — Prospect intake form.
@@ -35,6 +36,8 @@ export default function ProspectDialog({ property, onClose, onCreated }) {
   const drawingRef = useRef(false);
   const hasStrokeRef = useRef(false);
   const lastPointRef = useRef(null);
+  const panelRef = useRef(null);
+  useFocusTrap(panelRef, { onEscape: onClose });
 
   const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -178,8 +181,15 @@ export default function ProspectDialog({ property, onClose, onCreated }) {
 
   return (
     <Portal>
-      <div className="pdg-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-        <div className="pdg-panel" onClick={(e) => e.stopPropagation()} dir="rtl">
+      <div className="pdg-backdrop" onClick={onClose}>
+        <div
+          ref={panelRef}
+          className="pdg-panel"
+          onClick={(e) => e.stopPropagation()}
+          dir="rtl"
+          role="dialog"
+          aria-modal="true"
+        >
           <header className="pdg-head">
             <div className="pdg-head-text">
               <strong>הוסף מתעניין</strong>

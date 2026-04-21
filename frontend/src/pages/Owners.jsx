@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, Search, Phone, Building2, X, MessageSquare, ChevronLeft } from 'lucide-react';
 import api from '../lib/api';
+import { useRouteScrollRestore } from '../hooks/useScrollRestore';
 import OwnerEditDialog from '../components/OwnerEditDialog';
 import PullRefresh from '../components/PullRefresh';
 import SwipeRow from '../components/SwipeRow';
@@ -24,6 +25,7 @@ export default function Owners() {
   const isMobile = useViewportMobile(820);
   const toast = useToast();
   const navigate = useNavigate();
+  useRouteScrollRestore();
   // Seed from cache so a return trip paints instantly.
   const _cached = pageCache.get('owners');
   const [owners, setOwners] = useState(_cached || []);

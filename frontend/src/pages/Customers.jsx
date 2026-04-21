@@ -28,6 +28,7 @@ import {
   User,
 } from 'lucide-react';
 import api from '../lib/api';
+import { useRouteScrollRestore } from '../hooks/useScrollRestore';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CustomerEditDialog from '../components/CustomerEditDialog';
 import InlineText from '../components/InlineText';
@@ -108,6 +109,7 @@ export default function Customers() {
   const navigate = useNavigate();
   const toast = useToast();
   const isMobile = useViewportMobile(820);
+  useRouteScrollRestore();
   // Seed from cache so tab returns don't flash the empty state.
   const _cachedLeads = pageCache.get('customers');
   const [leads, setLeads] = useState(_cachedLeads || []);

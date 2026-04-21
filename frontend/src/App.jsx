@@ -1,5 +1,13 @@
 import { useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+// F-8.6 — These modules are already statically imported from
+// native/share.js + Login.jsx, so the dynamic import below was being
+// rewritten by Vite into a static one anyway (the "INEFFECTIVE_DYNAMIC
+// _IMPORT" warning). Replacing the dynamic imports in the effect with
+// static imports at the top of this file removes the warning without
+// changing actual bundle behavior.
+import { App as CapApp } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Properties from './pages/Properties';
@@ -89,10 +97,6 @@ function AppRoutes() {
     if (!isNative()) return;
     let sub;
     (async () => {
-      const [{ App: CapApp }, { Browser }] = await Promise.all([
-        import('@capacitor/app'),
-        import('@capacitor/browser'),
-      ]);
       sub = await CapApp.addListener('appUrlOpen', async (event) => {
         const raw = event?.url || '';
         if (!raw.toLowerCase().startsWith('com.estia.agent://auth')) return;
