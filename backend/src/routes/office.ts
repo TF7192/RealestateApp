@@ -8,6 +8,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { logActivity } from '../lib/activity.js';
 
 export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/office — the signed-in user's own office (or null).
@@ -83,6 +84,11 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
         members: { connect: { id: u.id } },
       },
     });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'created', entityType: 'Office', entityId: office.id,
+      summary: `נוצר משרד: ${office.name}`,
+    });
     return { office };
   });
 
@@ -107,6 +113,12 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
       data: { officeId: me.officeId },
       select: { id: true, email: true, displayName: true, role: true, officeId: true },
     });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'added_member', entityType: 'Office', entityId: me.officeId,
+      summary: `נוסף חבר למשרד: ${updated.displayName ?? updated.email}`,
+      metadata: { memberId: updated.id, memberEmail: updated.email },
+    });
     return { user: updated };
   });
 
@@ -128,6 +140,12 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: { message: 'User not in your office' } });
     }
     await prisma.user.update({ where: { id }, data: { officeId: null } });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'removed_member', entityType: 'Office', entityId: me.officeId,
+      summary: `הוסר חבר מהמשרד: ${target.displayName ?? target.email}`,
+      metadata: { memberId: target.id, memberEmail: target.email },
+    });
     return { ok: true };
   });
 };

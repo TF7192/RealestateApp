@@ -9,6 +9,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { logActivity } from '../lib/activity.js';
 
 const profileInput = z.object({
   label:          z.string().max(120).nullable().optional(),
@@ -70,6 +71,12 @@ export const registerLeadSearchProfileRoutes: FastifyPluginAsync = async (app) =
     const profile = await prisma.leadSearchProfile.create({
       data: { leadId, ...body },
     });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'created', entityType: 'LeadSearchProfile', entityId: profile.id,
+      summary: profile.label ?? 'פרופיל חיפוש חדש',
+      metadata: { leadId, label: profile.label },
+    });
     return { profile };
   });
 
@@ -84,6 +91,12 @@ export const registerLeadSearchProfileRoutes: FastifyPluginAsync = async (app) =
     const profile = await prisma.leadSearchProfile.update({
       where: { id }, data: body,
     });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'updated', entityType: 'LeadSearchProfile', entityId: profile.id,
+      summary: profile.label ?? 'פרופיל חיפוש',
+      metadata: { leadId, label: profile.label },
+    });
     return { profile };
   });
 
@@ -95,6 +108,12 @@ export const registerLeadSearchProfileRoutes: FastifyPluginAsync = async (app) =
     const existing = await prisma.leadSearchProfile.findFirst({ where: { id, leadId } });
     if (!existing) return reply.code(404).send({ error: { message: 'Profile not found' } });
     await prisma.leadSearchProfile.delete({ where: { id } });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'deleted', entityType: 'LeadSearchProfile', entityId: id,
+      summary: existing.label ?? 'פרופיל חיפוש',
+      metadata: { leadId, label: existing.label },
+    });
     return { ok: true };
   });
 };

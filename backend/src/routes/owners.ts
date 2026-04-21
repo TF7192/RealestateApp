@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
 import { track as phTrack } from '../lib/analytics.js';
+import { logActivity } from '../lib/activity.js';
 
 /**
  * Owner routes — `/api/owners/*`. The Owner persona is distinct from Lead
@@ -81,6 +82,11 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     phTrack('owner_created', u.id, { owner_id: owner.id });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'created', entityType: 'Owner', entityId: owner.id,
+      summary: owner.name,
+    });
     return { owner };
   });
 
@@ -114,6 +120,11 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
         },
       });
     }
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'updated', entityType: 'Owner', entityId: updated.id,
+      summary: updated.name,
+    });
     return { owner: updated };
   });
 
@@ -127,6 +138,11 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
     const existing = await prisma.owner.findFirst({ where: { id, agentId: u.id } });
     if (!existing) return reply.code(404).send({ error: { message: 'Owner not found' } });
     await prisma.owner.delete({ where: { id } });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'deleted', entityType: 'Owner', entityId: id,
+      summary: existing.name,
+    });
     return { ok: true };
   });
 

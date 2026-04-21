@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { logActivity } from '../lib/activity.js';
 
 const dealInput = z.object({
   propertyId: z.string().nullable().optional(),
@@ -36,8 +37,15 @@ export const registerDealRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/', { onRequest: [app.requireAgent] }, async (req) => {
     const body = dealInput.parse(req.body);
+    const uid = requireUser(req).id;
     const deal = await prisma.deal.create({
-      data: { agentId: requireUser(req).id, ...normalize(body) },
+      data: { agentId: uid, ...normalize(body) },
+    });
+    await logActivity({
+      agentId: uid, actorId: uid,
+      verb: 'created', entityType: 'Deal', entityId: deal.id,
+      summary: `נוצרה עסקה: ${deal.propertyStreet}, ${deal.city}`,
+      metadata: { status: deal.status },
     });
     return { deal };
   });
@@ -52,6 +60,12 @@ export const registerDealRoutes: FastifyPluginAsync = async (app) => {
     const deal = await prisma.deal.update({
       where: { id },
       data: { ...normalize(body), updateDate: new Date() },
+    });
+    await logActivity({
+      agentId: existing.agentId, actorId: requireUser(req).id,
+      verb: 'updated', entityType: 'Deal', entityId: deal.id,
+      summary: `עודכנה עסקה: ${deal.propertyStreet}, ${deal.city}`,
+      metadata: { status: deal.status },
     });
     return { deal };
   });
