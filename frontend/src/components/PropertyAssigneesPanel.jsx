@@ -1,4 +1,4 @@
-import { useEffect, useState, useId } from 'react';
+import { useCallback, useEffect, useState, useId } from 'react';
 import { Trash2, UserPlus } from 'lucide-react';
 import api from '../lib/api';
 import { SelectField } from './SmartFields';
@@ -27,7 +27,7 @@ export default function PropertyAssigneesPanel({ propertyId, toast }) {
   const emailId = useId();
   const roleId = useId();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!propertyId) return;
     setLoading(true);
     try {
@@ -38,9 +38,9 @@ export default function PropertyAssigneesPanel({ propertyId, toast }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [propertyId, toast]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [propertyId]);
+  useEffect(() => { load(); }, [load]);
 
   const submitAdd = async (e) => {
     e?.preventDefault?.();

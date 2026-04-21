@@ -434,3 +434,13 @@
 .np-agreement-link:hover { text-decoration: underline; }
 .np-agreement-actions { display: inline-flex; gap: 6px; }
 
+
+/* J4–J7 fieldsets. Reuse the form's checkbox-grid for heating-types. */
+.np-heating {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.np-heating > legend {
+  margin-block-end: 8px;
+}
