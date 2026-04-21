@@ -60,7 +60,9 @@ if (NODE_ENV === 'production') {
 const JWT_SECRET    = process.env.JWT_SECRET    || 'dev-only-change-me';
 const COOKIE_SECRET = process.env.COOKIE_SECRET || 'dev-only-cookie-secret';
 
-async function build() {
+// Exported so tests can build an isolated app instance without
+// listening on a port — tests call app.inject() for integration cases.
+export async function build() {
   const app = Fastify({
     logger:
       NODE_ENV === 'production'
@@ -246,13 +248,19 @@ async function build() {
   return app;
 }
 
-build()
-  .then((app) =>
-    app.listen({ port: PORT, host: HOST }).then(() => {
-      app.log.info(`Estia API listening on ${HOST}:${PORT}`);
-    })
-  )
-  .catch((err) => {
-    console.error('Failed to start', err);
-    process.exit(1);
-  });
+// Only auto-listen when run as the entrypoint (node dist/server.js /
+// tsx src/server.ts). During tests we import { build } above and call
+// app.inject() without binding a port.
+const runAsMain = import.meta.url === `file://${process.argv[1]}`;
+if (runAsMain) {
+  build()
+    .then((app) =>
+      app.listen({ port: PORT, host: HOST }).then(() => {
+        app.log.info(`Estia API listening on ${HOST}:${PORT}`);
+      })
+    )
+    .catch((err) => {
+      console.error('Failed to start', err);
+      process.exit(1);
+    });
+}

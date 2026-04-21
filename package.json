@@ -1,0 +1,29 @@
+{
+  "name": "estia",
+  "private": true,
+  "type": "module",
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "vitest run --project=unit",
+    "test:unit:watch": "vitest --project=unit",
+    "test:integration": "vitest run --project=integration",
+    "test:integration:watch": "vitest --project=integration",
+    "test:e2e": "playwright test",
+    "test:e2e:critical": "playwright test --grep @critical",
+    "test:e2e:ui": "playwright test --ui",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^9.0.3",
+    "@playwright/test": "^1.49.1",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.5.2",
+    "@vitest/coverage-v8": "^2.1.9",
+    "jsdom": "^25.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}

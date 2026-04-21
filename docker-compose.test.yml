@@ -1,0 +1,27 @@
+# Disposable Postgres for local integration tests.
+#
+# Bring up:   docker compose -f docker-compose.test.yml up -d
+# Use:        export DATABASE_URL="postgresql://estia:estia@localhost:54329/estia_test"
+# Tear down:  docker compose -f docker-compose.test.yml down -v
+#
+# Port 54329 (instead of 5432) so the test DB can coexist with a dev
+# Postgres on the default port.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: estia-test-db
+    environment:
+      POSTGRES_USER: estia
+      POSTGRES_PASSWORD: estia
+      POSTGRES_DB: estia_test
+    ports:
+      - "54329:5432"
+    tmpfs:
+      # tmpfs keeps the DB in RAM — fast tests, fast teardown, no disk
+      # write amplification in CI. Data is intentionally volatile.
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U estia -d estia_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 30

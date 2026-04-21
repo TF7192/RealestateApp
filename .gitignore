@@ -26,3 +26,7 @@ data/redis
 frontend/android/
 frontend/ios/
 frontend/ESTIA_MOBILE.md
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
