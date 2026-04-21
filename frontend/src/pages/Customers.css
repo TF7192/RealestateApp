@@ -1824,3 +1824,89 @@
   gap: 4px;
 }
 
+/* ─── Phase 4 Lane 3 / C4 — seriousness chip + popover ─────────────
+ * Small chip next to the status picker. Opens a Portal-mounted
+ * popover anchored to the chip. Four color tiers communicate the
+ * NONE → VERY scale without icons (to stay compact on the card). */
+
+.seriousness-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin-inline-start: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.seriousness-chip:hover { background: var(--bg-card-hover); }
+.seriousness-chip:focus-visible {
+  outline: 2px solid var(--gold, #d4a017);
+  outline-offset: 2px;
+}
+.seriousness-none {
+  color: var(--text-muted);
+}
+.seriousness-sort_of {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--warning, #d4a017) 35%, var(--border));
+}
+.seriousness-medium {
+  color: var(--warning, #b8890f);
+  border-color: color-mix(in srgb, var(--warning, #d4a017) 55%, var(--border));
+  background: color-mix(in srgb, var(--warning, #d4a017) 10%, var(--bg-card));
+}
+.seriousness-very {
+  color: var(--success, #1a7f4e);
+  border-color: color-mix(in srgb, var(--success, #1a7f4e) 55%, var(--border));
+  background: color-mix(in srgb, var(--success, #1a7f4e) 12%, var(--bg-card));
+}
+
+.seriousness-pop {
+  min-width: 160px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+}
+.seriousness-pop-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 2px 6px 6px;
+  text-transform: none;
+}
+.seriousness-pop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.seriousness-pop-item {
+  text-align: start;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.seriousness-pop-item:hover,
+.seriousness-pop-item:focus-visible {
+  background: var(--bg-card-hover);
+  outline: none;
+}
+.seriousness-pop-item.active {
+  background: color-mix(in srgb, var(--gold, #d4a017) 18%, transparent);
+  color: var(--gold-strong, #b8890f);
+  font-weight: 700;
+}
+

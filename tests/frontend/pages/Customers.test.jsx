@@ -6,6 +6,7 @@
 // on the new feature surface.
 
 import { describe, it, expect, vi } from 'vitest';
+import { axe } from 'vitest-axe';
 import { http, HttpResponse } from 'msw';
 import { render, screen, userEvent, waitFor, within } from '../setup/test-utils';
 import { server } from '../setup/msw-server';
@@ -148,6 +149,100 @@ describe('<Customers> filter + saved-search + favorite', () => {
       expect(screen.queryByText('דנה אבני')).toBeNull();
     });
     expect(screen.getByText('רון כהן')).toBeInTheDocument();
+  });
+
+  // ── Phase 4 Lane 3 / Task C4 — seriousness inline popover ──────────
+  // The lead card shows a chip with the Hebrew label for
+  // `seriousnessOverride` (ללא / סוג של / בינוני / מאוד). Clicking the
+  // chip opens a small popover with the four options; picking one
+  // patches the lead via api.updateLead and updates the chip
+  // optimistically. Failure rolls back + surfaces a toast.
+  describe('seriousness chip + popover (C4)', () => {
+    const leadsWithSeriousness = [
+      { ...sampleLeads[0], seriousnessOverride: 'MEDIUM' },
+      { ...sampleLeads[1], seriousnessOverride: 'NONE' },
+    ];
+
+    it('renders each lead\'s current seriousness as a chip', async () => {
+      mountLeads(leadsWithSeriousness);
+      render(<Customers />, { route: '/customers' });
+      await screen.findByText('דנה אבני');
+      // At minimum, the chip text appears in the page (desktop card view).
+      expect(screen.getByRole('button', { name: /רצינות: בינוני/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /רצינות: ללא/ })).toBeInTheDocument();
+    });
+
+    it('clicking the chip opens a popover with the four enum options', async () => {
+      const user = userEvent.setup({ delay: null });
+      mountLeads(leadsWithSeriousness);
+      render(<Customers />, { route: '/customers' });
+      await screen.findByText('דנה אבני');
+      await user.click(screen.getByRole('button', { name: /רצינות: בינוני/ }));
+      const pop = await screen.findByRole('dialog', { name: /רצינות/ });
+      const p = within(pop);
+      expect(p.getByRole('menuitem', { name: 'ללא' })).toBeInTheDocument();
+      expect(p.getByRole('menuitem', { name: 'סוג של' })).toBeInTheDocument();
+      expect(p.getByRole('menuitem', { name: 'בינוני' })).toBeInTheDocument();
+      expect(p.getByRole('menuitem', { name: 'מאוד' })).toBeInTheDocument();
+    });
+
+    it('picking a value PATCHes /api/leads/:id and updates the chip optimistically', async () => {
+      const user = userEvent.setup({ delay: null });
+      mountLeads(leadsWithSeriousness);
+      let patchedBody = null;
+      server.use(
+        http.patch('/api/leads/:id', async ({ request, params }) => {
+          patchedBody = await request.json();
+          return HttpResponse.json({
+            lead: { id: params.id, ...leadsWithSeriousness[0], ...patchedBody },
+          });
+        }),
+      );
+      render(<Customers />, { route: '/customers' });
+      await screen.findByText('דנה אבני');
+      await user.click(screen.getByRole('button', { name: /רצינות: בינוני/ }));
+      const pop = await screen.findByRole('dialog', { name: /רצינות/ });
+      await user.click(within(pop).getByRole('menuitem', { name: 'מאוד' }));
+      await waitFor(() => {
+        expect(patchedBody).toEqual({ seriousnessOverride: 'VERY' });
+      });
+      // Chip updates optimistically to the new label.
+      await screen.findByRole('button', { name: /רצינות: מאוד/ });
+    });
+
+    it('rolls back the chip if the PATCH fails', async () => {
+      const user = userEvent.setup({ delay: null });
+      mountLeads(leadsWithSeriousness);
+      server.use(
+        http.patch('/api/leads/:id', () =>
+          HttpResponse.json({ error: 'boom' }, { status: 500 })
+        ),
+        // The rollback fetches /api/leads again.
+        http.get('/api/leads', () => HttpResponse.json({ items: leadsWithSeriousness })),
+      );
+      render(<Customers />, { route: '/customers' });
+      await screen.findByText('דנה אבני');
+      await user.click(screen.getByRole('button', { name: /רצינות: בינוני/ }));
+      const pop = await screen.findByRole('dialog', { name: /רצינות/ });
+      await user.click(within(pop).getByRole('menuitem', { name: 'מאוד' }));
+      // After rollback + refetch, the chip is back to בינוני.
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /רצינות: בינוני/ })).toBeInTheDocument();
+      });
+    });
+
+    it('popover passes axe', async () => {
+      const user = userEvent.setup({ delay: null });
+      mountLeads(leadsWithSeriousness);
+      render(<Customers />, { route: '/customers' });
+      await screen.findByText('דנה אבני');
+      await user.click(screen.getByRole('button', { name: /רצינות: בינוני/ }));
+      // Scope axe to the popover itself — the rest of the Customers
+      // page has pre-existing landmark violations that aren't part of
+      // this lane's surface.
+      const pop = await screen.findByRole('dialog', { name: /רצינות/ });
+      expect(await axe(pop)).toHaveNoViolations();
+    });
   });
 
   it('loading a saved search applies its filters and re-fetches', async () => {

@@ -36,6 +36,9 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import CustomerEditDialog from '../components/CustomerEditDialog';
 import InlineText from '../components/InlineText';
 import Chip from '../components/Chip';
+import Portal from '../components/Portal';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import { SERIOUSNESS_LABELS } from '../lib/mlsLabels';
 import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import PullRefresh from '../components/PullRefresh';
@@ -869,6 +872,16 @@ export default function Customers() {
                               <Sparkles size={11} className="sp-auto-hint" />
                             )}
                           </button>
+                          <span onClick={(e) => e.stopPropagation()}>
+                            <SeriousnessPicker
+                              lead={lead}
+                              onChange={(value) => patchLead(
+                                lead.id,
+                                { seriousnessOverride: value },
+                                { success: `רצינות עודכנה ל-${SERIOUSNESS_LABELS[value] || value}` },
+                              )}
+                            />
+                          </span>
                         </div>
 
                         <div className="customer-card-body">
@@ -1041,6 +1054,14 @@ export default function Customers() {
                       />
                     </div>
                     <StatusPicker lead={lead} onChange={handleStatusChange} />
+                    <SeriousnessPicker
+                      lead={lead}
+                      onChange={(value) => patchLead(
+                        lead.id,
+                        { seriousnessOverride: value },
+                        { success: `רצינות עודכנה ל-${SERIOUSNESS_LABELS[value] || value}` },
+                      )}
+                    />
                   </div>
                 </div>
 
@@ -1892,5 +1913,117 @@ function FilterSheet({
         </div>
       </div>
     </div>
+  );
+}
+
+// Phase 4 Lane 3 / Task C4 — seriousness inline popover. The chip shows
+// the Hebrew label of the lead's current seriousnessOverride value and
+// opens a small Portal-mounted popover (role="dialog", aria-modal) with
+// the four enum options. Picking one invokes `onChange(value)` which
+// patches via api.updateLead; the host handles optimistic UI + rollback.
+function SeriousnessPicker({ lead, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [anchorRect, setAnchorRect] = useState(null);
+  const triggerRef = useRef(null);
+  const popRef = useRef(null);
+  const current = lead.seriousnessOverride || 'NONE';
+  const currentLabel = SERIOUSNESS_LABELS[current] || SERIOUSNESS_LABELS.NONE;
+
+  useFocusTrap(popRef, { onEscape: () => setOpen(false) });
+
+  useEffect(() => {
+    if (!open) return undefined;
+    // Position the popover under the trigger on open and whenever
+    // the viewport scrolls/resizes.
+    const sync = () => {
+      const el = triggerRef.current;
+      if (!el) return;
+      setAnchorRect(el.getBoundingClientRect());
+    };
+    sync();
+    const onDocDown = (e) => {
+      const trg = triggerRef.current;
+      const pop = popRef.current;
+      if (trg && trg.contains(e.target)) return;
+      if (pop && pop.contains(e.target)) return;
+      setOpen(false);
+    };
+    window.addEventListener('resize', sync);
+    window.addEventListener('scroll', sync, true);
+    document.addEventListener('mousedown', onDocDown);
+    document.addEventListener('touchstart', onDocDown);
+    return () => {
+      window.removeEventListener('resize', sync);
+      window.removeEventListener('scroll', sync, true);
+      document.removeEventListener('mousedown', onDocDown);
+      document.removeEventListener('touchstart', onDocDown);
+    };
+  }, [open]);
+
+  const pick = (value) => {
+    setOpen(false);
+    if (value !== current) {
+      // Caller is responsible for optimistic update + toast / rollback.
+      onChange?.(value);
+    }
+  };
+
+  const popStyle = anchorRect
+    ? {
+        position: 'fixed',
+        top: anchorRect.bottom + 6,
+        // RTL-friendly positioning: the popover's inline-start edge
+        // aligns with the trigger's inline-start edge.
+        insetInlineStart: anchorRect.left,
+        zIndex: 1000,
+      }
+    : { position: 'fixed', top: 0, insetInlineStart: 0, zIndex: 1000 };
+
+  return (
+    <>
+      <button
+        type="button"
+        ref={triggerRef}
+        className={`seriousness-chip seriousness-${current.toLowerCase()}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`רצינות: ${currentLabel}`}
+        title="שנה רצינות"
+      >
+        <span className="seriousness-chip-label">{currentLabel}</span>
+      </button>
+      {open && (
+        <Portal>
+          <div
+            ref={popRef}
+            className="seriousness-pop"
+            role="dialog"
+            aria-modal="true"
+            aria-label="בחר רצינות"
+            style={popStyle}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="seriousness-pop-title">רצינות</div>
+            <div className="seriousness-pop-list" role="menu">
+              {Object.entries(SERIOUSNESS_LABELS).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="menuitem"
+                  className={`seriousness-pop-item ${current === value ? 'active' : ''}`}
+                  onClick={() => pick(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Portal>
+      )}
+    </>
   );
 }
