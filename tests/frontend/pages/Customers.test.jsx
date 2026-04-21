@@ -166,18 +166,19 @@ describe('<Customers> filter + saved-search + favorite', () => {
     it('renders each lead\'s current seriousness as a chip', async () => {
       mountLeads(leadsWithSeriousness);
       render(<Customers />, { route: '/customers' });
-      await screen.findByText('דנה אבני');
-      // At minimum, the chip text appears in the page (desktop card view).
-      expect(screen.getByRole('button', { name: /רצינות: בינוני/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /רצינות: ללא/ })).toBeInTheDocument();
+      // findByRole awaits — some CI runners commit the page-header before
+      // the lead cards, so asserting the chip synchronously right after
+      // findByText catches a half-rendered DOM.
+      expect(await screen.findByRole('button', { name: /רצינות: בינוני/ })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: /רצינות: ללא/ })).toBeInTheDocument();
     });
 
     it('clicking the chip opens a popover with the four enum options', async () => {
       const user = userEvent.setup({ delay: null });
       mountLeads(leadsWithSeriousness);
       render(<Customers />, { route: '/customers' });
-      await screen.findByText('דנה אבני');
-      await user.click(screen.getByRole('button', { name: /רצינות: בינוני/ }));
+      const chip = await screen.findByRole('button', { name: /רצינות: בינוני/ });
+      await user.click(chip);
       const pop = await screen.findByRole('dialog', { name: /רצינות/ });
       const p = within(pop);
       expect(p.getByRole('menuitem', { name: 'ללא' })).toBeInTheDocument();
@@ -258,8 +259,9 @@ describe('<Customers> filter + saved-search + favorite', () => {
     it('renders the existing description text on each card', async () => {
       mountLeads(leadsWithDesc);
       render(<Customers />, { route: '/customers' });
-      await screen.findByText('דנה אבני');
-      expect(screen.getByText('חיפוש דחוף — ליד איכותי')).toBeInTheDocument();
+      // findByText awaits up to 1s so CI renders that commit the page
+      // header before the lead cards don't fail the assertion.
+      expect(await screen.findByText('חיפוש דחוף — ליד איכותי')).toBeInTheDocument();
     });
 
     it('shows a muted placeholder when the lead has no description', async () => {
