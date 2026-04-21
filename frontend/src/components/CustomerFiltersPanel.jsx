@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, SlidersHorizontal } from 'lucide-react';
 import { NumberField } from './SmartFields';
+import NeighborhoodPicker from './NeighborhoodPicker';
 import Portal from './Portal';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
@@ -221,6 +222,50 @@ export default function CustomerFiltersPanel({
               />
             </section>
 
+            {/* Location — cities (free-text comma-separated) + neighborhoods.
+                The neighborhood picker is keyed off the first city in the
+                list so the seed table can scope suggestions. When no city
+                is picked the picker is disabled with a prompt. */}
+            <section className="cfp-section">
+              <h4>מיקום</h4>
+              <div className="cfp-location-grid">
+                <label className="cfp-location-cell">
+                  <span>ערים</span>
+                  <CitiesInput
+                    value={draft.cities || []}
+                    onChange={(arr) => {
+                      setDraft((prev) => {
+                        const copy = { ...prev };
+                        if (arr.length) copy.cities = arr;
+                        else delete copy.cities;
+                        // When the first city changes, drop stale
+                        // neighborhoods that belonged to the previous one.
+                        if ((prev.cities?.[0] || '') !== (arr[0] || '')) {
+                          delete copy.neighborhoods;
+                        }
+                        return copy;
+                      });
+                    }}
+                  />
+                </label>
+                <label className="cfp-location-cell">
+                  <span>שכונות</span>
+                  <NeighborhoodPicker
+                    city={draft.cities?.[0] || ''}
+                    value={draft.neighborhoods || []}
+                    onChange={(arr) => {
+                      setDraft((prev) => {
+                        const copy = { ...prev };
+                        if (arr.length) copy.neighborhoods = arr;
+                        else delete copy.neighborhoods;
+                        return copy;
+                      });
+                    }}
+                  />
+                </label>
+              </div>
+            </section>
+
             {/* Budget range */}
             <section className="cfp-section">
               <h4>תקציב</h4>
@@ -348,5 +393,30 @@ export default function CustomerFiltersPanel({
         </aside>
       </div>
     </Portal>
+  );
+}
+
+// Minimal CSV city input — agents usually filter by a single city so the
+// dedicated chip picker would be overkill. Users type names separated by
+// commas; on blur we normalize to trimmed entries. Matches the existing
+// CsvInput pattern used elsewhere in the app.
+function CitiesInput({ value, onChange }) {
+  const [text, setText] = useState((value || []).join(', '));
+  useEffect(() => { setText((value || []).join(', ')); }, [value]);
+  const commit = () => {
+    const arr = text.split(',').map((s) => s.trim()).filter(Boolean);
+    onChange(arr);
+  };
+  return (
+    <input
+      className="form-input"
+      dir="auto"
+      placeholder="תל אביב, רמת גן"
+      aria-label="ערים"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
+    />
   );
 }

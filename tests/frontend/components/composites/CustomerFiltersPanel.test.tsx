@@ -122,6 +122,44 @@ describe('<CustomerFiltersPanel>', () => {
     expect(next.tags).toEqual(['t1']);
   });
 
+  it('disables the neighborhood picker when no city is set', () => {
+    render(<CustomerFiltersPanel {...baseProps()} />);
+    // The neighborhood picker renders in disabled mode with a Hebrew
+    // prompt telling the agent to pick a city first.
+    const nbhInput = screen.getByRole('combobox', { name: /שכונות/ });
+    expect(nbhInput).toBeDisabled();
+    expect(nbhInput).toHaveAttribute('placeholder', expect.stringContaining('עיר'));
+  });
+
+  it('enables the neighborhood picker and commits picks when a city is selected', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get('/api/neighborhoods', () =>
+        HttpResponse.json({
+          items: [{ id: 'n1', city: 'תל אביב', name: 'פלורנטין', aliases: [] }],
+        })
+      )
+    );
+    const onApply = vi.fn();
+    render(
+      <CustomerFiltersPanel
+        {...baseProps({ filters: { cities: ['תל אביב'] }, onApply })}
+      />
+    );
+    const nbhInput = screen.getByRole('combobox', { name: /שכונות/ });
+    expect(nbhInput).not.toBeDisabled();
+    await user.type(nbhInput, 'פלו');
+    const option = await screen.findByRole(
+      'option',
+      { name: /פלורנטין/ },
+      { timeout: 2000 },
+    );
+    await user.click(option);
+    await user.click(screen.getByRole('button', { name: /החל סינון/ }));
+    const next = onApply.mock.calls[0][0];
+    expect(next.neighborhoods).toEqual(['פלורנטין']);
+  });
+
   it('captures a price range and an elevator requirement together', async () => {
     const user = userEvent.setup({ delay: null });
     const onApply = vi.fn();
