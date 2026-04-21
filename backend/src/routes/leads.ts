@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
 import { track as phTrack } from '../lib/analytics.js';
 import { evaluateLeadProperty } from '../lib/matching.js';
+import { logActivity } from '../lib/activity.js';
 
 const leadInput = z.object({
   name: z.string().min(1).max(120),
@@ -263,6 +264,11 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       looking_for: created.lookingFor,
       city: created.city,
     });
+    await logActivity({
+      agentId, actorId: agentId,
+      verb: 'created', entityType: 'Lead', entityId: created.id,
+      summary: `לקוח חדש: ${created.name}`,
+    });
     return { lead: created };
   });
 
@@ -277,6 +283,12 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       data: normalize(body),
     });
+    await logActivity({
+      agentId: existing.agentId, actorId: requireUser(req).id,
+      verb: 'updated', entityType: 'Lead', entityId: id,
+      summary: `עודכן לקוח: ${updated.name}`,
+      metadata: { fields: Object.keys(body) },
+    });
     return { lead: updated };
   });
 
@@ -287,6 +299,11 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     await prisma.lead.delete({ where: { id } });
+    await logActivity({
+      agentId: existing.agentId, actorId: requireUser(req).id,
+      verb: 'deleted', entityType: 'Lead', entityId: id,
+      summary: `נמחק לקוח: ${existing.name}`,
+    });
     return { ok: true };
   });
 

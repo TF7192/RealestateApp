@@ -10,6 +10,7 @@ import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
 import { track as phTrack } from '../lib/analytics.js';
 import { assertAllowedMime } from '../lib/uploadGuards.js';
 import { evaluateLeadProperty } from '../lib/matching.js';
+import { logActivity } from '../lib/activity.js';
 
 // Canonical action keys for newly-created properties. `externalCoop` is
 // kept in existing rows but new keys use the renamed `brokerCoop`.
@@ -296,6 +297,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       city: created.city,
       has_photos: (body.images?.length || 0) > 0,
     });
+    await logActivity({
+      agentId, actorId: agentId,
+      verb: 'created', entityType: 'Property', entityId: created.id,
+      summary: `נכס חדש: ${created.street}, ${created.city}`,
+    });
     return { property: serialize(created) };
   });
 
@@ -325,6 +331,12 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         ...(propertyOwnerId !== undefined ? { propertyOwnerId } : {}),
       },
       include: { images: true, marketingActions: true, propertyOwner: true },
+    });
+    await logActivity({
+      agentId: existing.agentId, actorId: requireUser(req).id,
+      verb: 'updated', entityType: 'Property', entityId: id,
+      summary: `עודכן נכס: ${updated.street}, ${updated.city}`,
+      metadata: { fields: Object.keys(body) },
     });
     return { property: serialize(updated) };
   });
@@ -393,6 +405,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     await prisma.property.delete({ where: { id } });
+    await logActivity({
+      agentId: existing.agentId, actorId: requireUser(req).id,
+      verb: 'deleted', entityType: 'Property', entityId: id,
+      summary: `נמחק נכס: ${existing.street}, ${existing.city}`,
+    });
     return { ok: true };
   });
 

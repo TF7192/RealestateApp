@@ -980,6 +980,26 @@ model Reminder {
   @@index([customerId])
 }
 
+// Sprint 5 / MLS parity — Task H3. Agent-scoped activity log. Records
+// who did what to which entity so the UI can render a recent-activity
+// timeline and office owners can audit their agents' moves. FKs are
+// deliberately weak (no onDelete) — the log should outlive row
+// deletion for audit purposes.
+model ActivityLog {
+  id         String   @id @default(cuid())
+  agentId    String
+  actorId    String?
+  verb       String
+  entityType String
+  entityId   String?
+  summary    String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([entityType, entityId])
+}
+
 // Sprint 2 / MLS parity — Task K4. Repeatable "הנכס המבוקש" profile on
 // a lead. A lead can have multiple profiles (e.g. one for a residence
 // in Tel Aviv, another for an investment in Haifa) so matching hits
