@@ -315,6 +315,8 @@ model User {
   leadAssignments      LeadAgent[]      @relation("LeadAssignments")
   // Sprint 5 / MLS parity — Task J10.
   propertyAssignments  PropertyAssignee[] @relation("PropertyAssigneeUser")
+  // Sprint 6 / MLS parity — Task F1.
+  adverts              Advert[]           @relation("AgentAdverts")
 
   @@index([role])
   @@index([officeId])
@@ -518,6 +520,7 @@ model Property {
   prospects        Prospect[]
   reminders        Reminder[]
   assignees        PropertyAssignee[]
+  adverts          Advert[]
 
   @@unique([agentId, slug])
   @@index([agentId])
@@ -981,6 +984,53 @@ model Reminder {
   @@index([leadId])
   @@index([propertyId])
   @@index([customerId])
+}
+
+// Sprint 6 / MLS parity — Task F1. Per-channel marketing advert
+// ("פרסום") for a property. MarketingAction tracks which channels
+// have been touched; Advert tracks what copy was pushed to each
+// channel (Yad2/Facebook/Onmap…) so agents can tweak titles and
+// prices independently per outlet.
+enum AdvertChannel {
+  YAD2
+  ONMAP
+  MADLAN
+  FACEBOOK
+  WHATSAPP
+  INSTAGRAM
+  WEBSITE
+  OTHER
+}
+
+enum AdvertStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  EXPIRED
+  REMOVED
+}
+
+model Advert {
+  id             String        @id @default(cuid())
+  agentId        String
+  agent          User          @relation("AgentAdverts", fields: [agentId], references: [id], onDelete: Cascade)
+  propertyId     String
+  property       Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  channel        AdvertChannel
+  status         AdvertStatus  @default(DRAFT)
+  title          String?
+  body           String?
+  publishedPrice Int?
+  externalUrl    String?
+  externalId     String?
+  publishedAt    DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([agentId])
+  @@index([propertyId])
+  @@index([channel, status])
 }
 
 // Sprint 5 / MLS parity — Task J10. Secondary assignees on a

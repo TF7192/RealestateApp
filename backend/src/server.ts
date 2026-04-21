@@ -36,6 +36,7 @@ import { registerReminderRoutes } from './routes/reminders.js';
 import { registerLeadSearchProfileRoutes } from './routes/leadSearchProfiles.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { registerActivityRoutes } from './routes/activity.js';
+import { registerAdvertRoutes } from './routes/adverts.js';
 import { storageBackend, resolveUpload } from './lib/storage.js';
 import { track as phTrack, captureException as phCapture, shutdownAnalytics } from './lib/analytics.js';
 import { getUser } from './middleware/auth.js';
@@ -227,6 +228,7 @@ export async function build() {
   await app.register(registerLeadSearchProfileRoutes, { prefix: '/api' });
   await app.register(registerSearchRoutes, { prefix: '/api/search' });
   await app.register(registerActivityRoutes, { prefix: '/api/activity' });
+  await app.register(registerAdvertRoutes, { prefix: '/api' });
 
   // Request lifecycle observability — assigns a request_id, logs
   // method/route/status/duration, and sends an api_request event to
