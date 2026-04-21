@@ -413,6 +413,71 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
+  // Sprint 5 / MLS parity — Task J10. Secondary assignee management.
+  app.get('/:id/assignees', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const prop = await prisma.property.findFirst({ where: { id, agentId: uid } });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    const items = await prisma.propertyAssignee.findMany({
+      where: { propertyId: id },
+      include: { user: { select: { id: true, displayName: true, email: true, role: true } } },
+      orderBy: { assignedAt: 'asc' },
+    });
+    return { items };
+  });
+
+  const assigneeInput = z.object({
+    userId: z.string().min(1).max(40),
+    role:   z.enum(['CO_AGENT', 'OBSERVER']).optional(),
+  });
+  app.post('/:id/assignees', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const prop = await prisma.property.findFirst({ where: { id, agentId: uid } });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    const body = assigneeInput.parse(req.body);
+    // Assignee must belong to the same office (if any) so cross-office
+    // leakage is impossible.
+    const me = await prisma.user.findUnique({ where: { id: uid }, select: { officeId: true } });
+    const target = await prisma.user.findUnique({
+      where: { id: body.userId },
+      select: { id: true, officeId: true },
+    });
+    if (!target) return reply.code(404).send({ error: { message: 'User not found' } });
+    if (me?.officeId && target.officeId !== me.officeId) {
+      return reply.code(403).send({ error: { message: 'אפשר לשייך רק סוכנים מאותו משרד' } });
+    }
+    const row = await prisma.propertyAssignee.upsert({
+      where: { propertyId_userId: { propertyId: id, userId: body.userId } },
+      create: { propertyId: id, userId: body.userId, role: body.role ?? 'CO_AGENT' },
+      update: { role: body.role ?? 'CO_AGENT' },
+    });
+    await logActivity({
+      agentId: prop.agentId, actorId: uid,
+      verb: 'assigned', entityType: 'Property', entityId: id,
+      summary: `סוכן שותף נוסף לנכס`,
+      metadata: { userId: body.userId, role: row.role },
+    });
+    return { assignee: row };
+  });
+
+  app.delete('/:id/assignees/:userId', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id, userId } = req.params as { id: string; userId: string };
+    const uid = requireUser(req).id;
+    const prop = await prisma.property.findFirst({ where: { id, agentId: uid } });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    await prisma.propertyAssignee.deleteMany({
+      where: { propertyId: id, userId },
+    });
+    await logActivity({
+      agentId: prop.agentId, actorId: uid,
+      verb: 'unassigned', entityType: 'Property', entityId: id,
+      metadata: { userId },
+    });
+    return { ok: true };
+  });
+
   // Sprint 2 / MLS parity — Task C3. Reverse direction: leads from the
   // signed-in agent that match this property, sorted by match score.
   app.get('/:id/matching-customers', { onRequest: [app.requireAgent] }, async (req, reply) => {

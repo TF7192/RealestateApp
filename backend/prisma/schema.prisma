@@ -313,6 +313,8 @@ model User {
   reminderAnchors      Reminder[]       @relation("ReminderCustomer")
   // Sprint 1 / MLS parity — Task K2.
   leadAssignments      LeadAgent[]      @relation("LeadAssignments")
+  // Sprint 5 / MLS parity — Task J10.
+  propertyAssignments  PropertyAssignee[] @relation("PropertyAssigneeUser")
 
   @@index([role])
   @@index([officeId])
@@ -515,6 +517,7 @@ model Property {
   transfers        PropertyTransfer[]
   prospects        Prospect[]
   reminders        Reminder[]
+  assignees        PropertyAssignee[]
 
   @@unique([agentId, slug])
   @@index([agentId])
@@ -978,6 +981,21 @@ model Reminder {
   @@index([leadId])
   @@index([propertyId])
   @@index([customerId])
+}
+
+// Sprint 5 / MLS parity — Task J10. Secondary assignees on a
+// property. `agentId` on Property stays the canonical owner (used
+// for scoping); this join table lets additional agents collaborate.
+model PropertyAssignee {
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation("PropertyAssigneeUser", fields: [userId], references: [id], onDelete: Cascade)
+  role       String   @default("CO_AGENT")
+  assignedAt DateTime @default(now())
+
+  @@id([propertyId, userId])
+  @@index([userId])
 }
 
 // Sprint 5 / MLS parity — Task H3. Agent-scoped activity log. Records
