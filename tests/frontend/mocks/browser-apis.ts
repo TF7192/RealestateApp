@@ -7,8 +7,14 @@
 
 export function installBrowserApiMocks() {
   // ── matchMedia ─────────────────────────────────────────────────
-  // `useViewportMobile` + `prefers-reduced-motion` probes call this on mount.
-  if (typeof window !== 'undefined' && !window.matchMedia) {
+  // `useViewportMobile` + `prefers-reduced-motion` probes call this on
+  // mount. Always override (not just when absent) — happy-dom ships its
+  // own matchMedia whose default behavior can vary across versions. CI
+  // vs. local divergence is how we end up with a flaky desktop/mobile
+  // branch in the same test. The mock returns `matches: false` for
+  // every query, which keeps tests on the desktop render path unless
+  // a test overrides this explicitly.
+  if (typeof window !== 'undefined') {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       configurable: true,
