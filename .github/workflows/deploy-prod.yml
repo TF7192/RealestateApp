@@ -181,12 +181,18 @@ jobs:
       - name: Smoke test
         run: |
           set -e
+          # 3-point smoke:
+          #   • /api/health  — app is up
+          #   • /            — frontend is reachable
+          #   • /api/me      — auth middleware + DB are up (401 on no cookie
+          #                    is the documented contract; 200 would mean
+          #                    auth is broken; 4xx-other means route missing)
           PASS=0
           for i in 1 2 3 4 5 6; do
-            HEALTH=$(curl -sf https://estia.tripzio.xyz/api/health || true)
-            ROOT=$(curl -sf -o /dev/null -w '%{http_code}' https://estia.tripzio.xyz/ || true)
-            AUTH=$(curl -sf -o /dev/null -w '%{http_code}' https://estia.tripzio.xyz/api/auth/me || true)
-            echo "attempt $i: /api/health=$HEALTH  /=$ROOT  /api/auth/me=$AUTH"
+            HEALTH=$(curl -s --max-time 5 https://estia.tripzio.xyz/api/health || true)
+            ROOT=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' https://estia.tripzio.xyz/ || true)
+            AUTH=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' https://estia.tripzio.xyz/api/me || true)
+            echo "attempt $i: /api/health=$HEALTH  /=$ROOT  /api/me=$AUTH"
             if echo "$HEALTH" | grep -q '"ok":true' && [ "$ROOT" = "200" ] && [ "$AUTH" = "401" ]; then
               PASS=1
               break
