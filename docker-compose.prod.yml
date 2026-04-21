@@ -1,0 +1,48 @@
+# Production compose — pulls pre-built images from GHCR rather than
+# building on the EC2. The deploy pipeline sets ESTIA_TAG to the
+# commit short-SHA before calling `docker compose up -d`, so the same
+# file drives both forward deploys and rollbacks (pick a different
+# tag, up).
+#
+# Why separate from docker-compose.yml:
+#   • docker-compose.yml keeps `build:` for local dev (so you can work
+#     off your checkout without GHCR access).
+#   • This file uses `image:` so the EC2 never needs source, never
+#     rebuilds, and rollbacks are one pull away.
+#
+# The EC2 logs in to GHCR on every deploy with the runner-minted
+# GITHUB_TOKEN (short-lived, scoped to the package) — no long-lived
+# PAT lives on the host.
+
+services:
+  backend:
+    image: ghcr.io/tf7192/estia-backend:${ESTIA_TAG:-main}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      # /app/uploads is ephemeral by design — UPLOADS_BACKEND=s3 in .env
+      # routes writes to S3. See docker-compose.yml header note.
+      UPLOADS_DIR: /app/uploads
+    ports:
+      - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT:-6002}:4000"
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+    pull_policy: always          # `docker compose up -d` always grabs
+                                 # the newest image for the tag, so a
+                                 # re-push of `:main` without a SHA
+                                 # change still lands.
+
+  frontend:
+    image: ghcr.io/tf7192/estia-frontend:${ESTIA_TAG:-main}
+    restart: unless-stopped
+    depends_on: [ backend ]
+    ports:
+      - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-3001}:80"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    pull_policy: always
