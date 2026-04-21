@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { X, AlertCircle, Save, UserCircle } from 'lucide-react';
 import api from '../lib/api';
 import Portal from './Portal';
@@ -59,14 +59,22 @@ export default function OwnerEditDialog({ owner, onClose, onSaved }) {
     }
   };
 
+  const titleId = useId();
+
   return (
     <Portal>
       <div className="owner-dialog-backdrop" onClick={onClose}>
-        <div className="owner-dialog" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="owner-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          onClick={(e) => e.stopPropagation()}
+        >
           <header className="owner-dialog-head">
             <div className="owner-dialog-head-text">
-              <h3>
-                <UserCircle size={18} />
+              <h3 id={titleId}>
+                <UserCircle size={18} aria-hidden="true" />
                 {isEdit ? 'עריכת בעל נכס' : 'בעל נכס חדש'}
               </h3>
               {isEdit && owner?.name && <p>{owner.name}</p>}
@@ -120,6 +128,7 @@ export default function OwnerEditDialog({ owner, onClose, onSaved }) {
                   onChange={(v) => update('relationship', v)}
                   placeholder="בחר…"
                   options={RELATIONSHIP_OPTIONS}
+                  aria-label="סוג בעלות"
                 />
               </div>
               <div className="form-group form-group-wide">
