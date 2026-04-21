@@ -11,6 +11,7 @@ import {
   LogOut,
   Sun,
   Moon,
+  HelpCircle,
   Share2,
   Check,
   PanelRightClose,
@@ -373,6 +374,19 @@ export default function Layout({ onLogout }) {
               </span>
             </div>
           </NavLink>
+          {/* F-17.3 — Help / support link. mailto: opens the user's
+              email client with a prefilled subject; consistent with the
+              single-support-channel posture today. When we have a real
+              support URL (ticket system), swap the href — aria-label
+              + icon stay stable. */}
+          <a
+            className="sidebar-help"
+            href="mailto:support@estia.app?subject=עזרה%20ב-Estia"
+            title="צור קשר עם התמיכה"
+          >
+            <HelpCircle size={16} />
+            <span>עזרה</span>
+          </a>
           <button className="sidebar-logout" onClick={onLogout}>
             <LogOut size={16} />
             יציאה

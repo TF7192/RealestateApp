@@ -335,7 +335,8 @@ img.agent-avatar {
   color: var(--text-muted);
 }
 
-.sidebar-logout {
+.sidebar-logout,
+.sidebar-help {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -349,7 +350,18 @@ img.agent-avatar {
   font-family: var(--font-body);
   font-size: 13px;
   cursor: pointer;
+  text-decoration: none;
   transition: all 0.2s;
+}
+
+/* F-17.3 — help link sits above logout, distinct from it in hover
+   tone so "contact support" never looks like the dangerous "sign out"
+   action. */
+.sidebar-help { margin-top: 10px; }
+.sidebar-help:hover {
+  color: var(--gold);
+  border-color: var(--gold-border);
+  background: var(--gold-glow);
 }
 
 .sidebar-logout:hover {
@@ -357,6 +369,9 @@ img.agent-avatar {
   border-color: rgba(248, 113, 113, 0.25);
   background: var(--danger-bg);
 }
+
+.sidebar.collapsed .sidebar-help span { display: none; }
+.sidebar.collapsed .sidebar-help { justify-content: center; }
 
 /* Main content */
 .main-content {
