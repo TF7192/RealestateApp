@@ -14,12 +14,23 @@ import {
   inputPropsForCity,
   inputPropsForAddress,
 } from '../lib/inputProps';
-import { PhoneField, PriceRange, Segmented, SelectField } from '../components/SmartFields';
+import { NumberField, PhoneField, PriceRange, Segmented, SelectField } from '../components/SmartFields';
+import {
+  CUSTOMER_STATUS_LABELS,
+  QUICK_LEAD_STATUS_LABELS,
+  SERIOUSNESS_LABELS,
+  CUSTOMER_PURPOSE_LABELS,
+  labelsToOptions,
+} from '../lib/mlsLabels';
 import './Forms.css';
 
 const DRAFT_KEY = 'estia-draft:new-lead';
 
+// K2 — purposes is a multi-select. Order matches Nadlan One's UI.
+const PURPOSE_OPTIONS = Object.keys(CUSTOMER_PURPOSE_LABELS);
+
 const INITIAL_FORM = {
+  // Legacy — kept so the existing save path still works.
   name: '',
   phone: '',
   interestType: 'פרטי',
@@ -41,6 +52,30 @@ const INITIAL_FORM = {
   acRequired: false,
   storageRequired: false,
   notes: '',
+
+  // K1 — contact / identity block (additive, all optional).
+  firstName: '',
+  lastName: '',
+  companyName: '',
+  address: '',
+  cityText: '',
+  zip: '',
+  primaryPhone: '',
+  phone1: '',
+  phone2: '',
+  fax: '',
+  personalId: '',
+  description: '',
+
+  // K2 — admin block.
+  customerStatus: 'ACTIVE',
+  commissionPct: null,
+  isPrivate: false,
+  purposes: [],
+  seriousnessOverride: 'NONE',
+
+  // L1 — quick lead status.
+  leadStatus: 'NEW',
 };
 
 export default function NewLead() {
@@ -163,6 +198,33 @@ export default function NewLead() {
         acRequired: !!form.acRequired,
         storageRequired: !!form.storageRequired,
         notes: form.notes || null,
+
+        // K1 — contact / identity (only send non-empty so the server
+        // doesn't overwrite existing rows with "" on edit paths).
+        firstName:   form.firstName?.trim()   || null,
+        lastName:    form.lastName?.trim()    || null,
+        companyName: form.companyName?.trim() || null,
+        address:     form.address?.trim()     || null,
+        cityText:    form.cityText?.trim()    || null,
+        zip:         form.zip?.trim()         || null,
+        primaryPhone: form.primaryPhone?.trim() || null,
+        phone1:      form.phone1?.trim()      || null,
+        phone2:      form.phone2?.trim()      || null,
+        fax:         form.fax?.trim()         || null,
+        personalId:  form.personalId?.trim()  || null,
+        description: form.description?.trim() || null,
+
+        // K2 — admin block.
+        customerStatus: form.customerStatus || 'ACTIVE',
+        commissionPct: form.commissionPct != null && form.commissionPct !== ''
+          ? Number(form.commissionPct)
+          : null,
+        isPrivate: !!form.isPrivate,
+        purposes: Array.isArray(form.purposes) ? form.purposes : [],
+        seriousnessOverride: form.seriousnessOverride || 'NONE',
+
+        // L1 — quick lead status.
+        leadStatus: form.leadStatus || 'NEW',
       };
       const res = await api.createLead(body);
       savedRef.current = true;
@@ -452,6 +514,224 @@ export default function NewLead() {
               מחסן
             </label>
           </div>
+        </div>
+
+        <div className="form-section">
+          {/* K1 — contact / identity block. Optional: agents who only
+              have a phone number can leave the whole section blank. */}
+          <h3 className="form-section-title">פרטים מורחבים</h3>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label" htmlFor="k1-first">שם פרטי</label>
+              <input
+                id="k1-first"
+                className="form-input"
+                dir="auto"
+                autoCapitalize="words"
+                enterKeyHint="next"
+                value={form.firstName}
+                onChange={(e) => update('firstName', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="k1-last">שם משפחה</label>
+              <input
+                id="k1-last"
+                className="form-input"
+                dir="auto"
+                autoCapitalize="words"
+                enterKeyHint="next"
+                value={form.lastName}
+                onChange={(e) => update('lastName', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label" htmlFor="k1-company">שם חברה</label>
+              <input
+                id="k1-company"
+                className="form-input"
+                dir="auto"
+                enterKeyHint="next"
+                value={form.companyName}
+                onChange={(e) => update('companyName', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="k1-pid">ת.ז / ח.פ</label>
+              <input
+                id="k1-pid"
+                className="form-input"
+                dir="ltr"
+                inputMode="numeric"
+                value={form.personalId}
+                onChange={(e) => update('personalId', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label" htmlFor="k1-address">כתובת</label>
+              <input
+                id="k1-address"
+                className="form-input"
+                dir="auto"
+                enterKeyHint="next"
+                value={form.address}
+                onChange={(e) => update('address', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="k1-city">עיר (חופשי)</label>
+              <input
+                id="k1-city"
+                className="form-input"
+                dir="auto"
+                enterKeyHint="next"
+                value={form.cityText}
+                onChange={(e) => update('cityText', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label" htmlFor="k1-zip">מיקוד</label>
+              <input
+                id="k1-zip"
+                className="form-input"
+                dir="ltr"
+                inputMode="numeric"
+                value={form.zip}
+                onChange={(e) => update('zip', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">טלפון עיקרי</label>
+              <PhoneField
+                value={form.primaryPhone}
+                onChange={(v) => update('primaryPhone', v)}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">טלפון נוסף 1</label>
+              <PhoneField value={form.phone1} onChange={(v) => update('phone1', v)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">טלפון נוסף 2</label>
+              <PhoneField value={form.phone2} onChange={(v) => update('phone2', v)} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label" htmlFor="k1-fax">פקס</label>
+              <input
+                id="k1-fax"
+                className="form-input"
+                dir="ltr"
+                inputMode="tel"
+                value={form.fax}
+                onChange={(e) => update('fax', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="k1-desc">תיאור</label>
+              <input
+                id="k1-desc"
+                className="form-input"
+                dir="auto"
+                enterKeyHint="next"
+                value={form.description}
+                onChange={(e) => update('description', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="form-section">
+          {/* K2 + L1 — admin block. Lives in its own section so agents
+              can skip it entirely on quick-capture. */}
+          <h3 className="form-section-title">ניהול ולקוח</h3>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label" htmlFor="k2-cs">סטטוס לקוח</label>
+              <SelectField
+                value={form.customerStatus}
+                onChange={(v) => update('customerStatus', v)}
+                options={labelsToOptions(CUSTOMER_STATUS_LABELS)}
+                aria-label="סטטוס לקוח"
+                id="k2-cs"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="k2-ls">סטטוס ליד</label>
+              <SelectField
+                value={form.leadStatus}
+                onChange={(v) => update('leadStatus', v)}
+                options={labelsToOptions(QUICK_LEAD_STATUS_LABELS)}
+                aria-label="סטטוס ליד"
+                id="k2-ls"
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">אחוז עמלה</label>
+              <NumberField
+                value={form.commissionPct}
+                onChange={(n) => update('commissionPct', n)}
+                unit="%"
+                min={0}
+                max={100}
+                placeholder="2"
+                aria-label="אחוז עמלה"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">רצינות</label>
+              <Segmented
+                value={form.seriousnessOverride}
+                onChange={(v) => update('seriousnessOverride', v)}
+                options={labelsToOptions(SERIOUSNESS_LABELS)}
+                ariaLabel="רצינות"
+              />
+            </div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <span className="form-label">מטרת הרכישה</span>
+            <div className="checkbox-grid" role="group" aria-label="מטרת הרכישה">
+              {PURPOSE_OPTIONS.map((val) => {
+                const checked = form.purposes?.includes(val);
+                return (
+                  <label key={val} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={!!checked}
+                      onChange={(e) => {
+                        const set = new Set(form.purposes || []);
+                        if (e.target.checked) set.add(val);
+                        else set.delete(val);
+                        update('purposes', Array.from(set));
+                      }}
+                    />
+                    <span className="checkbox-custom" />
+                    {CUSTOMER_PURPOSE_LABELS[val]}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <label className="checkbox-item" style={{ marginTop: 4 }}>
+            <input
+              type="checkbox"
+              checked={!!form.isPrivate}
+              onChange={(e) => update('isPrivate', e.target.checked)}
+            />
+            <span className="checkbox-custom" />
+            לקוח פרטי (לא חשוף לשותפי משרד)
+          </label>
         </div>
 
         <div className="form-section">

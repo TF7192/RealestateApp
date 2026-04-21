@@ -404,6 +404,135 @@ export const api = {
   acceptTransfer: (id) => request(`/transfers/${id}/accept`, { method: 'POST' }),
   declineTransfer: (id) => request(`/transfers/${id}/decline`, { method: 'POST' }),
   cancelTransfer: (id) => request(`/transfers/${id}/cancel`, { method: 'POST' }),
+
+  // ─── MLS parity surface ────────────────────────────────────────────────
+  // Added as Phase 1 infrastructure for the multi-agent MLS UI build. All
+  // endpoints are owner-scoped on the server. Keep these grouped by
+  // feature so future renames land in one block.
+
+  // Office (A1)
+  getOffice:           () => request('/office'),
+  createOffice:        (body) => request('/office', { method: 'POST', body }),
+  updateOffice:        (body) => request('/office', { method: 'PATCH', body }),
+  addOfficeMember:     (body) => request('/office/members', { method: 'POST', body }),
+  removeOfficeMember:  (id) => request(`/office/members/${id}`, { method: 'DELETE' }),
+
+  // Tags (A2)
+  listTags:            () => request('/tags'),
+  createTag:           (body) => request('/tags', { method: 'POST', body }),
+  updateTag:           (id, body) => request(`/tags/${id}`, { method: 'PATCH', body }),
+  deleteTag:           (id) => request(`/tags/${id}`, { method: 'DELETE' }),
+  assignTag:           (tagId, { entityType, entityId }) =>
+    request(`/tags/${tagId}/assign`, { method: 'POST', body: { entityType, entityId } }),
+  unassignTag:         (tagId, entityType, entityId) =>
+    request(`/tags/${tagId}/assign/${entityType}/${entityId}`, { method: 'DELETE' }),
+  listAssignedTags:    (entityType, entityId) => {
+    const qs = new URLSearchParams({ entityType, entityId }).toString();
+    return request(`/tags/for?${qs}`);
+  },
+
+  // Reminders (D1)
+  listReminders:       (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+    });
+    const s = qs.toString();
+    return request(`/reminders${s ? `?${s}` : ''}`);
+  },
+  createReminder:      (body) => request('/reminders', { method: 'POST', body }),
+  updateReminder:      (id, body) => request(`/reminders/${id}`, { method: 'PATCH', body }),
+  completeReminder:    (id) => request(`/reminders/${id}/complete`, { method: 'POST' }),
+  cancelReminder:      (id) => request(`/reminders/${id}/cancel`, { method: 'POST' }),
+  deleteReminder:      (id) => request(`/reminders/${id}`, { method: 'DELETE' }),
+
+  // LeadSearchProfile (K4)
+  listLeadSearchProfiles:   (leadId) => request(`/leads/${leadId}/search-profiles`),
+  createLeadSearchProfile:  (leadId, body) =>
+    request(`/leads/${leadId}/search-profiles`, { method: 'POST', body }),
+  updateLeadSearchProfile:  (leadId, id, body) =>
+    request(`/leads/${leadId}/search-profiles/${id}`, { method: 'PATCH', body }),
+  deleteLeadSearchProfile:  (leadId, id) =>
+    request(`/leads/${leadId}/search-profiles/${id}`, { method: 'DELETE' }),
+
+  // Matching (C3)
+  leadMatches:              (leadId) => request(`/leads/${leadId}/matches`),
+  propertyMatchingCustomers: (propertyId) => request(`/properties/${propertyId}/matching-customers`),
+
+  // Property assignees (J10)
+  listPropertyAssignees:    (propertyId) => request(`/properties/${propertyId}/assignees`),
+  addPropertyAssignee:      (propertyId, body) =>
+    request(`/properties/${propertyId}/assignees`, { method: 'POST', body }),
+  removePropertyAssignee:   (propertyId, userId) =>
+    request(`/properties/${propertyId}/assignees/${userId}`, { method: 'DELETE' }),
+
+  // Adverts (F1)
+  listAdverts:         (propertyId) => request(`/properties/${propertyId}/adverts`),
+  createAdvert:        (propertyId, body) =>
+    request(`/properties/${propertyId}/adverts`, { method: 'POST', body }),
+  updateAdvert:        (id, body) => request(`/adverts/${id}`, { method: 'PATCH', body }),
+  deleteAdvert:        (id) => request(`/adverts/${id}`, { method: 'DELETE' }),
+
+  // Global search (H1)
+  globalSearch:        (q, take) => {
+    const qs = new URLSearchParams({ q: q ?? '' });
+    if (take !== undefined && take !== null) qs.set('take', String(take));
+    return request(`/search?${qs.toString()}`);
+  },
+
+  // Activity feed (H3)
+  listActivity:        (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+    });
+    const s = qs.toString();
+    return request(`/activity${s ? `?${s}` : ''}`);
+  },
+
+  // Reports (E1)
+  reportNewProperties:   (params = {}) => request(`/reports/new-properties${qsFrom(params)}`),
+  reportNewCustomers:    (params = {}) => request(`/reports/new-customers${qsFrom(params)}`),
+  reportDeals:           (params = {}) => request(`/reports/deals${qsFrom(params)}`),
+  reportViewings:        (params = {}) => request(`/reports/viewings${qsFrom(params)}`),
+  reportMarketingActions: (params = {}) => request(`/reports/marketing-actions${qsFrom(params)}`),
+  // B5 — CSV export URLs. Browser downloads need a plain URL (no fetch),
+  // so this returns the string and the caller sets window.location or an
+  // <a href>. `kind` is one of 'properties' | 'leads' | 'deals'.
+  exportUrl:           (kind) => `${BASE}/reports/export/${kind}.csv`,
+
+  // Neighborhoods (G1)
+  listNeighborhoods:   (params = {}) => request(`/neighborhoods${qsFrom(params)}`),
+  createNeighborhood:  (body) => request('/neighborhoods', { method: 'POST', body }),
+
+  // Saved searches (B3)
+  listSavedSearches:   (entityType) => {
+    const qs = entityType ? `?${new URLSearchParams({ entityType }).toString()}` : '';
+    return request(`/saved-searches${qs}`);
+  },
+  createSavedSearch:   (body) => request('/saved-searches', { method: 'POST', body }),
+  updateSavedSearch:   (id, body) => request(`/saved-searches/${id}`, { method: 'PATCH', body }),
+  deleteSavedSearch:   (id) => request(`/saved-searches/${id}`, { method: 'DELETE' }),
+
+  // Favorites (B4)
+  listFavorites:       (entityType) => {
+    const qs = entityType ? `?${new URLSearchParams({ entityType }).toString()}` : '';
+    return request(`/favorites${qs}`);
+  },
+  addFavorite:         (body) => request('/favorites', { method: 'POST', body }),
+  removeFavorite:      (entityType, entityId) =>
+    request(`/favorites/${entityType}/${entityId}`, { method: 'DELETE' }),
 };
+
+// Small querystring helper: drops empty values so `?from=&to=` doesn't
+// pollute server logs. Shared by the report endpoints.
+function qsFrom(params) {
+  const qs = new URLSearchParams();
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+  });
+  const s = qs.toString();
+  return s ? `?${s}` : '';
+}
 
 export default api;

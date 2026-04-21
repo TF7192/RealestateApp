@@ -31,9 +31,18 @@ import {
 } from '../lib/inputProps';
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
 import PageTour from '../components/PageTour';
+import PropertyPipelineBlock from '../components/PropertyPipelineBlock';
+import {
+  PROPERTY_CONDITION_LABELS,
+  HEATING_TYPE_LABELS,
+  labelsToOptions,
+} from '../lib/mlsLabels';
 import { getPositionDetailed } from '../native/geolocation';
 import './Forms.css';
 import './NewProperty.css';
+
+const CONDITION_OPTIONS = labelsToOptions(PROPERTY_CONDITION_LABELS);
+const HEATING_TYPES = Object.keys(HEATING_TYPE_LABELS);
 
 const DRAFT_KEY = 'estia-draft:new-property';
 
@@ -131,6 +140,32 @@ const INITIAL_FORM = {
   meetingRoom: false,
   workstations: null,
   lobbySecurity: false,
+
+  // Sprint 3 J4–J7 — Nadlan parity extras.
+  condition: '',
+  heatingTypes: [],
+  halfRooms: null,
+  masterBedroom: false,
+  bathrooms: null,
+  toilets: null,
+  furnished: false,
+  petFriendly: false,
+  doormenService: false,
+  gym: false,
+  pool: false,
+  gatedCommunity: false,
+  accessibility: false,
+  utilityRoom: false,
+  listingSource: '',
+
+  // Sprint 1 J9 — broker-side pipeline fields. The PropertyPipelineBlock
+  // reads/writes these directly from the form state.
+  stage: 'WATCHING',
+  agentCommissionPct: null,
+  primaryAgentId: null,
+  exclusivityExpire: '',
+  sellerSeriousness: 'NONE',
+  brokerNotes: '',
 };
 
 /**
@@ -284,6 +319,31 @@ export default function NewProperty() {
           meetingRoom: !!p.meetingRoom,
           workstations: p.workstations ?? null,
           lobbySecurity: !!p.lobbySecurity,
+          // J4–J7 extras
+          condition: p.condition || '',
+          heatingTypes: Array.isArray(p.heatingTypes) ? p.heatingTypes : [],
+          halfRooms: p.halfRooms ?? null,
+          masterBedroom: !!p.masterBedroom,
+          bathrooms: p.bathrooms ?? null,
+          toilets: p.toilets ?? null,
+          furnished: !!p.furnished,
+          petFriendly: !!p.petFriendly,
+          doormenService: !!p.doormenService,
+          gym: !!p.gym,
+          pool: !!p.pool,
+          gatedCommunity: !!p.gatedCommunity,
+          accessibility: !!p.accessibility,
+          utilityRoom: !!p.utilityRoom,
+          listingSource: p.listingSource || '',
+          // J9 pipeline
+          stage: p.stage || 'WATCHING',
+          agentCommissionPct: p.agentCommissionPct ?? null,
+          primaryAgentId: p.primaryAgentId || null,
+          exclusivityExpire: p.exclusivityExpire
+            ? String(p.exclusivityExpire).slice(0, 10)
+            : '',
+          sellerSeriousness: p.sellerSeriousness || 'NONE',
+          brokerNotes: p.brokerNotes || '',
         });
         setExistingMeta({
           street: p.street,
@@ -485,6 +545,33 @@ export default function NewProperty() {
     meetingRoom: !!form.meetingRoom,
     workstations: numOrNull(form.workstations),
     lobbySecurity: !!form.lobbySecurity,
+    // J4–J7 Nadlan parity extras
+    condition: form.condition || null,
+    heatingTypes: Array.isArray(form.heatingTypes) ? form.heatingTypes : [],
+    halfRooms: numOrNull(form.halfRooms),
+    masterBedroom: !!form.masterBedroom,
+    bathrooms: numOrNull(form.bathrooms),
+    toilets: numOrNull(form.toilets),
+    furnished: !!form.furnished,
+    petFriendly: !!form.petFriendly,
+    doormenService: !!form.doormenService,
+    gym: !!form.gym,
+    pool: !!form.pool,
+    gatedCommunity: !!form.gatedCommunity,
+    accessibility: !!form.accessibility,
+    utilityRoom: !!form.utilityRoom,
+    listingSource: form.listingSource || null,
+    // J9 broker pipeline
+    stage: form.stage || 'WATCHING',
+    agentCommissionPct: form.agentCommissionPct == null || form.agentCommissionPct === ''
+      ? null
+      : Number(form.agentCommissionPct),
+    primaryAgentId: form.primaryAgentId || null,
+    exclusivityExpire: form.exclusivityExpire
+      ? new Date(form.exclusivityExpire).toISOString()
+      : null,
+    sellerSeriousness: form.sellerSeriousness || 'NONE',
+    brokerNotes: form.brokerNotes || '',
   });
   const buildFullEditBody = () => ({ ...buildStep1Body(), ...buildStep2Body() });
 
@@ -1278,6 +1365,135 @@ export default function NewProperty() {
               </div>
             </div>
           )}
+
+          {/* ── J4–J7 — Nadlan parity extras ───────────────────────── */}
+          <div className="form-section">
+            <h3 className="form-section-title">פרטים נוספים (J4–J7)</h3>
+            <div className="form-row form-row-3">
+              <div className="form-group">
+                <label className="form-label" htmlFor="np-condition">מצב נכס</label>
+                <SelectField
+                  id="np-condition"
+                  value={form.condition}
+                  onChange={(v) => update('condition', v)}
+                  options={CONDITION_OPTIONS}
+                  placeholder="בחר…"
+                  aria-label="מצב הנכס"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="np-half-rooms">חצאי חדרים</label>
+                <NumberField
+                  id="np-half-rooms"
+                  value={form.halfRooms}
+                  onChange={(v) => update('halfRooms', v)}
+                  min={0}
+                  max={10}
+                  placeholder="0"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="np-listing-source">מקור הנכס</label>
+                <input
+                  id="np-listing-source"
+                  type="text"
+                  className="form-input"
+                  value={form.listingSource}
+                  onChange={(e) => update('listingSource', e.target.value)}
+                  placeholder="yad2 / referral / onmap"
+                />
+              </div>
+            </div>
+            <div className="form-row form-row-3">
+              <div className="form-group">
+                <label className="form-label" htmlFor="np-bathrooms">חדרי אמבטיה</label>
+                <NumberField
+                  id="np-bathrooms"
+                  value={form.bathrooms}
+                  onChange={(v) => update('bathrooms', v)}
+                  min={0}
+                  max={10}
+                  placeholder="1"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="np-toilets">שירותים</label>
+                <NumberField
+                  id="np-toilets"
+                  value={form.toilets}
+                  onChange={(v) => update('toilets', v)}
+                  min={0}
+                  max={10}
+                  placeholder="1"
+                />
+              </div>
+            </div>
+            <fieldset className="np-heating">
+              <legend className="form-label">חימום</legend>
+              <div className="checkbox-grid">
+                {HEATING_TYPES.map((key) => {
+                  const label = HEATING_TYPE_LABELS[key];
+                  const selected = form.heatingTypes.includes(key);
+                  return (
+                    <label key={key} className="checkbox-item">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? [...form.heatingTypes, key]
+                            : form.heatingTypes.filter((k) => k !== key);
+                          update('heatingTypes', next);
+                        }}
+                      />
+                      <span className="checkbox-custom" />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+            <div className="checkbox-grid">
+              {[
+                { key: 'masterBedroom',   label: 'חדר הורים' },
+                { key: 'utilityRoom',     label: 'חדר שירות' },
+                { key: 'furnished',       label: 'מרוהטת' },
+                { key: 'petFriendly',     label: 'ידידותי לחיות מחמד' },
+                { key: 'doormenService',  label: 'שירות קונסיירז׳' },
+                { key: 'gym',             label: 'חדר כושר בבניין' },
+                { key: 'pool',            label: 'בריכת שחייה' },
+                { key: 'gatedCommunity',  label: 'קהילה סגורה' },
+                { key: 'accessibility',   label: 'נגישות לנכי' },
+              ].map(({ key, label }) => (
+                <label key={key} className="checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={!!form[key]}
+                    onChange={(e) => update(key, e.target.checked)}
+                  />
+                  <span className="checkbox-custom" />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* ── J9 — צנרת תיווך ───────────────────────────────────── */}
+          <div className="form-section">
+            <h3 className="form-section-title">צנרת תיווך</h3>
+            <PropertyPipelineBlock
+              form={{
+                stage: form.stage,
+                agentCommissionPct: form.agentCommissionPct,
+                primaryAgentId: form.primaryAgentId,
+                exclusivityExpire: form.exclusivityExpire,
+                sellerSeriousness: form.sellerSeriousness,
+                brokerNotes: form.brokerNotes,
+              }}
+              onChange={update}
+              toast={toast}
+            />
+          </div>
 
           {/* ── מחסן מפורט ─────────────────────────────────────────── */}
           {form.storage && (

@@ -1791,3 +1791,36 @@
 .cl-stale-pill:hover {
   background: color-mix(in srgb, var(--danger) 14%, var(--bg-card));
 }
+
+/* ─── Sprint 2 C2 + Sprint 7 B3/B4 additions ──────────────────────
+ * Header toolbar hosts three new controls (advanced filter, saved-
+ * search menu, favorites toggle). Count pill echoes the number of
+ * active filters on the trigger. Star aligns with the card name. */
+
+.cust-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-inline-start: 4px;
+  border-radius: 999px;
+  background: var(--gold, #d4a017);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.btn-ghost.is-active {
+  background: var(--gold-soft, color-mix(in srgb, var(--gold, #d4a017) 18%, transparent));
+  color: var(--gold-strong, #b8890f);
+}
+
+.cc-v2-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+

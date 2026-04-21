@@ -328,3 +328,30 @@
     min-height: 48px;
   }
 }
+
+/* ── MLS parity — K1/K2/L1 subsections + embedded panel wrapper ─── */
+.cd-subsection {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+.cd-subsection-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+/* Zero out chrome when we embed one of the shared panels (which ship
+   their own card chrome) inside a cd-section slot. */
+.cd-section-embedded {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin-bottom: 12px;
+}
+.cd-tags-section {
+  margin-bottom: 12px;
+}

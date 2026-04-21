@@ -164,3 +164,18 @@
     max-height: min(280px, calc(var(--vh-usable, 60vh) - 16px));
   }
 }
+
+/* MLS G1 — optional neighborhood sub-field. Stacks under the street
+   row with a small gap and shares the list / item styles above. */
+.addr-field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.addr-field-nbh.addr-field-disabled .addr-field-input {
+  background: var(--surface-2, #f3f4f6);
+  cursor: not-allowed;
+}
+

@@ -1,0 +1,63 @@
+/* DeltaBadge — small pill next to KPI tiles showing rolling change.
+   Follows the chip style: rounded, neutral border, tonal fill that
+   matches existing `--success-*` / `--danger-*` / muted tokens so we
+   don't invent a new color system. Sized small enough to sit inline
+   with a stat value without reflowing the card. */
+
+.delta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  /* sit next to the stat-value without pulling the label row down */
+  vertical-align: middle;
+  margin-inline-start: 6px;
+}
+
+.delta-badge .delta-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.delta-badge .delta-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Tone variants — reuse the same `--success` / `--danger` tokens the
+   rest of the app uses for positive/negative signal, so a color-blind
+   agent gets the same palette across the product. */
+.delta-badge.delta-up {
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+}
+
+.delta-badge.delta-down {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.delta-badge.delta-neutral {
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+/* When a DeltaBadge sits inside a tonal tile (`.delta-up .delta-label`
+   etc.), let the label pick up the tone too so "השבוע" doesn't read
+   gray against a green pill. */
+.delta-badge.delta-up .delta-label,
+.delta-badge.delta-down .delta-label {
+  color: inherit;
+  opacity: 0.78;
+}

@@ -24,10 +24,16 @@ import {
   MessageCircle,
   Calculator,
   Download as DownloadIcon,
+  BarChart2,
+  Activity as ActivityIcon,
+  Bell,
+  Tag,
+  Heart,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
+import api from '../lib/api';
 import MobileTabBar from './MobileTabBar';
 import MobileMoreSheet from './MobileMoreSheet';
 
@@ -52,6 +58,16 @@ const navItems = [
 const quickActions = [
   { path: '/properties/new', icon: Plus, label: 'נכס חדש' },
   { path: '/customers/new', icon: UserPlus, label: 'ליד חדש' },
+];
+
+// Sprint 4 reporting surfaces + Sprint 1 A2 tag-settings entry point.
+// Collected in a "כלי ניהול" group so the main nav isn't cluttered; Office
+// (Sprint 7 A1) is gated to role === 'OWNER' — rendered conditionally below.
+const MANAGEMENT_ITEMS = [
+  { path: '/reports',       icon: BarChart2,   label: 'דוחות' },
+  { path: '/activity',      icon: ActivityIcon, label: 'פעילות' },
+  { path: '/reminders',     icon: Bell,         label: 'תזכורות' },
+  { path: '/settings/tags', icon: Tag,          label: 'ניהול תגיות' },
 ];
 
 // Pages that should show a back arrow + contextual title instead of the logo.
@@ -92,10 +108,66 @@ export default function Layout({ onLogout }) {
   const [copiedShare, setCopiedShare] = useState(false);
   const [dynamicTitle, setDynamicTitle] = useState('');
   const [headerHidden, setHeaderHidden] = useState(false);
+  const [favorites, setFavorites] = useState([]);
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
+
+  const isOwner = user?.role === 'OWNER';
+
+  // Sprint 7 B4 — sidebar "המועדפים" strip.
+  // Hydrates each favorite's display label by cross-referencing the list
+  // endpoints (properties / leads / owners). Cached in component state;
+  // refetched on window focus so a favorite added in another tab shows
+  // up when the agent returns. Kept to 5 items max in the UI.
+  const loadFavorites = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const favRes = await api.listFavorites();
+      const favItems = (favRes?.items || []).slice(0, 5);
+      if (favItems.length === 0) { setFavorites([]); return; }
+      const [propsRes, leadsRes, ownersRes] = await Promise.all([
+        api.listProperties({ mine: '1' }).catch(() => ({ items: [] })),
+        api.listLeads().catch(() => ({ items: [] })),
+        api.listOwners().catch(() => ({ items: [] })),
+      ]);
+      const byId = {
+        PROPERTY: new Map((propsRes?.items || []).map((p) => [p.id, p])),
+        LEAD:     new Map((leadsRes?.items || []).map((l) => [l.id, l])),
+        OWNER:    new Map((ownersRes?.items || []).map((o) => [o.id, o])),
+      };
+      const hydrated = favItems
+        .map((fav) => {
+          const entity = byId[fav.entityType]?.get(fav.entityId);
+          if (!entity) return null;
+          if (fav.entityType === 'PROPERTY') {
+            const street = [entity.street, entity.number].filter(Boolean).join(' ').trim();
+            const label = [street || entity.address || 'נכס', entity.city].filter(Boolean).join(', ');
+            return { key: `P-${fav.entityId}`, label, to: `/properties/${fav.entityId}` };
+          }
+          if (fav.entityType === 'LEAD') {
+            return { key: `L-${fav.entityId}`, label: entity.name || 'ליד', to: `/customers?selected=${fav.entityId}` };
+          }
+          if (fav.entityType === 'OWNER') {
+            return { key: `O-${fav.entityId}`, label: entity.name || 'בעל נכס', to: `/owners/${fav.entityId}` };
+          }
+          return null;
+        })
+        .filter(Boolean);
+      setFavorites(hydrated);
+    } catch {
+      // Fail silently — favorites are a nice-to-have; 401 will bounce
+      // via the api client already.
+    }
+  }, [user?.id]);
+
+  useEffect(() => { loadFavorites(); }, [loadFavorites]);
+  useEffect(() => {
+    const onFocus = () => loadFavorites();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadFavorites]);
 
   useEffect(() => {
     try { localStorage.setItem('estia-sidebar-collapsed', collapsed ? '1' : '0'); }
@@ -297,6 +369,66 @@ export default function Layout({ onLogout }) {
               </NavLink>
             ))}
           </div>
+
+          {/* Sprint 4 (reports, activity, reminders) + Sprint 1 A2 (tags)
+              + Sprint 7 A1 (office — OWNER only). Grouped so the main
+              nav isn't swamped with admin-ish surfaces. */}
+          <div className="nav-section">
+            <span className="nav-section-label">כלי ניהול</span>
+            {MANAGEMENT_ITEMS.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                data-label={item.label}
+                className={({ isActive }) =>
+                  `nav-item ${isActive ? 'active' : ''}`
+                }
+                onClick={() => setSidebarOpen(false)}
+              >
+                <item.icon size={20} />
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+            {isOwner && (
+              <NavLink
+                to="/office"
+                data-label="משרד"
+                className={({ isActive }) =>
+                  `nav-item ${isActive ? 'active' : ''}`
+                }
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Building2 size={20} />
+                <span>משרד</span>
+              </NavLink>
+            )}
+          </div>
+
+          {/* Sprint 7 B4 — sidebar favorites strip. Rendered only when
+              there is something to show; max 5 items. Each row links to
+              the favorited entity's detail page. */}
+          {favorites.length > 0 && (
+            <div className="nav-section nav-favorites">
+              <span className="nav-section-label">
+                <Heart size={12} style={{ marginInlineEnd: 4, verticalAlign: -1 }} />
+                המועדפים
+              </span>
+              {favorites.map((f) => (
+                <NavLink
+                  key={f.key}
+                  to={f.to}
+                  className={({ isActive }) =>
+                    `nav-item nav-favorite ${isActive ? 'active' : ''}`
+                  }
+                  onClick={() => setSidebarOpen(false)}
+                  title={f.label}
+                >
+                  <Heart size={14} />
+                  <span className="nav-favorite-label">{f.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          )}
 
           <div className="nav-section">
             <span className="nav-section-label">פעולות מהירות</span>

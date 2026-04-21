@@ -25,6 +25,12 @@ import {
   Sparkles,
   Pencil,
   UserPlus,
+  Users,
+  Workflow,
+  Tag,
+  Bell,
+  Activity,
+  Target,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
@@ -44,6 +50,13 @@ import PageTour from '../components/PageTour';
 import PropertyHero from '../components/PropertyHero';
 import PropertyKpiTile from '../components/PropertyKpiTile';
 import PropertyPanelSheet from '../components/PropertyPanelSheet';
+import PropertyPipelineBlock from '../components/PropertyPipelineBlock';
+import PropertyAssigneesPanel from '../components/PropertyAssigneesPanel';
+import AdvertsPanel from '../components/AdvertsPanel';
+import TagPicker from '../components/TagPicker';
+import RemindersPanel from '../components/RemindersPanel';
+import MatchingList from '../components/MatchingList';
+import ActivityPanel from '../components/ActivityPanel';
 import { useCopyFeedback, useViewportMobile } from '../hooks/mobile';
 import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/share';
 import { isNative } from '../native/platform';
@@ -197,7 +210,11 @@ export default function PropertyDetail() {
   const [panel, setPanel] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search).get('panel');
-      const allowed = ['marketing', 'owner', 'photos', 'exclusivity', 'notes', 'map'];
+      const allowed = [
+        'marketing', 'owner', 'photos', 'exclusivity', 'notes', 'map',
+        // MLS parity panels
+        'pipeline', 'adverts', 'assignees', 'matching', 'activity', 'reminders',
+      ];
       return allowed.includes(p) ? p : null;
     } catch { return null; }
   });
@@ -978,6 +995,144 @@ export default function PropertyDetail() {
           <div className="dc-map-addr">{property.street}, {property.city}</div>
         </DashCard>
 
+        {/* MLS parity — pipeline (J9) */}
+        <DashCard
+          delay={6}
+          icon={<Workflow size={16} />}
+          title="צנרת תיווך"
+          action={(
+            <button
+              type="button"
+              className="dc-cta"
+              onClick={() => setPanel('pipeline')}
+              aria-label="ערוך צנרת תיווך"
+            >
+              ערוך
+              <ChevronLeft size={14} />
+            </button>
+          )}
+        >
+          <div className="pd-pipeline-preview">
+            <span className="pd-pipeline-label">שלב: </span>
+            <strong>{property.stage || 'WATCHING'}</strong>
+            {property.agentCommissionPct != null && (
+              <span className="pd-pipeline-chip">עמלה {property.agentCommissionPct}%</span>
+            )}
+            {property.sellerSeriousness && property.sellerSeriousness !== 'NONE' && (
+              <span className="pd-pipeline-chip">רצינות {property.sellerSeriousness}</span>
+            )}
+          </div>
+        </DashCard>
+
+        {/* MLS parity — adverts (F1) */}
+        <DashCard
+          delay={6}
+          icon={<Megaphone size={16} />}
+          title="מודעות פרסום"
+          action={(
+            <button
+              type="button"
+              className="dc-cta"
+              onClick={() => setPanel('adverts')}
+              aria-label="נהל מודעות פרסום"
+            >
+              נהל
+              <ChevronLeft size={14} />
+            </button>
+          )}
+        >
+          <p className="dc-empty">לחץ "נהל" לפתיחה</p>
+        </DashCard>
+
+        {/* MLS parity — assignees (J10) */}
+        <DashCard
+          delay={7}
+          icon={<Users size={16} />}
+          title="שותפים לנכס"
+          action={(
+            <button
+              type="button"
+              className="dc-cta"
+              onClick={() => setPanel('assignees')}
+              aria-label="נהל שותפים לנכס"
+            >
+              נהל
+              <ChevronLeft size={14} />
+            </button>
+          )}
+        >
+          <p className="dc-empty">הוסף שותפים מהמשרד לצפייה משותפת</p>
+        </DashCard>
+
+        {/* MLS parity — matching customers (C3 reverse) */}
+        <DashCard
+          delay={7}
+          icon={<Target size={16} />}
+          title="לקוחות תואמים"
+          action={(
+            <button
+              type="button"
+              className="dc-cta"
+              onClick={() => setPanel('matching')}
+              aria-label="הצג לקוחות תואמים"
+            >
+              הצג
+              <ChevronLeft size={14} />
+            </button>
+          )}
+        >
+          <p className="dc-empty">גלה לקוחות במאגר שהנכס תואם את הפרופיל שלהם</p>
+        </DashCard>
+
+        {/* MLS parity — tags (A2) */}
+        <DashCard
+          delay={7}
+          icon={<Tag size={16} />}
+          title="תגיות"
+        >
+          <TagPicker entityType="PROPERTY" entityId={property.id} />
+        </DashCard>
+
+        {/* MLS parity — reminders (D1) */}
+        <DashCard
+          delay={8}
+          icon={<Bell size={16} />}
+          title="תזכורות"
+          action={(
+            <button
+              type="button"
+              className="dc-cta"
+              onClick={() => setPanel('reminders')}
+              aria-label="פתח תזכורות"
+            >
+              פתח
+              <ChevronLeft size={14} />
+            </button>
+          )}
+        >
+          <p className="dc-empty">הוסף תזכורת לפעולה עתידית על הנכס</p>
+        </DashCard>
+
+        {/* MLS parity — activity (H3) */}
+        <DashCard
+          delay={8}
+          icon={<Activity size={16} />}
+          title="פעילות"
+          action={(
+            <button
+              type="button"
+              className="dc-cta"
+              onClick={() => setPanel('activity')}
+              aria-label="הצג פעילות"
+            >
+              הצג
+              <ChevronLeft size={14} />
+            </button>
+          )}
+        >
+          <p className="dc-empty">יומן פעולות שבוצעו על הנכס</p>
+        </DashCard>
+
       </div>
 
       {/* ── Slide-in panels ── */}
@@ -1179,6 +1334,81 @@ export default function PropertyDetail() {
               <Edit3 size={14} />ערוך הערות ומאפיינים
             </button>
           </div>
+        </PropertyPanelSheet>
+      )}
+
+      {/* MLS parity — pipeline (J9) */}
+      {panel === 'pipeline' && (
+        <PropertyPanelSheet
+          title="צנרת תיווך"
+          subtitle="שלב, עמלה, סוכן ראשי, בלעדיות, רצינות מוכר, הערות מתווך"
+          width="lg"
+          onClose={() => setPanel(null)}
+        >
+          <PropertyPipelineBlock
+            property={property}
+            onSaved={() => { load(); }}
+            toast={toast}
+          />
+        </PropertyPanelSheet>
+      )}
+
+      {/* MLS parity — adverts (F1) */}
+      {panel === 'adverts' && (
+        <PropertyPanelSheet
+          title="מודעות פרסום"
+          subtitle="מודעה אחת לכל ערוץ פרסום"
+          width="lg"
+          onClose={() => setPanel(null)}
+        >
+          <AdvertsPanel propertyId={property.id} toast={toast} />
+        </PropertyPanelSheet>
+      )}
+
+      {/* MLS parity — assignees (J10) */}
+      {panel === 'assignees' && (
+        <PropertyPanelSheet
+          title="שותפים לנכס"
+          subtitle="שיוף סוכנים נוספים מהמשרד"
+          width="lg"
+          onClose={() => setPanel(null)}
+        >
+          <PropertyAssigneesPanel propertyId={property.id} toast={toast} />
+        </PropertyPanelSheet>
+      )}
+
+      {/* MLS parity — matching customers (C3 reverse) */}
+      {panel === 'matching' && (
+        <PropertyPanelSheet
+          title="לקוחות תואמים"
+          subtitle="לקוחות שפרופיל החיפוש שלהם תואם לנכס הזה"
+          width="lg"
+          onClose={() => setPanel(null)}
+        >
+          <MatchingList propertyId={property.id} />
+        </PropertyPanelSheet>
+      )}
+
+      {/* MLS parity — reminders (D1) */}
+      {panel === 'reminders' && (
+        <PropertyPanelSheet
+          title="תזכורות לנכס"
+          width="lg"
+          onClose={() => setPanel(null)}
+        >
+          <RemindersPanel scope={{ propertyId: property.id }} />
+        </PropertyPanelSheet>
+      )}
+
+      {/* MLS parity — activity (H3) */}
+      {panel === 'activity' && (
+        <PropertyPanelSheet
+          title="יומן פעילות"
+          subtitle="כל הפעולות שבוצעו על הנכס"
+          width="lg"
+          onClose={() => setPanel(null)}
+        >
+          <ActivityPanel scope={{ propertyId: property.id }} />
         </PropertyPanelSheet>
       )}
 

@@ -152,6 +152,33 @@
   margin-right: 4px;
 }
 
+/* B2 — period switcher above the KPI row ("שנה תקופה: week / month /
+   quarter"). Sits flush with the stat rail so the whole counters
+   section reads as one block. */
+.kpi-period-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.kpi-period-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Stat-value row — the number sits next to its DeltaBadge pill. Uses
+   inline-flex so the pill wraps onto a second line on very narrow
+   stat cards rather than pushing the label sideways. */
+.stat-value-row {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  line-height: 1;
+}
+
 /* Stats — clickable cards */
 .stats-grid {
   display: grid;
