@@ -321,6 +321,52 @@ export const defaultHandlers = [
     });
   }),
 
+  // Neighborhood groups (G2)
+  http.get('/api/neighborhood-groups', () => HttpResponse.json({ items: [] })),
+  http.post('/api/neighborhood-groups', async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      city?: string; name?: string; description?: string;
+      aliases?: string[]; memberIds?: string[];
+    };
+    return HttpResponse.json({
+      group: {
+        id: 'ng-1',
+        city: body?.city ?? '',
+        name: body?.name ?? '',
+        description: body?.description ?? null,
+        aliases: body?.aliases ?? [],
+        members: (body?.memberIds ?? []).map((nid, i) => ({
+          groupId: 'ng-1',
+          neighborhoodId: nid,
+          sortOrder: i,
+          neighborhood: { id: nid, city: body?.city ?? '', name: nid, aliases: [] },
+        })),
+      },
+    });
+  }),
+  http.patch('/api/neighborhood-groups/:id', async ({ params, request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      city?: string; name?: string; description?: string;
+      aliases?: string[]; memberIds?: string[];
+    };
+    return HttpResponse.json({
+      group: {
+        id: params.id,
+        city: body?.city ?? '',
+        name: body?.name ?? '',
+        description: body?.description ?? null,
+        aliases: body?.aliases ?? [],
+        members: (body?.memberIds ?? []).map((nid, i) => ({
+          groupId: params.id,
+          neighborhoodId: nid,
+          sortOrder: i,
+          neighborhood: { id: nid, city: body?.city ?? '', name: nid, aliases: [] },
+        })),
+      },
+    });
+  }),
+  http.delete('/api/neighborhood-groups/:id', () => HttpResponse.json({ ok: true })),
+
   // Saved searches (B3)
   http.get('/api/saved-searches', () => HttpResponse.json({ items: [] })),
   http.post('/api/saved-searches', async ({ request }) => {

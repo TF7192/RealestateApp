@@ -42,6 +42,7 @@ import {
   registerSavedSearchRoutes,
   registerFavoriteRoutes,
 } from './routes/mlsSprint7.js';
+import { registerNeighborhoodGroupRoutes } from './routes/neighborhoodGroups.js';
 import { storageBackend, resolveUpload } from './lib/storage.js';
 import { track as phTrack, captureException as phCapture, shutdownAnalytics } from './lib/analytics.js';
 import { getUser } from './middleware/auth.js';
@@ -236,6 +237,7 @@ export async function build() {
   await app.register(registerActivityRoutes, { prefix: '/api/activity' });
   await app.register(registerAdvertRoutes, { prefix: '/api' });
   await app.register(registerNeighborhoodRoutes, { prefix: '/api/neighborhoods' });
+  await app.register(registerNeighborhoodGroupRoutes, { prefix: '/api/neighborhood-groups' });
   await app.register(registerSavedSearchRoutes, { prefix: '/api/saved-searches' });
   await app.register(registerFavoriteRoutes, { prefix: '/api/favorites' });
 

@@ -1,0 +1,188 @@
+/* G2 — NeighborhoodAdmin page styles. Mirrors TagSettings layout with
+ * room for the larger multi-select picker. All sizing uses logical
+ * properties so the RTL root flips cleanly. */
+
+.nbhadmin-page {
+  max-inline-size: 960px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  padding-block: 24px;
+}
+
+.nbhadmin-header {
+  margin-block-end: 20px;
+}
+
+.nbhadmin-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nbhadmin-title h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.nbhadmin-subtitle {
+  margin-block-start: 6px;
+  color: var(--text-muted, #6b6b6b);
+  font-size: 14px;
+}
+
+.nbhadmin-filter {
+  margin-block-end: 16px;
+}
+
+.nbhadmin-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 12px;
+  padding: 16px;
+  margin-block-end: 20px;
+}
+
+.nbhadmin-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.nbhadmin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted, #6b6b6b);
+  min-inline-size: 160px;
+}
+
+.nbhadmin-field-grow {
+  flex: 1 1 200px;
+}
+
+.nbhadmin-field input[type='text'],
+.nbhadmin-field select {
+  padding-block: 8px;
+  padding-inline: 10px;
+  border: 1px solid var(--border, #d9d9d9);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--surface, #fff);
+}
+
+.nbhadmin-fallback {
+  min-block-size: 96px;
+}
+
+.nbhadmin-skel {
+  block-size: 120px;
+  background: var(--skel, #f0f0f0);
+  border-radius: 10px;
+  animation: nbhadmin-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes nbhadmin-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+.nbhadmin-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nbhadmin-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 10px;
+}
+
+.nbhadmin-row-main {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.nbhadmin-row-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.nbhadmin-row-desc {
+  margin-block-start: 2px;
+  color: var(--text-muted, #6b6b6b);
+  font-size: 13px;
+}
+
+.nbhadmin-chips {
+  list-style: none;
+  margin: 8px 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nbhadmin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 4px;
+  padding-inline: 8px;
+  background: var(--chip-bg, #f5efe2);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.nbhadmin-chip-empty {
+  background: transparent;
+  color: var(--text-muted, #6b6b6b);
+  font-style: italic;
+}
+
+.nbhadmin-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.nbhadmin-delete {
+  color: var(--danger, #b2342a);
+}
+
+.nbhadmin-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  inline-size: 100%;
+}
+
+.nbhadmin-edit-name {
+  flex: 1 1 200px;
+  min-inline-size: 160px;
+  padding-block: 8px;
+  padding-inline: 10px;
+  border: 1px solid var(--border, #d9d9d9);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.nbhadmin-edit-desc {
+  flex: 1 1 200px;
+  min-inline-size: 160px;
+  padding-block: 8px;
+  padding-inline: 10px;
+  border: 1px solid var(--border, #d9d9d9);
+  border-radius: 8px;
+  font-size: 14px;
+}

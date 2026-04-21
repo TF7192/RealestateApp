@@ -42,6 +42,8 @@ const Reminders = lazy(() => import('./pages/Reminders'));
 const Office = lazy(() => import('./pages/Office'));
 const TagSettings = lazy(() => import('./pages/TagSettings'));
 const Settings = lazy(() => import('./pages/Settings'));
+// G2 — OWNER-only admin for marketable-area groups, linked from /settings.
+const NeighborhoodAdmin = lazy(() => import('./pages/NeighborhoodAdmin'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import { AuthProvider, useAuth } from './lib/auth';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
@@ -194,6 +196,7 @@ function AppRoutes() {
             <Route path="/office" element={<Office />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/tags" element={<TagSettings />} />
+            <Route path="/settings/neighborhoods" element={<NeighborhoodAdmin />} />
             {/* Legacy + alias routes — redirect.
                 `/assets` is a reasonable English guess for "נכסים"
                 (literally "assets") — hitting the 404 felt like a bug
