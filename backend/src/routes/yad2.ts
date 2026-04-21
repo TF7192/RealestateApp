@@ -28,7 +28,13 @@ import { crawlAgency, mapSectionToAssetClass, type Yad2Listing } from '../lib/ya
  * Caveats — see routes/yad2.README.md.
  */
 
-const FEATURE_FLAG = (process.env.FEATURE_YAD2_IMPORT ?? '').toLowerCase() === 'true';
+// Evaluated per-registration (inside the plugin) rather than at module
+// load, so integration tests that set FEATURE_YAD2_IMPORT=true in their
+// beforeAll hook before calling build() see the real routes, not the
+// 404 stubs.
+function yad2FeatureEnabled(): boolean {
+  return (process.env.FEATURE_YAD2_IMPORT ?? '').toLowerCase() === 'true';
+}
 
 // Old single-page endpoints kept around — agency endpoints are the main
 // path going forward but the simpler version is harmless and useful for
@@ -148,13 +154,16 @@ function quotaExceededReply(reply: any, quota: QuotaSnapshot) {
 }
 
 export const registerYad2Routes: FastifyPluginAsync = async (app) => {
-  if (!FEATURE_FLAG) {
+  if (!yad2FeatureEnabled()) {
     const stub = async (_req: any, reply: any) =>
       reply.code(404).send({ error: { message: 'Yad2 import not enabled in this environment' } });
     app.post('/preview',         stub);
     app.post('/import',          stub);
     app.post('/agency/preview',  stub);
     app.post('/agency/import',   stub);
+    // /quota is read-only; still stub when disabled so the frontend gets
+    // a consistent 404 instead of a hang.
+    app.get('/quota',            stub);
     return;
   }
 

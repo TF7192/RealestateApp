@@ -46,6 +46,22 @@ export default function AddressField({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [err, setErr] = useState(null);
 
+  // Track the last `value` we've reconciled with `local`, so we can
+  // reset when the parent swaps it out externally (e.g., loading an
+  // existing record into an edit form). Render-phase diff keeps the
+  // sync in one pass, avoiding the cascading render the
+  // react-hooks/set-state-in-effect lint rule warns about. See
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const [lastExternalValue, setLastExternalValue] = useState(value ?? '');
+  if ((value ?? '') !== lastExternalValue) {
+    setLastExternalValue(value ?? '');
+    setLocal(value ?? '');
+    if ((value ?? '') === '') {
+      setPicked(false);
+      pickedLabelRef.current = '';
+    }
+  }
+
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
   const reqIdRef = useRef(0);
@@ -56,18 +72,12 @@ export default function AddressField({
   // invalidates the previous lat/lng).
   const pickedLabelRef = useRef('');
 
-  // Keep local in sync when the parent replaces the value externally
-  // (e.g., legacy edit loading an existing record). An external change
-  // always invalidates the "picked from list" marker.
-  useEffect(() => {
-    setLocal(value ?? '');
-    if ((value ?? '') === '') {
-      setPicked(false);
-      pickedLabelRef.current = '';
-    }
-  }, [value]);
-
   // Debounced Photon query. Aborts stale responses by bumping reqId.
+  // The two setState calls in the early-return clear the fetch-derived
+  // view state (results + loading) when the query becomes invalid
+  // (< 2 chars). This is the "cancelling a subscription to an async
+  // source" case the docs bless; the lint rule flags it defensively.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const q = (local || '').trim();
@@ -100,6 +110,7 @@ export default function AddressField({
 
     return () => clearTimeout(debounceRef.current);
   }, [local, city, picked]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handlePick = (item) => {
     const isStreetOnly = item.kind === 'street' && !item.houseNumber;

@@ -82,10 +82,13 @@ function AppRoutes() {
 
   // Tie the logged-in user to PostHog so session replay + funnels are
   // per-agent. On sign-out, reset so a new anonymous session starts.
+  // Depending on `user` directly triggers the identify call whenever
+  // any displayed field (displayName, avatar) changes — PostHog dedupes
+  // by distinctId so the extra calls are cheap and keep traits fresh.
   useEffect(() => {
     if (user?.id) identify(user);
     else resetIdentity();
-  }, [user?.id]);
+  }, [user]);
 
   useEffect(() => { initStatusBar(); }, []);
 
@@ -109,8 +112,11 @@ function AppRoutes() {
           await refresh();
           navigate('/', { replace: true });
         } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn('[oauth] native exchange failed', e);
+          // Swallow: this runs during native OAuth resume. A noisy log
+          // would surface in PostHog sessions; the user sees a toast
+          // from refresh()/navigate() if the session couldn't be
+          // established.
+          void e;
         }
       });
     })();
