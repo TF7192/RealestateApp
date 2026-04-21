@@ -9,6 +9,7 @@ import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
 import { track as phTrack } from '../lib/analytics.js';
 import { assertAllowedMime } from '../lib/uploadGuards.js';
+import { evaluateLeadProperty } from '../lib/matching.js';
 
 // Canonical action keys for newly-created properties. `externalCoop` is
 // kept in existing rows but new keys use the renamed `brokerCoop`.
@@ -372,6 +373,44 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     }
     await prisma.property.delete({ where: { id } });
     return { ok: true };
+  });
+
+  // Sprint 2 / MLS parity — Task C3. Reverse direction: leads from the
+  // signed-in agent that match this property, sorted by match score.
+  app.get('/:id/matching-customers', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const property = await prisma.property.findFirst({
+      where: { id, agentId: uid },
+    });
+    if (!property) return reply.code(404).send({ error: { message: 'Property not found' } });
+    const leads = await prisma.lead.findMany({
+      where: { agentId: uid },
+      include: { searchProfiles: true },
+    });
+    const scored = leads
+      .map((l: any) => ({ l, sig: evaluateLeadProperty(l, property as any) }))
+      .filter((r) => r.sig.matches)
+      .sort((a, b) => b.sig.score - a.sig.score)
+      .map((r) => ({
+        lead: {
+          id:            r.l.id,
+          name:          r.l.name,
+          phone:         r.l.phone,
+          email:         r.l.email,
+          city:          r.l.city,
+          budget:        r.l.budget,
+          rooms:         r.l.rooms,
+          lookingFor:    r.l.lookingFor,
+          interestType:  r.l.interestType,
+          status:        r.l.status,
+          customerStatus: r.l.customerStatus,
+          leadStatus:    r.l.leadStatus,
+        },
+        score:   r.sig.score,
+        reasons: r.sig.reasons,
+      }));
+    return { items: scored };
   });
 
   // Toggle / set a marketing action

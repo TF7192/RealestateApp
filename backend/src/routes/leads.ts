@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
 import { track as phTrack } from '../lib/analytics.js';
+import { evaluateLeadProperty } from '../lib/matching.js';
 
 const leadInput = z.object({
   name: z.string().min(1).max(120),
@@ -193,6 +194,36 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
     }
     await prisma.lead.delete({ where: { id } });
     return { ok: true };
+  });
+
+  // Sprint 2 / MLS parity — Task C3. Server-side matching: properties
+  // this lead could be interested in. Owner-scoped — only returns
+  // properties the signed-in agent owns.
+  app.get('/:id/matches', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const lead = await prisma.lead.findFirst({
+      where: { id, agentId: uid },
+      include: { searchProfiles: true },
+    });
+    if (!lead) return reply.code(404).send({ error: { message: 'Lead not found' } });
+    const props = await prisma.property.findMany({
+      where: { agentId: uid, status: 'ACTIVE' },
+      include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+    });
+    const scored = props
+      .map((p: any) => ({ p, sig: evaluateLeadProperty(lead as any, p) }))
+      .filter((r) => r.sig.matches)
+      .sort((a, b) => b.sig.score - a.sig.score)
+      .map((r) => ({
+        property: {
+          ...r.p,
+          images: (r.p.images || []).map((i: any) => i.url),
+        },
+        score:   r.sig.score,
+        reasons: r.sig.reasons,
+      }));
+    return { items: scored };
   });
 };
 
