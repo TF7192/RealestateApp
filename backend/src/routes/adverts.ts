@@ -5,6 +5,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { logActivity } from '../lib/activity.js';
 
 const advertInput = z.object({
   channel: z.enum([
@@ -60,6 +61,12 @@ export const registerAdvertRoutes: FastifyPluginAsync = async (app) => {
     const created = await prisma.advert.create({
       data: { agentId: uid, propertyId, ...normalize(body) },
     });
+    await logActivity({
+      agentId: uid, actorId: uid,
+      verb: 'created', entityType: 'Advert', entityId: created.id,
+      summary: `נוצר פרסום: ${created.channel}`,
+      metadata: { channel: created.channel, status: created.status },
+    });
     return { advert: created };
   });
 
@@ -73,6 +80,12 @@ export const registerAdvertRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       data: normalize(body),
     });
+    await logActivity({
+      agentId: uid, actorId: uid,
+      verb: 'updated', entityType: 'Advert', entityId: updated.id,
+      summary: `עודכן פרסום: ${updated.channel}`,
+      metadata: { channel: updated.channel, status: updated.status },
+    });
     return { advert: updated };
   });
 
@@ -82,6 +95,12 @@ export const registerAdvertRoutes: FastifyPluginAsync = async (app) => {
     const existing = await prisma.advert.findFirst({ where: { id, agentId: uid } });
     if (!existing) return reply.code(404).send({ error: { message: 'Advert not found' } });
     await prisma.advert.delete({ where: { id } });
+    await logActivity({
+      agentId: uid, actorId: uid,
+      verb: 'deleted', entityType: 'Advert', entityId: id,
+      summary: `נמחק פרסום: ${existing.channel}`,
+      metadata: { channel: existing.channel, status: existing.status },
+    });
     return { ok: true };
   });
 };
