@@ -20,6 +20,25 @@ export default defineConfig({
       },
     },
   },
+  // `vite preview` serves the built SPA and is what CI uses. It does not
+  // inherit `server.proxy` — Vite treats them as separate servers — so
+  // mirror the proxy block here. Without this, Playwright's global-setup
+  // POST /api/auth/login against the preview baseURL 404s and the whole
+  // E2E suite fails at startup.
+  preview: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY || 'http://localhost:6002',
+        changeOrigin: true,
+        ws: true,
+      },
+      '/uploads': {
+        target: process.env.VITE_API_PROXY || 'http://localhost:6002',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,

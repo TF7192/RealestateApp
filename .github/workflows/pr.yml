@@ -41,6 +41,12 @@ jobs:
       DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
       JWT_SECRET: test-jwt-secret
       COOKIE_SECRET: test-cookie-secret
+      # Disable per-route login/signup limits (10/15min, 3/1h) that the
+      # integration suite blows through immediately. Bump the global
+      # limiter too so 300/min doesn't trip either. See
+      # backend/src/routes/auth.ts and backend/src/server.ts.
+      AUTH_RATE_LIMIT_DISABLED: '1'
+      RATE_LIMIT_MAX_PER_MIN: '100000'
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-project
@@ -84,6 +90,13 @@ jobs:
       # Seed uses estia-demo-1234; align here to match seed.ts on the test DB.
       TEST_AGENT_PASSWORD: estia-demo-1234
       PLAYWRIGHT_WEB_URL: http://127.0.0.1:5173
+      # Backend rate-limiters off for the test run (see integration job).
+      AUTH_RATE_LIMIT_DISABLED: '1'
+      RATE_LIMIT_MAX_PER_MIN: '100000'
+      # vite preview honors `preview.proxy` in vite.config.js; this tells
+      # the proxy where the backend lives. Without it, the built SPA
+      # has no way to reach /api/*.
+      VITE_API_PROXY: http://127.0.0.1:4000
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-project

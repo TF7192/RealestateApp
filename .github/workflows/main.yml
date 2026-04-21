@@ -45,6 +45,8 @@ jobs:
       DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
       JWT_SECRET: test-jwt-secret
       COOKIE_SECRET: test-cookie-secret
+      AUTH_RATE_LIMIT_DISABLED: '1'
+      RATE_LIMIT_MAX_PER_MIN: '100000'
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-project
@@ -79,6 +81,9 @@ jobs:
       TEST_AGENT_EMAIL: agent.demo@estia.app
       TEST_AGENT_PASSWORD: estia-demo-1234
       PLAYWRIGHT_WEB_URL: http://127.0.0.1:5173
+      AUTH_RATE_LIMIT_DISABLED: '1'
+      RATE_LIMIT_MAX_PER_MIN: '100000'
+      VITE_API_PROXY: http://127.0.0.1:4000
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-project
