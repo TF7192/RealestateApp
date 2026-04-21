@@ -8,6 +8,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { logActivity } from '../lib/activity.js';
 
 const createSchema = z.object({
   title:      z.string().min(1).max(200),
@@ -70,6 +71,11 @@ export const registerReminderRoutes: FastifyPluginAsync = async (app) => {
         customerId: body.customerId ?? null,
       },
     });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'created', entityType: 'Reminder', entityId: reminder.id,
+      summary: reminder.title,
+    });
     return { reminder };
   });
 
@@ -101,6 +107,11 @@ export const registerReminderRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       data: { status: 'COMPLETED', completedAt: new Date(), cancelledAt: null },
     });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'completed', entityType: 'Reminder', entityId: reminder.id,
+      summary: reminder.title,
+    });
     return { reminder };
   });
 
@@ -114,6 +125,11 @@ export const registerReminderRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       data: { status: 'CANCELLED', cancelledAt: new Date(), completedAt: null },
     });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'cancelled', entityType: 'Reminder', entityId: reminder.id,
+      summary: reminder.title,
+    });
     return { reminder };
   });
 
@@ -124,6 +140,11 @@ export const registerReminderRoutes: FastifyPluginAsync = async (app) => {
     const existing = await prisma.reminder.findFirst({ where: { id, agentId: u.id } });
     if (!existing) return reply.code(404).send({ error: { message: 'Reminder not found' } });
     await prisma.reminder.delete({ where: { id } });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'deleted', entityType: 'Reminder', entityId: id,
+      summary: existing.title,
+    });
     return { ok: true };
   });
 };
