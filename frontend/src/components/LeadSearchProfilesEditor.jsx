@@ -5,6 +5,7 @@ import {
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
 import { NumberField, SelectField, Segmented } from './SmartFields';
+import NeighborhoodPicker from './NeighborhoodPicker';
 import EmptyState from './EmptyState';
 import './LeadSearchProfilesEditor.css';
 
@@ -278,11 +279,13 @@ function ProfileRow({ profile, expanded, onToggle, onChange, onSave, onDelete })
             </div>
             <div className="form-group">
               <label className="form-label">שכונות</label>
-              <CsvInput
+              {/* MLS G1 — typeahead picker scoped to the profile's first
+                  city. When no city is set yet the picker shows a prompt
+                  and stays disabled. */}
+              <NeighborhoodPicker
+                city={(profile.cities || [])[0] || ''}
                 value={profile.neighborhoods || []}
                 onChange={(arr) => onChange({ neighborhoods: arr })}
-                placeholder="לב העיר, פלורנטין"
-                ariaLabel="שכונות"
               />
             </div>
           </div>

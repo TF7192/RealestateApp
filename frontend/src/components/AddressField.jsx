@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapPin, Search as SearchIcon, Check, X } from 'lucide-react';
 import api from '../lib/api';
+import { useNeighborhoodSuggestions } from '../hooks/useNeighborhoodSuggestions';
 import './AddressField.css';
 
 /**
@@ -37,6 +38,14 @@ export default function AddressField({
   autoFocus = false,
   id,
   'aria-label': ariaLabel,
+  // MLS G1 — optional secondary field for neighborhoods. Pass
+  // `showNeighborhood` + controlled `neighborhood` / `onNeighborhoodChange`
+  // to opt into the new subfield. Existing callers leave these blank
+  // and see no change.
+  showNeighborhood = false,
+  neighborhood = '',
+  onNeighborhoodChange,
+  neighborhoodPlaceholder = 'שכונה (רשות)',
 }) {
   const [local, setLocal] = useState(value ?? '');
   const [results, setResults] = useState([]);
@@ -187,7 +196,7 @@ export default function AddressField({
     inputRef.current?.focus();
   };
 
-  return (
+  const streetBox = (
     <div className={`addr-field ${invalid ? 'addr-invalid' : ''} ${picked ? 'addr-picked' : ''}`}>
       <span className="addr-field-icon" aria-hidden="true">
         {picked ? <Check size={14} /> : <MapPin size={14} />}
@@ -289,6 +298,128 @@ export default function AddressField({
               </li>
             );
           })}
+        </ul>
+      )}
+    </div>
+  );
+
+  if (!showNeighborhood) return streetBox;
+  return (
+    <div className="addr-field-wrap">
+      {streetBox}
+      <NeighborhoodSubField
+        city={city}
+        value={neighborhood}
+        onChange={onNeighborhoodChange}
+        placeholder={neighborhoodPlaceholder}
+      />
+    </div>
+  );
+}
+
+// MLS G1 — optional secondary input sitting below the street row. When
+// a city is set, typing here suggests matches from the Neighborhood
+// table; picking one or leaving free text both propagate through
+// onNeighborhoodChange. Disabled (with a visual hint) when no city is
+// known yet, so the agent understands they need to pick a place first.
+function NeighborhoodSubField({ city, value = '', onChange, placeholder }) {
+  const [query, setQuery] = useState(value || '');
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  // Keep the local input in sync when the parent swaps the value
+  // externally (e.g. loading an existing record into an edit form).
+  const [lastExternal, setLastExternal] = useState(value || '');
+  if ((value || '') !== lastExternal) {
+    setLastExternal(value || '');
+    setQuery(value || '');
+  }
+  const disabled = !((city || '').trim());
+  const { items, loading, error } = useNeighborhoodSuggestions(city, query);
+
+  const pick = (name) => {
+    setQuery(name);
+    setOpen(false);
+    setActiveIndex(-1);
+    onChange?.(name);
+  };
+
+  const onKeyDown = (e) => {
+    if (!open) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(items.length - 1, i + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(0, i - 1));
+    } else if (e.key === 'Enter') {
+      if (activeIndex >= 0 && items[activeIndex]) {
+        e.preventDefault();
+        pick(items[activeIndex].name);
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      setActiveIndex(-1);
+    }
+  };
+
+  return (
+    <div className={`addr-field addr-field-nbh ${disabled ? 'addr-field-disabled' : ''}`}>
+      <span className="addr-field-icon" aria-hidden="true">
+        <MapPin size={14} />
+      </span>
+      <input
+        type="text"
+        className="addr-field-input form-input"
+        value={query}
+        disabled={disabled}
+        placeholder={disabled ? 'בחר עיר תחילה' : placeholder}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          // Free text flows through immediately; the parent persists
+          // whatever the agent has typed whether or not they pick a
+          // suggestion row.
+          onChange?.(e.target.value);
+        }}
+        onFocus={() => { if (items.length) setOpen(true); }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={onKeyDown}
+        aria-label="שכונה"
+        aria-autocomplete="list"
+        aria-expanded={open}
+        aria-controls="addr-field-nbh-list"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+      />
+      {loading && <span className="addr-field-loader" aria-hidden="true" />}
+      {open && !disabled && (items.length > 0 || error) && (
+        <ul id="addr-field-nbh-list" className="addr-field-list" role="listbox">
+          {error && (
+            <li className="addr-field-err">
+              <SearchIcon size={12} /> {error}
+            </li>
+          )}
+          {items.map((item, i) => (
+            <li
+              key={item.id || `${item.name}-${i}`}
+              role="option"
+              aria-selected={i === activeIndex}
+              className={`addr-field-item ${i === activeIndex ? 'is-active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); pick(item.name); }}
+              onMouseEnter={() => setActiveIndex(i)}
+            >
+              <span className="addr-field-item-icon" aria-hidden="true">
+                <MapPin size={12} />
+              </span>
+              <span className="addr-field-item-text">
+                <strong>{item.name}</strong>
+                {item.aliases?.length > 0 && (
+                  <small>{item.aliases.slice(0, 2).join(' · ')}</small>
+                )}
+              </span>
+            </li>
+          ))}
         </ul>
       )}
     </div>

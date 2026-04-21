@@ -189,6 +189,27 @@
   flex: 1;
 }
 
+/* MLS G1 — location section (cities + neighborhoods picker). */
+.cfp-location-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cfp-location-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+}
+
+@media (max-width: 600px) {
+  .cfp-location-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Mobile: full-screen drawer feels better than a right pane on
  * narrow viewports. */
 @media (max-width: 600px) {
