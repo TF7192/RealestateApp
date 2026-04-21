@@ -61,12 +61,14 @@ async function fetchBucket({ from, to }) {
   return { properties, customers, deals };
 }
 
-export default function useDashboardDeltas(_period = 'week') {
-  // `_period` is accepted for API ergonomics (so the Dashboard can
+export default function useDashboardDeltas(period = 'week') {
+  // `period` is accepted for API ergonomics (so the Dashboard can
   // pass the segmented-control value straight in) but the hook
   // currently fetches all three windows on mount anyway. Keeping the
   // arg in the signature means we can tighten this later without
-  // breaking callers.
+  // breaking callers. It's referenced below only to satisfy
+  // no-unused-vars; no-op at runtime.
+  void period;
   const [state, setState] = useState({
     week: EMPTY_BUCKET,
     month: EMPTY_BUCKET,
