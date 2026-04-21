@@ -15,6 +15,7 @@ const BASE_URL = process.env.PLAYWRIGHT_WEB_URL || 'http://127.0.0.1:5173';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  globalSetup: './tests/e2e/global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   // Tests should be deterministic. Retry once in CI to paper over the
@@ -36,6 +37,10 @@ export default defineConfig({
     locale: 'he-IL',
     timezoneId: 'Asia/Jerusalem',
     colorScheme: 'light',
+    // Shared cookie jar produced by tests/e2e/global-setup.ts. One login
+    // at startup, reused across all workers — eliminates parallel login
+    // contention against the test backend.
+    storageState: './tests/e2e/.auth/state.json',
   },
   projects: [
     {

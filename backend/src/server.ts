@@ -98,8 +98,12 @@ export async function build() {
     secret: JWT_SECRET,
     cookie: { cookieName: 'estia_token', signed: false },
   });
+  // E2E suites fan out across workers and can easily blow 300/min.
+  // RATE_LIMIT_MAX_PER_MIN lets tests raise the ceiling without forking
+  // the runtime; real deploys leave it unset and get the 300 default.
+  const globalRateMax = Number(process.env.RATE_LIMIT_MAX_PER_MIN) || 300;
   await app.register(rateLimit, {
-    max: 300,
+    max: globalRateMax,
     timeWindow: '1 minute',
     allowList: (req) => req.url.startsWith('/api/health'),
   });
@@ -149,6 +153,46 @@ export async function build() {
     } catch (e: any) {
       return reply.code(503).send({ ok: false, error: e?.message || 'db_unreachable' });
     }
+  });
+
+  // Install the error handler BEFORE routes so Fastify's encapsulation
+  // pins it as the handler-of-record for every downstream route. If
+  // registered after, routes inside registered plugins fall back to the
+  // framework default and we lose the zod→400 mapping.
+  app.setErrorHandler((err: any, req, reply) => {
+    req.log.error({ err }, 'request failed');
+    const zod =
+      (err?.name === 'ZodError' && err) ||
+      (Array.isArray(err?.issues) && err) ||
+      (err?.cause?.name === 'ZodError' && err.cause) ||
+      (Array.isArray(err?.cause?.issues) && err.cause);
+    if (zod) {
+      return reply.code(400).send({
+        error: {
+          message: 'Invalid request body',
+          code: 'invalid_request',
+          issues: (zod.issues || []).map((i: any) => ({
+            path: i.path, message: i.message, code: i.code,
+          })),
+        },
+      });
+    }
+    const status = err?.statusCode || 500;
+    if (status >= 500) {
+      const u = getUser(req);
+      const anonId = (req.headers['x-posthog-distinct-id'] as string | undefined)?.slice(0, 200);
+      phCapture(err, u?.id || anonId || null, {
+        method: req.method,
+        route: (req as any).routeOptions?.url || req.url,
+        request_id: (req as any).__reqId,
+      });
+    }
+    reply.code(status).send({
+      error: {
+        message: status >= 500 ? 'Internal server error' : (err?.message || 'Error'),
+        code: err?.code,
+      },
+    });
   });
 
   await app.register(registerAuthRoutes, { prefix: '/api/auth' });
@@ -212,27 +256,6 @@ export async function build() {
       status_code: reply.statusCode,
       duration_ms: duration,
       authenticated: !!u,
-    });
-  });
-
-  app.setErrorHandler((err: any, req, reply) => {
-    req.log.error({ err }, 'request failed');
-    const status = err?.statusCode || 500;
-    // Unhandled backend exceptions → PostHog
-    if (status >= 500) {
-      const u = getUser(req);
-      const anonId = (req.headers['x-posthog-distinct-id'] as string | undefined)?.slice(0, 200);
-      phCapture(err, u?.id || anonId || null, {
-        method: req.method,
-        route: (req as any).routeOptions?.url || req.url,
-        request_id: (req as any).__reqId,
-      });
-    }
-    reply.code(status).send({
-      error: {
-        message: status >= 500 ? 'Internal server error' : (err?.message || 'Error'),
-        code: err?.code,
-      },
     });
   });
 

@@ -45,8 +45,13 @@ const googleMockSchema = z.object({
 // 300/min. Slow the brute-force window on login and cap spam-signup
 // per IP. `@fastify/rate-limit` supports per-route config via
 // { config: { rateLimit: … } } on each app.post().
-const LOGIN_LIMIT  = { max: 10, timeWindow: '15 minutes' };
-const SIGNUP_LIMIT = { max: 3,  timeWindow: '1 hour' };
+//
+// Test E2E suites hammer these endpoints. Setting
+// AUTH_RATE_LIMIT_DISABLED=1 in a disposable test environment disables
+// the per-route caps while the global 300/min limiter still runs.
+const AUTH_RL_DISABLED = process.env.AUTH_RATE_LIMIT_DISABLED === '1';
+const LOGIN_LIMIT  = AUTH_RL_DISABLED ? false : { max: 10, timeWindow: '15 minutes' };
+const SIGNUP_LIMIT = AUTH_RL_DISABLED ? false : { max: 3,  timeWindow: '1 hour' };
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post('/signup', { config: { rateLimit: SIGNUP_LIMIT } }, async (req, reply) => {

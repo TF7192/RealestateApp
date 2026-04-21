@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { emailInput, passwordInput, emailMethodBtn } from '../helpers/login.ts';
 
 /**
  * @critical — if this fails, the product is effectively broken.
@@ -12,27 +13,34 @@ import { test, expect } from '@playwright/test';
  *
  * Test account comes from env:
  *   TEST_AGENT_EMAIL=agent.demo@estia.app
- *   TEST_AGENT_PASSWORD=Password1!
- * (the seeded demo agent; see backend/prisma/seed.ts).
+ *   TEST_AGENT_PASSWORD=estia-demo-1234  (matches backend/prisma/seed.ts)
  */
 const EMAIL = process.env.TEST_AGENT_EMAIL ?? 'agent.demo@estia.app';
 const PASSWORD = process.env.TEST_AGENT_PASSWORD ?? 'Password1!';
+
+// Critical path runs the real login flow end-to-end.
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Critical path @critical', () => {
   test('login → dashboard → /properties without hitting the ErrorBoundary', async ({ page }) => {
     await page.goto('/');
 
-    // Unauth — the app catchall renders Login. Assert we're there.
-    await expect(page.getByRole('textbox', { name: /אימייל|email/i })).toBeVisible();
+    // Login is two-step: pick email method, then fill the form.
+    await emailMethodBtn(page).first().click();
+    await expect(emailInput(page)).toBeVisible();
 
-    // Fill + submit the login form.
-    await page.getByRole('textbox', { name: /אימייל|email/i }).fill(EMAIL);
-    await page.getByRole('textbox', { name: /סיסמה|password/i }).fill(PASSWORD);
-    // Login button label per Login.jsx: "התחבר" / "Sign in"
-    await page.getByRole('button', { name: /התחבר|כניסה|sign in|log in/i }).click();
+    await emailInput(page).fill(EMAIL);
+    await passwordInput(page).fill(PASSWORD);
+    const loginResp = page.waitForResponse(
+      (r) => r.url().includes('/api/auth/login') && r.request().method() === 'POST'
+    );
+    await page.locator('form button[type="submit"]').first().click();
+    expect((await loginResp).status()).toBe(200);
 
-    // Arrived on dashboard.
-    await expect(page).toHaveURL(/\/$/);
+    // Navigate to the dashboard (Login doesn't self-redirect) and verify
+    // the authed Layout rendered.
+    await page.goto('/');
+    await expect(page.locator('nav').first()).toBeVisible({ timeout: 10_000 });
 
     // Go to the properties list — this was the TDZ-broken route.
     await page.goto('/properties');
@@ -46,8 +54,6 @@ test.describe('Critical path @critical', () => {
 
   test('unauthenticated user gets redirected / shown login when hitting /properties directly', async ({ page }) => {
     await page.goto('/properties');
-    await expect(page.getByRole('textbox', { name: /אימייל|email/i })).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(emailMethodBtn(page)).toBeVisible({ timeout: 10_000 });
   });
 });

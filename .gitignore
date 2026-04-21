@@ -30,3 +30,5 @@ frontend/ESTIA_MOBILE.md
 playwright-report/
 test-results/
 coverage/
+tests/e2e/.auth/
+backend/uploads-test/

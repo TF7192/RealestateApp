@@ -1,4 +1,4 @@
-import { beforeEach, afterAll } from 'vitest';
+import { beforeAll, beforeEach, afterAll } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { faker } from '@faker-js/faker';
 
@@ -10,32 +10,29 @@ faker.seed(1234);
 // handlers calling the singleton `prisma` client. Truncate is ~3-5ms on
 // an empty schema; fine for the expected suite size (<200 integration
 // tests).
+//
+// The table list is discovered from the DB once per run, so adding a
+// model to schema.prisma doesn't require touching this file.
 const prisma = new PrismaClient();
-const TRUNCATE_ORDER = [
-  // Dependents first.
-  'PropertyImage', 'PropertyVideo', 'MarketingAction', 'PropertyOwnership',
-  'Message', 'Conversation',
-  'CalendarConnection', 'Meeting',
-  'TransferRequest', 'Agreement',
-  'ProspectSignature',
-  'Yad2ImportAttempt',
-  'Deal', 'Lead', 'Property', 'Owner',
-  'Template',
-  'Session',
-  'User',
-];
+let truncateSQL = '';
+
+beforeAll(async () => {
+  const tables = await prisma.$queryRaw<{ tablename: string }[]>`
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+      AND tablename NOT IN ('_prisma_migrations')
+  `;
+  if (!tables.length) {
+    throw new Error(
+      'Integration setup found no application tables. Did prisma migrate deploy run against this DB?'
+    );
+  }
+  const list = tables.map((t) => `"public"."${t.tablename}"`).join(', ');
+  truncateSQL = `TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`;
+});
 
 beforeEach(async () => {
-  // We wrap the TRUNCATE in a single statement so it's atomic +
-  // FK-safe. Any table missing from TRUNCATE_ORDER gets picked up by
-  // the CASCADE but reset-identity won't fire on it — so keep the
-  // list current when the schema grows.
-  const safe = TRUNCATE_ORDER
-    .map((t) => `"public"."${t}"`)
-    .join(', ');
-  await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE ${safe} RESTART IDENTITY CASCADE`
-  );
+  await prisma.$executeRawUnsafe(truncateSQL);
 });
 
 afterAll(async () => {

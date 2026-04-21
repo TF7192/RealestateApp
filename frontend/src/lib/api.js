@@ -110,7 +110,15 @@ async function request(path, {
         // 401 triggers global sign-out, but only if the client actually
         // thought it was authenticated. Don't bounce on /auth/login's
         // own 401 (wrong-password) — that's handled in the form UI.
-        if (res.status === 401 && !path.startsWith('/auth/')) {
+        // Also skip /me: it's the "am I logged in?" probe every mount
+        // fires; a fresh visitor hitting a public page (/a/:id, /p/:id,
+        // /agents/:slug, /public/p/:token) would otherwise be yanked to
+        // /login instead of seeing the public portal.
+        if (
+          res.status === 401 &&
+          !path.startsWith('/auth/') &&
+          path !== '/me'
+        ) {
           broadcastUnauthorized();
         }
         // Retry-able server-side hiccups on GETs.

@@ -87,6 +87,69 @@ describe('GET /api/me — auth boundary', () => {
   });
 });
 
+describe('POST /api/auth/signup', () => {
+  it('H — creates a new AGENT + sets the session cookie', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/signup',
+      payload: {
+        email: 'new-agent@example.com',
+        password: 'StrongPass1!',
+        role: 'AGENT',
+        displayName: 'חדש',
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.user.email).toBe('new-agent@example.com');
+    expect(String(res.headers['set-cookie'])).toMatch(/estia_token=/);
+  });
+
+  it('V — 400 on weak password (< 8 chars)', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/auth/signup',
+      payload: { email: 'x@y.com', password: 'short', role: 'AGENT' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('V — 400 on invalid email', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/auth/signup',
+      payload: { email: 'not-an-email', password: 'StrongPass1!', role: 'AGENT' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('Idem — 409 when the email already exists', async () => {
+    const existing = await createAgent(prisma, { email: 'already@example.com' });
+    const res = await app.inject({
+      method: 'POST', url: '/api/auth/signup',
+      payload: {
+        email: existing.email, password: 'StrongPass1!',
+        role: 'AGENT', displayName: 'dup',
+      },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+});
+
+describe('POST /api/auth/logout', () => {
+  it('H — always 200 with a Set-Cookie that clears estia_token', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/auth/logout' });
+    expect(res.statusCode).toBe(200);
+    const c = String(res.headers['set-cookie'] || '');
+    expect(c).toMatch(/estia_token=/);
+    expect(c).toMatch(/Max-Age=0|Expires=/i);
+  });
+
+  it('A — works (200) without a cookie present (no-op signout)', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/auth/logout' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+  });
+});
+
 describe('Authorization (IDOR) — agent A cannot see agent B', () => {
   it("does not return another agent's leads", async () => {
     const [agentA, agentB] = await Promise.all([
