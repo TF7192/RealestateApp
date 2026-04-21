@@ -1,0 +1,122 @@
+/* H2 — QuickCreateFab.
+ *
+ * Floating action button bottom-inline-end that opens a small popover
+ * with three common creation shortcuts (property / lead / deal).
+ *
+ * The FAB itself is `position: fixed` so it floats over scroll content;
+ * the popover renders into a Portal so it can escape any transformed
+ * ancestors (same reason CommandPalette / ConfirmDialog portal out).
+ *
+ * Logical CSS properties everywhere — this is RTL-first and the FAB
+ * lives on the inline-end side (= right in RTL, left in LTR).
+ */
+
+.qcfab-trigger {
+  position: fixed;
+  /* Bottom-right in LTR, bottom-left in RTL — logical property flips
+     automatically when `dir` changes. Extra `bottom` so we clear the
+     mobile tab bar when it's present (56px bar + 16px gap). */
+  inset-block-end: calc(72px + env(safe-area-inset-bottom, 0px));
+  inset-inline-end: 20px;
+  z-index: 900;
+
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 0;
+
+  background: var(--color-primary, #c9a14a);
+  color: var(--color-on-primary, #1a1a1a);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.qcfab-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+.qcfab-trigger:focus-visible {
+  outline: 2px solid var(--color-focus-ring, #7aa2ff);
+  outline-offset: 2px;
+}
+
+.qcfab-trigger[aria-expanded='true'] {
+  /* Rotate the plus into an X when the popover is open — the same
+     icon doubles as a close affordance so we don't need a second
+     button in the menu header. */
+  transform: rotate(45deg);
+}
+
+/* On the wide layout the sidebar takes the inline-end side in RTL.
+   Push the FAB further in so it clears the sidebar rail. */
+@media (min-width: 900px) {
+  .qcfab-trigger {
+    inset-block-end: 28px;
+    inset-inline-end: 28px;
+  }
+}
+
+/* Popover ---------------------------------------------------------- */
+
+.qcfab-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 950;
+}
+
+.qcfab-menu {
+  position: fixed;
+  /* Anchored relative to the FAB; offset so it sits just above it. */
+  inset-block-end: calc(72px + env(safe-area-inset-bottom, 0px) + 64px);
+  inset-inline-end: 20px;
+  z-index: 951;
+
+  min-width: 220px;
+  padding: 6px;
+  border-radius: 12px;
+
+  background: var(--color-surface, #1e1e1e);
+  color: var(--color-text, #f2f2f2);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.32);
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@media (min-width: 900px) {
+  .qcfab-menu {
+    inset-block-end: calc(28px + 64px);
+    inset-inline-end: 28px;
+  }
+}
+
+.qcfab-menu-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qcfab-menu-item:hover,
+.qcfab-menu-item:focus-visible {
+  background: var(--color-surface-alt, rgba(255, 255, 255, 0.06));
+  outline: none;
+}
