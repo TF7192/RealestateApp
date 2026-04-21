@@ -14,6 +14,7 @@ import {
   Snowflake,
   Building2,
   Sparkles,
+  Printer,
 } from 'lucide-react';
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
@@ -220,6 +221,10 @@ export default function CustomerDetail() {
           >
             <Calendar size={14} />
             קבע פגישה
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title="הדפס">
+            <Printer size={14} />
+            הדפס
           </button>
         </div>
       </div>

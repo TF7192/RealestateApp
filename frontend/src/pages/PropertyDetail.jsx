@@ -31,6 +31,7 @@ import {
   Bell,
   Activity,
   Target,
+  Printer,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
@@ -619,6 +620,10 @@ export default function PropertyDetail() {
               <span>סטורי</span>
             </button>
           )}
+          <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title="הדפס">
+            <Printer size={14} />
+            <span>הדפס</span>
+          </button>
           <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={14} />
             <span>מחיקה</span>

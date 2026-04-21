@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Building2,
   UserCircle,
+  Printer,
 } from 'lucide-react';
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
@@ -159,6 +160,10 @@ export default function OwnerDetail() {
               אימייל
             </a>
           )}
+          <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title="הדפס">
+            <Printer size={14} />
+            הדפס
+          </button>
           <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={14} />
             מחק
