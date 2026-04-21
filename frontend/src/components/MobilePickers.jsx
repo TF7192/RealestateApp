@@ -170,7 +170,7 @@ export function SuggestPicker({
       </div>
       {open && (
         <Portal>
-          <div className="mpk-back" onClick={() => setOpen(false)} role="dialog">
+          <div className="mpk-back" onClick={() => setOpen(false)} role="dialog" aria-modal="true">
             <div className="mpk-sheet" onClick={(e) => e.stopPropagation()}>
               <div className="mpk-handle" />
               <header className="mpk-head">

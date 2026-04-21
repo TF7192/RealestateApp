@@ -1547,6 +1547,7 @@ export default function PropertyDetail() {
           className="pd-lightbox"
           onClick={() => setLightboxIdx(null)}
           role="dialog"
+          aria-modal="true"
           aria-label="תצוגת תמונה מלאה"
         >
           <button

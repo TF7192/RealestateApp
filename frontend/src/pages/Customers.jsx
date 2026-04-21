@@ -1776,7 +1776,7 @@ function StatusInfoSheet({ lead, onClose, onChange }) {
   ];
 
   return (
-    <div className="mpk-back mpk-overflow-back" onClick={onClose} role="dialog">
+    <div className="mpk-back mpk-overflow-back" onClick={onClose} role="dialog" aria-modal="true">
       <div className="mpk-sheet mpk-overflow sis-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="mpk-handle" />
         <header className="mpk-head">
@@ -1875,7 +1875,7 @@ function FilterSheet({
   );
 
   return (
-    <div className="mpk-back mpk-overflow-back" onClick={onClose} role="dialog">
+    <div className="mpk-back mpk-overflow-back" onClick={onClose} role="dialog" aria-modal="true">
       <div className="mpk-sheet mpk-overflow filter-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="mpk-handle" />
         <header className="mpk-head">
