@@ -15,6 +15,7 @@ import Login from './pages/Login';
 import AgentPortal from './pages/AgentPortal';
 import CustomerPropertyView from './pages/CustomerPropertyView';
 import ProspectSign from './pages/ProspectSign';
+import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
 import Transfers from './pages/Transfers';
 // S13: Templates, AdminChats, CommandPalette are heavy and not on the
@@ -171,7 +172,7 @@ function AppRoutes() {
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
           <Route path="/p/:id" element={<CustomerPropertyView />} />
           <Route path="/a/:agentId" element={<AgentPortal />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
       {/* Palette is only mounted when opened — another small win for

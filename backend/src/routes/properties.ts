@@ -8,6 +8,7 @@ import { requireUser } from '../middleware/auth.js';
 import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
 import { track as phTrack } from '../lib/analytics.js';
+import { assertAllowedMime } from '../lib/uploadGuards.js';
 
 // Canonical action keys for newly-created properties. `externalCoop` is
 // kept in existing rows but new keys use the renamed `brokerCoop`.
@@ -455,9 +456,10 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     }
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: { message: 'No file' } });
-    if (!file.mimetype.startsWith('video/')) {
-      return reply.code(400).send({ error: { message: 'רק קבצי וידאו' } });
-    }
+    // F-11.7 — whitelist (was startsWith('video/') which accepts
+    // obscure types; restrict to mp4 + quicktime).
+    try { assertAllowedMime(file, 'video'); }
+    catch { return reply.code(415).send({ error: { message: 'פורמט וידאו לא נתמך (mp4 / mov בלבד)' } }); }
     const ext = path.extname(file.filename) || '.mp4';
     const name = `${crypto.randomUUID()}${ext}`;
     const key = `videos/${id}/${name}`;
@@ -536,9 +538,8 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     }
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: { message: 'No file' } });
-    if (file.mimetype !== 'application/pdf') {
-      return reply.code(400).send({ error: { message: 'רק קבצי PDF' } });
-    }
+    try { assertAllowedMime(file, 'pdf'); }
+    catch { return reply.code(415).send({ error: { message: 'רק קבצי PDF' } }); }
     const key = `agreements/${id}/${crypto.randomUUID()}.pdf`;
     const url = await putUpload(key, await file.toBuffer(), file.mimetype);
     const updated = await prisma.property.update({
@@ -577,9 +578,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     }
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: { message: 'No file' } });
-    if (!file.mimetype.startsWith('image/')) {
-      return reply.code(400).send({ error: { message: 'Only image files are accepted' } });
-    }
+    // F-11.7 — whitelist (was startsWith('image/') which accepts
+    // SVG; SVG served from the same origin can execute script in the
+    // app's auth context). jpg/png/webp/heic only.
+    try { assertAllowedMime(file, 'image'); }
+    catch { return reply.code(415).send({ error: { message: 'פורמט תמונה לא נתמך (jpg / png / webp / heic בלבד)' } }); }
 
     let buffer = await file.toBuffer();
     let mimetype = file.mimetype;

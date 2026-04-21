@@ -174,14 +174,20 @@ if (typeof window !== 'undefined') {
   }, { passive: false });
 }
 
+// F-2.1 — lazy import so the boundary itself doesn't regress first-paint.
+// It's tiny (<1 kB) but we keep the main-chunk policy consistent.
+import RootErrorBoundary from './components/RootErrorBoundary';
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ThemeProvider>
-      <ToastProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ToastProvider>
-    </ThemeProvider>
+    <RootErrorBoundary>
+      <ThemeProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </ToastProvider>
+      </ThemeProvider>
+    </RootErrorBoundary>
   </StrictMode>,
 );

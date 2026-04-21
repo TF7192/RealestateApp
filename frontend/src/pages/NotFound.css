@@ -1,0 +1,61 @@
+.nf-page {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.nf-card {
+  max-width: 480px;
+  padding: 32px 28px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nf-code {
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.nf-card h1 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  margin: 4px 0 0;
+  letter-spacing: -0.1px;
+}
+
+.nf-card p {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+  margin: 0 0 12px;
+}
+
+.nf-card code {
+  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  direction: ltr;
+  display: inline-block;
+}
+
+.nf-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 4px;
+}

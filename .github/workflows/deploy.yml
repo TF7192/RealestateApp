@@ -21,6 +21,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── F-19.2 Pre-deploy gate — typecheck + build must pass locally
+      # before we ever rsync to EC2. Catches broken TypeScript, missing
+      # imports, syntax errors that would otherwise only surface during
+      # the in-container docker build (slow) or post-healthcheck (loud).
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Backend install + typecheck
+        working-directory: ./backend
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma generate
+          npx tsc --noEmit
+      - name: Frontend install + build
+        working-directory: ./frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh

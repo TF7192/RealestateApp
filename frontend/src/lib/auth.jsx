@@ -21,6 +21,26 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // F-2.2 — every 401 raised by the api wrapper dispatches
+  // "estia:unauthorized"; we listen once at the root and bounce the
+  // user to /login with a ?from=… so they return after re-auth.
+  useEffect(() => {
+    const handler = (e) => {
+      setUser(null);
+      clearPageCache();
+      try {
+        const from = e?.detail?.pathname || '/';
+        if (!from.startsWith('/login')) {
+          const url = `/login?from=${encodeURIComponent(from)}`;
+          window.history.replaceState({}, '', url);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('estia:unauthorized', handler);
+    return () => window.removeEventListener('estia:unauthorized', handler);
+  }, []);
+
   const signup = async (data) => {
     const res = await api.signup(data);
     setUser(res.user);

@@ -43,6 +43,23 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || './uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
+// ── Fail-fast on missing secrets in production (audit F-11.1) ────
+// If we ever deploy without JWT_SECRET set, every token in the world
+// is signed with a publicly-knowable string and any attacker can
+// forge sessions. Blow up loudly instead of silently shipping.
+if (NODE_ENV === 'production') {
+  const missing: string[] = [];
+  if (!process.env.JWT_SECRET)    missing.push('JWT_SECRET');
+  if (!process.env.COOKIE_SECRET) missing.push('COOKIE_SECRET');
+  if (missing.length) {
+    // eslint-disable-next-line no-console
+    console.error(`[startup] missing required env vars: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
+const JWT_SECRET    = process.env.JWT_SECRET    || 'dev-only-change-me';
+const COOKIE_SECRET = process.env.COOKIE_SECRET || 'dev-only-cookie-secret';
+
 async function build() {
   const app = Fastify({
     logger:
@@ -72,9 +89,11 @@ async function build() {
     },
     credentials: true,
   });
-  await app.register(cookie);
+  // F-11.3 — signed cookies so tampering requires the COOKIE_SECRET too.
+  // Split from JWT_SECRET so one leak doesn't compromise the other.
+  await app.register(cookie, { secret: COOKIE_SECRET });
   await app.register(jwt, {
-    secret: process.env.JWT_SECRET || 'dev-only-change-me',
+    secret: JWT_SECRET,
     cookie: { cookieName: 'estia_token', signed: false },
   });
   await app.register(rateLimit, {
@@ -93,7 +112,8 @@ async function build() {
       if (!key) return reply.code(404).send({ error: { message: 'Not found' } });
       try {
         const r = await resolveUpload(key);
-        if (r.kind === 'redirect') return reply.redirect(302, r.url);
+        // Fastify 5: reply.redirect(url, code) — arg order flipped.
+        if (r.kind === 'redirect') return reply.redirect(r.url, 302);
         return reply.sendFile(key);
       } catch (e: any) {
         return reply.code(404).send({ error: { message: 'Not found' } });
@@ -110,11 +130,24 @@ async function build() {
   await app.register(fastifyWebsocket);
   await app.register(authPlugin);
 
+  // F-12.2 — Liveness probe (is the process up?) vs readiness probe
+  // (can it actually serve?). The readiness probe actually touches the
+  // DB so rolling deploys wait until Prisma is reachable before flipping
+  // traffic over; the liveness probe stays trivially cheap.
   app.get('/api/health', async () => ({
     ok: true,
     service: 'estia-backend',
     time: new Date().toISOString(),
   }));
+  app.get('/api/health/ready', async (_req, reply) => {
+    try {
+      const { prisma } = await import('./lib/prisma.js');
+      await prisma.$queryRaw`SELECT 1`;
+      return { ok: true, service: 'estia-backend', time: new Date().toISOString() };
+    } catch (e: any) {
+      return reply.code(503).send({ ok: false, error: e?.message || 'db_unreachable' });
+    }
+  });
 
   await app.register(registerAuthRoutes, { prefix: '/api/auth' });
   await app.register(registerGoogleOAuthRoutes, { prefix: '/api/auth' });
@@ -180,9 +213,9 @@ async function build() {
     });
   });
 
-  app.setErrorHandler((err, req, reply) => {
+  app.setErrorHandler((err: any, req, reply) => {
     req.log.error({ err }, 'request failed');
-    const status = (err as any).statusCode || 500;
+    const status = err?.statusCode || 500;
     // Unhandled backend exceptions → PostHog
     if (status >= 500) {
       const u = getUser(req);
@@ -195,8 +228,8 @@ async function build() {
     }
     reply.code(status).send({
       error: {
-        message: status >= 500 ? 'Internal server error' : err.message,
-        code: (err as any).code,
+        message: status >= 500 ? 'Internal server error' : (err?.message || 'Error'),
+        code: err?.code,
       },
     });
   });

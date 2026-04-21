@@ -41,8 +41,15 @@ const googleMockSchema = z.object({
   displayName: z.string().optional(),
 });
 
+// F-11.4 — auth routes get much tighter rate limits than the global
+// 300/min. Slow the brute-force window on login and cap spam-signup
+// per IP. `@fastify/rate-limit` supports per-route config via
+// { config: { rateLimit: … } } on each app.post().
+const LOGIN_LIMIT  = { max: 10, timeWindow: '15 minutes' };
+const SIGNUP_LIMIT = { max: 3,  timeWindow: '1 hour' };
+
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
-  app.post('/signup', async (req, reply) => {
+  app.post('/signup', { config: { rateLimit: SIGNUP_LIMIT } }, async (req, reply) => {
     const body = signupSchema.parse(req.body);
     const existing = await prisma.user.findUnique({ where: { email: body.email } });
     if (existing) {
@@ -78,7 +85,7 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.post('/login', async (req, reply) => {
+  app.post('/login', { config: { rateLimit: LOGIN_LIMIT } }, async (req, reply) => {
     const body = loginSchema.parse(req.body);
     const user = await prisma.user.findUnique({ where: { email: body.email } });
     if (!user || !user.passwordHash) {

@@ -22,11 +22,57 @@ function posthogDistinctId() {
   return id && id.length <= 200 ? id : null;
 }
 
-async function request(path, { method = 'GET', body, headers = {}, raw, keepalive } = {}) {
+// Audit F-2.3 — every fetch gets an AbortController timeout. 20s for
+// reads, 60s for writes (uploads live on their own pathway and use a
+// bigger budget). Transient 502/503/504/network-error failures on GETs
+// retry with exponential backoff (200ms / 400ms / 800ms, 3 attempts
+// total). Non-idempotent methods never retry — a flaky POST might
+// have already hit the server.
+const DEFAULT_TIMEOUT_GET_MS = 20_000;
+const DEFAULT_TIMEOUT_WRITE_MS = 60_000;
+
+// F-2.4 — user-facing copy never leaks "HTTP 500" / "Failed to fetch".
+// Hebrew short phrases the UI can raise verbatim.
+function hebrewFallbackMessage(status) {
+  if (status === 0 || status == null) return 'אין חיבור לאינטרנט — נסה שוב בעוד רגע';
+  if (status === 401) return 'פג תוקף החיבור — נא להתחבר מחדש';
+  if (status === 403) return 'אין לך הרשאה לפעולה הזו';
+  if (status === 404) return 'הרשומה לא נמצאה';
+  if (status === 409) return 'הפעולה מתנגשת עם רשומה קיימת';
+  if (status === 413) return 'הקובץ גדול מדי';
+  if (status === 429) return 'יותר מדי בקשות — נסה/י בעוד רגע';
+  if (status >= 500) return 'תקלה בשרת — נסה/י שוב';
+  return 'משהו השתבש — נסה/י שוב';
+}
+
+// F-2.2 — single source of truth for the "session expired" bounce. When
+// the server returns 401 on what the client thought was an authed call,
+// we clear local auth caches and route the user to /login, preserving
+// where they were so they land back after re-auth. Broadcast via event
+// so useAuth can react without a circular import.
+let _onUnauthHookInstalled = false;
+function broadcastUnauthorized() {
+  try {
+    window.dispatchEvent(new CustomEvent('estia:unauthorized', {
+      detail: { pathname: window.location.pathname + window.location.search },
+    }));
+  } catch { /* non-browser env */ }
+}
+
+async function request(path, {
+  method = 'GET', body, headers = {}, raw, keepalive,
+  timeoutMs, retries,
+} = {}) {
   const phId = posthogDistinctId();
+  const isWrite = method !== 'GET' && method !== 'HEAD';
+  const controller = new AbortController();
+  const timeout = timeoutMs ?? (isWrite ? DEFAULT_TIMEOUT_WRITE_MS : DEFAULT_TIMEOUT_GET_MS);
+  const timer = setTimeout(() => controller.abort(), timeout);
+
   const init = {
     method,
     credentials: 'include',
+    signal: controller.signal,
     headers: {
       'Accept': 'application/json',
       'X-Estia-Platform': platformHeader(),
@@ -43,17 +89,71 @@ async function request(path, { method = 'GET', body, headers = {}, raw, keepaliv
       init.body = JSON.stringify(body);
     }
   }
-  const res = await fetch(`${BASE}${path}`, init);
-  if (raw) return res;
-  const text = await res.text();
-  const data = text ? safeParse(text) : null;
-  if (!res.ok) {
-    const err = new Error(data?.error?.message || `HTTP ${res.status}`);
-    err.status = res.status;
-    err.data = data;
-    throw err;
+
+  // Retry only on idempotent methods + transient failures. Body is
+  // already serialized, so re-sending is safe; AbortController is
+  // single-use — recreate per attempt.
+  const maxAttempts = retries ?? (isWrite ? 1 : 3);
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const attemptInit = attempt === 1 ? init : { ...init, signal: newSignal(timeout) };
+      const res = await fetch(`${BASE}${path}`, attemptInit);
+      clearTimeout(timer);
+      if (raw) return res;
+      const text = await res.text();
+      const data = text ? safeParse(text) : null;
+      if (!res.ok) {
+        const err = new Error(data?.error?.message || hebrewFallbackMessage(res.status));
+        err.status = res.status;
+        err.data = data;
+        // 401 triggers global sign-out, but only if the client actually
+        // thought it was authenticated. Don't bounce on /auth/login's
+        // own 401 (wrong-password) — that's handled in the form UI.
+        if (res.status === 401 && !path.startsWith('/auth/')) {
+          broadcastUnauthorized();
+        }
+        // Retry-able server-side hiccups on GETs.
+        if (!isWrite && [502, 503, 504].includes(res.status) && attempt < maxAttempts) {
+          await sleep(200 * 2 ** (attempt - 1));
+          continue;
+        }
+        throw err;
+      }
+      return data;
+    } catch (e) {
+      clearTimeout(timer);
+      // Network failure or timeout. Retry on GET, surface on write.
+      lastErr = e;
+      const isAbort = e?.name === 'AbortError';
+      const isNetwork = isAbort || e?.message === 'Failed to fetch' || /network/i.test(e?.message || '');
+      if (isNetwork && !isWrite && attempt < maxAttempts) {
+        await sleep(200 * 2 ** (attempt - 1));
+        continue;
+      }
+      if (isAbort) {
+        const err = new Error('הבקשה חרגה מזמן המענה — נסה/י שוב');
+        err.status = 0;
+        err.timeout = true;
+        throw err;
+      }
+      if (isNetwork && !e.status) {
+        const err = new Error('אין חיבור לשרת — בדוק חיבור אינטרנט');
+        err.status = 0;
+        err.network = true;
+        throw err;
+      }
+      throw e;
+    }
   }
-  return data;
+  throw lastErr || new Error('שגיאה לא ידועה');
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function newSignal(timeoutMs) {
+  const c = new AbortController();
+  setTimeout(() => c.abort(), timeoutMs);
+  return c.signal;
 }
 
 function safeParse(text) {

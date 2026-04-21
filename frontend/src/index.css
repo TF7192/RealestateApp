@@ -46,7 +46,9 @@
 
   --text-primary: #1e1a14;
   --text-secondary: #54503e;
-  --text-muted: #8b8574;
+  /* F-9.5 — darkened from #8b8574 (4.05:1) to #6b6356 (~6:1) so
+     caption / helper / date text meets WCAG AA body contrast. */
+  --text-muted: #6b6356;
   --text-accent: var(--gold);
 
   --border: rgba(30, 26, 20, 0.08);

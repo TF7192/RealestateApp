@@ -270,6 +270,28 @@ export function useOnlineStatus() {
   return online;
 }
 
+// F-2.8 — refetch on tab refocus. Fires `cb()` when the tab becomes
+// visible again AND it's been more than `staleAfterMs` since the last
+// successful fetch. Most list pages load on mount; this gets them
+// off the "stale from last night" state without polling.
+//
+// Usage:
+//   const markFetched = useRefreshOnRefocus(() => load(), { staleAfterMs: 5 * 60_000 });
+//   // inside load() on success: markFetched();
+export function useRefreshOnRefocus(cb, { staleAfterMs = 5 * 60_000 } = {}) {
+  const lastFetchRef = useRef(Date.now());
+  useEffect(() => {
+    const handler = () => {
+      if (document.hidden) return;
+      if (Date.now() - lastFetchRef.current < staleAfterMs) return;
+      try { cb(); } catch { /* ignore */ }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [cb, staleAfterMs]);
+  return () => { lastFetchRef.current = Date.now(); };
+}
+
 // ────────────────────────────────────────────────────────────────
 // useClipboardPhone — return a suggested Israeli phone found in clipboard,
 // available only after a user gesture (tap) per browser perms. Call

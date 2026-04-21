@@ -1,0 +1,69 @@
+.reb-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-primary, #f7f3ec);
+  color: var(--text-primary, #1e1a14);
+  font-family: var(--font-body, 'Heebo', system-ui);
+}
+
+.reb-card {
+  max-width: 460px;
+  width: 100%;
+  padding: 32px 28px 24px;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border, rgba(30,26,20,0.08));
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(30,26,20,0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.reb-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--danger-bg, #fdecea);
+  color: var(--danger, #b83f2a);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.reb-card h1 {
+  font-family: var(--font-display, 'Frank Ruhl Libre', serif);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  margin: 0;
+}
+
+.reb-card p {
+  color: var(--text-muted, #6b6356);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 8px;
+}
+
+.reb-actions {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.reb-retry {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #6b6356);
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+}
