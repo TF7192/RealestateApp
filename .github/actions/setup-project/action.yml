@@ -82,6 +82,28 @@ runs:
       working-directory: frontend
       run: npm ci --no-audit --no-fund --no-workspaces
 
+    # Remove duplicate React copies created by the standalone frontend
+    # install. The vitest `frontend` project aliases `react*` → the
+    # root-hoisted copy. If frontend/node_modules/react also exists,
+    # any non-aliased resolution (relative imports, transitively-loaded
+    # modules from inside frontend/node_modules that import React
+    # without going through Vite aliases) ends up using the frontend-
+    # local copy — producing the "Cannot read properties of null
+    # (reading 'useContext' | 'useRef')" dual-React symptom.
+    #
+    # vite build still works after this removal because Node module
+    # resolution walks up to node_modules/react at the repo root.
+    - name: De-duplicate React (keep root copy only)
+      if: inputs.install-frontend == 'true'
+      shell: bash
+      working-directory: frontend
+      run: |
+        rm -rf node_modules/react \
+               node_modules/react-dom \
+               node_modules/react-is \
+               node_modules/scheduler
+        echo "removed duplicate React from frontend/node_modules"
+
     - name: Sanity-check workspace installs
       if: inputs.install-backend == 'true' || inputs.install-frontend == 'true'
       shell: bash
@@ -97,6 +119,11 @@ runs:
           # react must be at root (vitest `frontend` project aliases it there)
           if [ ! -d node_modules/react ]; then
             echo "::error::node_modules/react missing — vitest frontend aliases will not resolve"
+            fail=1
+          fi
+          # Duplicate React must be removed from frontend/node_modules
+          if [ -d frontend/node_modules/react ]; then
+            echo "::error::frontend/node_modules/react still present — will cause dual-React"
             fail=1
           fi
           # lightningcss platform binary needs to be under frontend/ (vite build hits it)
