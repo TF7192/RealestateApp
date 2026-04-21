@@ -41,6 +41,7 @@ const ActivityLog = lazy(() => import('./pages/ActivityLog'));
 const Reminders = lazy(() => import('./pages/Reminders'));
 const Office = lazy(() => import('./pages/Office'));
 const TagSettings = lazy(() => import('./pages/TagSettings'));
+const Settings = lazy(() => import('./pages/Settings'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import { AuthProvider, useAuth } from './lib/auth';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
@@ -191,6 +192,7 @@ function AppRoutes() {
             <Route path="/activity" element={<ActivityLog />} />
             <Route path="/reminders" element={<Reminders />} />
             <Route path="/office" element={<Office />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/settings/tags" element={<TagSettings />} />
             {/* Legacy + alias routes — redirect.
                 `/assets` is a reasonable English guess for "נכסים"

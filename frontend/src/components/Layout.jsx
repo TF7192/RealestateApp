@@ -36,6 +36,7 @@ import { useTheme } from '../lib/theme';
 import api from '../lib/api';
 import MobileTabBar from './MobileTabBar';
 import MobileMoreSheet from './MobileMoreSheet';
+import QuickCreateFab from './QuickCreateFab';
 
 // Mirrors backend ADMIN_EMAILS default — anyone in this list sees the
 // admin chat link in the sidebar and the admin page loads for them.
@@ -529,6 +530,10 @@ export default function Layout({ onLogout }) {
       <main className="main-content">
         <Outlet />
       </main>
+
+      {/* H2 — global floating quick-create FAB. Mounts for every authed
+          route; hides itself on pages that already own a sticky CTA. */}
+      <QuickCreateFab />
 
       {/* Mobile chrome */}
       <MobileTabBar />
