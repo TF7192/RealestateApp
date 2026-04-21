@@ -24,12 +24,14 @@ import {
   Megaphone,
   Sparkles,
   Pencil,
+  UserPlus,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatFloor, formatFloorOutOf } from '../lib/formatFloor';
 import { useAuth } from '../lib/auth';
 import MarketingActionDialog from '../components/MarketingActionDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ProspectDialog from '../components/ProspectDialog';
 import PropertyPhotoManager from '../components/PropertyPhotoManager';
 import PropertyVideoManager from '../components/PropertyVideoManager';
 import OwnerPicker from '../components/OwnerPicker';
@@ -192,6 +194,8 @@ export default function PropertyDetail() {
   const [dragOver, setDragOver] = useState(false);
   // Active sliding panel: 'marketing' | 'owner' | 'photos' | 'exclusivity' | 'notes' | 'map' | null
   const [panel, setPanel] = useState(null);
+  // 1.5 — Prospect intake dialog open-state
+  const [prospectOpen, setProspectOpen] = useState(false);
   // OwnerPicker for swapping the linked Owner without leaving the page.
   const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
   const [ownerSaving, setOwnerSaving] = useState(false);
@@ -319,8 +323,10 @@ export default function PropertyDetail() {
     const matches = (leads || []).filter((l) => leadMatchesProperty(l, property));
     if (matches.length === 1) {
       const lead = matches[0];
-      const text = buildMessage();
-      window.open(waUrl(lead.phone, text), '_blank', 'noopener,noreferrer');
+      // 2.1 — route through openWhatsApp so the named-target reuse
+      // logic kicks in (WA-web tab is reused instead of spawning a
+      // fresh one each click).
+      openWhatsApp({ phone: lead.phone, text: buildMessage() });
       return;
     }
     if (matches.length >= 2 && matches.length <= 5) {
@@ -484,15 +490,37 @@ export default function PropertyDetail() {
   })();
   const hasExclusivity = !!(property.exclusiveStart || property.exclusiveEnd);
 
-  // ── Days on market ──
+  // ── Days on market (1.3) ──
+  // Prefer the explicit marketingStartDate the agent set (or the backend
+  // defaulted on create); fall back to createdAt for legacy rows with
+  // no start date. If the property is sold/off-market we freeze the
+  // count at (soldDate - startDate) so it stops counting up.
   const daysListed = (() => {
-    const ts = property.createdAt ? new Date(property.createdAt).getTime() : null;
-    if (!ts || !Number.isFinite(ts)) return null;
-    return Math.max(0, Math.floor((Date.now() - ts) / 86400000));
+    const startMs = (() => {
+      const startStr = property.marketingStartDate || property.createdAt;
+      const ts = startStr ? new Date(startStr).getTime() : null;
+      return (ts && Number.isFinite(ts)) ? ts : null;
+    })();
+    if (!startMs) return null;
+    // Freeze for sold / off-market properties — cap at the closing date.
+    const frozenMs = (() => {
+      if (property.status !== 'SOLD' && property.status !== 'OFF_MARKET') return null;
+      const d = property.closingDate || property.updatedAt;
+      const ts = d ? new Date(d).getTime() : null;
+      return (ts && Number.isFinite(ts)) ? ts : null;
+    })();
+    const endMs = frozenMs ?? Date.now();
+    return Math.max(0, Math.floor((endMs - startMs) / 86400000));
   })();
 
-  // ── KPI data ──
-  const visitsCount = Number(property._count?.visits ?? property.visitsCount ?? 0);
+  // ── KPI data (1.4) ──
+  // "Visits" here means real page-views of the public property URL
+  // (PropertyViewing rows) + prospects who filled the intake form;
+  // "Inquiries" means inbound contact attempts (PropertyInquiry rows).
+  // Both are exposed via backend's _count.
+  const visitsCount    = Number(property._count?.viewings ?? property._count?.visits ?? property.visitsCount ?? 0);
+  const prospectsCount = Number(property._count?.prospects ?? 0);
+  const pageViews      = visitsCount + prospectsCount;
   const inquiriesCount = Number(property._count?.inquiries ?? property.inquiriesCount ?? 0);
 
   // ── Notes summary chips: build a compact list of features ──
@@ -504,7 +532,18 @@ export default function PropertyDetail() {
   if (property.safeRoom) featureChips.push('ממ״ד');
   if (property.storage) featureChips.push('מחסן');
   if (property.ac) featureChips.push('מזגן');
-  if (property.balconySize > 0) featureChips.push(`מרפסת ${property.balconySize} מ״ר`);
+  if (property.balconySize > 0) {
+    // 1.1 — balconyType sub-option when present ("שמש" / "מקורה")
+    const typeLabel = property.balconyType === 'SUNNY' ? ' · שמש'
+      : property.balconyType === 'COVERED' ? ' · מקורה' : '';
+    featureChips.push(`מרפסת ${property.balconySize} מ״ר${typeLabel}`);
+  }
+  if (property.assetClass === 'COMMERCIAL' && property.commercialZone) {
+    featureChips.push(`איזור: ${property.commercialZone}`);
+  }
+  if (property.assetClass === 'COMMERCIAL' && property.workstations) {
+    featureChips.push(`${property.workstations} עמדות ישיבה`);
+  }
 
   return (
     <div className="property-detail pd-dashboard">
@@ -549,6 +588,12 @@ export default function PropertyDetail() {
               <span>סטורי</span>
             </button>
           )}
+          {/* 1.5 — Add Interested Party (prospect intake). Opens a
+              dialog with in-person signature pad + digital link share. */}
+          <button className="btn btn-secondary btn-sm" onClick={() => setProspectOpen(true)}>
+            <UserPlus size={14} />
+            <span>הוסף מתעניין</span>
+          </button>
           <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={14} />
             <span>מחיקה</span>
@@ -589,13 +634,15 @@ export default function PropertyDetail() {
           onClick={() => setPanel('marketing')}
         />
         <PropertyKpiTile
-          value={visitsCount}
-          label="ביקורים"
-          tone={visitsCount > 0 ? 'gold' : 'neutral'}
+          value={pageViews}
+          label="צפיות בעמוד"
+          sublabel="כניסות לעמוד הנכס"
+          tone={pageViews > 0 ? 'gold' : 'neutral'}
         />
         <PropertyKpiTile
           value={inquiriesCount}
           label="פניות"
+          sublabel="קשרו עם הנכס"
           tone={inquiriesCount > 0 ? 'gold' : 'neutral'}
         />
         <PropertyKpiTile
@@ -1116,6 +1163,14 @@ export default function PropertyDetail() {
           onConfirm={handleDelete}
           onClose={() => setConfirmDelete(false)}
           busy={deleting}
+        />
+      )}
+
+      {prospectOpen && (
+        <ProspectDialog
+          property={property}
+          onClose={() => setProspectOpen(false)}
+          onCreated={() => { load(); }}
         />
       )}
 

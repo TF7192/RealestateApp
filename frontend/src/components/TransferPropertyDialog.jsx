@@ -267,7 +267,7 @@ function buildPropertyBrief(p) {
   if (p.assetClass === 'RESIDENTIAL' && p.safeRoom) features.push('ממ״ד');
   if (features.length) lines.push(`✅ ${features.join(' · ')}`);
   if (p.renovated) lines.push(`🛠️ מצב: ${p.renovated}`);
-  if (p.vacancyDate) lines.push(`📅 פינוי: ${p.vacancyDate}`);
+  if (p.vacancyDate) lines.push(`📅 כניסה: ${p.vacancyDate}`);
   if (p.airDirections) lines.push(`🧭 כיוונים: ${p.airDirections}`);
   if (p.assetClass === 'COMMERCIAL' && p.sqmArnona) lines.push(`📄 מ״ר ארנונה: ${p.sqmArnona}`);
   if (p.notes) {

@@ -180,7 +180,7 @@ export default function MobilePropertyDetail() {
           {prop.balconySize > 0 && (
             <Spec icon={<Maximize size={16} />} label="מרפסת" value={`${prop.balconySize} מ״ר`} />
           )}
-          <Spec icon={<Calendar size={16} />} label="פינוי" value={prop.vacancyDate} />
+          <Spec icon={<Calendar size={16} />} label="כניסה" value={prop.vacancyDate} />
         </div>
 
         {prop.notes && (

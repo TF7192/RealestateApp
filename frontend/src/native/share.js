@@ -68,8 +68,17 @@ export async function openWhatsApp({ phone, text } = {}) {
       try { await Browser.open({ url: webUrl }); return true; } catch { return false; }
     }
   }
+  // Task 2.1 — open into a NAMED target so subsequent handoffs reuse the
+  // existing WhatsApp Web tab instead of spawning a fresh one each
+  // click. Drop `noopener` (was cargo-culted in earlier) — wa.me
+  // doesn't touch window.opener, and keeping the opener lets the
+  // browser focus the tab faster.
   try {
-    window.open(webUrl, '_blank', 'noopener,noreferrer');
+    const win = window.open(webUrl, 'estia-whatsapp', 'noreferrer');
+    // Some browsers return null when blocked (popup blocker) — fall
+    // back to a hard navigation rather than silently failing.
+    if (!win) window.location.href = webUrl;
+    else win.focus?.();
     return true;
   } catch { return false; }
 }

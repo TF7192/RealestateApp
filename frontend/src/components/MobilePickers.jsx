@@ -62,10 +62,22 @@ const CHIP_LABELS = {
   '+12m': '+שנה',
 };
 
-function chipToDate(chip) {
-  const d = new Date();
+// 1.6 Exclusivity calculator — the relative chips (+3m, +6m, +12m) are
+// computed from a baseDate, not from "today". For the exclusivity END
+// input we pass baseDate = exclusiveStart so "+6 חודשים" actually means
+// "6 months from the start", which is how Israeli brokerage agreements
+// are written. Defaults to today when no baseDate is given so the
+// existing callers (vacancyDate, signedAt, etc.) behave unchanged.
+function chipToDate(chip, baseIso) {
+  const base = (() => {
+    if (typeof baseIso === 'string' && /^\d{4}-\d{2}-\d{2}/.test(baseIso)) {
+      return new Date(`${baseIso.slice(0, 10)}T12:00:00`);
+    }
+    return new Date();
+  })();
+  const d = new Date(base.getTime());
   switch (chip) {
-    case 'today': break;
+    case 'today': return new Date().toISOString().slice(0, 10);
     case '-1d':   d.setDate(d.getDate() - 1); break;
     case '-7d':   d.setDate(d.getDate() - 7); break;
     case '+3m':   d.setMonth(d.getMonth() + 3); break;
@@ -73,19 +85,21 @@ function chipToDate(chip) {
     case '+12m':  d.setFullYear(d.getFullYear() + 1); break;
     default: break;
   }
+  // Noon anchor avoids DST edge cases that could push the ISO date by
+  // one day across certain boundaries (Israel observes DST).
   return d.toISOString().slice(0, 10);
 }
 
-export function DateQuickChips({ value, onChange, chips = ['today', '+6m'] }) {
+export function DateQuickChips({ value, onChange, chips = ['today', '+6m'], baseDate }) {
   // Mark the chip that matches today's value so the agent can see what
   // they've picked at a glance. Comparing ISO yyyy-mm-dd strings is safe.
-  const set = (chip) => onChange?.(chipToDate(chip));
+  const set = (chip) => onChange?.(chipToDate(chip, baseDate));
   return (
     <div className="mpk-datechips">
       {chips.map((chip) => {
         const label = CHIP_LABELS[chip];
         if (!label) return null;
-        const isSel = value && value === chipToDate(chip);
+        const isSel = value && value === chipToDate(chip, baseDate);
         return (
           <button
             key={chip}

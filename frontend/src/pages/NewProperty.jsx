@@ -29,13 +29,30 @@ import {
   inputPropsForAddress,
   inputPropsForCity,
 } from '../lib/inputProps';
-import { NumberField, PhoneField, SelectField } from '../components/SmartFields';
+import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
 import PageTour from '../components/PageTour';
 import { getPositionDetailed } from '../native/geolocation';
 import './Forms.css';
 import './NewProperty.css';
 
 const DRAFT_KEY = 'estia-draft:new-property';
+
+// 1.6 — Human-readable duration for the exclusivity window. Israeli
+// brokerage law caps residential exclusivity at 6 months by default,
+// so we flag anything longer as "לב לב לא חוקי" (informational only).
+function computeExclusivityDays(startIso, endIso) {
+  try {
+    const s = new Date(`${String(startIso).slice(0, 10)}T12:00:00`).getTime();
+    const e = new Date(`${String(endIso).slice(0, 10)}T12:00:00`).getTime();
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e < s) return 'תאריך סיום מוקדם מתאריך ההתחלה';
+    const days = Math.round((e - s) / 86400000);
+    if (days === 0) return 'יום אחד בלבד';
+    const months = Math.round((days / 30.44) * 10) / 10;
+    const monthLabel = months >= 1 ? `כ-${months} חודשים` : `${days} ימים`;
+    const warn = days > 180 ? '  · מעל 6 חודשים — לוודא שההסכם מאפשר זאת' : '';
+    return `תקופה: ${days} ימים (${monthLabel})${warn}`;
+  } catch { return ''; }
+}
 
 const INITIAL_FORM = {
   // Step 1 essentials
@@ -64,9 +81,11 @@ const INITIAL_FORM = {
   floor: null,
   totalFloors: null,
   balconySize: null,
+  balconyType: null,       // 1.1 — "SUNNY" | "COVERED" | null
   buildingAge: null,
   renovated: '',
   buildState: '',
+  commercialZone: '',      // 3.2 — commercial-only zone tag
   vacancyDate: '',
   vacancyFlexible: false,
   sector: 'כללי',
@@ -210,9 +229,11 @@ export default function NewProperty() {
           floor: p.floor ?? null,
           totalFloors: p.totalFloors ?? null,
           balconySize: p.balconySize ?? null,
+          balconyType: p.balconyType || null,
           buildingAge: p.buildingAge ?? null,
           renovated: p.renovated || '',
           buildState: p.buildState || '',
+          commercialZone: p.commercialZone || '',
           vacancyDate: dateOnly(p.vacancyDate),
           vacancyFlexible: !!p.vacancyFlexible,
           sector: p.sector || 'כללי',
@@ -403,9 +424,11 @@ export default function NewProperty() {
     floor: numOrNull(form.floor),
     totalFloors: numOrNull(form.totalFloors),
     balconySize: Number(form.balconySize) || 0,
+    balconyType: form.balconyType || null,
     buildingAge: numOrNull(form.buildingAge),
     renovated: form.renovated || null,
     buildState: form.buildState || null,
+    commercialZone: form.commercialZone || null,
     vacancyDate: form.vacancyDate || null,
     vacancyFlexible: !!form.vacancyFlexible,
     sector: form.sector || null,
@@ -960,6 +983,22 @@ export default function NewProperty() {
                     value={form.balconySize}
                     onChange={(v) => update('balconySize', v)}
                   />
+                  {/* 1.1 — Balcony type sub-option: only appears once a
+                      balcony size is entered. Stored server-side as
+                      balconyType: "SUNNY" | "COVERED". */}
+                  {form.balconySize > 0 && (
+                    <div style={{ marginTop: 6 }}>
+                      <Segmented
+                        value={form.balconyType || ''}
+                        onChange={(v) => update('balconyType', v || null)}
+                        ariaLabel="סוג מרפסת"
+                        options={[
+                          { value: 'SUNNY',   label: 'שמש' },
+                          { value: 'COVERED', label: 'מקורה' },
+                        ]}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
               <div className="form-group">
@@ -982,7 +1021,9 @@ export default function NewProperty() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">פינוי</label>
+                {/* 4.1 — "פינוי" → "כניסה" throughout the UI. DB column
+                    name (vacancyDate) stays for backwards-compat. */}
+                <label className="form-label">כניסה</label>
                 <input
                   type="date"
                   className="form-input"
@@ -1032,16 +1073,27 @@ export default function NewProperty() {
                 </div>
                 <div className="form-row form-row-3">
                   <div className="form-group">
-                    <label className="form-label">מ״ר ארנונה</label>
+                    <label className="form-label">שטח ארנונה (מ״ר)</label>
                     <NumberField unit="מ״ר" placeholder="115" value={form.sqmArnona} onChange={(v) => update('sqmArnona', v)} />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">מ״ר טאבו</label>
-                    <NumberField unit="מ״ר" placeholder="120" value={form.sqmTabu} onChange={(v) => update('sqmTabu', v)} />
-                  </div>
+                  {/* 3.3 — טאבו was removed from commercial per brief; the
+                      legacy sqmTabu column stays in the DB so existing rows
+                      don't lose data, but the field no longer renders here. */}
                   <div className="form-group">
                     <label className="form-label">מספר עמדות ישיבה</label>
                     <NumberField placeholder="12" value={form.workstations} onChange={(v) => update('workstations', v)} />
+                  </div>
+                  {/* 3.2 — Commercial zone tag. Free-form so product can
+                      add values without a migration. Default preset list
+                      includes the "איזור תעשיה" tag from the brief. */}
+                  <div className="form-group">
+                    <label className="form-label">איזור</label>
+                    <SelectField
+                      value={form.commercialZone}
+                      onChange={(v) => update('commercialZone', v)}
+                      placeholder="בחר…"
+                      options={['איזור תעשיה', 'מרכז עיר', 'פארק היי-טק', 'אזור מסחר', 'רחוב ראשי', 'מבנה משרדים']}
+                    />
                   </div>
                 </div>
               </>
@@ -1134,11 +1186,19 @@ export default function NewProperty() {
             </div>
             <div className="form-row form-row-2">
               <div className="form-group">
-                <label className="form-label">ארנונה חודשית</label>
+                {/* 1.2 — previous label was just "ארנונה", which collided
+                    visually with "מ״ר ארנונה" above. "ארנונה חודשית (₪)"
+                    is unambiguous. */}
+                <label className="form-label">ארנונה חודשית (₪)</label>
                 <NumberField unit="₪" placeholder="450" value={form.arnonaAmount} onChange={(v) => update('arnonaAmount', v)} />
               </div>
               <div className="form-group">
-                <label className="form-label">ועד בית חודשי</label>
+                {/* 3.1 — commercial properties call this "דמי ניהול"
+                    (management fees). Residential keeps "ועד בית".
+                    Underlying column (buildingCommittee) unchanged. */}
+                <label className="form-label">
+                  {isCommercial ? 'דמי ניהול חודשיים' : 'ועד בית חודשי'}
+                </label>
                 <NumberField unit="₪" placeholder="220" value={form.buildingCommittee} onChange={(v) => update('buildingCommittee', v)} />
               </div>
             </div>
@@ -1244,11 +1304,20 @@ export default function NewProperty() {
               <div className="form-group">
                 <label className="form-label">סיום בלעדיות</label>
                 <input type="date" className="form-input" value={form.exclusiveEnd} onChange={(e) => update('exclusiveEnd', e.target.value)} />
+                {/* 1.6 — chips now compute relative to exclusiveStart
+                    (was: relative to today — produced incorrect end
+                    dates whenever the start wasn't today). */}
                 <DateQuickChips
                   value={form.exclusiveEnd}
                   onChange={(v) => update('exclusiveEnd', v)}
                   chips={['+3m', '+6m', '+12m']}
+                  baseDate={form.exclusiveStart || undefined}
                 />
+                {form.exclusiveStart && form.exclusiveEnd && (
+                  <small className="form-hint">
+                    {computeExclusivityDays(form.exclusiveStart, form.exclusiveEnd)}
+                  </small>
+                )}
               </div>
             </div>
             {isEdit && (

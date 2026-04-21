@@ -26,7 +26,7 @@ export const PLACEHOLDERS = [
   { key: 'balconySize',   label: 'גודל מרפסת' },
   { key: 'buildingAge',   label: 'גיל בניין' },
   { key: 'price',         label: 'מחיר' },
-  { key: 'vacancyDate',   label: 'פינוי' },
+  { key: 'vacancyDate',   label: 'כניסה' },
   { key: 'airDirections', label: 'כיווני אוויר' },
   { key: 'renovated',     label: 'מצב הנכס' },
   { key: 'sector',        label: 'מגזר' },
@@ -64,7 +64,7 @@ export const VAR_GROUPS = [
   {
     id: 'price',
     title: 'מחיר ומצב',
-    hint: 'מחיר, פינוי, מצב, כיוונים',
+    hint: 'מחיר, כניסה, מצב, כיוונים',
     keys: ['price', 'vacancyDate', 'renovated', 'airDirections', 'sector'],
   },
   {
@@ -111,7 +111,7 @@ export const PRESETS = {
 ✨ {{features}}
 🧭 כיווני אוויר: {{airDirections}}
 🛠️ מצב: {{renovated}}
-📅 פינוי: {{vacancyDate}}
+📅 כניסה: {{vacancyDate}}
 
 📝 {{notes}}
 
@@ -182,7 +182,7 @@ export const PRESETS = {
 🏢 קומה {{floor}} מתוך {{totalFloors}}
 ✨ {{features}}
 🛠️ מצב: {{renovated}}
-📅 פינוי: {{vacancyDate}}
+📅 כניסה: {{vacancyDate}}
 🧩 מגזר: {{sector}}
 
 📝 {{notes}}
@@ -241,7 +241,7 @@ export const PRESETS = {
 🛏️ {{rooms}} חדרים · {{sqm}} מ״ר
 🏢 קומה {{floor}} מתוך {{totalFloors}}
 ✨ {{features}}
-📅 פינוי: {{vacancyDate}}
+📅 כניסה: {{vacancyDate}}
 
 📷 {{propertyUrl}}`,
     detailed: `*{{type}} ב{{city}}, {{street}}*
@@ -252,7 +252,7 @@ export const PRESETS = {
 ✨ {{features}}
 🧭 כיווני אוויר: {{airDirections}}
 🛠️ מצב: {{renovated}}
-📅 פינוי: {{vacancyDate}}
+📅 כניסה: {{vacancyDate}}
 
 📝 {{notes}}
 

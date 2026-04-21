@@ -59,6 +59,27 @@ export const NumberField = forwardRef(function NumberField(
     const beforeCaret = el.selectionStart ?? beforeStr.length;
     const digitsBeforeCaret = beforeStr.slice(0, beforeCaret).replace(/[^\d]/g, '').length;
 
+    // 6.4 — Shorthand expansion: "1.5m" → 1500000, "850k" → 850000.
+    // Triggered only on a trailing m/M/k/K because typing a digit in
+    // the middle of an existing value shouldn't accidentally expand.
+    const shorthand = (() => {
+      const trimmed = beforeStr.trim();
+      const m = trimmed.match(/^(\d+(?:[.,]\d+)?)\s*([mMkK])$/);
+      if (!m) return null;
+      const num = Number(m[1].replace(',', '.'));
+      if (!Number.isFinite(num)) return null;
+      return m[2].toLowerCase() === 'm'
+        ? Math.round(num * 1_000_000)
+        : Math.round(num * 1_000);
+    })();
+    if (shorthand != null) {
+      let n = shorthand;
+      if (typeof max === 'number' && n > max) n = max;
+      if (typeof min === 'number' && n < min) n = min;
+      onChange?.(n);
+      return;
+    }
+
     const raw = beforeStr.replace(/[^\d]/g, '');
     if (!raw) {
       onChange?.(null);

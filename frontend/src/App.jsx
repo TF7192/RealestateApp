@@ -14,6 +14,7 @@ import Deals from './pages/Deals';
 import Login from './pages/Login';
 import AgentPortal from './pages/AgentPortal';
 import CustomerPropertyView from './pages/CustomerPropertyView';
+import ProspectSign from './pages/ProspectSign';
 import Profile from './pages/Profile';
 import Transfers from './pages/Transfers';
 // S13: Templates, AdminChats, CommandPalette are heavy and not on the
@@ -125,6 +126,8 @@ function AppRoutes() {
         {/* SEO-friendly public routes */}
         <Route path="/agents/:agentSlug" element={<AgentPortal />} />
         <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
+        {/* Public prospect sign page (1.5) — no login required. */}
+        <Route path="/public/p/:token" element={<ProspectSign />} />
         {/* Legacy short routes — kept forever for shared-link backwards-compat */}
         <Route path="/p/:id" element={<CustomerPropertyView />} />
         <Route path="/a/:agentId" element={<AgentPortal />} />

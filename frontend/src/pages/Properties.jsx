@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -19,11 +19,14 @@ import {
   Phone,
   CheckSquare,
   Square,
+  Copy,
+  Edit3,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
 import { useAuth } from '../lib/auth';
 import ConfirmDialog from '../components/ConfirmDialog';
+import QuickEditDrawer from '../components/QuickEditDrawer';
 import WhatsAppSheet from '../components/WhatsAppSheet';
 import PullRefresh from '../components/PullRefresh';
 import LeadPickerSheet from '../components/LeadPickerSheet';
@@ -471,6 +474,37 @@ export default function Properties() {
     setOverflowFor(prop);
   };
 
+  // 5.1 — Duplicate action. Backend creates a fresh draft with "(עותק)"
+  // appended; we navigate straight to the edit screen so the agent can
+  // tweak the address/price — the common reason to duplicate.
+  const navigate = useNavigate();
+  const [duplicating, setDuplicating] = useState(null);
+  const handleDuplicate = async (e, prop) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (duplicating) return;
+    setDuplicating(prop.id);
+    try {
+      const { property: created } = await api.duplicateProperty(prop.id);
+      haptics?.press?.();
+      // Hand off to the edit screen — agents almost always want to tweak
+      // address/price before the duplicate goes live.
+      navigate(`/properties/${created.id}/edit?duplicated=1`);
+    } catch (err) {
+      // Swallow — the toast system is wired elsewhere in this page.
+      console.error(err);
+    } finally {
+      setDuplicating(null);
+    }
+  };
+
+  // 5.2 — Quick-edit drawer. Opens the most commonly edited fields
+  // (price, status, notes) inline without leaving the list page.
+  const [quickEditFor, setQuickEditFor] = useState(null);
+  const openQuickEdit = (e, prop) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setQuickEditFor(prop);
+  };
+
   const openSimilar = (e, prop) => {
     e.preventDefault();
     e.stopPropagation();
@@ -515,6 +549,16 @@ export default function Properties() {
 
   const overflowActions = overflowFor
     ? [
+        {
+          label: 'עריכה מהירה',
+          icon: Edit3,
+          onClick: () => openQuickEdit(null, overflowFor),
+        },
+        {
+          label: 'שכפל נכס',
+          icon: Copy,
+          onClick: () => handleDuplicate(null, overflowFor),
+        },
         {
           label: 'חיפוש נכסים דומים',
           icon: MoreHorizontal,
@@ -1130,6 +1174,18 @@ export default function Properties() {
           onConfirm={confirmDelete}
           onClose={() => setToDelete(null)}
           busy={deleting}
+        />
+      )}
+
+      {quickEditFor && (
+        <QuickEditDrawer
+          property={quickEditFor}
+          onClose={() => setQuickEditFor(null)}
+          onSaved={(updated) => {
+            // Optimistic: patch the row in place so the list reflects
+            // the edit without a round-trip.
+            setItems((list) => list.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+          }}
         />
       )}
 

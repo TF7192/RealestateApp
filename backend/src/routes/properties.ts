@@ -88,6 +88,8 @@ const propertyInput = z.object({
   storageSize: z.number().int().nonnegative().nullable().optional(),
   // Shelters & amenities
   balconySize: z.number().int().nonnegative().optional(),
+  // 1.1 Balcony type sub-option — "SUNNY" (שמש) / "COVERED" (מקורה).
+  balconyType: z.enum(['SUNNY', 'COVERED']).nullable().optional(),
   airDirections: z.string().max(120).nullable().optional(),
   ac: z.boolean().optional(),
   safeRoom: z.boolean().optional(),
@@ -107,6 +109,10 @@ const propertyInput = z.object({
   meetingRoom: z.boolean().optional(),
   workstations: z.number().int().nonnegative().nullable().optional(),
   lobbySecurity: z.boolean().optional(),
+  // 3.2 Commercial zone tag (e.g. "איזור תעשיה"). Residential rows keep NULL.
+  commercialZone: z.string().max(60).nullable().optional(),
+  // 1.3 Explicit listing-on-market date. When NULL the UI falls back to createdAt.
+  marketingStartDate: z.string().datetime().nullable().optional(),
   // Exclusivity agreement is set via its own upload endpoint, not here.
   marketingReminderFrequency: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).optional(),
   images: z.array(z.string().url()).optional(),
@@ -157,6 +163,9 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         marketingActions: true,
         videos: { orderBy: { sortOrder: 'asc' } },
         propertyOwner: true,
+        // 1.4 — surface real counts so the UI can render the combined
+        // "עמוד הנכס נצפה N פעמים · M פניות" tile without a second query.
+        _count: { select: { viewings: true, inquiries: true, prospects: true } },
       },
     });
     if (!property) return reply.code(404).send({ error: { message: 'Not found' } });
@@ -222,6 +231,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         agentId,
         slug,
         propertyOwnerId,
+        // 1.3 — default marketingStartDate to now so "Days on Market" is
+        // accurate from the moment the property is listed, not from
+        // whatever row-insert time that happens to be the same here but
+        // could diverge on future bulk imports.
+        marketingStartDate: data.marketingStartDate ?? new Date(),
         ...data,
         marketingActions: {
           create: DEFAULT_ACTION_KEYS.map((key) => ({ actionKey: key })),
@@ -270,6 +284,63 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       include: { images: true, marketingActions: true, propertyOwner: true },
     });
     return { property: serialize(updated) };
+  });
+
+  // 5.1 — Duplicate. Clones the property *definition* (address, specs,
+  // price, owner, photos) into a fresh draft; intentionally does NOT
+  // copy marketing activities, viewings/inquiries/prospects, or deal
+  // history — those belong to the original listing.
+  app.post('/:id/duplicate', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const agentId = requireUser(req).id;
+    const source = await prisma.property.findUnique({
+      where: { id },
+      include: { images: { orderBy: { sortOrder: 'asc' } } },
+    });
+    if (!source || source.agentId !== agentId) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    const {
+      id: _, createdAt: __, updatedAt: ___, slug: ____,
+      // Don't inherit exclusivity, deal, status — fresh draft starts
+      // with ACTIVE status and no dates.
+      exclusiveStart: _es, exclusiveEnd: _ee, exclusivityAgreementUrl: _ea,
+      closingPrice: _cp, lastContact: _lc, lastContactNotes: _lcn,
+      marketingStartDate: _msd,
+      status: _st,
+      images: sourceImages,
+      ...payload
+    } = source as any;
+    const dupSlugBase = propertySlug({
+      ...payload,
+      street: payload.street,
+      city: payload.city,
+    });
+    const newSlug = await ensureUniqueSlug(dupSlugBase, async (cand) => {
+      const x = await prisma.property.findFirst({ where: { agentId, slug: cand } });
+      return !!x;
+    });
+    const created = await prisma.property.create({
+      data: {
+        ...payload,
+        slug: newSlug,
+        status: 'ACTIVE',
+        // Mark the copy so agents eyeballing the list see it instantly.
+        notes: payload.notes ? `${payload.notes}\n\n(עותק)` : '(עותק)',
+        marketingStartDate: new Date(),
+        // Re-seed the marketing checklist — every new listing gets its own.
+        marketingActions: {
+          create: DEFAULT_ACTION_KEYS.map((key) => ({ actionKey: key })),
+        },
+        // Photos — copy the URLs only (point at the same S3 objects); the
+        // agent can delete them or re-upload per listing if needed.
+        images: sourceImages?.length
+          ? { create: sourceImages.map((img: any, i: number) => ({ url: img.url, sortOrder: i })) }
+          : undefined,
+      },
+      include: { images: true, marketingActions: true, propertyOwner: true },
+    });
+    return { property: serialize(created) };
   });
 
   app.delete('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
@@ -564,6 +635,14 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
   delete data.propertyOwnerId;
   if (data.exclusiveStart) data.exclusiveStart = new Date(data.exclusiveStart);
   if (data.exclusiveEnd) data.exclusiveEnd = new Date(data.exclusiveEnd);
+  // 1.3 marketingStartDate arrives as an ISO string; materialize it to a
+  // Date so Prisma accepts it. `null` stays null (explicitly wipe).
+  if (data.marketingStartDate) data.marketingStartDate = new Date(data.marketingStartDate);
+  // 1.1 Guard-rail: if balconySize is 0 the type tag is meaningless —
+  // clear it so the DB doesn't carry orphan "SUNNY" labels.
+  if (data.balconySize === 0 && data.balconyType !== undefined) {
+    data.balconyType = null;
+  }
   return data;
 }
 

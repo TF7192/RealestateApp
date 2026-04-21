@@ -124,6 +124,58 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     return { agent: { id: agent.id, slug: agent.slug, displayName: agent.displayName }, property };
   });
 
+  // 2.2 — Server-rendered Open Graph preview. Nginx should route crawler
+  // user-agents (WhatsApp, Twitterbot, Facebook, Telegram, LinkedIn) to
+  // this endpoint so link-unfurling in chat apps gets a real image +
+  // title without needing to execute the SPA's JavaScript. Regular
+  // browsers still hit the SPA via the /agents/<slug>/<slug> route.
+  app.get('/og/property/:agentSlug/:propertySlug', async (req, reply) => {
+    const { agentSlug, propertySlug: propSlug } = req.params as { agentSlug: string; propertySlug: string };
+    const agent =
+      (await prisma.user.findUnique({ where: { slug: agentSlug } })) ||
+      (await prisma.user.findUnique({ where: { id: agentSlug } }));
+    if (!agent) return reply.code(404).send('Not found');
+    const property =
+      (await prisma.property.findFirst({
+        where: { agentId: agent.id, slug: propSlug },
+        include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+      })) ||
+      (await prisma.property.findFirst({
+        where: { agentId: agent.id, id: propSlug },
+        include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+      }));
+    if (!property) return reply.code(404).send('Not found');
+    const origin = process.env.PUBLIC_ORIGIN || 'https://estia.tripzio.xyz';
+    const url = `${origin}/agents/${agentSlug}/${propSlug}`;
+    const img = property.images[0]?.url || '';
+    const imgAbs = img.startsWith('http') ? img : `${origin}${img}`;
+    const title = `${property.type} ב${property.street}, ${property.city}`;
+    const parts: string[] = [];
+    if (property.rooms) parts.push(`${property.rooms} חדרים`);
+    if (property.sqm) parts.push(`${property.sqm} מ״ר`);
+    const price = `₪${property.marketingPrice.toLocaleString('he-IL')}`;
+    const desc = [price, ...parts, agent.displayName].filter(Boolean).join(' · ');
+    const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
+    const html = `<!doctype html><html lang="he" dir="rtl"><head>
+<meta charset="utf-8">
+<title>${esc(title)}</title>
+<meta property="og:type" content="website">
+<meta property="og:url" content="${esc(url)}">
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${esc(imgAbs)}">
+<meta property="og:locale" content="he_IL">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(title)}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${esc(imgAbs)}">
+<meta http-equiv="refresh" content="0; url=${esc(url)}">
+</head><body><a href="${esc(url)}">${esc(title)}</a></body></html>`;
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    reply.header('Cache-Control', 'public, max-age=300');
+    return reply.send(html);
+  });
+
   /** Slug lookup helper — given an internal id, return the public URL.
    *  Public (no auth) so the dashboard can call it without elevation; the
    *  result only contains a slug pair, which is itself public anyway. */

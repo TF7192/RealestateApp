@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Camera,
@@ -17,6 +17,9 @@ import {
   Sun,
   Moon,
   Palette,
+  Calendar,
+  LinkIcon,
+  Unlink,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -261,6 +264,11 @@ export default function Profile() {
           </div>
         </section>
 
+        {/* 7.1 — Google Calendar connection. Shows status + connect/disconnect
+            CTA. The redirect URL is handled server-side; after OAuth the user
+            lands back on /profile?calendar=connected. */}
+        <CalendarSection />
+
         {/* P5-M5: theme toggle reachable on mobile without needing the sidebar */}
         <section className="profile-section">
           <div className="profile-section-head">
@@ -314,6 +322,78 @@ export default function Profile() {
         </div>
       </div>
     </div>
+  );
+}
+
+// 7.1 — Google Calendar connection widget.
+function CalendarSection() {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => {
+    api.calendarStatus().then(setStatus).catch(() => setStatus({ connected: false, configured: false }));
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  // Handle the callback bounce from backend — clears the ?calendar=…
+  // param and refreshes the status.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('calendar')) {
+      sp.delete('calendar');
+      const next = window.location.pathname + (sp.toString() ? `?${sp.toString()}` : '');
+      window.history.replaceState({}, '', next);
+      refresh();
+    }
+  }, []);
+
+  const connect = () => {
+    // Full-page navigation so the OAuth cookie state is set in the
+    // same-origin request the backend expects.
+    window.location.href = '/api/integrations/calendar/connect';
+  };
+  const disconnect = async () => {
+    setBusy(true);
+    try { await api.calendarDisconnect(); } catch { /* ignore */ }
+    setBusy(false);
+    refresh();
+  };
+
+  return (
+    <section className="profile-section">
+      <div className="profile-section-head">
+        <Calendar size={16} />
+        <h3>Google Calendar</h3>
+        <span>תזמון פגישות עם לידים — יסתנכרן ליומן שלך</span>
+      </div>
+      {status?.configured === false ? (
+        <div className="profile-cal-row profile-cal-warn">
+          האינטגרציה לא הוגדרה בצד השרת. נא ליצור קשר עם הצוות הטכני.
+        </div>
+      ) : status?.connected ? (
+        <div className="profile-cal-row profile-cal-ok">
+          <Check size={14} />
+          <div className="profile-cal-text">
+            <strong>מחובר</strong>
+            <span>פגישות שתיצור מעמוד הליד יופיעו אוטומטית ביומן שלך.</span>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={disconnect} disabled={busy}>
+            <Unlink size={13} /> נתק
+          </button>
+        </div>
+      ) : (
+        <div className="profile-cal-row">
+          <div className="profile-cal-text">
+            <strong>לא מחובר</strong>
+            <span>התחבר כדי שפגישות שתתזמן עם לידים יוצרו אוטומטית ב-Google Calendar.</span>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={connect}>
+            <LinkIcon size={13} /> חבר Google Calendar
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 

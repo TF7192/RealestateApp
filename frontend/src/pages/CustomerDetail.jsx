@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
+import LeadMeetingDialog from '../components/LeadMeetingDialog';
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
 import {
   inputPropsForName,
@@ -68,6 +69,7 @@ export default function CustomerDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [matchCount, setMatchCount] = useState(0);
+  const [meetingOpen, setMeetingOpen] = useState(false);
 
   const loadLead = useCallback(async () => {
     setLoading(true);
@@ -195,8 +197,28 @@ export default function CustomerDetail() {
             <MessageSquare size={14} />
             SMS
           </a>
+          {/* 7.2 — Schedule meeting. Opens LeadMeetingDialog which
+              checks Google Calendar connection; if not connected, the
+              dialog still lets the agent create a local record with a
+              nudge to connect. */}
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => { haptics.tap(); setMeetingOpen(true); }}
+            title="קבע פגישה"
+          >
+            <Calendar size={14} />
+            קבע פגישה
+          </button>
         </div>
       </div>
+
+      {meetingOpen && (
+        <LeadMeetingDialog
+          lead={lead}
+          onClose={() => setMeetingOpen(false)}
+          onCreated={() => { /* could re-load meeting list here */ }}
+        />
+      )}
 
       <div className="cd-grid">
         <CustomerEditForm

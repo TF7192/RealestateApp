@@ -251,6 +251,26 @@ export default function MarketingActionDialog({
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={config.hint}
                 />
+                {/* 1.7 — every marketing action now carries an optional
+                    URL (not just link-kind ones). Saved via the same
+                    `link` column; blank = null. */}
+                <label className="ma-field-label">קישור מקור (אופציונלי)</label>
+                <div className="ma-input-with-icon">
+                  <Link2 size={14} />
+                  <input
+                    type="url"
+                    inputMode="url"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    enterKeyHint="done"
+                    dir="ltr"
+                    className="ma-input"
+                    placeholder="https://…"
+                    value={link}
+                    onChange={(e) => setLink(e.target.value)}
+                  />
+                </div>
                 <button className="btn btn-primary ma-save-btn" onClick={handleSaveNotes} disabled={busy}>
                   <Check size={14} />
                   שמור וסמן כהושלם

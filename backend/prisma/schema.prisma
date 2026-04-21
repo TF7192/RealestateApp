@@ -124,6 +124,15 @@ model User {
   // device switch.
   hasCompletedTutorial Boolean      @default(false)
   firstLoginPlatform   String? // 'web' | 'ios' | 'android'
+  // 7.1 — Google Calendar OAuth tokens. Populated by a consent flow
+  // that's separate from (but layered on top of) the existing Google
+  // login — agents who logged in with email can still connect their
+  // Calendar. Access token expires ~1h; we keep the refresh token to
+  // mint new ones server-side without user re-consent.
+  googleAccessToken     String?
+  googleRefreshToken    String?
+  googleTokenExpiresAt  DateTime?
+  googleCalendarEnabled Boolean   @default(false)
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
@@ -145,6 +154,8 @@ model User {
   templates         MessageTemplate[]
   conversations     Conversation[]     @relation("UserConversations")
   sentMessages      Message[]          @relation("SentMessages")
+  prospects         Prospect[]
+  leadMeetings      LeadMeeting[]      @relation("AgentMeetings")
 
   @@index([role])
 }
@@ -261,6 +272,10 @@ model Property {
   storageSize                Int?
   // ────────────────────────────────────────────────────────────
   balconySize                Int                        @default(0)
+  // 1.1 — sub-option surfaced in the form only when balconySize > 0.
+  // Free-form string (not enum) so product can add values without a
+  // migration; UI today offers "SUNNY" (שמש) / "COVERED" (מקורה).
+  balconyType                String?
   airDirections              String?
   ac                         Boolean                    @default(false)
   safeRoom                   Boolean                    @default(false) // ממ״ד (in-unit)
@@ -282,6 +297,15 @@ model Property {
   lobbySecurity              Boolean                    @default(false)
   // ── Exclusivity agreement ──────────────────────────────────
   exclusivityAgreementUrl    String? // S3 key or URL to signed PDF
+  // 1.3 — explicit "on-market" date, independent of row createdAt so
+  // re-listings and import backfills can show the right "days on market".
+  // NULL means the property was never marketed (draft). Falls back to
+  // createdAt in the UI for legacy rows.
+  marketingStartDate         DateTime?
+  // 3.2 — commercial-only zone tag (e.g. "איזור תעשיה"). Residential
+  // rows keep NULL. Free-form string to avoid another migration when
+  // product adds more zones.
+  commercialZone             String?
   lastContact                DateTime?
   lastContactNotes           String?
   marketingReminderFrequency MarketingReminderFrequency @default(WEEKLY)
@@ -296,6 +320,7 @@ model Property {
   deal             Deal?
   agreements       Agreement[]
   transfers        PropertyTransfer[]
+  prospects        Prospect[]
 
   @@unique([agentId, slug])
   @@index([agentId])
@@ -461,6 +486,7 @@ model Lead {
   viewings        PropertyViewing[]
   customerProfile CustomerProfile?
   agreements      Agreement[]
+  meetings        LeadMeeting[]
 
   @@index([agentId])
   @@index([status])
@@ -566,4 +592,62 @@ model StreetLookup {
 
   @@unique([name, city])
   @@index([city])
+}
+
+// 1.5 — Prospect intake form, per-property. Collected either in-person
+// (canvas signature pad) or via a shareable short-lived public link
+// (publicToken + tokenExpiresAt) that lands the prospect on a kiosk-
+// style page they can sign on their own phone.
+//
+// Why a dedicated table instead of reusing Lead? A prospect is not
+// necessarily a CRM-tracked customer — they might just be interested
+// in this one property. Conversion "prospect → lead" is an explicit
+// agent decision, not an auto-consequence of filling the form.
+model Prospect {
+  id               String    @id @default(cuid())
+  propertyId       String
+  property         Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  agentId          String
+  agent            User      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  name             String
+  phone            String?
+  email            String?
+  source           String?
+  notes            String?
+  // Data-URL of the rendered signature strokes. Small (a few KB PNG)
+  // and self-contained — no extra storage backend required. Nullable
+  // for the digital flow where the prospect signs later.
+  signatureDataUrl String?
+  signedAt         DateTime?
+  // Public sign-from-phone flow tokens.
+  publicToken      String?   @unique
+  tokenExpiresAt   DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([propertyId])
+  @@index([agentId])
+}
+
+// 7.2 — Meetings scheduled with a lead, optionally mirrored to the
+// agent's Google Calendar. googleEventId ties the two so subsequent
+// edits / deletes propagate.
+model LeadMeeting {
+  id            String   @id @default(cuid())
+  leadId        String
+  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agentId       String
+  agent         User     @relation("AgentMeetings", fields: [agentId], references: [id], onDelete: Cascade)
+  title         String
+  notes         String?
+  location      String?
+  meetLink      String?
+  startsAt      DateTime
+  endsAt        DateTime
+  googleEventId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([startsAt])
 }

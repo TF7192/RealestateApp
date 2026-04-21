@@ -109,6 +109,28 @@ export const api = {
   createProperty: (body) => request('/properties', { method: 'POST', body }),
   updateProperty: (id, body) => request(`/properties/${id}`, { method: 'PATCH', body }),
   deleteProperty: (id) => request(`/properties/${id}`, { method: 'DELETE' }),
+  // 5.1 — Clones a property into a fresh draft. Backend tags the new
+  // row's notes with "(עותק)" and does NOT carry over marketing/viewings.
+  duplicateProperty: (id) => request(`/properties/${id}/duplicate`, { method: 'POST' }),
+
+  // 1.5 — Prospect intake
+  listProspects:    (propertyId) => request(`/properties/${propertyId}/prospects`),
+  createProspect:   (propertyId, body) => request(`/properties/${propertyId}/prospects`, { method: 'POST', body }),
+  createProspectDigital: (propertyId, body) =>
+    request(`/properties/${propertyId}/prospects/digital`, { method: 'POST', body }),
+  deleteProspect:   (propertyId, id) => request(`/properties/${propertyId}/prospects/${id}`, { method: 'DELETE' }),
+
+  // 7.1 — Google Calendar
+  calendarStatus:     () => request('/integrations/calendar/status'),
+  calendarDisconnect: () => request('/integrations/calendar/disconnect', { method: 'POST' }),
+  // connect is a redirect, we navigate directly rather than fetch it.
+  calendarConnectUrl: () => `${import.meta.env.VITE_API_URL || '/api'}/integrations/calendar/connect`,
+
+  // 7.2 — Lead meetings
+  listLeadMeetings:  (leadId)       => request(`/integrations/calendar/leads/${leadId}/meetings`),
+  createLeadMeeting: (leadId, body) => request(`/integrations/calendar/leads/${leadId}/meetings`, { method: 'POST', body }),
+  updateLeadMeeting: (id, body)     => request(`/integrations/calendar/meetings/${id}`, { method: 'PATCH', body }),
+  deleteLeadMeeting: (id)           => request(`/integrations/calendar/meetings/${id}`, { method: 'DELETE' }),
   toggleMarketingAction: (id, body) =>
     request(`/properties/${id}/marketing-actions`, { method: 'PUT', body }),
   uploadPropertyImage: (id, file) => {
