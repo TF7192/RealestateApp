@@ -41,17 +41,30 @@ runs:
       shell: bash
       run: npm install -g npm@11.6.0
 
-    - name: Install root deps
+    # Two-phase install, because the three lockfiles disagree:
+    #
+    # 1. Root `npm ci` runs in workspaces mode, resolving against root's
+    #    package-lock.json. This hoists shared deps (react, react-dom,
+    #    ...) into node_modules/ at the repo root — required by the
+    #    vitest `frontend` project's React aliases which point to
+    #    node_modules/react/index.js at repo root.
+    #
+    # 2. `cd backend && npm ci --no-workspaces` and the same in frontend
+    #    install against their OWN lockfiles as standalone trees. This
+    #    is what the Dockerfiles do, and it's what populates
+    #    backend/node_modules/fastify (argon2, prisma client, …) and
+    #    frontend/node_modules/lightningcss-linux-x64-gnu (+ other
+    #    platform-specific optional binaries). Root's lockfile is
+    #    missing those platform entries, so skipping step 2 breaks
+    #    vite build + backend tsc.
+    #
+    # Step 2 does NOT delete root/node_modules/react; npm ci only
+    # touches its own cwd's node_modules.
+    - name: Install root deps (workspaces)
       shell: bash
       run: npm ci --no-audit --no-fund
 
-    # Per-workspace installs. --no-workspaces forces npm to treat the
-    # directory as standalone and install the full tree into its own
-    # node_modules, which is what the build steps + vitest need. Without
-    # the flag, npm detects the parent workspace layout and may reroute
-    # installs to root/node_modules, leaving backend/node_modules empty
-    # and causing tsc to fail with "Cannot find module 'fastify'" etc.
-    - name: Install backend deps
+    - name: Install backend deps (standalone)
       if: inputs.install-backend == 'true'
       shell: bash
       working-directory: backend
@@ -63,30 +76,66 @@ runs:
       working-directory: backend
       run: npx prisma generate
 
-    - name: Install frontend deps
+    - name: Install frontend deps (standalone)
       if: inputs.install-frontend == 'true'
       shell: bash
       working-directory: frontend
       run: npm ci --no-audit --no-fund --no-workspaces
 
+    # Remove duplicate React copies created by the standalone frontend
+    # install. The vitest `frontend` project aliases `react*` → the
+    # root-hoisted copy. If frontend/node_modules/react also exists,
+    # any non-aliased resolution (relative imports, transitively-loaded
+    # modules from inside frontend/node_modules that import React
+    # without going through Vite aliases) ends up using the frontend-
+    # local copy — producing the "Cannot read properties of null
+    # (reading 'useContext' | 'useRef')" dual-React symptom.
+    #
+    # vite build still works after this removal because Node module
+    # resolution walks up to node_modules/react at the repo root.
+    - name: De-duplicate React (keep root copy only)
+      if: inputs.install-frontend == 'true'
+      shell: bash
+      working-directory: frontend
+      run: |
+        rm -rf node_modules/react \
+               node_modules/react-dom \
+               node_modules/react-is \
+               node_modules/scheduler
+        echo "removed duplicate React from frontend/node_modules"
+
     - name: Sanity-check workspace installs
       if: inputs.install-backend == 'true' || inputs.install-frontend == 'true'
       shell: bash
       run: |
+        fail=0
         if [ "${{ inputs.install-backend }}" = "true" ]; then
           if [ ! -d backend/node_modules/fastify ]; then
             echo "::error::backend/node_modules/fastify missing after install"
-            echo "--- backend/node_modules contents ---"
-            ls backend/node_modules 2>&1 | head -20
-            exit 1
+            fail=1
           fi
         fi
         if [ "${{ inputs.install-frontend }}" = "true" ]; then
-          if [ ! -d frontend/node_modules/react ]; then
-            echo "::error::frontend/node_modules/react missing after install"
-            echo "--- frontend/node_modules contents ---"
-            ls frontend/node_modules 2>&1 | head -20
-            exit 1
+          # react must be at root (vitest `frontend` project aliases it there)
+          if [ ! -d node_modules/react ]; then
+            echo "::error::node_modules/react missing — vitest frontend aliases will not resolve"
+            fail=1
           fi
+          # Duplicate React must be removed from frontend/node_modules
+          if [ -d frontend/node_modules/react ]; then
+            echo "::error::frontend/node_modules/react still present — will cause dual-React"
+            fail=1
+          fi
+          # lightningcss platform binary needs to be under frontend/ (vite build hits it)
+          if [ ! -d frontend/node_modules/lightningcss-linux-x64-gnu ]; then
+            echo "::error::frontend/node_modules/lightningcss-linux-x64-gnu missing — vite build will fail"
+            fail=1
+          fi
+        fi
+        if [ "$fail" = "1" ]; then
+          echo "--- root node_modules (top) ---"; ls node_modules 2>/dev/null | head -30
+          echo "--- backend/node_modules (top) ---"; ls backend/node_modules 2>/dev/null | head -30
+          echo "--- frontend/node_modules (top) ---"; ls frontend/node_modules 2>/dev/null | head -30
+          exit 1
         fi
         echo "workspace installs OK"

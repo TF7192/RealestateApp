@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import Portal from './Portal';
 import haptics from '../lib/haptics';
@@ -27,36 +27,54 @@ export default function ConfirmDialog({
     onConfirm?.();
   };
 
+  const titleId = useId();
+
   return (
     <Portal>
-    <div className="confirm-backdrop" onClick={onClose}>
-      <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
-        <header className="confirm-header">
-          <div className="confirm-title">
-            {danger && <AlertTriangle size={18} className="confirm-danger-icon" />}
-            <h3>{title}</h3>
+      <div className="confirm-backdrop" onClick={onClose}>
+        <div
+          className="confirm-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <header className="confirm-header">
+            <div className="confirm-title">
+              {danger && <AlertTriangle size={18} className="confirm-danger-icon" />}
+              <h3 id={titleId}>{title}</h3>
+            </div>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={onClose}
+              aria-label="סגור"
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          </header>
+          <div className="confirm-body">
+            <p>{message}</p>
           </div>
-          <button className="btn-ghost" onClick={onClose}>
-            <X size={18} />
-          </button>
-        </header>
-        <div className="confirm-body">
-          <p>{message}</p>
-        </div>
-        <div className="confirm-actions">
-          <button
-            className={danger ? 'btn btn-danger' : 'btn btn-primary'}
-            onClick={handleConfirm}
-            disabled={busy}
-          >
-            {busy ? '...' : confirmLabel}
-          </button>
-          <button className="btn btn-secondary" onClick={onClose}>
-            {cancelLabel}
-          </button>
+          <div className="confirm-actions">
+            <button
+              type="button"
+              className={danger ? 'btn btn-danger' : 'btn btn-primary'}
+              onClick={handleConfirm}
+              disabled={busy}
+            >
+              {busy ? '...' : confirmLabel}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onClose}
+            >
+              {cancelLabel}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
     </Portal>
   );
 }

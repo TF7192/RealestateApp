@@ -51,7 +51,10 @@ export default function MobileTabBar() {
 
   return (
     <>
-      <nav className="mtb" role="tablist" aria-label="ניווט ראשי">
+      {/* The bar is navigation, not a tablist — tabs imply tab-panel
+          pairs which this doesn't have. role="tablist" without
+          role="tab" children fails axe's aria-required-children rule. */}
+      <nav className="mtb" aria-label="ניווט ראשי">
         <div className="mtb-inner">
           {TABS_BEFORE.map((t) => (
             <NavLink
