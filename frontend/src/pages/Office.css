@@ -138,6 +138,36 @@
   color: var(--danger, #c0392b);
 }
 
+/* A1 fill-in — invite mode toggle + generated link preview. */
+.office-invite-modes {
+  display: flex;
+  gap: 8px;
+  margin-block-end: 10px;
+}
+
+.office-invite-link {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-block-start: 10px;
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated, transparent);
+}
+
+.office-invite-link input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+}
+
 .office-skel {
   height: 200px;
   background: linear-gradient(90deg, var(--bg-elevated, #eee), var(--bg-card), var(--bg-elevated, #eee));

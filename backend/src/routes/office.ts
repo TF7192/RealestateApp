@@ -122,6 +122,85 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     return { user: updated };
   });
 
+  // ── Invites (A1 fill-in) ────────────────────────────────────────
+  // Email-based invites, for the common case where the OWNER wants to
+  // onboard an agent who doesn't yet have an Estia login. No mail
+  // provider is configured in prod — the endpoint returns a surrogate
+  // `inviteUrl` which the OWNER copies and shares manually; when the
+  // invitee logs in or signs up, auth.ts auto-attaches them to the
+  // office and marks the invite accepted.
+  function inviteUrl(inviteId: string): string {
+    const origin = process.env.PUBLIC_ORIGIN || 'https://estia.tripzio.xyz';
+    return `${origin.replace(/\/$/, '')}/accept-invite?token=${inviteId}`;
+  }
+
+  const createInviteSchema = z.object({ email: z.string().email() });
+  app.post('/invites', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+    const body = createInviteSchema.parse(req.body);
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!me?.officeId) {
+      return reply.code(404).send({ error: { message: 'No office attached to your user' } });
+    }
+    const email = body.email.toLowerCase();
+    // If a user with this email is already a member of the same office
+    // there's nothing to invite — reject with 409 so the UI can show a
+    // useful toast.
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing?.officeId === me.officeId) {
+      return reply.code(409).send({ error: { message: 'User already a member of this office' } });
+    }
+    // Upsert the invite. Inviting the same email twice resets
+    // revokedAt/acceptedAt so a revoked invite can be re-issued.
+    const invite = await prisma.officeInvite.upsert({
+      where: { officeId_email: { officeId: me.officeId, email } },
+      create: {
+        officeId:    me.officeId,
+        email,
+        invitedById: u.id,
+      },
+      update: {
+        invitedById: u.id,
+        revokedAt:   null,
+        acceptedAt:  null,
+        acceptedById: null,
+      },
+    });
+    return { invite: { ...invite, inviteUrl: inviteUrl(invite.id) } };
+  });
+
+  app.get('/invites', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!me?.officeId) {
+      return reply.code(404).send({ error: { message: 'No office attached to your user' } });
+    }
+    const rows = await prisma.officeInvite.findMany({
+      where: { officeId: me.officeId, acceptedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    const items = rows.map((r) => ({ ...r, inviteUrl: inviteUrl(r.id) }));
+    return { items };
+  });
+
+  app.delete('/invites/:id', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!me?.officeId) {
+      return reply.code(404).send({ error: { message: 'No office attached to your user' } });
+    }
+    const target = await prisma.officeInvite.findUnique({ where: { id } });
+    if (!target || target.officeId !== me.officeId) {
+      return reply.code(404).send({ error: { message: 'Invite not found' } });
+    }
+    await prisma.officeInvite.update({
+      where: { id },
+      data: { revokedAt: new Date() },
+    });
+    return { ok: true };
+  });
+
   // DELETE /api/office/members/:id — remove a user from the office.
   // Owner-only, can't remove themselves (would leave the office
   // ownerless — POST back in if that's ever the intent).

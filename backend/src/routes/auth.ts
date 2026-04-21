@@ -13,6 +13,33 @@ async function buildAgentSlug(displayName: string): Promise<string> {
   });
 }
 
+// Sprint 1 / MLS parity — Task A1 fill-in. Auto-accept any pending
+// OfficeInvite rows for this user's email on signup/login. Only runs
+// for AGENT/OWNER roles — a CUSTOMER-role user keeps their invite
+// pending in case they later upgrade. Never throws outward; any DB
+// hiccup here must not break the auth flow.
+async function claimOfficeInvites(userId: string, email: string, role: string): Promise<void> {
+  if (role !== 'AGENT' && role !== 'OWNER') return;
+  try {
+    const invite = await prisma.officeInvite.findFirst({
+      where: { email: email.toLowerCase(), revokedAt: null, acceptedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!invite) return;
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { officeId: invite.officeId } }),
+      prisma.officeInvite.update({
+        where: { id: invite.id },
+        data: { acceptedAt: new Date(), acceptedById: userId },
+      }),
+    ]);
+  } catch {
+    // Silently ignore — auth path has already succeeded by the time
+    // this runs. A failed auto-attach just leaves the invite pending
+    // for the next login.
+  }
+}
+
 const COOKIE_NAME = 'estia_token';
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -84,6 +111,8 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
     phIdentify(user.id, { email: user.email, role: user.role, display_name: user.displayName });
     phTrack('signup_completed', user.id, { role: user.role, provider: 'EMAIL' });
+    // A1 fill-in — claim any pending OfficeInvite for this email.
+    await claimOfficeInvites(user.id, user.email, user.role);
     return {
       user: publicUser(user),
       token,
@@ -107,6 +136,8 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
     phIdentify(user.id, { email: user.email, role: user.role, display_name: user.displayName });
     phTrack('login_completed', user.id, { role: user.role, provider: 'EMAIL' });
+    // A1 fill-in — claim any pending OfficeInvite for this email.
+    await claimOfficeInvites(user.id, user.email, user.role);
     return { user: publicUser(user), token };
   });
 
@@ -138,6 +169,8 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       { expiresIn: '30d' }
     );
     reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
+    // A1 fill-in — claim any pending OfficeInvite for this email.
+    await claimOfficeInvites(user.id, user.email, user.role);
     return { user: publicUser(user), token };
   });
 
