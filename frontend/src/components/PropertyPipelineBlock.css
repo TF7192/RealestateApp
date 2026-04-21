@@ -1,0 +1,74 @@
+/* PropertyPipelineBlock — the J9 broker pipeline form section. Used both
+   inside NewProperty (as a read/edit block) and inside PropertyDetail
+   (as an inline editor card). */
+
+.ppb-root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ppb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.ppb-primary-lookup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ppb-primary-lookup .form-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ppb-primary-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--bg-subtle, #f5f5f5);
+  border: 1px solid var(--border-subtle, #e1e1e1);
+}
+
+.ppb-primary-chip strong {
+  font-weight: 600;
+}
+
+.ppb-primary-meta {
+  font-size: 12px;
+  color: var(--text-muted, #757575);
+  direction: ltr;
+}
+
+.ppb-primary-hint {
+  margin-block-start: 4px;
+  font-size: 12px;
+  color: var(--text-muted, #757575);
+}
+
+.ppb-notes-count {
+  display: block;
+  margin-block-start: 4px;
+  text-align: end;
+  font-size: 11px;
+  color: var(--text-muted, #757575);
+}
+
+.ppb-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.ppb-error {
+  color: var(--color-danger, #d32f2f);
+  font-size: 13px;
+  margin-inline-end: auto;
+}
