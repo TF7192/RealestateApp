@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { render, screen, userEvent, waitFor } from '../setup/test-utils';
 import { server } from '../setup/msw-server';
@@ -103,5 +103,113 @@ describe('<Office>', () => {
     await user.click(screen.getByRole('button', { name: /הזמן/ }));
     await waitFor(() => expect(invited).toBeTruthy());
     expect((invited as { userId: string }).userId).toBe('u9');
+  });
+
+  it('email-invite mode POSTs to /office/invites and shows the copy link', async () => {
+    asOwner();
+    const user = userEvent.setup();
+    let sent: unknown = null;
+    server.use(
+      http.get('/api/office', () =>
+        HttpResponse.json({
+          office: { id: 'o1', name: 'Acme' },
+          members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+        })
+      ),
+      http.post('/api/office/invites', async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({
+          invite: {
+            id: 'inv-7',
+            email: (sent as { email: string }).email,
+            inviteUrl: 'https://example.test/accept-invite?token=inv-7',
+          },
+        });
+      })
+    );
+    render(<Office />);
+    // Switch into "email" mode.
+    await user.click(await screen.findByRole('radio', { name: /הזמן לפי אימייל/ }));
+    const emailInput = await screen.findByLabelText('אימייל להזמנה');
+    await user.type(emailInput, 'newperson@example.com');
+    await user.click(screen.getByRole('button', { name: /הזמן/ }));
+    await waitFor(() => expect(sent).toBeTruthy());
+    expect((sent as { email: string }).email).toBe('newperson@example.com');
+    // Copy-link UI surfaces the returned URL.
+    expect(
+      await screen.findByDisplayValue('https://example.test/accept-invite?token=inv-7')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /העתק קישור/ })).toBeInTheDocument();
+  });
+
+  it('copy button writes the invite URL to the clipboard', async () => {
+    asOwner();
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    server.use(
+      http.get('/api/office', () =>
+        HttpResponse.json({
+          office: { id: 'o1', name: 'Acme' },
+          members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+        })
+      ),
+      http.post('/api/office/invites', () =>
+        HttpResponse.json({
+          invite: {
+            id: 'inv-9',
+            email: 'copy@example.com',
+            inviteUrl: 'https://example.test/accept-invite?token=inv-9',
+          },
+        })
+      )
+    );
+    render(<Office />);
+    await user.click(await screen.findByRole('radio', { name: /הזמן לפי אימייל/ }));
+    await user.type(await screen.findByLabelText('אימייל להזמנה'), 'copy@example.com');
+    await user.click(screen.getByRole('button', { name: /הזמן/ }));
+    const copyBtn = await screen.findByRole('button', { name: /העתק קישור/ });
+    await user.click(copyBtn);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(
+      'https://example.test/accept-invite?token=inv-9'
+    ));
+  });
+
+  it('renders pending invites + revoke button when OWNER has invites', async () => {
+    asOwner();
+    const user = userEvent.setup();
+    let revoked: string | null = null;
+    server.use(
+      http.get('/api/office', () =>
+        HttpResponse.json({
+          office: { id: 'o1', name: 'Acme' },
+          members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+        })
+      ),
+      http.get('/api/office/invites', () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 'inv-1',
+              email: 'pending@example.com',
+              inviteUrl: 'https://example.test/accept-invite?token=inv-1',
+            },
+          ],
+        })
+      ),
+      http.delete('/api/office/invites/:id', ({ params }) => {
+        revoked = params.id as string;
+        return HttpResponse.json({ ok: true });
+      })
+    );
+    render(<Office />);
+    expect(await screen.findByText('pending@example.com')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: /בטל הזמנה ל-pending@example.com/ })
+    );
+    await waitFor(() => expect(revoked).toBe('inv-1'));
   });
 });

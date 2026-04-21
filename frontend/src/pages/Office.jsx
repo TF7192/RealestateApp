@@ -8,6 +8,9 @@ import {
   Crown,
   Trash2,
   Plus,
+  Copy,
+  Send,
+  X,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -42,9 +45,18 @@ export default function Office() {
   const [officeName, setOfficeName] = useState('');
   const [creating, setCreating] = useState(false);
 
-  // Invite form
+  // Invite form. `inviteMode` toggles between adding an already-
+  // registered user ("existing") and sending an email-based invite
+  // that claims on next login ("email").
+  const [inviteMode, setInviteMode] = useState('existing');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
+  // Last-created invite's surrogate URL — the OWNER copies this and
+  // sends it manually since we don't ship email yet.
+  const [lastInviteUrl, setLastInviteUrl] = useState('');
+
+  // Pending invites list (filtered to non-accepted on the server).
+  const [invites, setInvites] = useState([]);
 
   // Confirm-remove dialog
   const [pendingRemove, setPendingRemove] = useState(null);
@@ -57,17 +69,31 @@ export default function Office() {
       const res = await api.getOffice();
       setOffice(res?.office || null);
       setMembers(res?.members || []);
+      // Invites are OWNER-only on the server; skip the request for
+      // non-OWNER sessions to avoid a noisy 403 in the network panel.
+      if (user?.role === 'OWNER' && res?.office) {
+        try {
+          const inv = await api.listOfficeInvites();
+          setInvites(inv?.items || []);
+        } catch {
+          // Silent — leaves the pending-invites section empty.
+          setInvites([]);
+        }
+      } else {
+        setInvites([]);
+      }
     } catch (e) {
       if (e?.status === 404) {
         setOffice(null);
         setMembers([]);
+        setInvites([]);
       } else {
         toast.error('שגיאה בטעינת פרטי המשרד');
       }
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, user?.role]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -100,21 +126,55 @@ export default function Office() {
     if (!email) return;
     setInviting(true);
     try {
-      const found = await api.searchAgentByEmail(email);
-      const agent = found?.agent || found?.user;
-      if (!agent?.id) {
-        toast.error('לא נמצא סוכן עם כתובת זו');
-        return;
+      if (inviteMode === 'existing') {
+        const found = await api.searchAgentByEmail(email);
+        const agent = found?.agent || found?.user;
+        if (!agent?.id) {
+          toast.error('לא נמצא סוכן עם כתובת זו');
+          return;
+        }
+        await api.addOfficeMember({ userId: agent.id });
+        toast.success('הסוכן הוזמן למשרד');
+      } else {
+        // Email-invite path: server stores an OfficeInvite row and
+        // returns an inviteUrl we surface for manual copy/share.
+        const res = await api.createOfficeInvite({ email });
+        const url = res?.invite?.inviteUrl || '';
+        setLastInviteUrl(url);
+        toast.success('ההזמנה נוצרה — העתק/י את הקישור ושלח/י לסוכן');
       }
-      await api.addOfficeMember({ userId: agent.id });
-      toast.success('הסוכן הוזמן למשרד');
       setInviteEmail('');
       await load();
-    } catch {
-      toast.error('ההזמנה נכשלה');
+    } catch (err) {
+      if (err?.status === 409) {
+        toast.error('הסוכן כבר חבר במשרד');
+      } else {
+        toast.error('ההזמנה נכשלה');
+      }
     } finally {
       setInviting(false);
     }
+  };
+
+  const handleCopyInvite = async (url) => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('הקישור הועתק');
+    } catch {
+      toast.error('לא ניתן היה להעתיק');
+    }
+  };
+
+  const handleRevokeInvite = async (id) => {
+    try {
+      await optimisticUpdate(toast, {
+        label: 'מבטל…',
+        success: 'ההזמנה בוטלה',
+        onSave: () => api.revokeOfficeInvite(id),
+      });
+      await load();
+    } catch { /* toast handled */ }
   };
 
   const handleRemove = async () => {
@@ -197,15 +257,39 @@ export default function Office() {
             <UserPlus size={16} aria-hidden="true" />
             <span>הזמנת סוכן</span>
           </h2>
+          <div
+            className="office-invite-modes"
+            role="radiogroup"
+            aria-label="סוג הזמנה"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={inviteMode === 'existing'}
+              className={`btn ${inviteMode === 'existing' ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setInviteMode('existing')}
+            >
+              קיים במערכת
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={inviteMode === 'email'}
+              className={`btn ${inviteMode === 'email' ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setInviteMode('email')}
+            >
+              הזמן לפי אימייל
+            </button>
+          </div>
           <form className="office-form office-form-row" onSubmit={handleInvite}>
             <label className="office-field office-field-grow">
-              <span>אימייל</span>
+              <span>{inviteMode === 'existing' ? 'אימייל' : 'אימייל החבר החדש'}</span>
               <input
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="agent@example.com"
-                aria-label="אימייל הסוכן"
+                aria-label={inviteMode === 'existing' ? 'אימייל הסוכן' : 'אימייל להזמנה'}
                 dir="ltr"
                 required
               />
@@ -215,10 +299,77 @@ export default function Office() {
               className="btn btn-primary"
               disabled={inviting || !inviteEmail.trim()}
             >
-              <Mail size={14} aria-hidden="true" />
+              {inviteMode === 'existing' ? (
+                <Mail size={14} aria-hidden="true" />
+              ) : (
+                <Send size={14} aria-hidden="true" />
+              )}
               <span>{inviting ? 'מזמין…' : 'הזמן'}</span>
             </button>
           </form>
+          {inviteMode === 'email' && lastInviteUrl && (
+            <div
+              className="office-invite-link"
+              role="group"
+              aria-label="קישור ההזמנה שנוצר"
+            >
+              <input
+                type="text"
+                readOnly
+                value={lastInviteUrl}
+                aria-label="קישור ההזמנה"
+                dir="ltr"
+                onFocus={(e) => e.target.select()}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => handleCopyInvite(lastInviteUrl)}
+              >
+                <Copy size={14} aria-hidden="true" />
+                <span>העתק קישור</span>
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {isOwner && invites.length > 0 && (
+        <section className="office-card" aria-label="הזמנות בהמתנה">
+          <h2 className="office-card-title">
+            <Mail size={16} aria-hidden="true" />
+            <span>הזמנות בהמתנה ({invites.length})</span>
+          </h2>
+          <ul className="office-members">
+            {invites.map((inv) => (
+              <li key={inv.id} className="office-member">
+                <div className="office-member-body">
+                  <div className="office-member-name">
+                    {displayText(inv.email)}
+                  </div>
+                  <div className="office-member-email">
+                    {displayText(inv.inviteUrl)}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => handleCopyInvite(inv.inviteUrl)}
+                  aria-label={`העתק קישור ל-${inv.email}`}
+                >
+                  <Copy size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost office-remove"
+                  onClick={() => handleRevokeInvite(inv.id)}
+                  aria-label={`בטל הזמנה ל-${inv.email}`}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
