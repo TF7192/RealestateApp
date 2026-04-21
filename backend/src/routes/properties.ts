@@ -137,6 +137,27 @@ const propertyInput = z.object({
   exclusivityExpire: z.string().datetime().nullable().optional(),
   sellerSeriousness: z.enum(['NONE', 'SORT_OF', 'MEDIUM', 'VERY']).nullable().optional(),
   brokerNotes: z.string().max(4000).nullable().optional(),
+
+  // Sprint 3 / MLS parity — Tasks J4–J7. Extras for Nadlan parity.
+  condition: z
+    .enum(['NEW', 'AS_NEW', 'RENOVATED', 'PRESERVED', 'NEEDS_RENOVATION', 'NEEDS_TLC', 'RAW'])
+    .nullable()
+    .optional(),
+  heatingTypes:     z.array(z.string().max(40)).optional(),
+  halfRooms:        z.number().int().min(0).max(10).nullable().optional(),
+  masterBedroom:    z.boolean().optional(),
+  bathrooms:        z.number().int().min(0).max(20).nullable().optional(),
+  toilets:          z.number().int().min(0).max(20).nullable().optional(),
+  furnished:        z.boolean().optional(),
+  petFriendly:      z.boolean().optional(),
+  doormenService:   z.boolean().optional(),
+  gym:              z.boolean().optional(),
+  pool:             z.boolean().optional(),
+  gatedCommunity:   z.boolean().optional(),
+  accessibility:    z.boolean().optional(),
+  utilityRoom:      z.boolean().optional(),
+  listingSource:    z.string().max(40).nullable().optional(),
+
   images: z.array(z.string().url()).optional(),
 });
 

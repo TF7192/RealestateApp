@@ -84,6 +84,18 @@ enum Seriousness {
   VERY
 }
 
+// Sprint 3 / MLS parity — Task J5. Building / unit condition, distinct
+// from the free-text `renovated` hint which stays for legacy rows.
+enum PropertyCondition {
+  NEW               // חדש מקבלן
+  AS_NEW            // חדש
+  RENOVATED         // משופץ
+  PRESERVED         // שמור
+  NEEDS_RENOVATION  // דורש שיפוץ
+  NEEDS_TLC         // זקוק לחידוש
+  RAW               // שלד / מעטפת
+}
+
 // Sprint 1 / MLS parity — Task D1. Standalone reminder ("תזכורת").
 // Orthogonal to LeadMeeting (which is a calendar-synced meeting with a
 // lead). A reminder can float (no anchor) or attach to a lead /
@@ -455,6 +467,25 @@ model Property {
   lastContact                DateTime?
   lastContactNotes           String?
   marketingReminderFrequency MarketingReminderFrequency @default(WEEKLY)
+
+  // Sprint 3 / MLS parity — Tasks J4–J7. Richer property attributes to
+  // reach Nadlan One parity on the listing form. All additive + nullable/
+  // defaulted so legacy rows stay valid.
+  condition            PropertyCondition?
+  heatingTypes         String[]   @default([])
+  halfRooms            Int?
+  masterBedroom        Boolean    @default(false)
+  bathrooms            Int?
+  toilets              Int?
+  furnished            Boolean    @default(false)
+  petFriendly          Boolean    @default(false)
+  doormenService       Boolean    @default(false)
+  gym                  Boolean    @default(false)
+  pool                 Boolean    @default(false)
+  gatedCommunity       Boolean    @default(false)
+  accessibility        Boolean    @default(false)
+  utilityRoom          Boolean    @default(false)
+  listingSource        String?    // e.g. "yad2" | "onmap" | "facebook" | "referral" | "self"
 
   // Sprint 1 / MLS parity — Task J9. Pipeline stage (see PropertyStage
   // comment), commission %, primary assignee, exclusivity expiry, and
