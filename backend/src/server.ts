@@ -29,7 +29,7 @@ import { registerTransferRoutes } from './routes/transfers.js';
 import { registerTemplateRoutes } from './routes/templates.js';
 import { registerGeoRoutes } from './routes/geo.js';
 import { registerPublicRoutes } from './routes/public.js';
-import { registerOwnerRoutes } from './routes/owners.js';
+import { registerOwnerRoutes, registerOwnerPhoneRoutes } from './routes/owners.js';
 import { registerOfficeRoutes } from './routes/office.js';
 import { registerTagRoutes } from './routes/tags.js';
 import { registerReminderRoutes } from './routes/reminders.js';
@@ -222,6 +222,7 @@ export async function build() {
   await app.register(registerGeoRoutes, { prefix: '/api/geo' });
   await app.register(registerPublicRoutes, { prefix: '/api/public' });
   await app.register(registerOwnerRoutes, { prefix: '/api/owners' });
+  await app.register(registerOwnerPhoneRoutes, { prefix: '/api' });
   await app.register(registerChatRoutes, { prefix: '/api/chat' });
   await app.register(registerAdminRoutes, { prefix: '/api/admin' });
   await app.register(registerYad2Routes,  { prefix: '/api/integrations/yad2' });

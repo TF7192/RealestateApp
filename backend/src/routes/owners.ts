@@ -130,6 +130,56 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
+  // ── J8 multi-phone: list an owner's phones ───────────────────────────
+  // On first read, if no OwnerPhone rows exist yet but the legacy
+  // Owner.phone column is populated, we lazily create a single
+  // `kind: 'primary'` row so the UI has something to show without a
+  // destructive migration-time backfill.
+  app.get('/:id/phones', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const u = requireUser(req);
+    const { id } = req.params as { id: string };
+    const owner = await prisma.owner.findFirst({ where: { id, agentId: u.id } });
+    if (!owner) return reply.code(404).send({ error: { message: 'Owner not found' } });
+
+    let items = await prisma.ownerPhone.findMany({
+      where: { ownerId: id },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+    if (items.length === 0 && owner.phone) {
+      const seeded = await prisma.ownerPhone.create({
+        data: { ownerId: id, phone: owner.phone, kind: 'primary', sortOrder: 0 },
+      });
+      items = [seeded];
+    }
+    return { items };
+  });
+
+  // ── J8 multi-phone: add a phone to an owner ──────────────────────────
+  const phoneInput = z.object({
+    phone: z.string().min(3).max(40),
+    kind: z.enum(['primary', 'secondary', 'spouse', 'work', 'fax', 'other']).default('primary'),
+    label: z.string().max(120).optional().nullable(),
+    sortOrder: z.number().int().optional(),
+  });
+  app.post('/:id/phones', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const u = requireUser(req);
+    const { id } = req.params as { id: string };
+    const owner = await prisma.owner.findFirst({ where: { id, agentId: u.id } });
+    if (!owner) return reply.code(404).send({ error: { message: 'Owner not found' } });
+    const body = phoneInput.parse(req.body);
+    const phone = await prisma.ownerPhone.create({
+      data: {
+        ownerId: id,
+        phone: body.phone.trim(),
+        kind: body.kind,
+        label: body.label?.trim() || null,
+        sortOrder: body.sortOrder ?? 0,
+      },
+    });
+    phTrack('owner_phone_added', u.id, { owner_id: id, kind: body.kind });
+    return { phone };
+  });
+
   // ── Quick-search by phone (used by NewProperty form to dedupe) ────────
   app.get('/search', { onRequest: [app.requireAgent] }, async (req) => {
     const u = requireUser(req);
@@ -151,5 +201,58 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
       take: 10,
     });
     return { items };
+  });
+};
+
+/**
+ * J8 multi-phone mutations that aren't scoped under `/owners/:id/*`.
+ * Registered at the flat `/api/owner-phones/:id` path so the FE can
+ * patch / delete a single phone without having to round-trip the
+ * owner id in the URL.
+ */
+export const registerOwnerPhoneRoutes: FastifyPluginAsync = async (app) => {
+  const patchInput = z.object({
+    phone: z.string().min(3).max(40).optional(),
+    kind: z.enum(['primary', 'secondary', 'spouse', 'work', 'fax', 'other']).optional(),
+    label: z.string().max(120).optional().nullable(),
+    sortOrder: z.number().int().optional(),
+  });
+
+  // Shared agent-scoping check so we never leak or mutate another
+  // agent's owner phones.
+  async function requirePhone(id: string, agentId: string) {
+    const phone = await prisma.ownerPhone.findUnique({
+      where: { id },
+      include: { owner: true },
+    });
+    if (!phone || phone.owner.agentId !== agentId) return null;
+    return phone;
+  }
+
+  app.patch('/owner-phones/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const u = requireUser(req);
+    const { id } = req.params as { id: string };
+    const existing = await requirePhone(id, u.id);
+    if (!existing) return reply.code(404).send({ error: { message: 'Phone not found' } });
+    const body = patchInput.parse(req.body);
+    const updated = await prisma.ownerPhone.update({
+      where: { id },
+      data: {
+        ...(body.phone !== undefined ? { phone: body.phone.trim() } : {}),
+        ...(body.kind  !== undefined ? { kind: body.kind } : {}),
+        ...(body.label !== undefined ? { label: body.label?.trim() || null } : {}),
+        ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
+      },
+    });
+    return { phone: updated };
+  });
+
+  app.delete('/owner-phones/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const u = requireUser(req);
+    const { id } = req.params as { id: string };
+    const existing = await requirePhone(id, u.id);
+    if (!existing) return reply.code(404).send({ error: { message: 'Phone not found' } });
+    await prisma.ownerPhone.delete({ where: { id } });
+    return { ok: true };
   });
 };
