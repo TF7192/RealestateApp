@@ -1,0 +1,75 @@
+/* ActivityPanel — scoped styles. Matches the card framing used by
+   RemindersPanel and MatchingList so all three embed consistently. */
+
+.activity-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  padding: 16px;
+}
+
+.ap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ap-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.ap-loading,
+.ap-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 12px 4px;
+}
+.ap-error { color: var(--danger, #b00020); }
+
+.ap-list { list-style: none; margin: 0; padding: 0; position: relative; }
+.ap-list::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  inset-inline-end: 7px;
+  width: 1px;
+  background: var(--border);
+}
+
+.ap-item {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  position: relative;
+}
+
+.ap-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+  margin-top: 6px;
+  flex-shrink: 0;
+  margin-inline-start: 3px;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 0 3px var(--bg-card);
+}
+
+.ap-body { flex: 1; min-width: 0; }
+.ap-line { font-size: 13px; color: var(--text-primary); }
+.ap-actor { font-weight: 600; margin-inline-end: 4px; }
+.ap-action { color: var(--text-secondary); }
+.ap-time { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }

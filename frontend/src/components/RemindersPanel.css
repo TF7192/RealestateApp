@@ -1,0 +1,125 @@
+/* RemindersPanel — scoped styles. Matches the card look of CustomerDetail
+   sections so it can embed as a sub-section without extra chrome. */
+
+.reminders-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  padding: 16px;
+}
+
+.reminders-panel.is-compact { padding: 12px; }
+
+.rp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.rp-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0;
+}
+
+.rp-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: 10px;
+  background: var(--gold-soft, rgba(212, 175, 55, 0.15));
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rp-compose {
+  padding: 12px;
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.rp-compose-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.rp-loading,
+.rp-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  padding: 12px 4px;
+  font-size: 13px;
+}
+
+.rp-error { color: var(--danger, #b00020); }
+
+.rp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rp-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+
+.rp-item-main { flex: 1; min-width: 0; }
+
+.rp-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.rp-item-due {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rp-item-notes {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-line;
+}
+
+.rp-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.rp-item.rp-status-completed .rp-item-title { text-decoration: line-through; color: var(--text-muted); }
+.rp-item.rp-status-cancelled { opacity: 0.65; }
