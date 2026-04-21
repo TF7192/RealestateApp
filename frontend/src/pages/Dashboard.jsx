@@ -23,12 +23,24 @@ import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import ShareCatalogDialog from '../components/ShareCatalogDialog';
 import PullRefresh from '../components/PullRefresh';
+import DeltaBadge from '../components/DeltaBadge';
+import { Segmented } from '../components/SmartFields';
 import { relativeDate } from '../lib/relativeDate';
 import { shareSheet } from '../native/share';
 import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
+import useDashboardDeltas from '../hooks/useDashboardDeltas';
 import { pageCache } from '../lib/pageCache';
 import haptics from '../lib/haptics';
 import './Dashboard.css';
+
+// Maps a period value to the Hebrew label shown inside DeltaBadge
+// ("+3 השבוע"). Kept outside the component so it's a stable reference.
+const PERIOD_LABEL = { week: 'השבוע', month: 'החודש', quarter: 'הרבעון' };
+const PERIOD_OPTIONS = [
+  { value: 'week', label: 'שבוע' },
+  { value: 'month', label: 'חודש' },
+  { value: 'quarter', label: 'רבעון' },
+];
 
 function formatPrice(price) {
   if (!price) return '₪0';
@@ -42,6 +54,11 @@ export default function Dashboard() {
   const _cached = pageCache.get('dashboard');
   const [data, setData] = useState(_cached || null);
   const [loading, setLoading] = useState(!_cached);
+  // B2 — rolling-delta window. Default "week" matches Nadlan One's
+  // out-of-the-box dashboard. All three windows are fetched once on
+  // mount (see useDashboardDeltas) so switching is instant.
+  const [period, setPeriod] = useState('week');
+  const deltas = useDashboardDeltas(period);
 
   const load = async () => {
     try {
@@ -145,6 +162,7 @@ export default function Dashboard() {
       color: 'var(--gold)',
       bg: 'var(--gold-glow)',
       to: '/properties?assetClass=residential',
+      deltaKey: 'properties',
     },
     {
       icon: Store,
@@ -154,6 +172,7 @@ export default function Dashboard() {
       color: 'var(--warning)',
       bg: 'var(--warning-bg)',
       to: '/properties?assetClass=commercial',
+      deltaKey: 'properties',
     },
     {
       icon: Target,
@@ -163,6 +182,7 @@ export default function Dashboard() {
       color: 'var(--danger)',
       bg: 'var(--danger-bg)',
       to: '/customers?filter=hot',
+      deltaKey: 'customers',
     },
     {
       icon: Handshake,
@@ -172,6 +192,7 @@ export default function Dashboard() {
       color: 'var(--success)',
       bg: 'var(--success-bg)',
       to: '/deals',
+      deltaKey: 'deals',
     },
     {
       icon: TrendingUp,
@@ -181,6 +202,9 @@ export default function Dashboard() {
       color: 'var(--info)',
       bg: 'var(--info-bg)',
       to: '/deals?tab=signed',
+      // Commission-total doesn't map cleanly to a count delta, so we
+      // intentionally don't show a pill here.
+      deltaKey: null,
     },
     {
       icon: UserCircle,
@@ -190,6 +214,8 @@ export default function Dashboard() {
       color: 'var(--gold)',
       bg: 'var(--gold-glow)',
       to: '/owners',
+      // No report endpoint for owners deltas yet.
+      deltaKey: null,
     },
   ];
 
@@ -211,7 +237,22 @@ export default function Dashboard() {
 
         <TodayStrip leads={leads} properties={properties} />
 
-        <KpiScroller stats={stats} refreshing={isRefreshing} />
+        <div className="kpi-period-row">
+          <span className="kpi-period-label">שנה תקופה</span>
+          <Segmented
+            value={period}
+            onChange={setPeriod}
+            options={PERIOD_OPTIONS}
+            ariaLabel="בחר תקופה להשוואה"
+          />
+        </div>
+
+        <KpiScroller
+          stats={stats}
+          refreshing={isRefreshing}
+          deltaBucket={deltas[period]}
+          periodLabel={PERIOD_LABEL[period]}
+        />
 
         {staleLeads.length > 0 && (
         <div className="dash-signals animate-in animate-in-delay-2">
@@ -378,7 +419,7 @@ export default function Dashboard() {
   );
 }
 
-function KpiScroller({ stats, refreshing = false }) {
+function KpiScroller({ stats, refreshing = false, deltaBucket = null, periodLabel = 'השבוע' }) {
   const trackRef = useRef(null);
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -405,23 +446,38 @@ function KpiScroller({ stats, refreshing = false }) {
   return (
     <>
       <div className="stats-grid" ref={trackRef}>
-        {stats.map((stat, i) => (
-          <Link
-            key={stat.label}
-            to={stat.to}
-            className={`stat-card animate-in animate-in-delay-${Math.min(i + 1, 5)}`}
-            onClick={() => haptics.tap()}
-          >
-            <div className="stat-icon" style={{ background: stat.bg, color: stat.color }}>
-              <stat.icon size={22} />
-            </div>
-            <div className="stat-info">
-              <span className={`stat-value ${refreshing ? 'stat-value-refreshing' : ''}`}>{stat.value}</span>
-              <span className="stat-label">{stat.label}</span>
-              <span className="stat-sub">{stat.sub}</span>
-            </div>
-          </Link>
-        ))}
+        {stats.map((stat, i) => {
+          // Per-KPI delta — null means either the bucket failed to load
+          // or this stat doesn't map to a report endpoint (owners,
+          // commission total). In both cases we just skip the pill so
+          // the tile still shows its total.
+          const deltaValue = stat.deltaKey && deltaBucket
+            ? deltaBucket[stat.deltaKey]
+            : null;
+          const showDelta = stat.deltaKey && Number.isFinite(Number(deltaValue));
+          return (
+            <Link
+              key={stat.label}
+              to={stat.to}
+              className={`stat-card animate-in animate-in-delay-${Math.min(i + 1, 5)}`}
+              onClick={() => haptics.tap()}
+            >
+              <div className="stat-icon" style={{ background: stat.bg, color: stat.color }}>
+                <stat.icon size={22} />
+              </div>
+              <div className="stat-info">
+                <span className="stat-value-row">
+                  <span className={`stat-value ${refreshing ? 'stat-value-refreshing' : ''}`}>{stat.value}</span>
+                  {showDelta && (
+                    <DeltaBadge value={Number(deltaValue)} label={periodLabel} />
+                  )}
+                </span>
+                <span className="stat-label">{stat.label}</span>
+                <span className="stat-sub">{stat.sub}</span>
+              </div>
+            </Link>
+          );
+        })}
       </div>
       <div className="stats-dots" aria-hidden="true">
         {stats.map((_, i) => (
