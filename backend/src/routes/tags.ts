@@ -8,6 +8,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { logActivity } from '../lib/activity.js';
 
 const ENTITY = z.enum(['PROPERTY', 'LEAD', 'CUSTOMER']);
 const SCOPE = z.enum(['PROPERTY', 'LEAD', 'CUSTOMER', 'ALL']);
@@ -47,6 +48,11 @@ export const registerTagRoutes: FastifyPluginAsync = async (app) => {
           scope:   body.scope ?? 'ALL',
         },
       });
+      await logActivity({
+        agentId: u.id, actorId: u.id,
+        verb: 'created', entityType: 'Tag', entityId: tag.id,
+        summary: `נוצרה מדבקה: ${tag.name}`,
+      });
       return { tag };
     } catch (e: any) {
       if (e?.code === 'P2002') {
@@ -72,6 +78,11 @@ export const registerTagRoutes: FastifyPluginAsync = async (app) => {
         ...(body.scope !== undefined ? { scope: body.scope } : {}),
       },
     });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'updated', entityType: 'Tag', entityId: tag.id,
+      summary: `עודכנה מדבקה: ${tag.name}`,
+    });
     return { tag };
   });
 
@@ -82,6 +93,11 @@ export const registerTagRoutes: FastifyPluginAsync = async (app) => {
     const existing = await prisma.tag.findFirst({ where: { id, agentId: u.id } });
     if (!existing) return reply.code(404).send({ error: { message: 'Tag not found' } });
     await prisma.tag.delete({ where: { id } });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'deleted', entityType: 'Tag', entityId: id,
+      summary: `נמחקה מדבקה: ${existing.name}`,
+    });
     return { ok: true };
   });
 
@@ -118,6 +134,12 @@ export const registerTagRoutes: FastifyPluginAsync = async (app) => {
       create: { tagId: id, entityType: body.entityType, entityId: body.entityId },
       update: {},
     });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'assigned', entityType: 'Tag', entityId: id,
+      summary: `מדבקה "${tag.name}" שויכה`,
+      metadata: { entityType: body.entityType, entityId: body.entityId },
+    });
     return { assignment };
   });
 
@@ -130,6 +152,12 @@ export const registerTagRoutes: FastifyPluginAsync = async (app) => {
     if (!tag) return reply.code(404).send({ error: { message: 'Tag not found' } });
     await prisma.tagAssignment.deleteMany({
       where: { tagId: id, entityType: body.entityType, entityId: body.entityId },
+    });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'unassigned', entityType: 'Tag', entityId: id,
+      summary: `מדבקה "${tag.name}" הוסרה`,
+      metadata: { entityType: body.entityType, entityId: body.entityId },
     });
     return { ok: true };
   });
@@ -147,6 +175,12 @@ export const registerTagRoutes: FastifyPluginAsync = async (app) => {
     if (!tag) return reply.code(404).send({ error: { message: 'Tag not found' } });
     await prisma.tagAssignment.deleteMany({
       where: { tagId: id, entityType: ent.data, entityId },
+    });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'unassigned', entityType: 'Tag', entityId: id,
+      summary: `מדבקה "${tag.name}" הוסרה`,
+      metadata: { entityType: ent.data, entityId },
     });
     return { ok: true };
   });
