@@ -13,6 +13,10 @@ datasource db {
 enum UserRole {
   AGENT
   CUSTOMER
+  // Sprint 1 / MLS parity — Task A1. An OWNER is an agency owner who
+  // sees every agent in their `Office`. Defaults to AGENT-scoped
+  // visibility when no office is attached.
+  OWNER
 }
 
 enum AuthProvider {
@@ -36,6 +40,70 @@ enum PropertyStatus {
   SOLD
   RENTED
   ARCHIVED
+  // Sprint 1 / MLS parity — Task J9. Nadlan's `StatusID` exposes three
+  // extra life-cycle values that we need for conversion parity. UI
+  // labels: אקטואלי (ACTIVE) · לא אקטואלי (INACTIVE) · מוקפא (PAUSED)
+  // · נמכר (SOLD) · הושכר (RENTED) · מבוטל (CANCELLED) · עיסקה
+  // (IN_DEAL). ARCHIVED stays for the existing soft-delete UX.
+  INACTIVE
+  CANCELLED
+  IN_DEAL
+}
+
+// Sprint 1 / MLS parity — Task J9. Pipeline stage is *orthogonal* to
+// status: a property can be `ACTIVE` (listed) at many different stages
+// of its relationship with the office (watching / in-progress / signed
+// non-exclusive / signed exclusive / exclusivity ended / refused
+// brokerage / removed). Hebrew UI labels per the Nadlan form:
+//   WATCHING             → במעקב
+//   PRE_ACQUISITION      → טרום גיוס
+//   IN_PROGRESS          → נכס בטיפול              (default for legacy rows)
+//   SIGNED_NON_EXCLUSIVE → נכס חתום בהסכמה
+//   SIGNED_EXCLUSIVE     → נכס חתום בלעדי
+//   EXCLUSIVITY_ENDED    → בלעדיות הסתיימה
+//   REFUSED_BROKERAGE    → לא מעוניין בתיווך
+//   REMOVED              → הסר מנכסים בטיפול
+enum PropertyStage {
+  WATCHING
+  PRE_ACQUISITION
+  IN_PROGRESS
+  SIGNED_NON_EXCLUSIVE
+  SIGNED_EXCLUSIVE
+  EXCLUSIVITY_ENDED
+  REFUSED_BROKERAGE
+  REMOVED
+}
+
+// Sprint 1 / MLS parity — Task J9. Owner-side seriousness rating (how
+// serious the *seller* is, not the buyer lead). Nadlan's `SeriousID`
+// Hebrew labels: לא (NONE) · די (SORT_OF) · בינוני (MEDIUM) · מאד (VERY).
+enum Seriousness {
+  NONE
+  SORT_OF
+  MEDIUM
+  VERY
+}
+
+// Sprint 3 / MLS parity — Task J5. Building / unit condition, distinct
+// from the free-text `renovated` hint which stays for legacy rows.
+enum PropertyCondition {
+  NEW               // חדש מקבלן
+  AS_NEW            // חדש
+  RENOVATED         // משופץ
+  PRESERVED         // שמור
+  NEEDS_RENOVATION  // דורש שיפוץ
+  NEEDS_TLC         // זקוק לחידוש
+  RAW               // שלד / מעטפת
+}
+
+// Sprint 1 / MLS parity — Task D1. Standalone reminder ("תזכורת").
+// Orthogonal to LeadMeeting (which is a calendar-synced meeting with a
+// lead). A reminder can float (no anchor) or attach to a lead /
+// property / customer for quick navigation.
+enum ReminderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
 }
 
 enum LeadStatus {
@@ -52,6 +120,60 @@ enum LeadInterestType {
 enum LeadLookingFor {
   BUY
   RENT
+}
+
+// Sprint 1 / MLS parity — Task K2. Customer-facing life-cycle status
+// (Nadlan `CustomerStatusID`). Distinct from LeadStatus (HOT/WARM/COLD),
+// which stays as the thermal temperature rating. Hebrew labels:
+//   ACTIVE    → אקטואלי
+//   INACTIVE  → לא אקטואלי
+//   CANCELLED → מבוטל
+//   PAUSED    → מוקפא
+//   IN_DEAL   → עיסקה
+//   BOUGHT    → קנה
+//   RENTED    → שכר
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
+  PAUSED
+  IN_DEAL
+  BOUGHT
+  RENTED
+}
+
+// Sprint 1 / MLS parity — Task K2. Purpose of search, multi-select.
+// Nadlan `PurposeList` Hebrew labels: השקעה · מגורים · מסחרי · קומבינציה.
+enum CustomerPurpose {
+  INVESTMENT
+  RESIDENCE
+  COMMERCIAL
+  COMBINATION
+}
+
+// Sprint 2 / MLS parity — Task L1. Quick-lead status ("סטטוס ליד") —
+// Nadlan's richer `LeadStatusID`. Orthogonal to `LeadStatus`
+// (HOT/WARM/COLD = thermal) and `CustomerStatus` (customer lifecycle).
+// Hebrew labels:
+//   NEW                      → חדש
+//   INTENT_TO_CALL           → בכוונת התקשרות
+//   CONVERTED                → הומר
+//   DISQUALIFIED             → נפסל
+//   NOT_INTERESTED           → לא מעוניין
+//   IN_PROGRESS              → בתהליך
+//   CONVERTED_NO_OPPORTUNITY → הומר, אין הזדמנות
+//   DELETED                  → נמחק
+//   ARCHIVED                 → ארכיון
+enum QuickLeadStatus {
+  NEW
+  INTENT_TO_CALL
+  CONVERTED
+  DISQUALIFIED
+  NOT_INTERESTED
+  IN_PROGRESS
+  CONVERTED_NO_OPPORTUNITY
+  DELETED
+  ARCHIVED
 }
 
 enum DealStatus {
@@ -104,6 +226,23 @@ enum MarketingReminderFrequency {
   MONTHLY
 }
 
+// ─── Offices ───────────────────────────────────────────────────────────────
+// Sprint 1 / MLS parity — Task A1. A real-estate office groups multiple
+// agents under one `OWNER`-role user. `officeId` on User is nullable to
+// keep the existing single-agent flow working; owners see rows where
+// `agentId IN (office members)`, agents still scope to their own.
+model Office {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  address   String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members User[]
+}
+
 // ─── Users ─────────────────────────────────────────────────────────────────
 model User {
   id                   String       @id @default(cuid())
@@ -133,6 +272,14 @@ model User {
   googleRefreshToken    String?
   googleTokenExpiresAt  DateTime?
   googleCalendarEnabled Boolean   @default(false)
+
+  // Sprint 1 / MLS parity — Task A1. Office membership. Null for the
+  // legacy solo-agent flow; populated once an OWNER invites an agent
+  // into their office. Deleting an office doesn't delete the users —
+  // it just detaches them.
+  officeId String?
+  office   Office? @relation(fields: [officeId], references: [id], onDelete: SetNull)
+
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
@@ -156,8 +303,26 @@ model User {
   sentMessages      Message[]          @relation("SentMessages")
   prospects         Prospect[]
   leadMeetings      LeadMeeting[]      @relation("AgentMeetings")
+  tags              Tag[]              @relation("AgentTags")
+  // Sprint 1 / MLS parity — Task J9. Properties for which this user is
+  // the primary assignee. Separate from `AgentProperties` because a row
+  // can be owned by one agent and assigned to another inside the office.
+  primaryForProperties Property[]       @relation("PrimaryAgent")
+  // Sprint 1 / MLS parity — Task D1.
+  reminders            Reminder[]       @relation("AgentReminders")
+  reminderAnchors      Reminder[]       @relation("ReminderCustomer")
+  // Sprint 1 / MLS parity — Task K2.
+  leadAssignments      LeadAgent[]      @relation("LeadAssignments")
+  // Sprint 5 / MLS parity — Task J10.
+  propertyAssignments  PropertyAssignee[] @relation("PropertyAssigneeUser")
+  // Sprint 6 / MLS parity — Task F1.
+  adverts              Advert[]           @relation("AgentAdverts")
+  // Sprint 7 / MLS parity — Tasks B3, B4.
+  savedSearches        SavedSearch[]      @relation("AgentSavedSearches")
+  favorites            Favorite[]         @relation("AgentFavorites")
 
   @@index([role])
+  @@index([officeId])
 }
 
 model AgentProfile {
@@ -309,6 +474,41 @@ model Property {
   lastContact                DateTime?
   lastContactNotes           String?
   marketingReminderFrequency MarketingReminderFrequency @default(WEEKLY)
+
+  // Sprint 3 / MLS parity — Tasks J4–J7. Richer property attributes to
+  // reach Nadlan One parity on the listing form. All additive + nullable/
+  // defaulted so legacy rows stay valid.
+  condition            PropertyCondition?
+  heatingTypes         String[]   @default([])
+  halfRooms            Int?
+  masterBedroom        Boolean    @default(false)
+  bathrooms            Int?
+  toilets              Int?
+  furnished            Boolean    @default(false)
+  petFriendly          Boolean    @default(false)
+  doormenService       Boolean    @default(false)
+  gym                  Boolean    @default(false)
+  pool                 Boolean    @default(false)
+  gatedCommunity       Boolean    @default(false)
+  accessibility        Boolean    @default(false)
+  utilityRoom          Boolean    @default(false)
+  listingSource        String?    // e.g. "yad2" | "onmap" | "facebook" | "referral" | "self"
+
+  // Sprint 1 / MLS parity — Task J9. Pipeline stage (see PropertyStage
+  // comment), commission %, primary assignee, exclusivity expiry, and
+  // seller-side seriousness. `status` stays the life-cycle flag; the
+  // two axes are orthogonal.
+  stage                PropertyStage? @default(IN_PROGRESS)
+  agentCommissionPct   Float?
+  // Primary assignee ("סוכן מטפל"). Defaults to the row's `agentId`;
+  // set explicitly when the office owner reassigns without transferring
+  // ownership. Nullable so legacy rows stay clean.
+  primaryAgentId       String?
+  primaryAgent         User?          @relation("PrimaryAgent", fields: [primaryAgentId], references: [id], onDelete: SetNull)
+  exclusivityExpire    DateTime?
+  sellerSeriousness    Seriousness?
+  brokerNotes          String?
+
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
 
@@ -321,6 +521,9 @@ model Property {
   agreements       Agreement[]
   transfers        PropertyTransfer[]
   prospects        Prospect[]
+  reminders        Reminder[]
+  assignees        PropertyAssignee[]
+  adverts          Advert[]
 
   @@unique([agentId, slug])
   @@index([agentId])
@@ -475,11 +678,43 @@ model Lead {
   storageRequired    Boolean          @default(false)
   schoolProximity    String?
   source             String?
+  // `status` is the thermal temperature rating (HOT/WARM/COLD). New in
+  // Sprint 1 / MLS parity Task K2: `customerStatus` is the separate
+  // life-cycle flag (אקטואלי / לא אקטואלי / etc.). Kept orthogonal.
   status             LeadStatus       @default(WARM)
   notes              String?
   brokerageSignedAt  DateTime?
   brokerageExpiresAt DateTime?
   lastContact        DateTime?
+
+  // Sprint 1 / MLS parity — Task K2. Customer admin block.
+  customerStatus      CustomerStatus?
+  commissionPct       Float?
+  isPrivate           Boolean           @default(false)
+  purposes            CustomerPurpose[] @default([])
+  seriousnessOverride Seriousness?
+
+  // Sprint 2 / MLS parity — Task K1. Richer contact + identity fields
+  // mirroring the Nadlan customer form. Existing `name` / `phone` /
+  // `email` stay as primary/display values; these are the expanded
+  // variants so import/export and power-user flows don't lose data.
+  firstName    String?
+  lastName     String?
+  companyName  String?
+  address      String?
+  cityText     String?
+  zip          String?
+  primaryPhone String?
+  phone1       String?
+  phone2       String?
+  fax          String?
+  personalId   String?
+  // Sprint 2 / MLS parity — Task L3 placeholder. Quick-lead UI uses
+  // the shorter single-line `description`; the longer `notes` stays.
+  description  String?
+  // Sprint 2 / MLS parity — Task L1. Quick-lead lifecycle status.
+  leadStatus   QuickLeadStatus? @default(NEW)
+
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
@@ -487,10 +722,31 @@ model Lead {
   customerProfile CustomerProfile?
   agreements      Agreement[]
   meetings        LeadMeeting[]
+  reminders       Reminder[]
+  // Sprint 1 / MLS parity — Task K2. Additional assignees. Primary
+  // assignee stays `agentId` on Lead; the join table lets the office
+  // share a lead across multiple agents.
+  extraAgents     LeadAgent[]
+  // Sprint 2 / MLS parity — Task K4. Repeatable "הנכס המבוקש" profiles.
+  searchProfiles  LeadSearchProfile[]
 
   @@index([agentId])
   @@index([status])
+  @@index([customerStatus])
   @@index([city])
+}
+
+// Sprint 1 / MLS parity — Task K2. Composite-PK join table for
+// multi-agent lead assignment.
+model LeadAgent {
+  leadId     String
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agentId    String
+  agent      User     @relation("LeadAssignments", fields: [agentId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@id([leadId, agentId])
+  @@index([agentId])
 }
 
 model Deal {
@@ -650,4 +906,264 @@ model LeadMeeting {
   @@index([leadId])
   @@index([agentId])
   @@index([startsAt])
+}
+
+// ─── Tags ──────────────────────────────────────────────────────────────────
+// Sprint 1 / MLS parity — Task A2. Nadlan calls these "מדבקות" (stickers /
+// labels). A single `Tag` can target properties, leads, customers, or any
+// mix (via `scope`). `TagAssignment` is a per-entity attach-point so we
+// don't have to add a FK on every model. Join is manually-keyed rather
+// than using a polymorphic column trick — keeps Prisma queries simple.
+enum TagScope {
+  PROPERTY
+  LEAD
+  CUSTOMER
+  ALL
+}
+
+enum TagEntity {
+  PROPERTY
+  LEAD
+  CUSTOMER
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  agentId   String
+  agent     User     @relation("AgentTags", fields: [agentId], references: [id], onDelete: Cascade)
+  name      String
+  // Stored as a 7-char hex string (e.g. "#C9A14B"). No enum — callers
+  // pick from the design-system palette client-side.
+  color     String   @default("#C9A14B")
+  scope     TagScope @default(ALL)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments TagAssignment[]
+
+  @@unique([agentId, name])
+  @@index([agentId, scope])
+}
+
+model TagAssignment {
+  id         String    @id @default(cuid())
+  tagId      String
+  tag        Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  entityType TagEntity
+  entityId   String
+  createdAt  DateTime  @default(now())
+
+  @@unique([tagId, entityType, entityId])
+  @@index([entityType, entityId])
+}
+
+// Sprint 1 / MLS parity — Task D1. Standalone reminder. The dashboard
+// merges these with LeadMeetings for the "מתוכננות/ארכיון" panel.
+model Reminder {
+  id          String         @id @default(cuid())
+  agentId     String
+  agent       User           @relation("AgentReminders", fields: [agentId], references: [id], onDelete: Cascade)
+  title       String
+  notes       String?
+  dueAt       DateTime
+  status      ReminderStatus @default(PENDING)
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  leadId     String?
+  lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  // A `customerId` here is a User id (the customer-side login). Most
+  // reminders anchor to a lead instead; this is for the rarer case of a
+  // reminder tied to a confirmed customer.
+  customerId String?
+  customer   User?     @relation("ReminderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentId, status, dueAt])
+  @@index([leadId])
+  @@index([propertyId])
+  @@index([customerId])
+}
+
+// Sprint 7 / MLS parity — Task G1. Canonical city+neighborhood
+// lookup. Properties keep storing the free-text `neighborhood` column
+// for back-compat; this table is the dictionary that powers
+// autocomplete and hygiene. Aliases capture historical spellings
+// (e.g. רמת-אביב vs רמת אביב) without a migration per variant.
+model Neighborhood {
+  id        String   @id @default(cuid())
+  city      String
+  name      String
+  aliases   String[] @default([])
+  createdAt DateTime @default(now())
+
+  @@unique([city, name])
+  @@index([city])
+}
+
+// Sprint 7 / MLS parity — Task B3. Named filter snapshots.
+enum SavedSearchEntity {
+  PROPERTY
+  LEAD
+}
+
+model SavedSearch {
+  id         String            @id @default(cuid())
+  agentId    String
+  agent      User              @relation("AgentSavedSearches", fields: [agentId], references: [id], onDelete: Cascade)
+  entityType SavedSearchEntity
+  name       String
+  filters    Json
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([agentId])
+}
+
+// Sprint 7 / MLS parity — Task B4. Cross-entity pinboard.
+enum FavoriteEntity {
+  PROPERTY
+  LEAD
+  OWNER
+}
+
+model Favorite {
+  id         String         @id @default(cuid())
+  agentId    String
+  agent      User           @relation("AgentFavorites", fields: [agentId], references: [id], onDelete: Cascade)
+  entityType FavoriteEntity
+  entityId   String
+  createdAt  DateTime       @default(now())
+
+  @@unique([agentId, entityType, entityId])
+}
+
+// Sprint 6 / MLS parity — Task F1. Per-channel marketing advert
+// ("פרסום") for a property. MarketingAction tracks which channels
+// have been touched; Advert tracks what copy was pushed to each
+// channel (Yad2/Facebook/Onmap…) so agents can tweak titles and
+// prices independently per outlet.
+enum AdvertChannel {
+  YAD2
+  ONMAP
+  MADLAN
+  FACEBOOK
+  WHATSAPP
+  INSTAGRAM
+  WEBSITE
+  OTHER
+}
+
+enum AdvertStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  EXPIRED
+  REMOVED
+}
+
+model Advert {
+  id             String        @id @default(cuid())
+  agentId        String
+  agent          User          @relation("AgentAdverts", fields: [agentId], references: [id], onDelete: Cascade)
+  propertyId     String
+  property       Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  channel        AdvertChannel
+  status         AdvertStatus  @default(DRAFT)
+  title          String?
+  body           String?
+  publishedPrice Int?
+  externalUrl    String?
+  externalId     String?
+  publishedAt    DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([agentId])
+  @@index([propertyId])
+  @@index([channel, status])
+}
+
+// Sprint 5 / MLS parity — Task J10. Secondary assignees on a
+// property. `agentId` on Property stays the canonical owner (used
+// for scoping); this join table lets additional agents collaborate.
+model PropertyAssignee {
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation("PropertyAssigneeUser", fields: [userId], references: [id], onDelete: Cascade)
+  role       String   @default("CO_AGENT")
+  assignedAt DateTime @default(now())
+
+  @@id([propertyId, userId])
+  @@index([userId])
+}
+
+// Sprint 5 / MLS parity — Task H3. Agent-scoped activity log. Records
+// who did what to which entity so the UI can render a recent-activity
+// timeline and office owners can audit their agents' moves. FKs are
+// deliberately weak (no onDelete) — the log should outlive row
+// deletion for audit purposes.
+model ActivityLog {
+  id         String   @id @default(cuid())
+  agentId    String
+  actorId    String?
+  verb       String
+  entityType String
+  entityId   String?
+  summary    String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([entityType, entityId])
+}
+
+// Sprint 2 / MLS parity — Task K4. Repeatable "הנכס המבוקש" profile on
+// a lead. A lead can have multiple profiles (e.g. one for a residence
+// in Tel Aviv, another for an investment in Haifa) so matching hits
+// all of them. The flat single-value criteria fields on Lead
+// (`rooms`, `budget`, `city`, `sector`, the *Required booleans) stay
+// for back-compat during rollout.
+model LeadSearchProfile {
+  id              String             @id @default(cuid())
+  leadId          String
+  lead            Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // Optional user-facing label like "השקעה בתל אביב".
+  label           String?
+  domain          AssetClass?
+  dealType        PropertyCategory?
+  // PG text arrays keep the form wiring simple; frontend sends each as
+  // a multi-select and backend stores without extra join tables.
+  propertyTypes   String[]           @default([])
+  cities          String[]           @default([])
+  neighborhoods   String[]           @default([])
+  streets         String[]           @default([])
+  minRoom         Float?
+  maxRoom         Float?
+  minPrice        Int?
+  maxPrice        Int?
+  minPricePerSqm  Int?
+  maxPricePerSqm  Int?
+  minFloor        Int?
+  maxFloor        Int?
+  minBuilt        Int?
+  maxBuilt        Int?
+  minPlot         Int?
+  maxPlot         Int?
+  parkingReq      Boolean            @default(false)
+  elevatorReq     Boolean            @default(false)
+  balconyReq      Boolean            @default(false)
+  furnitureReq    Boolean            @default(false)
+  mamadReq        Boolean            @default(false)
+  storeroomReq    Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([leadId])
 }

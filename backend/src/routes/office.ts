@@ -1,0 +1,133 @@
+// Sprint 1 / MLS parity — Task A1.
+//
+// Office-level endpoints. Owners see and edit their office + its
+// members; agents see a read-only view of the office they belong to
+// (so the profile page can show "משרד: Acme Realty").
+
+import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { prisma } from '../lib/prisma.js';
+import { requireUser } from '../middleware/auth.js';
+
+export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
+  // GET /api/office — the signed-in user's own office (or null).
+  app.get('/', { onRequest: [app.requireAuth] }, async (req) => {
+    const u = requireUser(req);
+    const user = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!user?.officeId) return { office: null };
+    const office = await prisma.office.findUnique({
+      where: { id: user.officeId },
+      include: {
+        members: {
+          select: {
+            id: true, email: true, displayName: true, role: true,
+            phone: true, avatarUrl: true, slug: true,
+          },
+          orderBy: { displayName: 'asc' },
+        },
+      },
+    });
+    return { office };
+  });
+
+  // PATCH /api/office — update the office's public details. Only OWNERs
+  // may update, and only their own office.
+  const updateSchema = z.object({
+    name:    z.string().min(1).max(200).optional(),
+    phone:   z.string().max(40).nullable().optional(),
+    address: z.string().max(400).nullable().optional(),
+    logoUrl: z.string().url().nullable().optional(),
+  });
+
+  app.patch('/', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+    const body = updateSchema.parse(req.body);
+    const u = requireUser(req);
+    const user = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!user?.officeId) {
+      return reply.code(404).send({ error: { message: 'No office attached to your user' } });
+    }
+    const office = await prisma.office.update({
+      where: { id: user.officeId },
+      data: {
+        name:    body.name,
+        phone:   body.phone    ?? undefined,
+        address: body.address  ?? undefined,
+        logoUrl: body.logoUrl  ?? undefined,
+      },
+    });
+    return { office };
+  });
+
+  // POST /api/office — create an office and attach the caller (must be
+  // OWNER already). Kept tight: a user can only have one office at a
+  // time. Creating a second one returns 409.
+  const createSchema = z.object({
+    name:    z.string().min(1).max(200),
+    phone:   z.string().max(40).nullable().optional(),
+    address: z.string().max(400).nullable().optional(),
+    logoUrl: z.string().url().nullable().optional(),
+  });
+  app.post('/', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+    const body = createSchema.parse(req.body);
+    const u = requireUser(req);
+    const user = await prisma.user.findUnique({ where: { id: u.id } });
+    if (user?.officeId) {
+      return reply.code(409).send({ error: { message: 'User already belongs to an office' } });
+    }
+    const office = await prisma.office.create({
+      data: {
+        name:    body.name,
+        phone:   body.phone ?? null,
+        address: body.address ?? null,
+        logoUrl: body.logoUrl ?? null,
+        members: { connect: { id: u.id } },
+      },
+    });
+    return { office };
+  });
+
+  // POST /api/office/members — add a user (by email) to this office.
+  // Owner-only. The invited user keeps their current role (AGENT stays
+  // AGENT) but now sees office-wide data where applicable.
+  const addMemberSchema = z.object({ email: z.string().email() });
+  app.post('/members', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+    const body = addMemberSchema.parse(req.body);
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!me?.officeId) {
+      return reply.code(404).send({ error: { message: 'No office attached to your user' } });
+    }
+    const target = await prisma.user.findUnique({ where: { email: body.email.toLowerCase() } });
+    if (!target) return reply.code(404).send({ error: { message: 'User not found' } });
+    if (target.role === 'CUSTOMER') {
+      return reply.code(400).send({ error: { message: 'Only AGENT/OWNER users can join an office' } });
+    }
+    const updated = await prisma.user.update({
+      where: { id: target.id },
+      data: { officeId: me.officeId },
+      select: { id: true, email: true, displayName: true, role: true, officeId: true },
+    });
+    return { user: updated };
+  });
+
+  // DELETE /api/office/members/:id — remove a user from the office.
+  // Owner-only, can't remove themselves (would leave the office
+  // ownerless — POST back in if that's ever the intent).
+  app.delete('/members/:id', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const u = requireUser(req);
+    if (id === u.id) {
+      return reply.code(400).send({ error: { message: 'Cannot remove yourself' } });
+    }
+    const me = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!me?.officeId) {
+      return reply.code(404).send({ error: { message: 'No office attached to your user' } });
+    }
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target || target.officeId !== me.officeId) {
+      return reply.code(404).send({ error: { message: 'User not in your office' } });
+    }
+    await prisma.user.update({ where: { id }, data: { officeId: null } });
+    return { ok: true };
+  });
+};

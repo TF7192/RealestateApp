@@ -9,6 +9,8 @@ import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
 import { track as phTrack } from '../lib/analytics.js';
 import { assertAllowedMime } from '../lib/uploadGuards.js';
+import { evaluateLeadProperty } from '../lib/matching.js';
+import { logActivity } from '../lib/activity.js';
 
 // Canonical action keys for newly-created properties. `externalCoop` is
 // kept in existing rows but new keys use the renamed `brokerCoop`.
@@ -32,7 +34,11 @@ const listQuery = z.object({
 const propertyInput = z.object({
   assetClass: z.enum(['RESIDENTIAL', 'COMMERCIAL']),
   category: z.enum(['SALE', 'RENT']),
-  status: z.enum(['ACTIVE', 'PAUSED', 'SOLD', 'RENTED', 'ARCHIVED']).optional(),
+  // Sprint 1 / MLS parity — Task J9. Extended life-cycle values:
+  // INACTIVE (לא אקטואלי), CANCELLED (מבוטל), IN_DEAL (עיסקה).
+  status: z
+    .enum(['ACTIVE', 'PAUSED', 'SOLD', 'RENTED', 'ARCHIVED', 'INACTIVE', 'CANCELLED', 'IN_DEAL'])
+    .optional(),
   type: z.string().min(1).max(60),
   street: z.string().min(1).max(120),
   city: z.string().min(1).max(80),
@@ -116,6 +122,43 @@ const propertyInput = z.object({
   marketingStartDate: z.string().datetime().nullable().optional(),
   // Exclusivity agreement is set via its own upload endpoint, not here.
   marketingReminderFrequency: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).optional(),
+  // Sprint 1 / MLS parity — Task J9. Pipeline admin block.
+  stage: z
+    .enum([
+      'WATCHING', 'PRE_ACQUISITION', 'IN_PROGRESS',
+      'SIGNED_NON_EXCLUSIVE', 'SIGNED_EXCLUSIVE',
+      'EXCLUSIVITY_ENDED', 'REFUSED_BROKERAGE', 'REMOVED',
+    ])
+    .nullable()
+    .optional(),
+  // Accepts percentages (e.g. 2, 2.5). Commission is opt-in so leaving
+  // it off doesn't force a value on legacy rows.
+  agentCommissionPct: z.number().min(0).max(100).nullable().optional(),
+  primaryAgentId: z.string().nullable().optional(),
+  exclusivityExpire: z.string().datetime().nullable().optional(),
+  sellerSeriousness: z.enum(['NONE', 'SORT_OF', 'MEDIUM', 'VERY']).nullable().optional(),
+  brokerNotes: z.string().max(4000).nullable().optional(),
+
+  // Sprint 3 / MLS parity — Tasks J4–J7. Extras for Nadlan parity.
+  condition: z
+    .enum(['NEW', 'AS_NEW', 'RENOVATED', 'PRESERVED', 'NEEDS_RENOVATION', 'NEEDS_TLC', 'RAW'])
+    .nullable()
+    .optional(),
+  heatingTypes:     z.array(z.string().max(40)).optional(),
+  halfRooms:        z.number().int().min(0).max(10).nullable().optional(),
+  masterBedroom:    z.boolean().optional(),
+  bathrooms:        z.number().int().min(0).max(20).nullable().optional(),
+  toilets:          z.number().int().min(0).max(20).nullable().optional(),
+  furnished:        z.boolean().optional(),
+  petFriendly:      z.boolean().optional(),
+  doormenService:   z.boolean().optional(),
+  gym:              z.boolean().optional(),
+  pool:             z.boolean().optional(),
+  gatedCommunity:   z.boolean().optional(),
+  accessibility:    z.boolean().optional(),
+  utilityRoom:      z.boolean().optional(),
+  listingSource:    z.string().max(40).nullable().optional(),
+
   images: z.array(z.string().url()).optional(),
 });
 
@@ -254,6 +297,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       city: created.city,
       has_photos: (body.images?.length || 0) > 0,
     });
+    await logActivity({
+      agentId, actorId: agentId,
+      verb: 'created', entityType: 'Property', entityId: created.id,
+      summary: `נכס חדש: ${created.street}, ${created.city}`,
+    });
     return { property: serialize(created) };
   });
 
@@ -283,6 +331,12 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         ...(propertyOwnerId !== undefined ? { propertyOwnerId } : {}),
       },
       include: { images: true, marketingActions: true, propertyOwner: true },
+    });
+    await logActivity({
+      agentId: existing.agentId, actorId: requireUser(req).id,
+      verb: 'updated', entityType: 'Property', entityId: id,
+      summary: `עודכן נכס: ${updated.street}, ${updated.city}`,
+      metadata: { fields: Object.keys(body) },
     });
     return { property: serialize(updated) };
   });
@@ -351,7 +405,115 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     await prisma.property.delete({ where: { id } });
+    await logActivity({
+      agentId: existing.agentId, actorId: requireUser(req).id,
+      verb: 'deleted', entityType: 'Property', entityId: id,
+      summary: `נמחק נכס: ${existing.street}, ${existing.city}`,
+    });
     return { ok: true };
+  });
+
+  // Sprint 5 / MLS parity — Task J10. Secondary assignee management.
+  app.get('/:id/assignees', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const prop = await prisma.property.findFirst({ where: { id, agentId: uid } });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    const items = await prisma.propertyAssignee.findMany({
+      where: { propertyId: id },
+      include: { user: { select: { id: true, displayName: true, email: true, role: true } } },
+      orderBy: { assignedAt: 'asc' },
+    });
+    return { items };
+  });
+
+  const assigneeInput = z.object({
+    userId: z.string().min(1).max(40),
+    role:   z.enum(['CO_AGENT', 'OBSERVER']).optional(),
+  });
+  app.post('/:id/assignees', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const prop = await prisma.property.findFirst({ where: { id, agentId: uid } });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    const body = assigneeInput.parse(req.body);
+    // Assignee must belong to the same office (if any) so cross-office
+    // leakage is impossible.
+    const me = await prisma.user.findUnique({ where: { id: uid }, select: { officeId: true } });
+    const target = await prisma.user.findUnique({
+      where: { id: body.userId },
+      select: { id: true, officeId: true },
+    });
+    if (!target) return reply.code(404).send({ error: { message: 'User not found' } });
+    if (me?.officeId && target.officeId !== me.officeId) {
+      return reply.code(403).send({ error: { message: 'אפשר לשייך רק סוכנים מאותו משרד' } });
+    }
+    const row = await prisma.propertyAssignee.upsert({
+      where: { propertyId_userId: { propertyId: id, userId: body.userId } },
+      create: { propertyId: id, userId: body.userId, role: body.role ?? 'CO_AGENT' },
+      update: { role: body.role ?? 'CO_AGENT' },
+    });
+    await logActivity({
+      agentId: prop.agentId, actorId: uid,
+      verb: 'assigned', entityType: 'Property', entityId: id,
+      summary: `סוכן שותף נוסף לנכס`,
+      metadata: { userId: body.userId, role: row.role },
+    });
+    return { assignee: row };
+  });
+
+  app.delete('/:id/assignees/:userId', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id, userId } = req.params as { id: string; userId: string };
+    const uid = requireUser(req).id;
+    const prop = await prisma.property.findFirst({ where: { id, agentId: uid } });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    await prisma.propertyAssignee.deleteMany({
+      where: { propertyId: id, userId },
+    });
+    await logActivity({
+      agentId: prop.agentId, actorId: uid,
+      verb: 'unassigned', entityType: 'Property', entityId: id,
+      metadata: { userId },
+    });
+    return { ok: true };
+  });
+
+  // Sprint 2 / MLS parity — Task C3. Reverse direction: leads from the
+  // signed-in agent that match this property, sorted by match score.
+  app.get('/:id/matching-customers', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const property = await prisma.property.findFirst({
+      where: { id, agentId: uid },
+    });
+    if (!property) return reply.code(404).send({ error: { message: 'Property not found' } });
+    const leads = await prisma.lead.findMany({
+      where: { agentId: uid },
+      include: { searchProfiles: true },
+    });
+    const scored = leads
+      .map((l: any) => ({ l, sig: evaluateLeadProperty(l, property as any) }))
+      .filter((r) => r.sig.matches)
+      .sort((a, b) => b.sig.score - a.sig.score)
+      .map((r) => ({
+        lead: {
+          id:            r.l.id,
+          name:          r.l.name,
+          phone:         r.l.phone,
+          email:         r.l.email,
+          city:          r.l.city,
+          budget:        r.l.budget,
+          rooms:         r.l.rooms,
+          lookingFor:    r.l.lookingFor,
+          interestType:  r.l.interestType,
+          status:        r.l.status,
+          customerStatus: r.l.customerStatus,
+          leadStatus:    r.l.leadStatus,
+        },
+        score:   r.sig.score,
+        reasons: r.sig.reasons,
+      }));
+    return { items: scored };
   });
 
   // Toggle / set a marketing action
@@ -638,6 +800,10 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
   delete data.propertyOwnerId;
   if (data.exclusiveStart) data.exclusiveStart = new Date(data.exclusiveStart);
   if (data.exclusiveEnd) data.exclusiveEnd = new Date(data.exclusiveEnd);
+  // Sprint 1 / MLS parity — Task J9. `exclusivityExpire` is orthogonal
+  // to `exclusiveStart/End` (the latter is the mid-deal exclusivity
+  // window; the former is the broader broker-exclusivity expiry).
+  if (data.exclusivityExpire) data.exclusivityExpire = new Date(data.exclusivityExpire);
   // 1.3 marketingStartDate arrives as an ISO string; materialize it to a
   // Date so Prisma accepts it. `null` stays null (explicitly wipe).
   if (data.marketingStartDate) data.marketingStartDate = new Date(data.marketingStartDate);

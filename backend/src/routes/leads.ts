@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
 import { track as phTrack } from '../lib/analytics.js';
+import { evaluateLeadProperty } from '../lib/matching.js';
+import { logActivity } from '../lib/activity.js';
 
 const leadInput = z.object({
   name: z.string().min(1).max(120),
@@ -30,6 +32,43 @@ const leadInput = z.object({
   brokerageSignedAt: z.string().nullable().optional(),
   brokerageExpiresAt: z.string().nullable().optional(),
   lastContact: z.string().nullable().optional(),
+
+  // Sprint 1 / MLS parity — Task K2. Customer admin block.
+  // `status` (above) stays thermal; `customerStatus` is the life-cycle.
+  customerStatus: z
+    .enum(['ACTIVE', 'INACTIVE', 'CANCELLED', 'PAUSED', 'IN_DEAL', 'BOUGHT', 'RENTED'])
+    .nullable()
+    .optional(),
+  commissionPct: z.number().min(0).max(100).nullable().optional(),
+  isPrivate: z.boolean().optional(),
+  purposes: z
+    .array(z.enum(['INVESTMENT', 'RESIDENCE', 'COMMERCIAL', 'COMBINATION']))
+    .optional(),
+  seriousnessOverride: z.enum(['NONE', 'SORT_OF', 'MEDIUM', 'VERY']).nullable().optional(),
+
+  // Sprint 2 / MLS parity — Task K1. Richer contact + identity fields.
+  firstName:    z.string().max(120).nullable().optional(),
+  lastName:     z.string().max(120).nullable().optional(),
+  companyName:  z.string().max(200).nullable().optional(),
+  address:      z.string().max(400).nullable().optional(),
+  cityText:     z.string().max(120).nullable().optional(),
+  zip:          z.string().max(20).nullable().optional(),
+  primaryPhone: z.string().max(40).nullable().optional(),
+  phone1:       z.string().max(40).nullable().optional(),
+  phone2:       z.string().max(40).nullable().optional(),
+  fax:          z.string().max(40).nullable().optional(),
+  personalId:   z.string().max(40).nullable().optional(),
+  description:  z.string().max(500).nullable().optional(),
+
+  // Sprint 2 / MLS parity — Task L1. Quick-lead lifecycle status.
+  leadStatus: z
+    .enum([
+      'NEW', 'INTENT_TO_CALL', 'CONVERTED', 'DISQUALIFIED',
+      'NOT_INTERESTED', 'IN_PROGRESS', 'CONVERTED_NO_OPPORTUNITY',
+      'DELETED', 'ARCHIVED',
+    ])
+    .nullable()
+    .optional(),
 });
 
 // Suggest HOT/WARM/COLD status from activity signals.
@@ -74,7 +113,9 @@ function explainStatus(lead: any, suggested: string): string {
 export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const q = req.query as any;
-    const where: any = { agentId: requireUser(req).id };
+    const uid = requireUser(req).id;
+    const where: any = { agentId: uid };
+    // Legacy single-value filters.
     if (q.status) where.status = q.status;
     if (q.lookingFor) where.lookingFor = q.lookingFor;
     if (q.interestType) where.interestType = q.interestType;
@@ -86,13 +127,105 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
         { city: { contains: s, mode: 'insensitive' } },
       ];
     }
+
+    // Sprint 2 / MLS parity — Task C2. Nadlan-parity filter panel.
+    // Query params arrive as either a single string or an array (Fastify
+    // auto-parses `?cities=A&cities=B`); `toList` normalizes both shapes.
+    const toList = (v: unknown): string[] => {
+      if (v == null) return [];
+      return (Array.isArray(v) ? v : [v]).map((x) => String(x)).filter(Boolean);
+    };
+    const cities = toList(q.cities);
+    if (cities.length) where.city = { in: cities };
+    const leadStatus = toList(q.leadStatus);
+    if (leadStatus.length) where.leadStatus = { in: leadStatus };
+    const customerStatus = toList(q.customerStatus);
+    if (customerStatus.length) where.customerStatus = { in: customerStatus };
+    const seriousness = toList(q.seriousness);
+    if (seriousness.length) where.seriousnessOverride = { in: seriousness };
+    const types = toList(q.types); // apartment / house / ...
+    // Lead.type is a free-form hint; we match via searchProfiles when
+    // supplied AND also accept exact match on the flat field for back-compat.
+    if (q.minPrice != null || q.maxPrice != null) {
+      const min = q.minPrice != null ? Number(q.minPrice) : undefined;
+      const max = q.maxPrice != null ? Number(q.maxPrice) : undefined;
+      where.budget = {};
+      if (Number.isFinite(min!)) where.budget.gte = min;
+      if (Number.isFinite(max!)) where.budget.lte = max;
+    }
+    // Requirement booleans — flags on the lead itself.
+    for (const k of [
+      'balconyRequired', 'parkingRequired', 'elevatorRequired',
+      'safeRoomRequired', 'acRequired', 'storageRequired',
+    ] as const) {
+      if (q[k] === '1' || q[k] === 'true' || q[k] === true) where[k] = true;
+    }
+    // Keyword (Nadlan `Keyword`): broad text match across name/notes/city.
+    if (q.keyword) {
+      const s = String(q.keyword);
+      where.AND = [...(where.AND || []), {
+        OR: [
+          { name:   { contains: s, mode: 'insensitive' } },
+          { notes:  { contains: s, mode: 'insensitive' } },
+          { city:   { contains: s, mode: 'insensitive' } },
+          { street: { contains: s, mode: 'insensitive' } },
+          { description: { contains: s, mode: 'insensitive' } },
+        ],
+      }];
+    }
+    // Flag = Tag filter (server-side join via TagAssignment).
+    const tagIds = toList(q.tags);
+    if (tagIds.length) {
+      const assigned = await prisma.tagAssignment.findMany({
+        where: { tagId: { in: tagIds }, entityType: 'LEAD' },
+        select: { entityId: true },
+      });
+      const leadIds = Array.from(new Set(assigned.map((a) => a.entityId)));
+      where.AND = [...(where.AND || []), { id: { in: leadIds.length ? leadIds : ['__none__'] } }];
+    }
+
     const items = await prisma.lead.findMany({
       where,
-      include: { viewings: true, agreements: true },
+      include: { viewings: true, agreements: true, searchProfiles: true },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Post-filter on search-profile fields (rooms / floor / types / hoods)
+    // — doing this in Prisma requires either a raw join or a nested
+    // `some: { ... }` per field, and mixing them in one where-clause gets
+    // hairy. The result set is already owner-scoped (bounded) so an
+    // in-memory filter is safe and keeps the query readable.
+    const hoods    = toList(q.neighborhoods);
+    const minRoom  = q.minRoom  != null ? Number(q.minRoom)  : null;
+    const maxRoom  = q.maxRoom  != null ? Number(q.maxRoom)  : null;
+    const minFloor = q.minFloor != null ? Number(q.minFloor) : null;
+    const maxFloor = q.maxFloor != null ? Number(q.maxFloor) : null;
+    const hasProfileFilters =
+      hoods.length || types.length ||
+      minRoom != null || maxRoom != null ||
+      minFloor != null || maxFloor != null;
+
+    const filtered = !hasProfileFilters ? items : items.filter((l: any) => {
+      const profiles = l.searchProfiles || [];
+      // A lead passes if ANY of its profiles matches every constraint.
+      // Leads with no profiles fall back to flat `rooms`/`city` fields.
+      const candidates = profiles.length ? profiles : [{
+        neighborhoods: [], propertyTypes: [],
+        minRoom:  null, maxRoom:  null,
+        minFloor: null, maxFloor: null,
+      }];
+      return candidates.some((p: any) => {
+        if (hoods.length && !(p.neighborhoods || []).some((h: string) => hoods.includes(h))) return false;
+        if (types.length && !(p.propertyTypes || []).some((t: string) => types.includes(t))) return false;
+        if (minRoom != null && (p.maxRoom != null && p.maxRoom < minRoom)) return false;
+        if (maxRoom != null && (p.minRoom != null && p.minRoom > maxRoom)) return false;
+        if (minFloor != null && (p.maxFloor != null && p.maxFloor < minFloor)) return false;
+        if (maxFloor != null && (p.minFloor != null && p.minFloor > maxFloor)) return false;
+        return true;
+      });
+    });
     // Decorate with computed heat suggestion + explanation
-    const withSuggest = items.map((l: any) => {
+    const withSuggest = filtered.map((l: any) => {
       const suggestedStatus = suggestStatus(l);
       return {
         ...l,
@@ -131,6 +264,11 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       looking_for: created.lookingFor,
       city: created.city,
     });
+    await logActivity({
+      agentId, actorId: agentId,
+      verb: 'created', entityType: 'Lead', entityId: created.id,
+      summary: `לקוח חדש: ${created.name}`,
+    });
     return { lead: created };
   });
 
@@ -145,6 +283,12 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       data: normalize(body),
     });
+    await logActivity({
+      agentId: existing.agentId, actorId: requireUser(req).id,
+      verb: 'updated', entityType: 'Lead', entityId: id,
+      summary: `עודכן לקוח: ${updated.name}`,
+      metadata: { fields: Object.keys(body) },
+    });
     return { lead: updated };
   });
 
@@ -155,7 +299,42 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     await prisma.lead.delete({ where: { id } });
+    await logActivity({
+      agentId: existing.agentId, actorId: requireUser(req).id,
+      verb: 'deleted', entityType: 'Lead', entityId: id,
+      summary: `נמחק לקוח: ${existing.name}`,
+    });
     return { ok: true };
+  });
+
+  // Sprint 2 / MLS parity — Task C3. Server-side matching: properties
+  // this lead could be interested in. Owner-scoped — only returns
+  // properties the signed-in agent owns.
+  app.get('/:id/matches', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const lead = await prisma.lead.findFirst({
+      where: { id, agentId: uid },
+      include: { searchProfiles: true },
+    });
+    if (!lead) return reply.code(404).send({ error: { message: 'Lead not found' } });
+    const props = await prisma.property.findMany({
+      where: { agentId: uid, status: 'ACTIVE' },
+      include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+    });
+    const scored = props
+      .map((p: any) => ({ p, sig: evaluateLeadProperty(lead as any, p) }))
+      .filter((r) => r.sig.matches)
+      .sort((a, b) => b.sig.score - a.sig.score)
+      .map((r) => ({
+        property: {
+          ...r.p,
+          images: (r.p.images || []).map((i: any) => i.url),
+        },
+        score:   r.sig.score,
+        reasons: r.sig.reasons,
+      }));
+    return { items: scored };
   });
 };
 

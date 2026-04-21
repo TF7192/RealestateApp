@@ -117,7 +117,20 @@ export default function Customers() {
   const [leads, setLeads] = useState(_cachedLeads || []);
   const [properties, setProperties] = useState(pageCache.get('properties') || []);
   const [loading, setLoading] = useState(!_cachedLeads);
-  const [lookingForFilter, setLookingForFilter] = useState('all'); // all | BUY | RENT
+  // Sprint 1 / MLS parity — Task C1. Seed the קונים / שוכרים segment
+  // from the URL (`?segment=buyers|renters|all`) so deep links hydrate
+  // and sharing / copy-paste works. Segment ↔ lookingFor mapping:
+  //   buyers  → BUY   → קונים
+  //   renters → RENT  → שוכרים
+  //   all     → 'all' → both tabs off
+  const [lookingForFilter, setLookingForFilter] = useState(() => {
+    try {
+      const seg = new URLSearchParams(window.location.search).get('segment');
+      if (seg === 'buyers') return 'BUY';
+      if (seg === 'renters') return 'RENT';
+    } catch { /* SSR / no window — fall through */ }
+    return 'all';
+  });
   const [interestFilter, setInterestFilter] = useState('all'); // all | PRIVATE | COMMERCIAL
   const [statusFilter, setStatusFilter] = useState('all');
   // S12: `inactive` lets the Dashboard Today strip deep-link straight into a
@@ -264,6 +277,27 @@ export default function Customers() {
     haptics.tap();
     window.open(`sms:${lead.phone}`, '_self');
   };
+
+  // Sprint 1 / MLS parity — Task C1. Keep `?segment=` in sync with the
+  // active looking-for filter so back/forward + deep-link copy work.
+  // Uses history.replaceState rather than useSearchParams's setter so
+  // the effect doesn't fight the other `searchParams` useEffect above
+  // (which reads, not writes).
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const prev = url.searchParams.get('segment');
+      const next =
+        lookingForFilter === 'BUY'  ? 'buyers'
+        : lookingForFilter === 'RENT' ? 'renters'
+        : null;
+      if (next && prev === next) return;
+      if (!next && !prev)         return;
+      if (next) url.searchParams.set('segment', next);
+      else      url.searchParams.delete('segment');
+      window.history.replaceState({}, '', url.toString());
+    } catch { /* SSR / exotic env — ignore */ }
+  }, [lookingForFilter]);
 
   // P1-M11: count of non-default filters active for the mobile filter pill
   const activeFilterCount =
