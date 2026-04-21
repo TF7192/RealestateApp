@@ -14,7 +14,10 @@ import {
   Snowflake,
   Building2,
   Sparkles,
+  Printer,
+  Maximize2,
 } from 'lucide-react';
+import { popoutCurrentRoute } from '../lib/popout';
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import LeadMeetingDialog from '../components/LeadMeetingDialog';
@@ -220,6 +223,14 @@ export default function CustomerDetail() {
           >
             <Calendar size={14} />
             קבע פגישה
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title="הדפס">
+            <Printer size={14} />
+            הדפס
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => popoutCurrentRoute()} title="פתח בחלון חדש">
+            <Maximize2 size={14} />
+            פתח בחלון חדש
           </button>
         </div>
       </div>

@@ -1,0 +1,89 @@
+/* Shared print stylesheet (Phase-4 Lane 4 — B6).
+ *
+ * Imported once globally from main.jsx. Covers all printable routes —
+ * detail pages today (property / customer / owner), others later.
+ *
+ * Design goals:
+ *   1. Hide app chrome (sidebar / mobile header / mobile tab bar /
+ *      sticky action bars / FABs) so only the main content prints.
+ *   2. Drop shadows and surface tinting — black text on white paper.
+ *   3. Keep imagery present at a readable width; don't blow photos up
+ *      to full A4.
+ *   4. Print-friendly @page margins (18mm all round — a hair narrower
+ *      than LibreOffice's default, fits most inkjets edge-to-edge).
+ */
+
+@media print {
+  @page {
+    margin: 18mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* App chrome — hide everything that isn't the content. */
+  .sidebar,
+  .sidebar-overlay,
+  .mobile-header,
+  .mobile-tab-bar,
+  .mobile-more-sheet,
+  .sticky-action-bar,
+  .chatw-btn,
+  .chatw-panel,
+  .noise-overlay,
+  .pd-topbar,
+  .cd-toolbar,
+  .od-toolbar,
+  .od-mobile-header,
+  .pd-print-only-hide,
+  [data-print-hide='1'] {
+    display: none !important;
+  }
+
+  /* Main surface spans the page. */
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Flatten cards / surfaces. */
+  .card,
+  .section,
+  .pd-section,
+  .cd-section,
+  .od-section,
+  .pd-kpi,
+  .pd-hero,
+  .pd-matches,
+  .pd-panel,
+  .pd-block {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    background: #fff !important;
+    page-break-inside: avoid;
+  }
+
+  /* Keep photos readable but not wasteful. */
+  img,
+  video {
+    max-width: 420px !important;
+    height: auto !important;
+    box-shadow: none !important;
+  }
+
+  a,
+  a:visited {
+    color: #000 !important;
+    text-decoration: none !important;
+  }
+
+  /* Avoid orphans on headings. */
+  h1, h2, h3, h4 {
+    page-break-after: avoid;
+  }
+}

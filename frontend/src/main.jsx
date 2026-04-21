@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from './lib/theme.jsx';
 import { ToastProvider } from './lib/toast.jsx';
 import './index.css';
+import './styles/print.css';
 import App from './App.jsx';
 import { initAnalytics } from './lib/analytics.js';
 
