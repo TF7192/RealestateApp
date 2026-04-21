@@ -34,6 +34,13 @@ const AdminChats = lazy(() => import('./pages/AdminChats'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const SellerCalculator = lazy(() => import('./pages/SellerCalculator'));
 const Yad2Import = lazy(() => import('./pages/Yad2Import'));
+// MLS parity — Sprint 1/4/5 new pages. Lazy so each lands in its own
+// chunk and the Dashboard-first-paint budget doesn't regress.
+const Reports = lazy(() => import('./pages/Reports'));
+const ActivityLog = lazy(() => import('./pages/ActivityLog'));
+const Reminders = lazy(() => import('./pages/Reminders'));
+const Office = lazy(() => import('./pages/Office'));
+const TagSettings = lazy(() => import('./pages/TagSettings'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import { AuthProvider, useAuth } from './lib/auth';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
@@ -179,6 +186,12 @@ function AppRoutes() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/calculator" element={<SellerCalculator />} />
             <Route path="/integrations/yad2" element={<Yad2Import />} />
+            {/* MLS parity — Sprint 4/5/1 standalone pages. */}
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/activity" element={<ActivityLog />} />
+            <Route path="/reminders" element={<Reminders />} />
+            <Route path="/office" element={<Office />} />
+            <Route path="/settings/tags" element={<TagSettings />} />
             {/* Legacy + alias routes — redirect.
                 `/assets` is a reasonable English guess for "נכסים"
                 (literally "assets") — hitting the 404 felt like a bug
