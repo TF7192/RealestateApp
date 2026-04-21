@@ -213,3 +213,99 @@ describe('DELETE /api/office/invites/:id', () => {
   });
 });
 
+describe('auth auto-accept on login/signup', () => {
+  it('login — attaches user to office and marks invite accepted', async () => {
+    const { cookie: ownerCookie, office } = await setupOwnerWithOffice();
+    const target = await createAgent(prisma, { email: 'loginclaim@example.com' });
+    await app.inject({
+      method: 'POST', url: '/api/office/invites', headers: { cookie: ownerCookie },
+      payload: { email: target.email },
+    });
+    const res = await app.inject({
+      method: 'POST', url: '/api/auth/login',
+      payload: { email: target.email, password: target._plainPassword },
+    });
+    expect(res.statusCode).toBe(200);
+    // Response shape unchanged — {user, token}.
+    expect(res.json().user.id).toBe(target.id);
+    expect(typeof res.json().token).toBe('string');
+    const after = await prisma.user.findUnique({ where: { id: target.id } });
+    expect(after?.officeId).toBe(office.id);
+    const invite = await prisma.officeInvite.findUnique({
+      where: { officeId_email: { officeId: office.id, email: target.email } },
+    });
+    expect(invite?.acceptedAt).toBeInstanceOf(Date);
+    expect(invite?.acceptedById).toBe(target.id);
+  });
+
+  it('signup — attaches brand-new user to the office', async () => {
+    const { cookie: ownerCookie, office } = await setupOwnerWithOffice();
+    const email = `signup-${Date.now()}@example.com`;
+    await app.inject({
+      method: 'POST', url: '/api/office/invites', headers: { cookie: ownerCookie },
+      payload: { email },
+    });
+    const res = await app.inject({
+      method: 'POST', url: '/api/auth/signup',
+      payload: {
+        email,
+        password: 'Password1!',
+        role: 'AGENT',
+        displayName: 'New Agent',
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const created = await prisma.user.findUnique({ where: { email } });
+    expect(created?.officeId).toBe(office.id);
+    const invite = await prisma.officeInvite.findUnique({
+      where: { officeId_email: { officeId: office.id, email } },
+    });
+    expect(invite?.acceptedAt).toBeInstanceOf(Date);
+    expect(invite?.acceptedById).toBe(created!.id);
+  });
+
+  it('login — revoked invite does NOT auto-accept', async () => {
+    const { cookie: ownerCookie, office } = await setupOwnerWithOffice();
+    const target = await createAgent(prisma, { email: 'revoked-login@example.com' });
+    const r1 = await app.inject({
+      method: 'POST', url: '/api/office/invites', headers: { cookie: ownerCookie },
+      payload: { email: target.email },
+    });
+    await app.inject({
+      method: 'DELETE',
+      url: `/api/office/invites/${r1.json().invite.id}`,
+      headers: { cookie: ownerCookie },
+    });
+    await app.inject({
+      method: 'POST', url: '/api/auth/login',
+      payload: { email: target.email, password: target._plainPassword },
+    });
+    const after = await prisma.user.findUnique({ where: { id: target.id } });
+    expect(after?.officeId ?? null).not.toBe(office.id);
+  });
+
+  it('login — CUSTOMER role logs in but is not attached', async () => {
+    // Owner invites an email that happens to resolve to a CUSTOMER
+    // account. Auto-accept filters these out so customer-side flows
+    // aren't silently reclassified into an agency.
+    const { cookie: ownerCookie, office } = await setupOwnerWithOffice();
+    const customer = await createCustomer(prisma, { email: 'cust-claim@example.com' });
+    await app.inject({
+      method: 'POST', url: '/api/office/invites', headers: { cookie: ownerCookie },
+      payload: { email: customer.email },
+    });
+    const res = await app.inject({
+      method: 'POST', url: '/api/auth/login',
+      payload: { email: customer.email, password: customer._plainPassword },
+    });
+    expect(res.statusCode).toBe(200);
+    const after = await prisma.user.findUnique({ where: { id: customer.id } });
+    expect(after?.officeId).toBeNull();
+    const invite = await prisma.officeInvite.findUnique({
+      where: { officeId_email: { officeId: office.id, email: customer.email } },
+    });
+    expect(invite?.acceptedAt).toBeNull();
+  });
+});
+
+
