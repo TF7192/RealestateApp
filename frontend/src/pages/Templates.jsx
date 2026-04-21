@@ -35,6 +35,7 @@ import {
   renderTemplate,
 } from '../lib/templates';
 import ChipEditor from '../components/ChipEditor';
+import ConfirmDialog from '../components/ConfirmDialog';
 import Portal from '../components/Portal';
 import PageTour from '../components/PageTour';
 import { Maximize2 } from 'lucide-react';
@@ -72,6 +73,9 @@ export default function Templates() {
   const [mobileMode, setMobileMode] = useState('edit'); // 'edit' | 'preview'
   const [pickerOpen, setPickerOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  // Gate destructive reset with a ConfirmDialog instead of window.confirm so
+  // the copy, focus-trap, and RTL styling match the rest of the app.
+  const [pendingReset, setPendingReset] = useState(false);
   const editorRef = useRef(null);
 
   // ── Load templates + properties ───────────────────────────────
@@ -167,8 +171,12 @@ export default function Templates() {
     setSaving(false);
   };
 
-  const handleReset = async () => {
-    if (!confirm('להחזיר לברירת המחדל? הנוסח הנוכחי יוחלף.')) return;
+  const handleReset = () => {
+    setPendingReset(true);
+  };
+
+  const confirmReset = async () => {
+    setPendingReset(false);
     setSaving(true);
     try {
       const r = await api.resetTemplate(kind);
@@ -556,6 +564,17 @@ export default function Templates() {
           onInsertVariable={(k) => insertVariable(k)}
         />
       )}
+
+      {pendingReset && (
+        <ConfirmDialog
+          title="איפוס תבנית"
+          message="להחזיר את התבנית לברירת המחדל? הנוסח הנוכחי יימחק ואי אפשר לשחזר אותו."
+          confirmLabel="איפוס"
+          onConfirm={confirmReset}
+          onClose={() => setPendingReset(false)}
+          busy={saving}
+        />
+      )}
     </div>
   );
 }
@@ -696,7 +715,7 @@ function VariableSheet({ kind, variables, onClose, onPick }) {
   }, []);
   const q = query.trim();
   return (
-    <div className="tpl-sheet-back" onClick={onClose} role="dialog">
+    <div className="tpl-sheet-back" onClick={onClose} role="dialog" aria-modal="true">
       <div className="tpl-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="tpl-sheet-handle" />
         <header className="tpl-sheet-head">
