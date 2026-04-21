@@ -395,7 +395,7 @@ function DealEditModal({ deal, mode, onClose, onSaved }) {
             <h3>{mode === 'sign' ? 'סימון עסקה כנחתמה' : 'עריכת עסקה'}</h3>
             <p>{deal.propertyStreet}, {deal.city}</p>
           </div>
-          <button className="btn-ghost" onClick={onClose}>
+          <button className="btn-ghost" onClick={onClose} aria-label="סגור">
             <X size={20} />
           </button>
         </header>

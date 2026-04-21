@@ -125,7 +125,7 @@ export default function MarketingActionDialog({
               <h3>{config.label}</h3>
               <p>{config.hint}</p>
             </div>
-            <button className="btn-ghost" onClick={onClose}>
+            <button className="btn-ghost" onClick={onClose} aria-label="סגור">
               <X size={18} />
             </button>
           </header>

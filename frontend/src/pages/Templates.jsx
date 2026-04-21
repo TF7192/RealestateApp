@@ -701,7 +701,7 @@ function VariableSheet({ kind, variables, onClose, onPick }) {
         <div className="tpl-sheet-handle" />
         <header className="tpl-sheet-head">
           <h3>הוסף שדה אוטומטי</h3>
-          <button type="button" className="tpl-sheet-close" onClick={onClose}>
+          <button type="button" className="tpl-sheet-close" onClick={onClose} aria-label="סגור">
             <X size={18} />
           </button>
         </header>

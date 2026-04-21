@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { useRouteScrollRestore } from '../hooks/useScrollRestore';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CustomerEditDialog from '../components/CustomerEditDialog';
 import InlineText from '../components/InlineText';
@@ -217,6 +218,9 @@ export default function Customers() {
     return null;
   })();
 
+  // F-3.4 / F-8.5 — debounce the search input so the filter + card
+  // render only re-runs once the agent has paused typing.
+  const debouncedSearch = useDebouncedValue(search, 200);
   const filtered = useMemo(() => {
     const now = Date.now();
     const DAY = 86400000;
@@ -232,15 +236,15 @@ export default function Customers() {
         const days = (now - new Date(l.lastContact).getTime()) / DAY;
         if (days < inactiveFilter) return false;
       }
-      if (!search) return true;
-      const s = search.toLowerCase();
+      if (!debouncedSearch) return true;
+      const s = debouncedSearch.toLowerCase();
       return (
         l.name?.toLowerCase().includes(s) ||
         l.city?.toLowerCase().includes(s) ||
         l.phone?.includes(s)
       );
     });
-  }, [leads, lookingForFilter, interestFilter, statusFilter, inactiveFilter, search]);
+  }, [leads, lookingForFilter, interestFilter, statusFilter, inactiveFilter, debouncedSearch]);
 
   const handleWhatsApp = (lead) => {
     primeContactBump(lead.id);

@@ -29,6 +29,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import QuickEditDrawer from '../components/QuickEditDrawer';
 import EmptyState from '../components/EmptyState';
 import { useRouteScrollRestore } from '../hooks/useScrollRestore';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import WhatsAppSheet from '../components/WhatsAppSheet';
 import PullRefresh from '../components/PullRefresh';
 import LeadPickerSheet from '../components/LeadPickerSheet';
@@ -350,6 +351,10 @@ export default function Properties() {
 
   const locationCenter = useMemo(() => resolveLocation(locationQuery), [locationQuery]);
 
+  // F-3.4 + F-8.5 — debounce the search input so the 500-row list isn't
+  // re-filtered on every keystroke. 200ms is tight enough to feel
+  // live; bigger lists should consider 300ms.
+  const debouncedSearch = useDebouncedValue(search, 200);
   const filtered = useMemo(() => {
     return items
       .map((p) => {
@@ -377,8 +382,8 @@ export default function Properties() {
           if (anyDone) return false;
         }
         if (locationCenter && p._distance != null && p._distance > locationRadius) return false;
-        if (search) {
-          const s = search.toLowerCase();
+        if (debouncedSearch) {
+          const s = debouncedSearch.toLowerCase();
           return (
             p.street?.toLowerCase().includes(s) ||
             p.city?.toLowerCase().includes(s) ||
@@ -392,7 +397,7 @@ export default function Properties() {
         if (a._distance != null && b._distance != null) return a._distance - b._distance;
         return 0;
       });
-  }, [items, filter, assetClassFilter, advFilters, search, locationCenter, locationRadius, unmarketedOnly]);
+  }, [items, filter, assetClassFilter, advFilters, debouncedSearch, locationCenter, locationRadius, unmarketedOnly]);
 
   const cities = [...new Set(items.map((p) => p.city))];
 
