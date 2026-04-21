@@ -126,6 +126,11 @@ describe('<NeighborhoodAdmin>', () => {
     const user = userEvent.setup();
     render(<NeighborhoodAdmin />);
     const nameInput = await screen.findByLabelText('שם הקבוצה');
+    // The page defaults to the first city alphabetically (ח before ת), so
+    // explicitly select תל אביב before creating — otherwise the POST body's
+    // city would be חיפה and the assertion below would flake.
+    const citySelect = await screen.findByLabelText('עיר');
+    await user.selectOptions(citySelect, 'תל אביב');
     await user.type(nameInput, 'חדש');
     await user.click(screen.getByRole('button', { name: /הוסף קבוצה/ }));
     await waitFor(() => expect(posted).toBeTruthy());
