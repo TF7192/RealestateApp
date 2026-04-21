@@ -1,0 +1,116 @@
+/* LeadSearchProfilesEditor — scoped styles. Rows collapse by default to
+   keep leads with many profiles scannable. */
+
+.lsp-editor {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  padding: 16px;
+}
+
+.lsp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.lsp-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.lsp-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: 10px;
+  background: var(--gold-soft, rgba(212, 175, 55, 0.15));
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lsp-loading,
+.lsp-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 12px 4px;
+}
+.lsp-error { color: var(--danger, #b00020); }
+
+.lsp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lsp-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.lsp-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.02));
+}
+
+.lsp-row-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 0;
+  min-width: 0;
+}
+
+.lsp-label-input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 4px 6px;
+  border-radius: 4px;
+  min-width: 0;
+}
+.lsp-label-input:focus { background: var(--bg-card); outline: 2px solid var(--gold); }
+
+.lsp-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.lsp-row-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
