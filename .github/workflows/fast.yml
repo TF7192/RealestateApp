@@ -66,6 +66,7 @@ jobs:
             frontend:
               - 'frontend/**'
               - 'tests/unit/frontend/**'
+              - 'tests/frontend/**'
               - 'tests/e2e/**'
               - 'playwright.config.ts'
 
@@ -122,18 +123,20 @@ jobs:
       - run: npm run test:unit
 
   unit-frontend:
-    name: Unit (frontend / RTL)
+    name: Unit + component (frontend)
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-project
         with: { install-backend: 'false' }
-      # Runs the vitest.workspace `unit-frontend` project (jsdom + RTL).
-      # Previously not exercised by CI at all.
-      - run: npx vitest run --project=unit-frontend
+      # Runs both vitest workspace projects:
+      #   • unit-frontend — pure-logic JS tests (jsdom)
+      #   • frontend      — component/hook tests (happy-dom + MSW)
+      # Script at root is `vitest run --project=frontend --project=unit-frontend`.
+      - run: npm run test:frontend
 
   build:
     name: Build
