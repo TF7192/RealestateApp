@@ -241,6 +241,32 @@ model Office {
   updatedAt DateTime @updatedAt
 
   members User[]
+  // Sprint 1 / MLS parity — Task A1 fill-in. Email-based invites for
+  // users who aren't yet registered. Rows auto-resolve on signup/login.
+  invites OfficeInvite[]
+}
+
+// Sprint 1 / MLS parity — Task A1 fill-in. An invitation by email into
+// an office. Rows are upserted on (officeId, email) so re-inviting the
+// same address updates the existing row. When a user logs in or signs
+// up with a matching email, auth.ts attaches them to the office and
+// marks the invite accepted.
+model OfficeInvite {
+  id           String    @id @default(cuid())
+  officeId     String
+  office       Office    @relation(fields: [officeId], references: [id], onDelete: Cascade)
+  email        String
+  invitedById  String
+  invitedBy    User      @relation("OfficeInvitesSent", fields: [invitedById], references: [id], onDelete: Cascade)
+  acceptedAt   DateTime?
+  acceptedById String?
+  acceptedBy   User?     @relation("OfficeInvitesAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([officeId, email])
+  @@index([email])
 }
 
 // ─── Users ─────────────────────────────────────────────────────────────────
@@ -320,6 +346,10 @@ model User {
   // Sprint 7 / MLS parity — Tasks B3, B4.
   savedSearches        SavedSearch[]      @relation("AgentSavedSearches")
   favorites            Favorite[]         @relation("AgentFavorites")
+  // Sprint 1 / MLS parity — Task A1 fill-in. Office invites sent by
+  // this user (as OWNER) and accepted by this user (on signup/login).
+  officeInvitesSent     OfficeInvite[]    @relation("OfficeInvitesSent")
+  officeInvitesAccepted OfficeInvite[]    @relation("OfficeInvitesAccepted")
 
   @@index([role])
   @@index([officeId])
