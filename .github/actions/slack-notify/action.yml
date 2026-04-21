@@ -1,0 +1,79 @@
+name: Slack notify
+description: >-
+  Post a status update to Slack via an incoming webhook. No-ops silently if
+  SLACK_WEBHOOK_URL is unset, so workflows don't break when the secret is
+  missing (e.g. forks).
+
+inputs:
+  webhook:
+    description: Slack incoming webhook URL (repo secret SLACK_WEBHOOK_URL)
+    required: true
+  status:
+    description: 'One of: success | failure | cancelled | starting'
+    required: true
+  title:
+    description: Short one-line title (first line in the Slack message)
+    required: true
+  details:
+    description: Optional additional markdown (a second section block)
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Post to Slack
+      if: inputs.webhook != ''
+      shell: bash
+      env:
+        WEBHOOK: ${{ inputs.webhook }}
+        STATUS: ${{ inputs.status }}
+        TITLE: ${{ inputs.title }}
+        DETAILS: ${{ inputs.details }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        REPO: ${{ github.repository }}
+        REF: ${{ github.ref_name }}
+        ACTOR: ${{ github.actor }}
+        WF: ${{ github.workflow }}
+        SHA: ${{ github.sha }}
+      run: |
+        set -e
+        case "$STATUS" in
+          success)   COLOR="#2eb886"; EMOJI=":white_check_mark:" ;;
+          failure)   COLOR="#a30200"; EMOJI=":x:" ;;
+          cancelled) COLOR="#dddddd"; EMOJI=":warning:" ;;
+          starting)  COLOR="#3aa3e3"; EMOJI=":rocket:" ;;
+          *)         COLOR="#cccccc"; EMOJI=":grey_question:" ;;
+        esac
+        SHORT_SHA="${SHA:0:7}"
+        BODY=$(jq -n \
+          --arg title  "$EMOJI  *$WF* — $TITLE" \
+          --arg details "$DETAILS" \
+          --arg color  "$COLOR" \
+          --arg repo   "$REPO" \
+          --arg ref    "$REF" \
+          --arg actor  "$ACTOR" \
+          --arg short  "$SHORT_SHA" \
+          --arg run    "$RUN_URL" \
+          --arg commit "$COMMIT_URL" \
+          '{
+            attachments: [{
+              color: $color,
+              blocks: (
+                [
+                  { type: "section", text: { type: "mrkdwn", text: $title } },
+                  { type: "context", elements: [
+                    { type: "mrkdwn", text: ("*repo:* `" + $repo + "`") },
+                    { type: "mrkdwn", text: ("*ref:* `" + $ref + "`") },
+                    { type: "mrkdwn", text: ("*by:* " + $actor) },
+                    { type: "mrkdwn", text: ("*sha:* <" + $commit + "|" + $short + ">") },
+                    { type: "mrkdwn", text: ("<" + $run + "|open run>") }
+                  ] }
+                ]
+                + (if $details != "" then [{ type: "section", text: { type: "mrkdwn", text: $details } }] else [] end)
+              )
+            }]
+          }')
+        curl -sS -X POST -H 'Content-type: application/json' --data "$BODY" "$WEBHOOK" > /dev/null
+        echo "Slack notification sent ($STATUS)."

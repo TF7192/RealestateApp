@@ -1,0 +1,229 @@
+name: Deploy → production
+
+# Manual only. Adam's "deploy only when asked" rule is enforced by keeping
+# workflow_dispatch as the sole trigger — no tag-push, no auto-deploy from
+# main. The old `on: push: tags: [v*]` trigger was removed.
+#
+# Two modes via the single `ref` input:
+#   • Normal deploy: ref = 'main' (default), or any branch/SHA you want shipped.
+#   • Rollback:      ref = <older-sha-or-tag>, e.g. 'abc1234'.
+# Either way, the workflow checks out that ref, runs the pre-deploy gate
+# (typecheck + build), rsyncs to EC2, rebuilds compose, migrates, and
+# smoke-checks.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to deploy (branch, tag, or SHA). For rollback, pass the older SHA.'
+        required: true
+        default: 'main'
+      skip_migrations:
+        description: 'Skip prisma migrate deploy (only for rollbacks where migrations would go backward)'
+        required: false
+        default: 'false'
+        type: boolean
+
+concurrency:
+  group: estia-prod
+  cancel-in-progress: false   # never cancel a deploy mid-flight
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: ssh → rsync → docker compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # The `production` environment is the place to wire a required-reviewer
+    # rule in repo Settings → Environments → production. If unconfigured,
+    # this is a no-op and the workflow runs immediately on dispatch.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Resolve deploy ref
+        id: ref
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Deploying ref: ${{ inputs.ref }} → $(git rev-parse HEAD)"
+
+      - name: Slack — deploy starting
+        uses: ./.github/actions/slack-notify
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: starting
+          title: deploying `${{ inputs.ref }}` → production
+          details: |
+            *target SHA:* `${{ steps.ref.outputs.short }}`
+            *skip migrations:* `${{ inputs.skip_migrations }}`
+            *triggered by:* ${{ github.actor }}
+
+      - uses: ./.github/actions/setup-project
+        with: { prisma-generate: 'true' }
+
+      # ── Pre-deploy gate: typecheck + build must pass before we touch EC2.
+      - name: Typecheck backend
+        working-directory: backend
+        run: npx tsc --noEmit
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/estia.pem
+          chmod 600 ~/.ssh/estia.pem
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      # Record the currently-deployed SHA on the EC2 before we overwrite it.
+      # This is the breadcrumb that makes rollback possible without git archaeology.
+      - name: Snapshot previous deploy
+        run: |
+          ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" '
+            set -e
+            cd /home/ec2-user/estia-new
+            if [ -f .deployed_sha ]; then
+              PREV=$(cat .deployed_sha)
+              echo "previous SHA on host: $PREV"
+              # Keep last 5 prior SHAs in a rolling log for manual inspection.
+              echo "$(date -u +%FT%TZ) rolled_from=$PREV rolling_to=${{ steps.ref.outputs.sha }}" >> .deploy_history
+              tail -5 .deploy_history > .deploy_history.tmp && mv .deploy_history.tmp .deploy_history
+            else
+              echo "no previous .deployed_sha on host (first deploy)"
+            fi
+          '
+
+      - name: Rsync source to EC2
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/estia.pem" \
+            --include='/backend/' --include='/backend/src/***' --include='/backend/prisma/***' \
+            --include='/backend/package.json' --include='/backend/package-lock.json' \
+            --include='/backend/Dockerfile' --include='/backend/tsconfig.json' \
+            --include='/frontend/' --include='/frontend/src/***' --include='/frontend/public/***' \
+            --include='/frontend/package.json' --include='/frontend/package-lock.json' \
+            --include='/frontend/Dockerfile' --include='/frontend/nginx.conf' \
+            --include='/frontend/index.html' --include='/frontend/vite.config.js' \
+            --include='/frontend/eslint.config.js' --include='/frontend/capacitor.config.json' \
+            --include='/docker-compose.yml' --include='/scripts/***' \
+            --exclude='*' \
+            ./ "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ec2-user/estia-new/"
+
+      - name: Sync managed secrets to EC2 .env
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          PUBLIC_ORIGIN: ${{ secrets.PUBLIC_ORIGIN }}
+          POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+        run: |
+          umask 077
+          PATCH=$(mktemp)
+          {
+            [ -n "$GOOGLE_CLIENT_ID" ]        && echo "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
+            [ -n "$GOOGLE_CLIENT_SECRET" ]    && echo "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET"
+            [ -n "$PUBLIC_ORIGIN" ]           && echo "PUBLIC_ORIGIN=$PUBLIC_ORIGIN"
+            [ -n "$POSTHOG_PROJECT_API_KEY" ] && echo "POSTHOG_PROJECT_API_KEY=$POSTHOG_PROJECT_API_KEY"
+            [ -n "$POSTHOG_HOST" ]            && echo "POSTHOG_HOST=$POSTHOG_HOST"
+          } > "$PATCH"
+          if [ ! -s "$PATCH" ]; then
+            echo "No managed secrets set — skipping .env patch"
+            rm -f "$PATCH"; exit 0
+          fi
+          scp -i ~/.ssh/estia.pem "$PATCH" \
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/estia-env-patch"
+          rm -f "$PATCH"
+          ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" '
+            set -e
+            ENV_FILE=/home/ec2-user/estia-new/.env
+            sudo touch "$ENV_FILE"
+            sudo chmod 600 "$ENV_FILE"
+            while IFS="=" read -r key _; do
+              [ -n "$key" ] && sudo sed -i "/^${key}=/d" "$ENV_FILE"
+            done < /tmp/estia-env-patch
+            cat /tmp/estia-env-patch | sudo tee -a "$ENV_FILE" >/dev/null
+            shred -u /tmp/estia-env-patch 2>/dev/null || rm -f /tmp/estia-env-patch
+          '
+
+      - name: Build + restart on EC2
+        env:
+          SKIP_MIGRATIONS: ${{ inputs.skip_migrations }}
+          NEW_SHA: ${{ steps.ref.outputs.sha }}
+        run: |
+          ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "
+            set -e
+            cd /home/ec2-user/estia-new
+            sudo docker builder prune -af >/dev/null 2>&1 || true
+            sudo docker image prune -af >/dev/null 2>&1 || true
+            sudo docker compose build --pull
+            sudo docker compose up -d --remove-orphans
+            if [ '${SKIP_MIGRATIONS}' = 'true' ]; then
+              echo 'skip_migrations=true — not running prisma migrate deploy'
+            else
+              sudo docker compose exec -T backend npx prisma migrate deploy
+            fi
+            echo '${NEW_SHA}' | sudo tee .deployed_sha >/dev/null
+            df -h / | tail -1
+          "
+
+      # Richer healthcheck: hit both the public root + an API endpoint that
+      # requires the DB to be reachable. GET /api/auth/me without a cookie
+      # must return 401 — proves app + auth middleware + DB are all up.
+      - name: Smoke test
+        run: |
+          set -e
+          PASS=0
+          for i in 1 2 3 4 5 6; do
+            HEALTH=$(curl -sf https://estia.tripzio.xyz/api/health || true)
+            ROOT=$(curl -sf -o /dev/null -w '%{http_code}' https://estia.tripzio.xyz/ || true)
+            AUTH=$(curl -sf -o /dev/null -w '%{http_code}' https://estia.tripzio.xyz/api/auth/me || true)
+            echo "attempt $i: /api/health=$HEALTH  /=$ROOT  /api/auth/me=$AUTH"
+            if echo "$HEALTH" | grep -q '"ok":true' && [ "$ROOT" = "200" ] && [ "$AUTH" = "401" ]; then
+              PASS=1
+              break
+            fi
+            sleep 5
+          done
+          if [ "$PASS" != "1" ]; then
+            echo "::error::smoke test failed"
+            exit 1
+          fi
+          echo "✓ smoke passed"
+
+      - name: Deploy summary
+        if: always()
+        run: |
+          {
+            echo "## Deploy ${{ job.status }}"
+            echo ""
+            echo "- **Ref:** \`${{ inputs.ref }}\` → \`${{ steps.ref.outputs.short }}\`"
+            echo "- **Skip migrations:** ${{ inputs.skip_migrations }}"
+            echo "- **Commit:** ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${{ steps.ref.outputs.sha }}"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Slack — deploy finished
+        if: always()
+        uses: ./.github/actions/slack-notify
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ job.status == 'success' && 'success' || (job.status == 'cancelled' && 'cancelled' || 'failure') }}
+          title: >-
+            ${{ job.status == 'success' && 'production deployed & smoke OK' || (job.status == 'cancelled' && 'production deploy cancelled' || 'production deploy FAILED') }}
+          details: |
+            *ref:* `${{ inputs.ref }}` → `${{ steps.ref.outputs.short }}`
+            *skip migrations:* `${{ inputs.skip_migrations }}`
+            *site:* https://estia.tripzio.xyz
+            ${{ job.status != 'success' && '⚠️ check the run, decide whether to roll back (dispatch with `ref=<older-sha>`).' || '' }}
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/estia.pem

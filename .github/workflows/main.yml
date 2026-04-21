@@ -1,0 +1,182 @@
+name: Main branch
+
+# Runs on every push to main (post-merge). Defense in depth: re-runs the
+# full PR suite against the merged SHA to catch anything a rebase/merge
+# introduced.
+#
+# Does NOT deploy — per the "deploy only when asked" rule, prod deploys
+# are strictly manual via deploy-prod.yml.
+#
+# On failure, opens a GitHub issue. GitHub's built-in notifications email
+# the repo owner when an issue is opened — this is the email path.
+
+on:
+  push:
+    branches: [ main ]
+
+concurrency:
+  group: main-${{ github.workflow }}
+  cancel-in-progress: false   # never cancel a main-branch validation
+
+permissions:
+  contents: read
+  issues: write                # needed for the failure-issue step
+
+jobs:
+  fast:
+    uses: ./.github/workflows/fast.yml
+
+  integration:
+    name: Integration (API + DB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estia
+          POSTGRES_PASSWORD: estia
+          POSTGRES_DB: estia_test
+        ports: [ '54329:5432' ]
+        options: >-
+          --health-cmd="pg_isready -U estia -d estia_test"
+          --health-interval=2s --health-timeout=2s --health-retries=30
+    env:
+      DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
+      JWT_SECRET: test-jwt-secret
+      COOKIE_SECRET: test-cookie-secret
+      AUTH_RATE_LIMIT_DISABLED: '1'
+      RATE_LIMIT_MAX_PER_MIN: '100000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { install-frontend: 'false', prisma-generate: 'true' }
+      - working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npm run db:seed
+      - run: npm run test:integration
+
+  e2e-critical:
+    name: E2E critical (Chromium)
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estia
+          POSTGRES_PASSWORD: estia
+          POSTGRES_DB: estia_test
+        ports: [ '54329:5432' ]
+        options: >-
+          --health-cmd="pg_isready -U estia -d estia_test"
+          --health-interval=2s --health-timeout=2s --health-retries=30
+    env:
+      DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
+      JWT_SECRET: test-jwt-secret
+      COOKIE_SECRET: test-cookie-secret
+      PUBLIC_URL: http://localhost:5173
+      TEST_AGENT_EMAIL: agent.demo@estia.app
+      TEST_AGENT_PASSWORD: estia-demo-1234
+      PLAYWRIGHT_WEB_URL: http://127.0.0.1:5173
+      AUTH_RATE_LIMIT_DISABLED: '1'
+      RATE_LIMIT_MAX_PER_MIN: '100000'
+      VITE_API_PROXY: http://127.0.0.1:4000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { prisma-generate: 'true' }
+      - uses: actions/download-artifact@v4
+        with: { name: frontend-dist, path: frontend/dist }
+      - uses: actions/download-artifact@v4
+        with: { name: backend-dist, path: backend/dist }
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+      - run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npm run db:seed
+      - working-directory: backend
+        run: node dist/server.js &
+      - working-directory: frontend
+        run: npx vite preview --host 127.0.0.1 --port 5173 &
+      - run: npx --yes wait-on http://127.0.0.1:4000/api/health http://127.0.0.1:5173 --timeout 30000
+      - run: npm run test:e2e:critical
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main-e2e-critical-traces
+          path: test-results
+          retention-days: 14
+
+  notify-on-failure:
+    name: Notify on failure
+    needs: [ fast, integration, e2e-critical ]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open / update failure issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TITLE="main CI broken at ${GITHUB_SHA:0:7}"
+          BODY=$(cat <<EOF
+          **Workflow:** [${GITHUB_WORKFLOW}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})
+          **Commit:** [${GITHUB_SHA}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})
+          **Failed jobs:** see the workflow summary.
+
+          Fix-forward or revert; do not deploy main while this is open.
+          EOF
+          )
+          gh issue create \
+            --title "$TITLE" \
+            --body "$BODY" \
+            --label "ci-failure" \
+            || echo "issue creation failed (label may be missing — create 'ci-failure' label in repo settings)"
+
+  notify:
+    name: Slack notify
+    needs: [ fast, integration, e2e-critical ]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute aggregate status
+        id: agg
+        run: |
+          results='${{ toJSON(needs) }}'
+          if echo "$results" | grep -q '"result": "failure"'; then
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+            echo "title=main branch broken at ${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          elif echo "$results" | grep -q '"result": "cancelled"'; then
+            echo "status=cancelled" >> "$GITHUB_OUTPUT"
+            echo "title=main CI cancelled at ${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=success" >> "$GITHUB_OUTPUT"
+            echo "title=main CI green at ${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: ./.github/actions/slack-notify
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.agg.outputs.status }}
+          title: ${{ steps.agg.outputs.title }}
+          details: |
+            *fast:* ${{ needs.fast.result }} · *integration:* ${{ needs.integration.result }} · *e2e-critical:* ${{ needs.e2e-critical.result }}
+            ${{ steps.agg.outputs.status == 'failure' && '⚠️ do not deploy main while the `ci-failure` issue is open.' || '' }}

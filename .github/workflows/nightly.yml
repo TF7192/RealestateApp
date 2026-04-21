@@ -1,0 +1,236 @@
+name: Nightly
+
+# Exhaustive suite: cross-browser E2E, flake detection, deeper audits.
+# Informational — does not block any deploy.
+#
+# Scheduled at 02:17 UTC (05:17 Asia/Jerusalem) — quiet hours in Israel,
+# off-peak in the GitHub-hosted runner pool.
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  e2e-full:
+    name: E2E full matrix (${{ matrix.browser }}, shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [ chromium, firefox, webkit ]
+        shard: [ 1, 2, 3, 4 ]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estia
+          POSTGRES_PASSWORD: estia
+          POSTGRES_DB: estia_test
+        ports: [ '54329:5432' ]
+        options: >-
+          --health-cmd="pg_isready -U estia -d estia_test"
+          --health-interval=2s --health-timeout=2s --health-retries=30
+    env:
+      DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
+      JWT_SECRET: test-jwt-secret
+      COOKIE_SECRET: test-cookie-secret
+      PUBLIC_URL: http://localhost:5173
+      TEST_AGENT_EMAIL: agent.demo@estia.app
+      TEST_AGENT_PASSWORD: estia-demo-1234
+      PLAYWRIGHT_WEB_URL: http://127.0.0.1:5173
+      AUTH_RATE_LIMIT_DISABLED: '1'
+      RATE_LIMIT_MAX_PER_MIN: '100000'
+      VITE_API_PROXY: http://127.0.0.1:4000
+      PLAYWRIGHT_FULL_MATRIX: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { prisma-generate: 'true' }
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+      - name: Install Playwright ${{ matrix.browser }}
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps ${{ matrix.browser }}
+          else
+            npx playwright install --with-deps ${{ matrix.browser }}
+          fi
+      - working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npm run db:seed
+      - working-directory: backend
+        run: npm run build
+      - working-directory: frontend
+        run: npm run build
+      - working-directory: backend
+        run: node dist/server.js &
+      - working-directory: frontend
+        run: npx vite preview --host 127.0.0.1 --port 5173 &
+      - run: npx --yes wait-on http://127.0.0.1:4000/api/health http://127.0.0.1:5173 --timeout 30000
+      - name: Run Playwright
+        run: npx playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --reporter=blob
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-e2e-blob-${{ matrix.browser }}-${{ matrix.shard }}
+          path: blob-report
+          retention-days: 14
+
+  flake-rerun:
+    name: Flake detection (Chromium re-run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estia
+          POSTGRES_PASSWORD: estia
+          POSTGRES_DB: estia_test
+        ports: [ '54329:5432' ]
+        options: >-
+          --health-cmd="pg_isready -U estia -d estia_test"
+          --health-interval=2s --health-timeout=2s --health-retries=30
+    env:
+      DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
+      JWT_SECRET: test-jwt-secret
+      COOKIE_SECRET: test-cookie-secret
+      PUBLIC_URL: http://localhost:5173
+      TEST_AGENT_EMAIL: agent.demo@estia.app
+      TEST_AGENT_PASSWORD: estia-demo-1234
+      PLAYWRIGHT_WEB_URL: http://127.0.0.1:5173
+      AUTH_RATE_LIMIT_DISABLED: '1'
+      RATE_LIMIT_MAX_PER_MIN: '100000'
+      VITE_API_PROXY: http://127.0.0.1:4000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with: { prisma-generate: 'true' }
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npm run db:seed
+          npm run build
+      - working-directory: frontend
+        run: npm run build
+      - working-directory: backend
+        run: node dist/server.js &
+      - working-directory: frontend
+        run: npx vite preview --host 127.0.0.1 --port 5173 &
+      - run: npx --yes wait-on http://127.0.0.1:4000/api/health http://127.0.0.1:5173 --timeout 30000
+      # Run twice; tests that pass once and fail once are flaky.
+      - name: Run 1
+        id: run1
+        run: npx playwright test --project=chromium --reporter=json > run1.json
+        continue-on-error: true
+      - name: Run 2
+        id: run2
+        run: npx playwright test --project=chromium --reporter=json > run2.json
+        continue-on-error: true
+      - name: Diff flakes
+        run: |
+          node -e '
+            const r1 = require("./run1.json");
+            const r2 = require("./run2.json");
+            const results = s => new Map(s.suites.flatMap(function flat(x) {
+              return [...(x.specs || []).map(sp => [sp.title, sp.ok]), ...(x.suites || []).flatMap(flat)];
+            }));
+            const m1 = results(r1), m2 = results(r2);
+            const flaky = [];
+            for (const [t, ok1] of m1) {
+              const ok2 = m2.get(t);
+              if (ok1 !== ok2) flaky.push(t);
+            }
+            console.log(`## Flake report\n\n${flaky.length ? flaky.map(f => "- " + f).join("\n") : "No flakes detected."}`);
+          ' | tee -a $GITHUB_STEP_SUMMARY
+
+  audit-deep:
+    name: Deep dependency audit (moderate+)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc }
+      # Nightly runs at moderate+ (PR lane blocks only on high/critical).
+      - name: Audit root
+        run: npm audit --audit-level=moderate || echo "::warning::moderate+ advisory in root"
+      - name: Audit backend
+        working-directory: backend
+        run: npm audit --audit-level=moderate || echo "::warning::moderate+ advisory in backend"
+      - name: Audit frontend
+        working-directory: frontend
+        run: npm audit --audit-level=moderate || echo "::warning::moderate+ advisory in frontend"
+
+  notify-on-critical-failure:
+    name: Notify on critical nightly failure
+    needs: [ e2e-full ]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "nightly E2E failure $(date -u +%Y-%m-%d)" \
+            --body "Full cross-browser E2E failed. See [run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})." \
+            --label "nightly-failure" \
+            || echo "issue creation failed (label may be missing)"
+
+  notify:
+    name: Slack notify
+    needs: [ e2e-full, flake-rerun, audit-deep ]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute aggregate status
+        id: agg
+        run: |
+          results='${{ toJSON(needs) }}'
+          if echo "$results" | grep -q '"result": "failure"'; then
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+            echo "title=nightly suite failed $(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=success" >> "$GITHUB_OUTPUT"
+            echo "title=nightly suite green $(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: ./.github/actions/slack-notify
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.agg.outputs.status }}
+          title: ${{ steps.agg.outputs.title }}
+          details: |
+            *E2E (chromium + firefox + webkit × 4 shards):* ${{ needs.e2e-full.result }}
+            *flake rerun:* ${{ needs.flake-rerun.result }} · *deep audit:* ${{ needs.audit-deep.result }}
+            (flake list and audit advisories are in the run's step summaries)

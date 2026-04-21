@@ -1,0 +1,92 @@
+name: Setup project
+description: >-
+  Sets up Node per .nvmrc, restores npm caches keyed on all three lockfiles,
+  and installs root + (optionally) backend + frontend dependencies.
+  Caller is responsible for actions/checkout before invoking this action.
+
+inputs:
+  install-backend:
+    description: Install backend/node_modules (default true)
+    required: false
+    default: 'true'
+  install-frontend:
+    description: Install frontend/node_modules (default true)
+    required: false
+    default: 'true'
+  prisma-generate:
+    description: Run prisma generate after backend install (default false)
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+        cache: 'npm'
+        # Cache key hashes every lockfile — invalidates correctly when any
+        # of the three change.
+        cache-dependency-path: |
+          package-lock.json
+          backend/package-lock.json
+          frontend/package-lock.json
+
+    # Node 20.20.2 ships with npm 10.8.2. The existing lockfiles were
+    # produced by npm 11.x, which tolerates empty `version` fields on
+    # platform-specific optional deps; npm 10 rejects them with
+    # "Invalid Version:". Pin to match `packageManager`.
+    - name: Pin npm to match packageManager
+      shell: bash
+      run: npm install -g npm@11.6.0
+
+    - name: Install root deps
+      shell: bash
+      run: npm ci --no-audit --no-fund
+
+    # Per-workspace installs. --no-workspaces forces npm to treat the
+    # directory as standalone and install the full tree into its own
+    # node_modules, which is what the build steps + vitest need. Without
+    # the flag, npm detects the parent workspace layout and may reroute
+    # installs to root/node_modules, leaving backend/node_modules empty
+    # and causing tsc to fail with "Cannot find module 'fastify'" etc.
+    - name: Install backend deps
+      if: inputs.install-backend == 'true'
+      shell: bash
+      working-directory: backend
+      run: npm ci --no-audit --no-fund --no-workspaces
+
+    - name: Prisma generate
+      if: inputs.install-backend == 'true' && inputs.prisma-generate == 'true'
+      shell: bash
+      working-directory: backend
+      run: npx prisma generate
+
+    - name: Install frontend deps
+      if: inputs.install-frontend == 'true'
+      shell: bash
+      working-directory: frontend
+      run: npm ci --no-audit --no-fund --no-workspaces
+
+    - name: Sanity-check workspace installs
+      if: inputs.install-backend == 'true' || inputs.install-frontend == 'true'
+      shell: bash
+      run: |
+        if [ "${{ inputs.install-backend }}" = "true" ]; then
+          if [ ! -d backend/node_modules/fastify ]; then
+            echo "::error::backend/node_modules/fastify missing after install"
+            echo "--- backend/node_modules contents ---"
+            ls backend/node_modules 2>&1 | head -20
+            exit 1
+          fi
+        fi
+        if [ "${{ inputs.install-frontend }}" = "true" ]; then
+          if [ ! -d frontend/node_modules/react ]; then
+            echo "::error::frontend/node_modules/react missing after install"
+            echo "--- frontend/node_modules contents ---"
+            ls frontend/node_modules 2>&1 | head -20
+            exit 1
+          fi
+        fi
+        echo "workspace installs OK"

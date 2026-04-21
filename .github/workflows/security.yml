@@ -1,0 +1,67 @@
+name: Security
+
+# SAST + secret scanning. Runs on PRs (blocking) and weekly (exhaustive).
+
+on:
+  pull_request:
+  schedule:
+    - cron: '33 3 * * 1'    # Monday 03:33 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write      # CodeQL uploads SARIF
+
+jobs:
+  codeql:
+    name: CodeQL (JS/TS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript-typescript' ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'
+
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history needed to scan the diff range correctly.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No GITLEAKS_LICENSE — fine for private repos under 25 contributors.
+
+  notify:
+    name: Slack notify on failure
+    needs: [ codeql, gitleaks ]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/slack-notify
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: failure
+          title: security scan flagged something
+          details: |
+            *CodeQL:* ${{ needs.codeql.result }} · *gitleaks:* ${{ needs.gitleaks.result }}
+            Check the Security tab for SARIF findings.
