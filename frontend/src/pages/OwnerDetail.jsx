@@ -245,7 +245,7 @@ export default function OwnerDetail() {
   );
 }
 
-function OwnerEditForm({ owner, onSaved, toast, isMobile }) {
+function OwnerEditForm({ owner, onSaved, toast }) {
   const [form, setForm] = useState({
     name: owner.name || '',
     phone: owner.phone || '',

@@ -29,7 +29,7 @@ export async function shareSheet({ title, text, url }) {
 export async function openUrl(url) {
   if (!url) return;
   if (isNative()) {
-    try { await Browser.open({ url, presentationStyle: 'popover' }); return; } catch {}
+    try { await Browser.open({ url, presentationStyle: 'popover' }); return; } catch { /* ignore */ }
   }
   window.open(url, '_blank', 'noopener,noreferrer');
 }
@@ -114,7 +114,7 @@ export async function shareWithPhotos({ photos = [], text, title, url } = {}) {
       sources.map((src, idx) => downloadToCache(src, `estia-share-${Date.now()}-${idx}.jpg`))
     );
     fileUris = fileUris.filter(Boolean);
-  } catch (e) {
+  } catch {
     // Couldn't download — fall back to text-only share
     fileUris = [];
   }
@@ -131,7 +131,7 @@ export async function shareWithPhotos({ photos = [], text, title, url } = {}) {
       dialogTitle: title || 'שיתוף נכס',
     });
     return true;
-  } catch (e) {
+  } catch {
     // User cancelled, or files unsupported on this OS — last-ditch text share
     return shareSheet({ title, text, url });
   }
@@ -211,7 +211,7 @@ export async function shareToInstagramStory({ coverUrl, caption, footer, badge }
   let blob;
   try {
     blob = await composeStoryImage({ coverUrl, caption, footer, badge });
-  } catch (e) {
+  } catch {
     return false;
   }
 
@@ -226,7 +226,7 @@ export async function shareToInstagramStory({ coverUrl, caption, footer, badge }
       recursive: true,
     });
     fileUri = written.uri;
-  } catch (e) {
+  } catch {
     return false;
   }
 

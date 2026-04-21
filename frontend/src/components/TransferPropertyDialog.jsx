@@ -239,7 +239,6 @@ export default function TransferPropertyDialog({ property, onClose, onDone }) {
   );
 }
 
-function fmt(v) { return v == null ? '—' : v; }
 function price(v) {
   if (!v) return '—';
   if (v < 10000) return `₪${v.toLocaleString('he-IL')}/חודש`;

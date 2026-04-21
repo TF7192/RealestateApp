@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, UserPlus, Flame, Thermometer, Snowflake,
   PhoneCall, MessageCircle, MessageSquareText, Calendar, MapPin, DollarSign, FileCheck,
@@ -17,7 +17,6 @@ const STATUS = {
 
 export default function MobileLeads() {
   const [params] = useSearchParams();
-  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState(params.get('filter') || 'all');
 

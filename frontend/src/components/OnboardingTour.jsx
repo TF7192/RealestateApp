@@ -133,7 +133,6 @@ export default function OnboardingTour() {
 // own kill-switch directly. We never rely on Joyride's callback
 // chain for dismissal — that was the source of every persistence
 // bug so far.
-// eslint-disable-next-line react/prop-types
 export function TourTooltip({
   continuous,
   index,

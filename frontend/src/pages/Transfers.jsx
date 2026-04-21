@@ -41,7 +41,7 @@ export default function Transfers() {
     try {
       const r = await api.listTransfers();
       setItems(r.items || []);
-    } catch (_) { /* ignore */ } finally {
+    } catch { /* ignore */ } finally {
       setLoading(false);
     }
   };

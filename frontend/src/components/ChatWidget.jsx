@@ -21,10 +21,6 @@ export default function ChatWidget() {
   const [draft, setDraft] = useState('');
   const listRef = useRef(null);
 
-  // Only show for logged-in non-admin users (admins use /admin/chats)
-  if (!user) return null;
-  if (ADMIN_EMAILS.has((user.email || '').toLowerCase())) return null;
-
   // Auto-scroll on new messages
   useEffect(() => {
     if (!open) return;
@@ -46,6 +42,11 @@ export default function ChatWidget() {
     window.addEventListener('estia:open-chat', onOpen);
     return () => window.removeEventListener('estia:open-chat', onOpen);
   }, []);
+
+  // Hide for logged-out users and admins (admins use /admin/chats).
+  // Placed AFTER hooks so rules-of-hooks holds.
+  if (!user) return null;
+  if (ADMIN_EMAILS.has((user.email || '').toLowerCase())) return null;
 
   const onSubmit = async (e) => {
     e.preventDefault();

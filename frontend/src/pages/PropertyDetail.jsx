@@ -27,7 +27,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import api from '../lib/api';
-import { formatFloor, formatFloorOutOf } from '../lib/formatFloor';
+import { formatFloor } from '../lib/formatFloor';
 import { useAuth } from '../lib/auth';
 import MarketingActionDialog from '../components/MarketingActionDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -44,11 +44,11 @@ import PageTour from '../components/PageTour';
 import PropertyHero from '../components/PropertyHero';
 import PropertyKpiTile from '../components/PropertyKpiTile';
 import PropertyPanelSheet from '../components/PropertyPanelSheet';
-import { useCopyFeedback, useViewportMobile, useViewportDesktop } from '../hooks/mobile';
+import { useCopyFeedback, useViewportMobile } from '../hooks/mobile';
 import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/share';
 import { isNative } from '../native/platform';
 import { track } from '../lib/analytics';
-import { telUrl, wazeUrl, waUrl } from '../lib/waLink';
+import { telUrl, wazeUrl } from '../lib/waLink';
 import { shareSheet } from '../native/share';
 import { leadMatchesProperty } from './Properties';
 import { relativeDate } from '../lib/relativeDate';
@@ -173,7 +173,6 @@ export default function PropertyDetail() {
   const { user } = useAuth();
   const toast = useToast();
   const isMobile = useViewportMobile(820);
-  const isDesktop = useViewportDesktop(1100);
   const { copied, copy } = useCopyFeedback();
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
