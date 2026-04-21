@@ -187,24 +187,29 @@ export function usePullToRefresh(onRefresh, { threshold = 72 } = {}) {
 // ────────────────────────────────────────────────────────────────
 export function useDraftAutosave(key, value, { debounce = 400 } = {}) {
   const timer = useRef();
+  // F-15 — expose pending/savedAt so the UI can honestly say "pending"
+  // during the debounce window and "saved N sec ago" once flushed.
+  const [savedAt, setSavedAt] = useState(null);
+  const [pending, setPending] = useState(false);
   useEffect(() => {
+    setPending(true);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       try {
         if (value == null) sessionStorage.removeItem(key);
-        // S16: wrap the draft in { value, savedAt } so the restore banner
-        // can say "נשמר לפני 3 דקות" instead of just "נמצאה טיוטה".
-        // Stops agents from accidentally restoring a week-old draft
-        // they'd long forgotten about.
         else sessionStorage.setItem(key, JSON.stringify({ value, savedAt: Date.now() }));
+        setSavedAt(Date.now());
       } catch { /* ignore storage errors */ }
+      setPending(false);
     }, debounce);
     return () => clearTimeout(timer.current);
   }, [key, value, debounce]);
   const clear = useCallback(() => {
     try { sessionStorage.removeItem(key); } catch { /* ignore */ }
+    setSavedAt(null);
+    setPending(false);
   }, [key]);
-  return { clear };
+  return { clear, savedAt, pending };
 }
 
 export function readDraft(key) {

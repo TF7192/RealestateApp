@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Clipboard, X } from 'lucide-react';
+import { ArrowRight, Save, Clipboard, X, Check, Loader2 } from 'lucide-react';
+import api from '../lib/api';
 import { cityNames, streetNames } from '../data/mockData';
 import { useToast } from '../lib/toast';
 import useBeforeUnload from '../hooks/useBeforeUnload';
@@ -47,16 +48,20 @@ export default function NewLead() {
   const toast = useToast();
   const [form, setForm] = useState(INITIAL_FORM);
   const [draftBanner, setDraftBanner] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  // F-14 — once we successfully save, disarm the beforeunload prompt so
+  // closing the tab after a save doesn't pop "יש שינויים שלא נשמרו".
+  const savedRef = useRef(false);
 
-  // F-5.5 — dirty guard on create only.
-  const isDirty = !!(form.name || form.phone || form.email || form.city || form.notes);
+  const hasContent = !!(form.name || form.phone || form.email || form.city || form.notes);
+  const isDirty = hasContent && !savedRef.current;
   useBeforeUnload(isDirty, 'יש שינויים שלא נשמרו בליד — לעזוב?');
   const [clipboardSuggestion, setClipboardSuggestion] = useState(null);
   const [clipboardDismissed, setClipboardDismissed] = useState(false);
   const peekedRef = useRef(false);
 
   const { peek } = useClipboardPhone();
-  const { clear: clearDraft } = useDraftAutosave(DRAFT_KEY, form);
+  const { clear: clearDraft, savedAt: draftSavedAt, pending: draftPending } = useDraftAutosave(DRAFT_KEY, form);
 
   // ── Draft restore banner on mount ──────────────────────────────────
   // S16: readDraft now returns { value, savedAt }. `value` is the old
@@ -85,10 +90,24 @@ export default function NewLead() {
   };
 
   // ── Clipboard phone auto-paste ─────────────────────────────────────
+  // F-8 — dismiss is now 60-second TTL in sessionStorage, not permanent.
+  // Agent who mis-tapped X gets the chip back on their next visit or
+  // after 60s.
+  const CLIP_DISMISS_KEY = 'estia-clip-dismiss:new-lead';
+  const CLIP_DISMISS_TTL_MS = 60_000;
+  const isClipDismissed = () => {
+    try {
+      const raw = sessionStorage.getItem(CLIP_DISMISS_KEY);
+      if (!raw) return false;
+      const ts = Number(raw);
+      return Number.isFinite(ts) && Date.now() - ts < CLIP_DISMISS_TTL_MS;
+    } catch { return false; }
+  };
+
   const tryPeekClipboard = async () => {
     if (peekedRef.current) return;
     peekedRef.current = true;
-    if (clipboardDismissed) return;
+    if (clipboardDismissed || isClipDismissed()) return;
     if (form.phone) return;
     const phone = await peek();
     if (phone) setClipboardSuggestion(phone);
@@ -104,15 +123,58 @@ export default function NewLead() {
   const dismissClipboard = () => {
     setClipboardSuggestion(null);
     setClipboardDismissed(true);
+    try { sessionStorage.setItem(CLIP_DISMISS_KEY, String(Date.now())); } catch { /* ignore */ }
   };
 
   const update = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const handleSubmit = (e) => {
+  // F-1 (P0) — the previous handler navigated without persisting the
+  // lead. Wire up api.createLead and surface success/failure properly.
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    clearDraft();
-    navigate('/leads');
+    if (submitting) return;
+    if (!form.name?.trim()) {
+      toast.error('שם הלקוח הוא שדה חובה');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // Map checkbox flags to the API's expected requirement fields.
+      const body = {
+        name: form.name.trim(),
+        phone: form.phone || null,
+        interestType: form.interestType === 'מסחרי' ? 'COMMERCIAL' : 'PRIVATE',
+        lookingFor: form.lookingFor === 'rent' ? 'RENT' : 'BUY',
+        city: form.city || null,
+        street: form.street || null,
+        roomsMin: form.roomsMin ? Number(form.roomsMin) : null,
+        roomsMax: form.roomsMax ? Number(form.roomsMax) : null,
+        priceMin: form.priceMin ? Number(form.priceMin) : null,
+        priceMax: form.priceMax ? Number(form.priceMax) : null,
+        preApproval: !!form.preApproval,
+        source: form.source || null,
+        sector: form.sector || 'כללי',
+        schoolProximity: form.schoolProximity || null,
+        balconyRequired: !!form.balconyRequired,
+        parkingRequired: !!form.parkingRequired,
+        elevatorRequired: !!form.elevatorRequired,
+        safeRoomRequired: !!form.safeRoomRequired,
+        acRequired: !!form.acRequired,
+        storageRequired: !!form.storageRequired,
+        notes: form.notes || null,
+      };
+      const res = await api.createLead(body);
+      savedRef.current = true;
+      clearDraft();
+      toast.success('הליד נשמר');
+      const newId = res?.id || res?.lead?.id;
+      if (newId) navigate(`/customers/${newId}`);
+      else navigate('/customers');
+    } catch (err) {
+      toast.error(err?.message || 'שמירת הליד נכשלה');
+      setSubmitting(false);
+    }
   };
 
   // Street autocomplete is narrowed by the selected city when there's a match
@@ -151,12 +213,28 @@ export default function NewLead() {
       )}
 
       {clipboardSuggestion && (
-        <div className="clipboard-chip animate-in" role="status">
-          <button type="button" className="clipboard-chip-main" onClick={acceptClipboard}>
+        <div
+          className="clipboard-chip animate-in"
+          role="status"
+          aria-describedby="clip-chip-desc"
+        >
+          <button
+            type="button"
+            className="clipboard-chip-main clipboard-chip-main-xl"
+            onClick={acceptClipboard}
+          >
             <Clipboard size={14} />
             <span>{clipboardSuggestion} מהלוח — הוסף</span>
           </button>
-          <button type="button" className="clipboard-chip-dismiss" aria-label="סגור" onClick={dismissClipboard}>
+          <span id="clip-chip-desc" className="sr-only">
+            מספר טלפון זוהה בלוח העתקה
+          </span>
+          <button
+            type="button"
+            className="clipboard-chip-dismiss clipboard-chip-dismiss-sm"
+            aria-label="סגור"
+            onClick={dismissClipboard}
+          >
             <X size={14} />
           </button>
         </div>
@@ -187,11 +265,19 @@ export default function NewLead() {
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">מקור הליד</label>
+              {/* F-5 — grouped sources. Flat 9-option dropdown hurt
+                  scanning; "הפניה" vs "הפניה מלקוח" adjacency cost real
+                  agent seconds and polluted the funnel report. */}
               <SelectField
                 value={form.source}
                 onChange={(v) => update('source', v)}
                 placeholder="בחר מקור..."
-                options={['פייסבוק', 'יד 2', 'אתר', 'הפניה', 'הפניה מלקוח', 'סיור סוכנים', 'בית פתוח', 'שלט', 'אחר']}
+                groups={[
+                  { label: 'אונליין', options: ['פייסבוק', 'יד 2', 'אתר'] },
+                  { label: 'מכרים',   options: ['הפניה', 'הפניה מלקוח'] },
+                  { label: 'פיזי',    options: ['בית פתוח', 'שלט', 'סיור סוכנים'] },
+                  { label: 'אחר',     options: ['אחר'] },
+                ]}
               />
             </div>
             <div className="form-group">
@@ -257,20 +343,27 @@ export default function NewLead() {
               />
             </div>
           </div>
-          <div className="form-row">
-            <div className="form-group">
-              <RoomsChips
-                value={form.roomsMin}
-                onChange={(v) => update('roomsMin', v)}
-                label="חדרים: מ"
-              />
-            </div>
-            <div className="form-group">
-              <RoomsChips
-                value={form.roomsMax}
-                onChange={(v) => update('roomsMax', v)}
-                label="חדרים: עד"
-              />
+          {/* UX review F-5.3 — one labeled "טווח חדרים" group instead
+              of two stacked selectors with literal-translation labels
+              ("חדרים: מ" / "חדרים: עד"). Mirrors the PriceRange pattern
+              right below this. */}
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label className="form-label">טווח חדרים</label>
+            <div className="form-row">
+              <div className="form-group">
+                <RoomsChips
+                  value={form.roomsMin}
+                  onChange={(v) => update('roomsMin', v)}
+                  label="מ"
+                />
+              </div>
+              <div className="form-group">
+                <RoomsChips
+                  value={form.roomsMax}
+                  onChange={(v) => update('roomsMax', v)}
+                  label="עד"
+                />
+              </div>
             </div>
           </div>
           <div className="form-group" style={{ marginBottom: 16 }}>
@@ -378,20 +471,35 @@ export default function NewLead() {
         </div>
 
         <div className="form-actions form-actions-desktop">
-          <button type="submit" className="btn btn-primary btn-lg">
-            <Save size={18} />
-            שמור ליד
+          <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
+            {submitting ? <Loader2 size={18} className="y2-spin" /> : <Save size={18} />}
+            {submitting ? 'שומר…' : 'שמור ליד'}
           </button>
           <Link to="/customers" className="btn btn-secondary btn-lg">
             ביטול
           </Link>
+          {/* F-15 — honest autosave chip. During the debounce window
+              (draftPending) we say "pending"; after the flush we show the
+              actual savedAt time. No more lying about "saved" before the
+              bytes actually hit sessionStorage. */}
+          {hasContent && !savedRef.current && (
+            <span
+              className={`form-autosave-chip ${draftPending ? 'is-pending' : ''}`}
+              aria-live="polite"
+            >
+              {draftPending
+                ? (<><Loader2 size={12} className="y2-spin" /> שומר טיוטה…</>)
+                : (<><Check size={12} /> {draftSavedAt ? `טיוטה נשמרה ${relLabel(draftSavedAt)}` : 'טיוטה נשמרה'}</>)
+              }
+            </span>
+          )}
         </div>
       </form>
 
       <StickyActionBar visible>
-        <button type="submit" form="lead-form" className="btn btn-primary btn-lg">
-          <Save size={18} />
-          שמור ליד
+        <button type="submit" form="lead-form" className="btn btn-primary btn-lg" disabled={submitting}>
+          {submitting ? <Loader2 size={18} className="y2-spin" /> : <Save size={18} />}
+          {submitting ? 'שומר…' : 'שמור ליד'}
         </button>
         <Link to="/customers" className="btn btn-secondary btn-lg">ביטול</Link>
       </StickyActionBar>

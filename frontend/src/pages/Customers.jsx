@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { RoomsChips } from '../components/MobilePickers';
 import {
   UserPlus,
   Search,
@@ -299,10 +300,39 @@ export default function Customers() {
   const confirmDeleteLead = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
+    // F-3 — best-effort undo. Snapshot the lead so the toast action can
+    // re-POST it via api.createLead. Backend stays hard-delete for now;
+    // a proper soft-delete is a separate backend ticket (see review).
+    const snapshot = deleteTarget;
     try {
-      await api.deleteLead(deleteTarget.id);
+      await api.deleteLead(snapshot.id);
       setDeleteTarget(null);
       await loadLeads();
+      toast.success(`נמחק "${snapshot.name}"`, {
+        duration: 10_000,
+        action: {
+          label: 'בטל',
+          onClick: async () => {
+            try {
+              await api.createLead({
+                name: snapshot.name,
+                phone: snapshot.phone,
+                interestType: snapshot.interestType,
+                lookingFor: snapshot.lookingFor,
+                city: snapshot.city,
+                street: snapshot.street,
+                rooms: snapshot.rooms,
+                status: snapshot.status,
+                notes: snapshot.notes,
+              });
+              await loadLeads();
+              toast.success('הליד שוחזר');
+            } catch (e) {
+              toast.error(e?.message || 'שחזור נכשל');
+            }
+          },
+        },
+      });
     } catch (_) { /* ignore */ }
     setDeleting(false);
   };
@@ -383,10 +413,10 @@ export default function Customers() {
               רשימה
             </button>
           </div>
-          <Link to="/templates" className="btn btn-secondary cust-tpl-btn" title="ערוך תבניות הודעה">
-            <FileText size={16} />
-            ערוך תבניות הודעה
-          </Link>
+          {/* F-4 + F-16 — templates link removed from header. It duplicates
+              the sidebar entry and competed with "ליד חדש" (4×/day vs
+              1×/month). Canonical header pattern: primary CTA rightmost,
+              tertiary actions into overflow menus. */}
           <Link to="/customers/new" className="btn btn-primary">
             <UserPlus size={18} />
             ליד חדש
@@ -512,6 +542,7 @@ export default function Customers() {
           onEdit={setEditDialog}
           onDelete={setDeleteTarget}
           onNavigate={(id) => navigate(`/customers/${id}`)}
+          onBumpLastContact={(lead) => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: 'קשר אחרון עודכן' })}
         />
       ) : (
       <div className="customers-grid animate-in animate-in-delay-3">
@@ -676,11 +707,13 @@ export default function Customers() {
                           </div>
                           <div className="cc-row">
                             <span className="cc-label">חדרים</span>
-                            <span className="cc-value inline-edit">
-                              <InlineText
-                                value={lead.rooms || ''}
-                                onCommit={(v) => patchLead(lead.id, { rooms: v || null })}
-                                placeholder="—"
+                            <span className="cc-value">
+                              {/* F-11 — numeric chip picker replaces the
+                                  free-text inline edit so values always
+                                  match the numeric filter / match logic. */}
+                              <RoomsInlinePicker
+                                value={lead.rooms}
+                                onChange={(v) => patchLead(lead.id, { rooms: v }, { success: 'חדרים עודכנו' })}
                               />
                             </span>
                           </div>
@@ -721,6 +754,7 @@ export default function Customers() {
                             value={lead.notes || ''}
                             onCommit={(v) => patchLead(lead.id, { notes: v || null }, { success: 'הערות עודכנו' })}
                             multiline
+                            dir="auto"
                             placeholder="הוסף הערות..."
                             className="customer-notes-inline"
                           />
@@ -741,21 +775,12 @@ export default function Customers() {
                           </button>
                         </div>
 
-                        {/* P0-M9/M10/M8 + P5-M10: 48x48 icon-only quick-action rail (tel/wa/sms anchors) + ⋯ overflow */}
-                        <div className="ccm-actions ccm-rail">
-                          <a
-                            href={telUrl(lead.phone)}
-                            className="ccm-rail-btn ccm-rail-call"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              primeContactBump(lead.id);
-                              haptics.tap();
-                            }}
-                            aria-label={`התקשר ל${lead.name}`}
-                            title={`התקשר ל${lead.name}`}
-                          >
-                            <Phone size={20} aria-hidden="true" />
-                          </a>
+                        {/* F-7 — SMS demoted to overflow sheet; WhatsApp
+                            now dominates the rail because it's the #1
+                            daily action (20:1 over SMS for Israeli agents).
+                            Remaining 3 slots grow to 56×56 per rail-xl
+                            class. */}
+                        <div className="ccm-actions ccm-rail ccm-rail-xl">
                           <a
                             href={waUrl(lead.phone, `שלום ${lead.name}`)}
                             target="_blank"
@@ -769,20 +794,21 @@ export default function Customers() {
                             aria-label={`וואטסאפ ל${lead.name}`}
                             title={`וואטסאפ ל${lead.name}`}
                           >
-                            <WhatsAppIcon size={22} />
+                            <WhatsAppIcon size={24} />
+                            <span className="ccm-rail-label">וואטסאפ</span>
                           </a>
                           <a
-                            href={`sms:${lead.phone}`}
-                            className="ccm-rail-btn ccm-rail-sms"
+                            href={telUrl(lead.phone)}
+                            className="ccm-rail-btn ccm-rail-call"
                             onClick={(e) => {
                               e.stopPropagation();
                               primeContactBump(lead.id);
                               haptics.tap();
                             }}
-                            aria-label={`SMS ל${lead.name}`}
-                            title={`SMS ל${lead.name}`}
+                            aria-label={`התקשר ל${lead.name}`}
+                            title={`התקשר ל${lead.name}`}
                           >
-                            <MessageSquare size={20} aria-hidden="true" />
+                            <Phone size={22} aria-hidden="true" />
                           </a>
                           <button
                             type="button"
@@ -794,7 +820,7 @@ export default function Customers() {
                             aria-label={`פעולות נוספות ל${lead.name}`}
                             title="פעולות נוספות"
                           >
-                            <MoreHorizontal size={20} aria-hidden="true" />
+                            <MoreHorizontal size={22} aria-hidden="true" />
                           </button>
                         </div>
                       </div>
@@ -889,6 +915,7 @@ export default function Customers() {
                   value={lead.notes || ''}
                   onCommit={(v) => patchLead(lead.id, { notes: v || null }, { success: 'הערות עודכנו' })}
                   multiline
+                  dir="auto"
                   placeholder="הוסף הערות..."
                   className="customer-notes-inline"
                 />
@@ -906,6 +933,23 @@ export default function Customers() {
                   </button>
                 </div>
                 <div className="customer-actions">
+                  {/* F-2 — WhatsApp is the single daily action; upgrade
+                      it to a filled primary (green) button so it's not
+                      visually identical to Delete. Edit + Delete move to
+                      an overflow menu so the destructive action can't be
+                      fat-fingered. */}
+                  <a
+                    href={waUrl(lead.phone, `שלום ${lead.name}`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-wa btn-sm"
+                    title="שלח בוואטסאפ"
+                    aria-label={`וואטסאפ ל${lead.name}`}
+                    onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
+                  >
+                    <WhatsAppIcon size={14} />
+                    <span>וואטסאפ</span>
+                  </a>
                   <a
                     href={telUrl(lead.phone)}
                     className="btn btn-ghost btn-sm"
@@ -916,30 +960,13 @@ export default function Customers() {
                     <Phone size={14} />
                     <span className="hide-sm">{lead.phone}</span>
                   </a>
-                  <a
-                    href={waUrl(lead.phone, `שלום ${lead.name}`)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-ghost btn-sm"
-                    title="שלח בוואטסאפ"
-                    aria-label={`וואטסאפ ל${lead.name}`}
-                    onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
-                  >
-                    <WhatsAppIcon size={14} className="wa-green" />
-                  </a>
                   <button
                     className="btn btn-ghost btn-sm"
-                    onClick={() => setEditDialog(lead)}
-                    title="עריכה"
+                    onClick={() => setOverflowLead(lead)}
+                    title="פעולות נוספות"
+                    aria-label={`פעולות נוספות ל${lead.name}`}
                   >
-                    <Edit3 size={14} />
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm danger-hover"
-                    onClick={() => setDeleteTarget(lead)}
-                    title="מחיקה"
-                  >
-                    <Trash2 size={14} />
+                    <MoreHorizontal size={14} />
                   </button>
                 </div>
               </div>
@@ -990,17 +1017,15 @@ export default function Customers() {
         />
       )}
 
-      {/* Mobile ⋯ overflow sheet for per-lead secondary actions (P1-M8) */}
+      {/* Mobile ⋯ overflow sheet for per-lead secondary actions (P1-M8).
+          Desktop also routes Edit + Delete through here now (F-2) so the
+          destructive action can't be mis-tapped. */}
       <OverflowSheet
         open={!!overflowLead}
         onClose={() => setOverflowLead(null)}
         title={overflowLead ? overflowLead.name : ''}
         actions={overflowLead ? [
           {
-            // Task 6 — top-billed: open the full customer profile.
-            // Mobile rows previously had no path to /customers/:id —
-            // only the inline expand. Adding this action makes the
-            // detail page reachable in 2 taps from any list row.
             icon: User,
             label: 'פתח כרטיס לקוח',
             description: 'היסטוריה, התאמות, עריכה מלאה',
@@ -1011,6 +1036,12 @@ export default function Customers() {
             label: 'התקשר',
             description: overflowLead.phone,
             onClick: () => handleTel(overflowLead),
+          },
+          {
+            icon: MessageSquare,
+            label: 'SMS',
+            description: overflowLead.phone,
+            onClick: () => handleSms(overflowLead),
           },
           {
             icon: Edit3,
@@ -1041,6 +1072,8 @@ export default function Customers() {
       {/* P1-M11: Mobile filters bottom sheet */}
       {filterSheetOpen && (
         <FilterSheet
+          allLeads={leads}
+          inactiveFilter={inactiveFilter}
           lookingForFilter={lookingForFilter}
           interestFilter={interestFilter}
           statusFilter={statusFilter}
@@ -1068,11 +1101,28 @@ function CustomerList({
   onEdit,
   onDelete,
   onNavigate,
+  onBumpLastContact,
 }) {
-  // P2-D13: sort state — clicking a header toggles asc/desc; clicking a
-  // different one resets to asc.
-  const [sortKey, setSortKey] = useState('name');
-  const [sortDir, setSortDir] = useState('asc');
+  // F-9 — persist sort in URL so back-nav and shareable links preserve
+  // the agent's preferred order (typical: "stale first" = lastContact desc).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSort = searchParams.get('sort');
+  const urlDir  = searchParams.get('dir');
+  const validKeys = ['name', 'city', 'rooms', 'budget', 'status', 'lastContact'];
+  const [sortKey, setSortKey] = useState(validKeys.includes(urlSort) ? urlSort : 'name');
+  const [sortDir, setSortDir] = useState(urlDir === 'desc' ? 'desc' : 'asc');
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (sortKey === 'name' && sortDir === 'asc') {
+      next.delete('sort'); next.delete('dir');
+    } else {
+      next.set('sort', sortKey);
+      next.set('dir', sortDir);
+    }
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortKey, sortDir]);
 
   const sorted = useMemo(() => {
     const arr = [...leads];
@@ -1184,8 +1234,31 @@ function CustomerList({
                   <td
                     className={`cl-td cl-td-num cl-muted ${stalePillDays(lead) ? 'cl-td-stale' : ''}`}
                     title={lead.lastContact ? absoluteTime(lead.lastContact) : ''}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {lastRel ? lastRel.label : '—'}
+                    {/* F-17 — parity with the card view: if the lead is
+                        stale, show a clickable red pill that bumps
+                        lastContact to now. Previously the table cell was
+                        just colored muted text; no affordance. */}
+                    {(() => {
+                      const stale = stalePillDays(lead);
+                      if (stale && onBumpLastContact) {
+                        return (
+                          <button
+                            type="button"
+                            className="cl-stale-pill"
+                            title="לחץ לעדכון קשר אחרון לעכשיו"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onBumpLastContact(lead);
+                            }}
+                          >
+                            {stale} ימים ללא קשר
+                          </button>
+                        );
+                      }
+                      return lastRel ? lastRel.label : '—';
+                    })()}
                   </td>
                   <td className="cl-td cl-td-actions" onClick={(e) => e.stopPropagation()}>
                     <a
@@ -1309,14 +1382,35 @@ function CustomerList({
 // Inline dropdown to pick HOT/WARM/COLD manually, with auto-suggestion badge.
 function StatusPicker({ lead, onChange }) {
   const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
   const isAutoMatch = lead.suggestedStatus && lead.status === lead.suggestedStatus;
 
+  // F-10 — outside-click + ESC close. The old mouseLeave-only handler
+  // trapped keyboard users and mis-fired on trackpad drift.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDocDown);
+    document.addEventListener('touchstart', onDocDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown);
+      document.removeEventListener('touchstart', onDocDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="status-picker">
+    <div className="status-picker" ref={wrapRef}>
       <button
         className={`badge ${statusBadgeClass(lead.status)} status-badge-btn`}
         onClick={() => setOpen((v) => !v)}
         title={lead.statusExplanation || 'שנה סטטוס'}
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
         {statusIcon(lead.status)}
         {statusLabel(lead.status)}
@@ -1325,7 +1419,7 @@ function StatusPicker({ lead, onChange }) {
         )}
       </button>
       {open && (
-        <div className="status-menu" onMouseLeave={() => setOpen(false)}>
+        <div className="status-menu" role="menu">
           <div className="status-menu-hint">
             <HelpCircle size={12} />
             <span>{lead.statusExplanation || 'בחר סטטוס לליד'}</span>
@@ -1333,6 +1427,7 @@ function StatusPicker({ lead, onChange }) {
           {['HOT', 'WARM', 'COLD'].map((s) => (
             <button
               key={s}
+              role="menuitem"
               className={`status-menu-item ${lead.status === s ? 'active' : ''}`}
               onClick={async () => {
                 setOpen(false);
@@ -1347,6 +1442,56 @@ function StatusPicker({ lead, onChange }) {
         </div>
       )}
     </div>
+  );
+}
+
+// F-11 — tiny rooms chip picker used inline on the customer card.
+// Clicking the value opens a 10-chip grid; picking a chip commits and
+// closes. Replaces the free-text InlineText that let agents save "3-4"
+// and break numeric matching.
+function RoomsInlinePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDocDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  const label = value != null && value !== '' ? `${value} חד׳` : '—';
+  return (
+    <span className="rooms-inline" ref={ref}>
+      <button
+        type="button"
+        className={`inline-text ${value == null || value === '' ? 'is-empty' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        {label}
+      </button>
+      {open && (
+        <div className="rooms-inline-pop" role="menu">
+          <RoomsChips
+            value={value}
+            onChange={(v) => { onChange?.(v); setOpen(false); }}
+          />
+          <button
+            type="button"
+            className="rooms-inline-clear"
+            onClick={() => { onChange?.(null); setOpen(false); }}
+          >
+            נקה
+          </button>
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -1411,8 +1556,12 @@ function StatusInfoSheet({ lead, onClose, onChange }) {
   );
 }
 
-// P1-M11: Mobile filter bottom sheet — three groups stacked + clear
+// P1-M11: Mobile filter bottom sheet — three groups stacked + clear.
+// F-18 — live "show N results" button label so the agent sees the count
+// update as they toggle chips.
 function FilterSheet({
+  allLeads = [],
+  inactiveFilter,
   lookingForFilter,
   interestFilter,
   statusFilter,
@@ -1422,6 +1571,22 @@ function FilterSheet({
   onClear,
   onClose,
 }) {
+  const matchCount = useMemo(() => {
+    const now = Date.now();
+    const DAY = 86400000;
+    return allLeads.filter((l) => {
+      if (lookingForFilter !== 'all' && l.lookingFor !== lookingForFilter) return false;
+      if (interestFilter !== 'all' && l.interestType !== interestFilter) return false;
+      if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+      if (inactiveFilter != null) {
+        if (l.status === 'COLD') return false;
+        if (!l.lastContact) return false;
+        const days = (now - new Date(l.lastContact).getTime()) / DAY;
+        if (days < inactiveFilter) return false;
+      }
+      return true;
+    }).length;
+  }, [allLeads, lookingForFilter, interestFilter, statusFilter, inactiveFilter]);
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -1502,7 +1667,7 @@ function FilterSheet({
             className="filter-sheet-apply"
             onClick={onClose}
           >
-            הצג תוצאות
+            הצג {matchCount} תוצאות
           </button>
         </div>
       </div>

@@ -113,6 +113,10 @@ export default function Dashboard() {
   const properties = data?.properties || [];
   const leads = data?.leads || [];
   const owners = data?.owners || [];
+  // F-21 — when data came from the page cache we're probably refetching
+  // fresher numbers in the background; mark the tiles with a shimmer
+  // so an agent doesn't mistake "0 hot leads (stale)" for "genuinely 0".
+  const isRefreshing = loading;
 
   // Real counts, never mock
   const res = summary.properties?.residential || { total: 0, sale: 0, rent: 0 };
@@ -207,7 +211,7 @@ export default function Dashboard() {
 
         <TodayStrip leads={leads} properties={properties} />
 
-        <KpiScroller stats={stats} />
+        <KpiScroller stats={stats} refreshing={isRefreshing} />
 
         {staleLeads.length > 0 && (
         <div className="dash-signals animate-in animate-in-delay-2">
@@ -293,7 +297,7 @@ export default function Dashboard() {
                 return (
                   <Link
                     key={prop.id}
-                    to={`/properties/${prop.id}`}
+                    to={`/properties/${prop.id}?panel=marketing`}
                     className="property-progress-item"
                     onClick={() => haptics.tap()}
                   >
@@ -374,7 +378,7 @@ export default function Dashboard() {
   );
 }
 
-function KpiScroller({ stats }) {
+function KpiScroller({ stats, refreshing = false }) {
   const trackRef = useRef(null);
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -412,7 +416,7 @@ function KpiScroller({ stats }) {
               <stat.icon size={22} />
             </div>
             <div className="stat-info">
-              <span className="stat-value">{stat.value}</span>
+              <span className={`stat-value ${refreshing ? 'stat-value-refreshing' : ''}`}>{stat.value}</span>
               <span className="stat-label">{stat.label}</span>
               <span className="stat-sub">{stat.sub}</span>
             </div>
@@ -499,7 +503,28 @@ function TodayStrip({ leads = [], properties = [] }) {
     });
   }
 
-  if (tiles.length === 0) return null;
+  // UX review F-4.2 — on a quiet day, keep the strip visible with a
+  // positive empty state. Collapsing silently breaks the agent's
+  // morning scan rhythm — they think the widget broke.
+  if (tiles.length === 0) {
+    return (
+      <section className="today-strip animate-in animate-in-delay-1" aria-label="סדר היום">
+        <header className="today-strip-head">
+          <Sun size={14} aria-hidden="true" />
+          <h3>היום</h3>
+        </header>
+        <div className="today-strip-rail">
+          <div className="today-tile today-tile-ok" aria-live="polite">
+            <span className="today-tile-icon"><Sparkles size={16} /></span>
+            <span className="today-tile-meta">
+              <strong>הכל מסודר להיום</strong>
+              <small>אין לידים חמים ממתינים · אין נכסים ללא שיווק</small>
+            </span>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="today-strip animate-in animate-in-delay-1" aria-label="סדר היום">
@@ -569,7 +594,7 @@ function WelcomeSection() {
         </div>
         <div className="welcome-actions">
           <button
-            className="btn btn-primary btn-lg"
+            className="btn btn-secondary btn-lg"
             onClick={handleShare}
             disabled={!catalogUrl}
             title="תצוגה מקדימה ושיתוף"

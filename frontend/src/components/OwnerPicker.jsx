@@ -156,7 +156,23 @@ export default function OwnerPicker({ open, onClose, onPick }) {
               {loading && <div className="owner-picker-empty">טוען…</div>}
               {!loading && results.length === 0 && (
                 <div className="owner-picker-empty">
-                  {q ? 'לא נמצאו בעלי נכסים לחיפוש' : 'עוד אין בעלי נכסים במערכת'}
+                  {/* F-22 — if the agent typed a name, let them commit it
+                      via a single-click "create with this name" button.
+                      Previously the empty state was a dead copy line. */}
+                  {q ? (
+                    <>
+                      <p>לא נמצא בעלים עם השם "{q}".</p>
+                      <button
+                        type="button"
+                        className="owner-picker-create-with-q"
+                        onClick={() => setCreateOpen(true)}
+                      >
+                        <UserPlus size={14} /> צור בעלים חדש: <strong>{q}</strong>
+                      </button>
+                    </>
+                  ) : (
+                    'עוד אין בעלי נכסים במערכת'
+                  )}
                 </div>
               )}
               {!loading && results.map((o) => (

@@ -267,9 +267,11 @@ export default function Properties() {
     setBulkProgress({ done: 0, total: ids.length });
     let done = 0;
     let failed = 0;
-    // Sequential — for typical 1-20 selections the latency is fine,
-    // and serial keeps server pressure bounded if a future bulk op
-    // does meaningful per-item work (e.g., S3 cleanup of photos).
+    // F-3 — snapshot what's about to be deleted so the undo toast can
+    // best-effort re-create them. Photos are NOT restorable (the delete
+    // path cleans S3 keys). That limitation is surfaced in the undo
+    // toast copy ("ללא תמונות").
+    const snapshots = items.filter((p) => selectedIds.has(p.id));
     for (const id of ids) {
       try {
         await api.deleteProperty(id);
@@ -286,7 +288,36 @@ export default function Properties() {
     exitSelect();
     await load();
     if (failed === 0) {
-      toast?.success?.(`נמחקו ${done} נכסים`);
+      toast?.success?.(`נמחקו ${done} נכסים · ללא תמונות אחרי שחזור`, {
+        duration: 10_000,
+        action: {
+          label: 'בטל',
+          onClick: async () => {
+            let restored = 0;
+            for (const p of snapshots) {
+              try {
+                await api.createProperty({
+                  assetClass: p.assetClass || 'RESIDENTIAL',
+                  category: p.category || 'SALE',
+                  street: p.street,
+                  city: p.city,
+                  owner: p.owner || 'שחזור',
+                  ownerPhone: p.ownerPhone || '',
+                  marketingPrice: p.marketingPrice,
+                  sqm: p.sqm,
+                  type: p.type,
+                  rooms: p.rooms,
+                  floor: p.floor,
+                  notes: p.notes,
+                });
+                restored++;
+              } catch { /* continue */ }
+            }
+            await load();
+            toast?.success?.(`שוחזרו ${restored} נכסים`);
+          },
+        },
+      });
       haptics.success();
     } else if (done === 0) {
       toast?.error?.('המחיקה נכשלה');
@@ -486,15 +517,27 @@ export default function Properties() {
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
-  const hasActiveFilters =
-    advFilters.city ||
-    advFilters.minPrice ||
-    advFilters.maxPrice ||
-    advFilters.minRooms ||
-    advFilters.maxRooms ||
-    advFilters.minSqm ||
-    advFilters.maxSqm ||
-    locationQuery;
+  const activeFilterCount = (
+    (advFilters.city ? 1 : 0) +
+    (advFilters.minPrice ? 1 : 0) +
+    (advFilters.maxPrice ? 1 : 0) +
+    (advFilters.minRooms ? 1 : 0) +
+    (advFilters.maxRooms ? 1 : 0) +
+    (advFilters.minSqm ? 1 : 0) +
+    (advFilters.maxSqm ? 1 : 0) +
+    (locationQuery ? 1 : 0)
+  );
+  const hasActiveFilters = activeFilterCount > 0;
+  const anyFilterActive = hasActiveFilters || filter !== 'all' || assetClassFilter !== 'all' || (search || '').trim().length > 0;
+  const clearAllFilters = () => {
+    setSearch('');
+    setFilter('all');
+    setAssetClassFilter('all');
+    setAdvFilters({ city: '', minRooms: '', maxRooms: '', minSqm: null, maxSqm: null, minPrice: null, maxPrice: null });
+    setLocationQuery('');
+    setLocationRadius(5);
+    setShowAdvanced(false);
+  };
 
   const confirmDelete = async () => {
     if (!toDelete) return;
@@ -664,22 +707,17 @@ export default function Properties() {
             <p>{filtered.length} מתוך {items.length} נכסים</p>
           </div>
           <div className="page-header-actions">
+            {/* F-4 — canonical header: primary rightmost, secondaries demoted.
+                Bulk-select and share-link move behind the ⋯ overflow so the
+                primary CTA ("קליטת נכס חדש") wins the visual hierarchy. */}
             <button
               type="button"
-              className={`btn btn-ghost ${selectMode ? 'is-active' : ''}`}
-              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-              title="בחירה מרובה לפעולות (מחיקה וכו׳)"
+              className="btn btn-ghost"
+              onClick={() => setPageOverflowOpen(true)}
+              aria-label="פעולות נוספות"
+              title="פעולות נוספות"
             >
-              <CheckSquare size={18} />
-              {selectMode ? 'יציאה מבחירה' : 'בחר'}
-            </button>
-            <button
-              className={`btn btn-secondary ${copiedLink ? 'btn-copied' : ''}`}
-              onClick={handleGenerateLink}
-              title="יצירת קישור לשיתוף עם הלקוח — כולל כל הסינונים הפעילים"
-            >
-              {copiedLink ? <Check size={18} /> : <LinkIcon size={18} />}
-              {copiedLink ? 'הקישור הועתק' : 'קישור ללקוח'}
+              <MoreHorizontal size={18} />
             </button>
             <Link to="/properties/new" className="btn btn-primary">
               <Plus size={18} />
@@ -753,9 +791,18 @@ export default function Properties() {
           onClick={() => setShowAdvanced(!showAdvanced)}
         >
           <SlidersHorizontal size={16} />
-          סינון מתקדם
-          {hasActiveFilters && <span className="filter-dot" />}
+          {hasActiveFilters ? `סינון מתקדם · ${activeFilterCount}` : 'סינון מתקדם'}
         </button>
+        {anyFilterActive && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm filter-clear-all"
+            onClick={clearAllFilters}
+            title="נקה את כל הסינונים"
+          >
+            <X size={13} /> נקה הכל
+          </button>
+        )}
       </div>
 
       {showAdvanced && (
@@ -1033,7 +1080,7 @@ export default function Properties() {
                           aria-label={`שלח את ${prop.street} בוואטסאפ`}
                         >
                           <WhatsAppIcon />
-                          <span>וואטסאפ</span>
+                          <span>שלח בוואטסאפ</span>
                         </button>
                         <a
                           href={wazeUrl(`${prop.street} ${prop.city}`)}
@@ -1181,7 +1228,7 @@ export default function Properties() {
                   title="שלח את כל פרטי הנכס + תמונות בוואטסאפ"
                 >
                   <WhatsAppIcon size={16} />
-                  <span>שלח ללקוח</span>
+                  <span>שלח בוואטסאפ</span>
                 </button>
                 <button
                   className="property-overflow-btn"
@@ -1264,16 +1311,25 @@ export default function Properties() {
         />
       )}
 
-      {bulkConfirm && (
-        <ConfirmDialog
-          title="מחיקה מרובה"
-          message={`למחוק ${selectedIds.size} נכסים? הפעולה אינה הפיכה.`}
-          confirmLabel={`מחק ${selectedIds.size}`}
-          onConfirm={bulkDelete}
-          onClose={() => setBulkConfirm(false)}
-          busy={bulkBusy}
-        />
-      )}
+      {bulkConfirm && (() => {
+        // UX review F-8.1 — list up to 5 addresses so the agent can
+        // verify the selection before deleting. Safer than a bare count.
+        const selected = items.filter((p) => selectedIds.has(p.id));
+        const shown = selected.slice(0, 5);
+        const rest = selected.length - shown.length;
+        const list = shown.map((p) => `• ${p.street}, ${p.city}`).join('\n');
+        const tail = rest > 0 ? `\n• ועוד ${rest}` : '';
+        return (
+          <ConfirmDialog
+            title="מחיקה מרובה"
+            message={`למחוק ${selectedIds.size} נכסים?\n\n${list}${tail}\n\nהפעולה אינה הפיכה.`}
+            confirmLabel={`מחק ${selectedIds.size}`}
+            onConfirm={bulkDelete}
+            onClose={() => setBulkConfirm(false)}
+            busy={bulkBusy}
+          />
+        );
+      })()}
 
       {/* Floating bulk action bar — slides up from the bottom thumb
           zone the moment selection mode kicks in. Empty state shows

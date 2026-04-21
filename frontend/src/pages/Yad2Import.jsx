@@ -97,9 +97,10 @@ export default function Yad2Import() {
     if (!url.trim()) return;
     if (quota && quota.remaining === 0) return;
     initPickedRef.current = false;
-    setStep('paste'); // keep the user on paste while scan is running
-    // startScan fires-and-forgets — the store updates flow back via the
-    // subscription, so the agent can navigate away freely.
+    // F-24 — do NOT reset step to 'paste' here. The component already
+    // renders the paste step; explicitly setting it caused a brief flash
+    // of URL-cleared state on some renders. The URL input stays visible
+    // below the running-scan banner so the agent sees what's in flight.
     startScan(url.trim()).catch(() => { /* handled via store */ });
     toast.info?.('הסריקה החלה — תוכל/י להמשיך לעבוד. תקבל/י התראה בסיום.');
   };

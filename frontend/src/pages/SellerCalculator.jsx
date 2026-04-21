@@ -310,15 +310,14 @@ function DesktopSellerCalculator() {
                   most common follow-up step after a pricing chat. */}
               {result.net > 0 && (
                 <div className="sc-share-row">
+                  {/* F-25 — same-tab navigation on desktop too. Agents
+                      typically have a pinned WhatsApp Web tab already; a
+                      new window forces them to deal with two WA tabs. */}
                   <a
                     href={buildShareUrl({ result, mode: s.mode, isMobile })}
-                    target={isMobile ? '_self' : '_blank'}
+                    target="_self"
                     rel="noopener noreferrer"
                     className="sc-share-cta"
-                    onClick={(e) => {
-                      // On non-Capacitor desktop the wa.me link opens in a
-                      // new tab; nothing else to do here.
-                    }}
                   >
                     <Share2 size={16} />
                     שתף לבעלים בוואטסאפ

@@ -146,10 +146,10 @@ export default function OwnerDetail() {
                 type="button"
                 onClick={() => openWhatsApp({ phone: owner.phone, text: `שלום ${owner.name}` })}
                 className="btn btn-secondary btn-sm"
-                title="וואטסאפ"
+                title="שלח בוואטסאפ"
               >
                 <WhatsAppIcon size={14} className="wa-green" />
-                וואטסאפ
+                שלח בוואטסאפ
               </button>
             </>
           )}
@@ -217,7 +217,7 @@ export default function OwnerDetail() {
             aria-label={`וואטסאפ ל${owner.name}`}
           >
             <WhatsAppIcon size={18} />
-            <span>וואטסאפ</span>
+            <span>שלח בוואטסאפ</span>
           </button>
           <a
             href={`sms:${owner.phone}`}

@@ -144,7 +144,16 @@ function AppRoutes() {
   return (
     <>
       <OfflineBanner />
-      <Suspense fallback={<div className="app-loading" aria-hidden />}>
+      {/* F-26 — Suspense fallback is now a tiny page-aware skeleton
+          instead of a silent blank. Kicks in while Templates / AdminChats /
+          SellerCalculator / Yad2Import lazy chunks load on first visit. */}
+      <Suspense fallback={(
+        <div className="app-loading app-loading-skel" aria-hidden>
+          <div className="skel skel-line w-40" style={{ margin: '24px auto', maxWidth: 420 }} />
+          <div className="skel skel-line w-70" style={{ margin: '12px auto', maxWidth: 420 }} />
+          <div className="skel skel-line w-90" style={{ margin: '12px auto', maxWidth: 420 }} />
+        </div>
+      )}>
         <Routes>
           <Route element={<Layout onLogout={logout} />}>
             <Route path="/" element={<Dashboard />} />
@@ -164,10 +173,16 @@ function AppRoutes() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/calculator" element={<SellerCalculator />} />
             <Route path="/integrations/yad2" element={<Yad2Import />} />
-            {/* Legacy routes — redirect */}
+            {/* Legacy + alias routes — redirect.
+                `/assets` is a reasonable English guess for "נכסים"
+                (literally "assets") — hitting the 404 felt like a bug
+                even though it was just an unbound URL. Redirect to the
+                canonical path so guessed URLs resolve. */}
             <Route path="/leads" element={<Navigate to="/customers" replace />} />
             <Route path="/leads/new" element={<Navigate to="/customers/new" replace />} />
             <Route path="/buyers" element={<Navigate to="/customers?tab=active" replace />} />
+            <Route path="/assets" element={<Navigate to="/properties" replace />} />
+            <Route path="/assets/:id" element={<Navigate to="/properties" replace />} />
             <Route path="/deals" element={<Deals />} />
           </Route>
           {/* SEO-friendly public routes */}

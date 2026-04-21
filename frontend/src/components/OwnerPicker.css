@@ -277,3 +277,20 @@
 .owner-picker-pill strong {
   font-weight: 700;
 }
+
+/* F-22 — inline "create with this name" shortcut from the empty state. */
+.owner-picker-create-with-q {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--gold-glow);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+  font-weight: 600;
+  cursor: pointer;
+}
+.owner-picker-create-with-q:hover { background: color-mix(in srgb, var(--gold) 22%, var(--bg-card)); }
+.owner-picker-create-with-q strong { color: var(--text-primary); margin-inline-start: 2px; }

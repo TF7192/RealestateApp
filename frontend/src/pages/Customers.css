@@ -1698,3 +1698,96 @@
     justify-content: flex-start;
   }
 }
+
+/* ============================================================
+   UX review F-2 · F-7 · F-11 · F-17 — polish pass
+   ============================================================ */
+
+/* F-2 — WhatsApp filled primary (green) used on the desktop customer
+   card footer so the daily action is visually obvious + 40% larger
+   pointer target than the old ghost icon. */
+.btn.btn-wa {
+  background: #25D366;
+  color: white;
+  border: 1px solid #1DA851;
+  font-weight: 600;
+  gap: 6px;
+}
+.btn.btn-wa:hover  { background: #1fc25c; }
+.btn.btn-wa:active { background: #18a84f; }
+.btn.btn-wa svg   { color: white; }
+
+/* F-7 — "extra-large" rail: SMS gone → remaining 3 slots get more
+   generous targets (56×56) with a label under WhatsApp so agents can
+   confirm which of the 3 looks like which. */
+.ccm-rail-xl {
+  gap: 14px;
+}
+.ccm-rail-xl .ccm-rail-btn {
+  min-width: 56px;
+  min-height: 56px;
+}
+.ccm-rail-xl .ccm-rail-wa {
+  background: #25D366;
+  color: white;
+  border-color: #1DA851;
+  flex: 1 1 auto;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  min-width: 96px;
+}
+.ccm-rail-xl .ccm-rail-wa svg { color: white; }
+.ccm-rail-xl .ccm-rail-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  line-height: 1;
+}
+
+/* F-11 — RoomsInlinePicker popover */
+.rooms-inline { position: relative; display: inline-block; }
+.rooms-inline-pop {
+  position: absolute;
+  z-index: 30;
+  inset-inline-start: 0;
+  top: calc(100% + 6px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 10px;
+  min-width: 240px;
+}
+.rooms-inline-clear {
+  margin-top: 8px;
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.rooms-inline-clear:hover { background: var(--bg-card-hover); }
+
+/* F-17 — clickable stale-lead pill in the customer TABLE cell (parity
+   with the card view's red pill). */
+.cl-stale-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--danger-bg);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 11px;
+  cursor: pointer;
+}
+.cl-stale-pill:hover {
+  background: color-mix(in srgb, var(--danger) 14%, var(--bg-card));
+}

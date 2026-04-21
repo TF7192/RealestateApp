@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { Check, Loader2 } from 'lucide-react';
 import './InlineText.css';
 
 /**
  * Click-to-edit text. Enter commits, Esc cancels. Optimistic UI is the
  * caller's responsibility — just implement `onCommit(newValue)` to resolve a
  * Promise. The component never locks on failure.
+ *
+ * F-6 — shows a spinner while onCommit is in-flight and a checkmark flash
+ *       for 600ms on success so the agent has honest feedback.
+ * F-12 — `dir` prop lets callers force RTL/LTR/auto; defaults to auto for
+ *       prose fields, ltr for numeric/email/tel.
  */
 export default function InlineText({
   value,
@@ -15,9 +21,12 @@ export default function InlineText({
   className = '',
   display,
   suffix,
+  dir: dirProp,
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
+  const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -38,13 +47,16 @@ export default function InlineText({
       setEditing(false);
       return;
     }
+    setSaving(true);
+    setEditing(false);
     try {
       await onCommit(draft);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 600);
     } catch {
-      // Revert to original value on failure
       setDraft(value ?? '');
     } finally {
-      setEditing(false);
+      setSaving(false);
     }
   };
 
@@ -70,7 +82,10 @@ export default function InlineText({
   const inputType = isNumeric ? 'text' : type;
   const inputMode = isNumeric ? 'numeric' : (type === 'tel' ? 'tel' : type === 'email' ? 'email' : 'text');
   const enterKeyHint = multiline ? 'enter' : 'done';
-  const dirAttr = type === 'email' || type === 'tel' || isNumeric ? 'ltr' : 'auto';
+  // F-12 — honor `dir` prop if given; otherwise auto for prose, ltr for
+  // numeric/email/tel. Prose fields (notes, city) that mix Hebrew and
+  // English stay correctly aligned.
+  const dirAttr = dirProp ?? (type === 'email' || type === 'tel' || isNumeric ? 'ltr' : 'auto');
 
   if (editing) {
     return multiline ? (
@@ -109,15 +124,20 @@ export default function InlineText({
   const shown = display != null ? display : (value || placeholder);
   return (
     <span
-      className={`inline-text ${className} ${!value ? 'is-empty' : ''}`}
+      className={`inline-text ${className} ${!value ? 'is-empty' : ''} ${saving ? 'is-saving' : ''} ${justSaved ? 'is-saved' : ''}`}
       onClick={() => setEditing(true)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter') setEditing(true); }}
       title="לחץ לעריכה"
+      dir={dirAttr}
     >
       {shown}
       {suffix}
+      {/* F-6 — honest visual feedback: spinner while committing, flash
+          checkmark for 600ms after success. No more "optimistic silence". */}
+      {saving && <Loader2 size={11} className="inline-text-saving" aria-hidden="true" />}
+      {justSaved && !saving && <Check size={11} className="inline-text-saved" aria-hidden="true" />}
     </span>
   );
 }

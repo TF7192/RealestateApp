@@ -63,3 +63,18 @@
 }
 
 .toast-close:hover { color: var(--text-primary); }
+
+/* F-3 — optional action button (e.g., "בטל" for undo). Gold outline so
+   it's obviously clickable inside the toast pill. */
+.toast-action {
+  background: transparent;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.toast-action:hover { background: var(--gold-glow); }

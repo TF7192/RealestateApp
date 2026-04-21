@@ -42,3 +42,29 @@
   max-width: 260px;
   resize: vertical;
 }
+
+/* F-6 — saving / saved visual states */
+.inline-text.is-saving {
+  background: var(--gold-glow);
+  border-color: var(--gold-border);
+  color: var(--text-muted);
+}
+.inline-text.is-saved {
+  background: var(--success-bg);
+  border-color: color-mix(in srgb, var(--success) 28%, transparent);
+}
+.inline-text-saving {
+  margin-inline-start: 6px;
+  color: var(--gold);
+  animation: y2-spin 1s linear infinite;
+  vertical-align: middle;
+}
+.inline-text-saved {
+  margin-inline-start: 6px;
+  color: var(--success);
+  vertical-align: middle;
+}
+@keyframes y2-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

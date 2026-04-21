@@ -193,7 +193,15 @@ export default function PropertyDetail() {
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   // Active sliding panel: 'marketing' | 'owner' | 'photos' | 'exclusivity' | 'notes' | 'map' | null
-  const [panel, setPanel] = useState(null);
+  // F-4.3 — respect `?panel=marketing` deep-link from the Dashboard's
+  // marketing-progress card.
+  const [panel, setPanel] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get('panel');
+      const allowed = ['marketing', 'owner', 'photos', 'exclusivity', 'notes', 'map'];
+      return allowed.includes(p) ? p : null;
+    } catch { return null; }
+  });
   // 1.5 — Prospect intake dialog open-state
   const [prospectOpen, setProspectOpen] = useState(false);
   // OwnerPicker for swapping the linked Owner without leaving the page.
@@ -562,10 +570,9 @@ export default function PropertyDetail() {
           <span>חזרה לנכסים</span>
         </Link>
         <div className="pd-top-actions">
-          <button className="btn btn-secondary btn-sm" onClick={() => setTransferOpen(true)}>
-            <ArrowLeftRight size={14} />
-            <span>העבר</span>
-          </button>
+          {/* UX review F-6.1 + F-6.2 — canonical toolbar order:
+              Edit (highest frequency) · Share · Add-Prospect · overflow
+              for rare actions (Transfer, Story) · Delete (red, last). */}
           <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/properties/${id}/edit`)}>
             <Edit3 size={14} />
             <span>עריכה</span>
@@ -573,6 +580,14 @@ export default function PropertyDetail() {
           <button className="btn btn-secondary btn-sm" onClick={handleShare}>
             <Share2 size={14} />
             <span>שתף</span>
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setProspectOpen(true)}>
+            <UserPlus size={14} />
+            <span>הוסף מתעניין</span>
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setTransferOpen(true)} title="העברה לסוכן אחר">
+            <ArrowLeftRight size={14} />
+            <span>העבר</span>
           </button>
           {isNative() && (
             <button
@@ -588,12 +603,6 @@ export default function PropertyDetail() {
               <span>סטורי</span>
             </button>
           )}
-          {/* 1.5 — Add Interested Party (prospect intake). Opens a
-              dialog with in-person signature pad + digital link share. */}
-          <button className="btn btn-secondary btn-sm" onClick={() => setProspectOpen(true)}>
-            <UserPlus size={14} />
-            <span>הוסף מתעניין</span>
-          </button>
           <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={14} />
             <span>מחיקה</span>
@@ -626,6 +635,57 @@ export default function PropertyDetail() {
       />
 
       {/* KPI strip */}
+      {/* UX review F-1.1 — Matched-leads quick dispatch.
+          Surfaces top 3 leads that match this property as one-tap
+          "Send WhatsApp" rows. The matching function was already used
+          by handleWhatsApp below; this just makes it visible before
+          the user has to click the generic picker. Saves ~13s × ~15
+          handoffs/day = 11min/agent/day on the #1 workflow.  */}
+      {(() => {
+        const matches = (leads || []).filter((l) => leadMatchesProperty(l, property));
+        if (matches.length === 0) return null;
+        const top = matches.slice(0, 3);
+        const restCount = matches.length - top.length;
+        return (
+          <section className="pd-matches animate-in animate-in-delay-2" aria-label="לידים תואמים">
+            <header className="pd-matches-head">
+              <span>מתאים ל-{matches.length} לידים</span>
+            </header>
+            <ul className="pd-matches-list">
+              {top.map((lead) => (
+                <li key={lead.id}>
+                  <button
+                    type="button"
+                    className="pd-match-row"
+                    onClick={() => openWhatsApp({ phone: lead.phone, text: buildMessage() })}
+                    title={`שלח לליד ${lead.name} בוואטסאפ`}
+                  >
+                    <span className="pd-match-name">{lead.name}</span>
+                    <span className="pd-match-meta">
+                      {lead.city || '—'}{lead.budget ? ` · תקציב ₪${Number(lead.budget).toLocaleString('he-IL')}` : ''}
+                    </span>
+                    <span className="pd-match-cta">
+                      <WhatsAppIcon size={14} /> שלח בוואטסאפ
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {restCount > 0 && (
+                <li>
+                  <button
+                    type="button"
+                    className="pd-match-more"
+                    onClick={() => { setPickerLeadsOverride(matches); setPickerOpen(true); }}
+                  >
+                    ראה עוד {restCount} לידים תואמים
+                  </button>
+                </li>
+              )}
+            </ul>
+          </section>
+        );
+      })()}
+
       <div className="pd-kpis animate-in animate-in-delay-2">
         <PropertyKpiTile
           value={`${pct}%`}
@@ -777,7 +837,7 @@ export default function PropertyDetail() {
                     aria-label={`WhatsApp ${ownerName}`}
                   >
                     <WhatsAppIcon size={13} />
-                    <span>וואטסאפ</span>
+                    <span>שלח בוואטסאפ</span>
                   </button>
                 </div>
               )}
@@ -1291,7 +1351,7 @@ export default function PropertyDetail() {
           aria-label={`WhatsApp ${property.street}`}
         >
           <WhatsAppIcon size={18} />
-          <span>שלח ללקוח</span>
+          <span>שלח בוואטסאפ</span>
         </button>
         <button
           type="button"

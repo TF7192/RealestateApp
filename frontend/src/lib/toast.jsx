@@ -21,12 +21,12 @@ export function ToastProvider({ children }) {
     const id = ++idSeq;
     const kind = opts.kind || 'success';
     const duration = opts.duration ?? (kind === 'error' ? 5000 : 2400);
-    // S22: cap the stack at 3 — rapid-fire API errors (offline, server
-    // hiccup) used to stack 5–7 toasts and block the screen for 20s.
-    // Oldest overflow toasts get evicted and their timers cleared so we
-    // don't leak setTimeout refs.
+    // F-3 — optional action (e.g., "בטל" for delete undo). When present
+    // the toast shows a button next to the message; click runs the
+    // callback and dismisses the toast.
+    const action = opts.action || null;
     setItems((cur) => {
-      const next = [...cur, { id, message, kind }];
+      const next = [...cur, { id, message, kind, action }];
       if (next.length <= 3) return next;
       const overflow = next.slice(0, next.length - 3);
       overflow.forEach((t) => {
@@ -35,7 +35,6 @@ export function ToastProvider({ children }) {
       });
       return next.slice(-3);
     });
-    // Fire matching native haptic so toasts feel "physical" on iPhone
     if (kind === 'success') haptics.success();
     else if (kind === 'error') haptics.error();
     else if (kind === 'warning') haptics.warning();
@@ -65,6 +64,14 @@ export function ToastProvider({ children }) {
               {t.kind === 'info' && <Info size={15} />}
             </span>
             <span className="toast-msg">{t.message}</span>
+            {t.action && (
+              <button
+                className="toast-action"
+                onClick={() => { t.action.onClick?.(); dismiss(t.id); }}
+              >
+                {t.action.label}
+              </button>
+            )}
             <button className="toast-close" onClick={() => dismiss(t.id)} aria-label="סגור">
               <X size={13} />
             </button>

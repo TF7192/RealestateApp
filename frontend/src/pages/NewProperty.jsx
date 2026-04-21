@@ -171,14 +171,15 @@ export default function NewProperty() {
 
   const [form, setForm] = useState(INITIAL_FORM);
 
-  // F-5.5 — dirty-form guard. Only arms in create mode; edit mode
-  // doesn't need the prompt because unsaved edits are not "new" data
-  // (they're on a persisted record and the draft-banner path can
-  // recover them anyway).
-  const isDirty = !isEdit && (
+  // F-5.5 + F-14 — dirty-form guard. Only arms in create mode and
+  // disarms after successful save so closing the tab post-save doesn't
+  // pop the unload prompt.
+  const savedRef = useRef(false);
+  const hasFormContent = !isEdit && (
     !!form.street || !!form.city || !!form.marketingPrice || !!form.owner ||
     !!form.ownerPhone || !!form.notes
   );
+  const isDirty = hasFormContent && !savedRef.current;
   useBeforeUnload(isDirty, 'יש שינויים שלא נשמרו בנכס — לעזוב?');
 
   // ── Draft autosave + restore banner ────────────────────────────────
@@ -554,6 +555,10 @@ export default function NewProperty() {
       }
       photoFiles.forEach((p) => URL.revokeObjectURL(p.url));
       if (!isEdit) clearDraft();
+      // F-14 — disarm the beforeunload prompt now that the form is
+      // fully persisted; otherwise closing the tab post-navigate pops
+      // "יש שינויים שלא נשמרו" on a form that's done.
+      savedRef.current = true;
       toast.success(isEdit ? 'הנכס עודכן' : 'הנכס נשמר במלואו');
       navigate(`/properties/${propertyId}`);
     } catch (e2) {

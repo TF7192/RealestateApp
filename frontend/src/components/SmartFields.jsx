@@ -90,7 +90,10 @@ export const NumberField = forwardRef(function NumberField(
     if (typeof min === 'number' && n < min) n = min;
     onChange?.(n);
 
-    // Restore caret to the same digit position post-format
+    // Restore caret to the same digit position post-format.
+    // F-19 — support logged caret jitter on iPad split-view / older
+    // WKWebView. If we repro, consider useLayoutEffect over rAF or
+    // reading beforeInput caret directly. See /docs/ux-review-web-2026-04-22.md.
     requestAnimationFrame(() => {
       const node = inputRef.current;
       if (!node) return;
@@ -209,6 +212,7 @@ export function SelectField({
   value,
   onChange,
   options,
+  groups,
   placeholder,
   children,
   className = '',
@@ -225,13 +229,26 @@ export function SelectField({
         {placeholder && (
           <option value="" disabled>{placeholder}</option>
         )}
-        {options
-          ? options.map((o) =>
-              typeof o === 'string'
-                ? <option key={o} value={o}>{o}</option>
-                : <option key={o.value} value={o.value}>{o.label}</option>
-            )
-          : children}
+        {/* F-5 — optional `groups` prop: [{label, options: [...]}] renders
+            as <optgroup>, tightening long flat lists into scannable
+            categories. Falls back to options/children when absent. */}
+        {groups
+          ? groups.map((g) => (
+              <optgroup key={g.label} label={g.label}>
+                {g.options.map((o) =>
+                  typeof o === 'string'
+                    ? <option key={o} value={o}>{o}</option>
+                    : <option key={o.value} value={o.value}>{o.label}</option>
+                )}
+              </optgroup>
+            ))
+          : options
+            ? options.map((o) =>
+                typeof o === 'string'
+                  ? <option key={o} value={o}>{o}</option>
+                  : <option key={o.value} value={o.value}>{o.label}</option>
+              )
+            : children}
       </select>
       <ChevronDown size={14} className="sf-select-chev" aria-hidden />
     </div>

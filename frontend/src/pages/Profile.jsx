@@ -348,6 +348,15 @@ function CalendarSection() {
     }
   }, []);
 
+  // F-20 — tab-visibility refetch. If the agent connects Calendar in a
+  // second tab (common OAuth UX) this tab would otherwise show the
+  // stale "not connected" state until a hard reload.
+  useEffect(() => {
+    const onVis = () => { if (!document.hidden) refresh(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
   const connect = () => {
     // Full-page navigation so the OAuth cookie state is set in the
     // same-origin request the backend expects.

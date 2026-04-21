@@ -78,11 +78,17 @@
   color: var(--gold);
 }
 
-/* Advanced filter toggle */
+/* Advanced filter toggle — gold fill when filters active so the state
+   is visible from across the room, not a tiny 6-px dot. */
 .btn-ghost.has-filters {
   color: var(--gold);
+  background: var(--gold-glow);
+  border-color: var(--gold-border);
+  font-weight: 700;
 }
 
+/* Legacy tiny-dot kept for back-compat with any caller not yet
+   migrated. Most places use the count suffix in the button text now. */
 .filter-dot {
   width: 6px;
   height: 6px;
@@ -90,6 +96,17 @@
   background: var(--gold);
   display: inline-block;
   margin-right: 2px;
+}
+
+/* UX review F-7.2 — top-level "clear all" pill next to the filter
+   chip when any filter is active. One click resets; removes the
+   "hunt for a small X in each panel" workflow. */
+.filter-clear-all {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.filter-clear-all:hover {
+  background: var(--danger-bg);
 }
 
 /* Agent advanced filters panel */

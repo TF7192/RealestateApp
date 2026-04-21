@@ -1,6 +1,6 @@
 # Estia — UX Review Orientation
 
-**Date:** 2026-04-21
+**Date:** 2026-04-22 (revised from 2026-04-21)
 **Reviewer:** Claude Opus 4.7 (senior UX review stance)
 **Purpose:** Ground-truth sheet before producing the full findings doc. Not for distribution.
 

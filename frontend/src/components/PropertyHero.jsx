@@ -182,7 +182,7 @@ export default function PropertyHero({
             aria-label={`WhatsApp ${property.street}`}
           >
             <WhatsAppIcon size={18} />
-            <span>שלח ללקוח</span>
+            <span>שלח בוואטסאפ</span>
           </button>
           <div className="ph-cta-row">
             <a

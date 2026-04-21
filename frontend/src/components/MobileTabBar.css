@@ -294,3 +294,12 @@
     padding-bottom: calc(56px + env(safe-area-inset-bottom) + 8px) !important;
   }
 }
+
+/* F-23 — iPhone SE & narrower: labels start to clip at 5 tabs.
+   Hide labels, rely on icons (title attr still surfaces tooltip via
+   accessibility tree). */
+@media (max-width: 360px) {
+  .mtb-label { display: none; }
+  .mtb-item  { padding: 8px 6px; }
+  .mtb-icon  { transform: scale(1.1); }
+}
