@@ -3,6 +3,15 @@
   padding-bottom: 32px;
 }
 
+/* J8 multi-phone section — sits below the edit+properties grid. */
+.od-phones-section {
+  margin-block-start: 18px;
+  padding: 16px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-subtle, #e2e2e6);
+  border-radius: 12px;
+}
+
 /* Reserve room on mobile for the floating bottom action bar (above MobileTabBar). */
 @media (max-width: 900px) {
   .owner-detail-page.has-sticky-bar {

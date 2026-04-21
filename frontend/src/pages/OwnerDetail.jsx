@@ -16,6 +16,7 @@ import WhatsAppIcon from '../components/WhatsAppIcon';
 import ConfirmDialog from '../components/ConfirmDialog';
 import StickyActionBar from '../components/StickyActionBar';
 import { PhoneField, SelectField } from '../components/SmartFields';
+import OwnerPhonesPanel from '../components/OwnerPhonesPanel';
 import { inputPropsForName, inputPropsForEmail, inputPropsForNotes } from '../lib/inputProps';
 import { useToast } from '../lib/toast';
 import { useViewportMobile } from '../hooks/mobile';
@@ -193,6 +194,14 @@ export default function OwnerDetail() {
       <div className="od-grid">
         <OwnerEditForm owner={owner} onSaved={onSaved} toast={toast} isMobile={isMobile} />
         <OwnerPropertiesPanel properties={properties} />
+      </div>
+
+      {/* J8 — multi-phone editor. The legacy owner.phone column is the
+          denormalized primary shown in the toolbar above for back-compat;
+          this panel layers additional numbers (secondary / spouse / work
+          / fax) on top via the OwnerPhone child table. */}
+      <div className="od-phones-section">
+        <OwnerPhonesPanel ownerId={owner.id} />
       </div>
 
       {/* Sticky bottom action bar — mobile only */}
