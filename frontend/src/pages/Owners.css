@@ -53,6 +53,25 @@
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   cursor: pointer;
   min-height: 140px;
+  position: relative;
+}
+
+/* Lane 2 — favorite-star anchor. Top-left of the card (physical left
+   is the "visual left" corner even in RTL). Uses logical properties
+   where meaningful; inset-inline-end pins to the LTR edge under
+   `dir="rtl"`. */
+.owner-card-fav {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+  z-index: 1;
+  display: inline-flex;
+}
+
+.owner-row-fav {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-end: 2px;
 }
 
 .owner-card:hover {

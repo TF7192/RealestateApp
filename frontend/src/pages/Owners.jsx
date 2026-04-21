@@ -7,6 +7,7 @@ import OwnerEditDialog from '../components/OwnerEditDialog';
 import PullRefresh from '../components/PullRefresh';
 import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
+import FavoriteStar from '../components/FavoriteStar';
 import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
 import PageTour from '../components/PageTour';
 import { pageCache } from '../lib/pageCache';
@@ -32,6 +33,9 @@ export default function Owners() {
   const [loading, setLoading] = useState(!_cached);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null); // null | {} (new) | owner (edit)
+  // Lane 2 — favorite ids for OWNER entities. Seeded from /api/favorites
+  // so the star on each card reflects the current state before any toggle.
+  const [favoriteIds, setFavoriteIds] = useState(() => new Set());
   const cardRefs = useRef({});
 
   const load = useCallback(async () => {
@@ -48,7 +52,42 @@ export default function Owners() {
 
   useEffect(() => {
     load().finally(() => setLoading(false));
+    // Seed favorite stars for OWNER — failures are non-fatal, each card
+    // simply shows an empty star until the agent toggles it.
+    api.listFavorites('OWNER')
+      .then((r) => {
+        const ids = new Set((r?.items || []).map((f) => f.entityId));
+        setFavoriteIds(ids);
+      })
+      .catch(() => { /* ignore */ });
   }, [load]);
+
+  // Toggle an owner's favorite state with an optimistic update that
+  // rolls back on failure. Mirrors the Customers page pattern so the
+  // star flips the moment the agent taps.
+  const handleToggleFavorite = async (ownerId, nextActive) => {
+    setFavoriteIds((cur) => {
+      const copy = new Set(cur);
+      if (nextActive) copy.add(ownerId);
+      else copy.delete(ownerId);
+      return copy;
+    });
+    try {
+      if (nextActive) {
+        await api.addFavorite({ entityType: 'OWNER', entityId: ownerId });
+      } else {
+        await api.removeFavorite('OWNER', ownerId);
+      }
+    } catch (e) {
+      setFavoriteIds((cur) => {
+        const copy = new Set(cur);
+        if (nextActive) copy.delete(ownerId);
+        else copy.add(ownerId);
+        return copy;
+      });
+      toast?.error?.(e?.message || 'שינוי המועדפים נכשל');
+    }
+  };
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -224,6 +263,16 @@ export default function Owners() {
                       className="owner-row"
                       onClick={() => haptics.tap()}
                     >
+                      {/* Lane 2 — favorite toggle sits at the row start
+                          (top-left in RTL). stopPropagation keeps the
+                          tap from opening the owner detail page. */}
+                      <span className="owner-row-fav" onClick={(e) => e.stopPropagation()}>
+                        <FavoriteStar
+                          active={favoriteIds.has(o.id)}
+                          onToggle={(next) => handleToggleFavorite(o.id, next)}
+                          className="fav-star-sm"
+                        />
+                      </span>
                       <div className="owner-row-avatar" aria-hidden="true">
                         {(o.name || '?').charAt(0)}
                       </div>
@@ -262,6 +311,16 @@ export default function Owners() {
                   className="owner-card"
                   ref={(el) => { if (el) cardRefs.current[o.id] = el; }}
                 >
+                  {/* Lane 2 — favorite toggle anchored top-left of each
+                      card. FavoriteStar stops click propagation so it
+                      won't also fire the card's <Link> navigation. */}
+                  <span className="owner-card-fav" onClick={(e) => e.stopPropagation()}>
+                    <FavoriteStar
+                      active={favoriteIds.has(o.id)}
+                      onToggle={(next) => handleToggleFavorite(o.id, next)}
+                      className="fav-star-sm"
+                    />
+                  </span>
                   <div className="owner-card-head">
                     <div className="owner-card-avatar" aria-hidden="true">
                       {(o.name || '?').charAt(0)}
