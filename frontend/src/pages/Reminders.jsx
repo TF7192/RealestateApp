@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   Check,
@@ -38,7 +38,7 @@ export default function Reminders() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.listReminders({ status: tab });
@@ -48,9 +48,9 @@ export default function Reminders() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tab, toast]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tab]);
+  useEffect(() => { load(); }, [load]);
 
   const update = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 

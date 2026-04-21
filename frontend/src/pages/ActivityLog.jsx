@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, RefreshCw } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
@@ -38,7 +38,7 @@ export default function ActivityLog() {
     return p;
   }, [entityType, limit]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.listActivity(params);
@@ -48,9 +48,9 @@ export default function ActivityLog() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params, toast]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [params]);
+  useEffect(() => { load(); }, [load]);
 
   return (
     <div className="activity-page" dir="rtl">

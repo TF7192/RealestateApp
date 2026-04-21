@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   Building2,
@@ -51,7 +51,7 @@ export default function Office() {
 
   const isOwner = user?.role === 'OWNER';
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.getOffice();
@@ -67,9 +67,9 @@ export default function Office() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { load(); }, [load]);
 
   // Non-owner without an office → send them home. Owners without an
   // office still see the create form.

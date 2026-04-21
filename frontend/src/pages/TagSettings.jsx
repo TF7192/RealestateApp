@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Tag, Plus, Trash2, Pencil, Check, X as XIcon } from 'lucide-react';
 import api from '../lib/api';
 import { useToast, optimisticUpdate } from '../lib/toast';
@@ -33,7 +33,7 @@ export default function TagSettings() {
   const [editing, setEditing] = useState(null); // {id, name, color, scope}
   const [pendingDelete, setPendingDelete] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.listTags();
@@ -43,9 +43,9 @@ export default function TagSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { load(); }, [load]);
 
   const updateForm = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
