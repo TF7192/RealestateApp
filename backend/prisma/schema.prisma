@@ -139,6 +139,31 @@ enum CustomerPurpose {
   COMBINATION
 }
 
+// Sprint 2 / MLS parity — Task L1. Quick-lead status ("סטטוס ליד") —
+// Nadlan's richer `LeadStatusID`. Orthogonal to `LeadStatus`
+// (HOT/WARM/COLD = thermal) and `CustomerStatus` (customer lifecycle).
+// Hebrew labels:
+//   NEW                      → חדש
+//   INTENT_TO_CALL           → בכוונת התקשרות
+//   CONVERTED                → הומר
+//   DISQUALIFIED             → נפסל
+//   NOT_INTERESTED           → לא מעוניין
+//   IN_PROGRESS              → בתהליך
+//   CONVERTED_NO_OPPORTUNITY → הומר, אין הזדמנות
+//   DELETED                  → נמחק
+//   ARCHIVED                 → ארכיון
+enum QuickLeadStatus {
+  NEW
+  INTENT_TO_CALL
+  CONVERTED
+  DISQUALIFIED
+  NOT_INTERESTED
+  IN_PROGRESS
+  CONVERTED_NO_OPPORTUNITY
+  DELETED
+  ARCHIVED
+}
+
 enum DealStatus {
   NEGOTIATING
   WAITING_MORTGAGE
@@ -628,6 +653,27 @@ model Lead {
   isPrivate           Boolean           @default(false)
   purposes            CustomerPurpose[] @default([])
   seriousnessOverride Seriousness?
+
+  // Sprint 2 / MLS parity — Task K1. Richer contact + identity fields
+  // mirroring the Nadlan customer form. Existing `name` / `phone` /
+  // `email` stay as primary/display values; these are the expanded
+  // variants so import/export and power-user flows don't lose data.
+  firstName    String?
+  lastName     String?
+  companyName  String?
+  address      String?
+  cityText     String?
+  zip          String?
+  primaryPhone String?
+  phone1       String?
+  phone2       String?
+  fax          String?
+  personalId   String?
+  // Sprint 2 / MLS parity — Task L3 placeholder. Quick-lead UI uses
+  // the shorter single-line `description`; the longer `notes` stays.
+  description  String?
+  // Sprint 2 / MLS parity — Task L1. Quick-lead lifecycle status.
+  leadStatus   QuickLeadStatus? @default(NEW)
 
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt

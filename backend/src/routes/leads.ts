@@ -43,6 +43,30 @@ const leadInput = z.object({
     .array(z.enum(['INVESTMENT', 'RESIDENCE', 'COMMERCIAL', 'COMBINATION']))
     .optional(),
   seriousnessOverride: z.enum(['NONE', 'SORT_OF', 'MEDIUM', 'VERY']).nullable().optional(),
+
+  // Sprint 2 / MLS parity — Task K1. Richer contact + identity fields.
+  firstName:    z.string().max(120).nullable().optional(),
+  lastName:     z.string().max(120).nullable().optional(),
+  companyName:  z.string().max(200).nullable().optional(),
+  address:      z.string().max(400).nullable().optional(),
+  cityText:     z.string().max(120).nullable().optional(),
+  zip:          z.string().max(20).nullable().optional(),
+  primaryPhone: z.string().max(40).nullable().optional(),
+  phone1:       z.string().max(40).nullable().optional(),
+  phone2:       z.string().max(40).nullable().optional(),
+  fax:          z.string().max(40).nullable().optional(),
+  personalId:   z.string().max(40).nullable().optional(),
+  description:  z.string().max(500).nullable().optional(),
+
+  // Sprint 2 / MLS parity — Task L1. Quick-lead lifecycle status.
+  leadStatus: z
+    .enum([
+      'NEW', 'INTENT_TO_CALL', 'CONVERTED', 'DISQUALIFIED',
+      'NOT_INTERESTED', 'IN_PROGRESS', 'CONVERTED_NO_OPPORTUNITY',
+      'DELETED', 'ARCHIVED',
+    ])
+    .nullable()
+    .optional(),
 });
 
 // Suggest HOT/WARM/COLD status from activity signals.
