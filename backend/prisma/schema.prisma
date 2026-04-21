@@ -13,6 +13,10 @@ datasource db {
 enum UserRole {
   AGENT
   CUSTOMER
+  // Sprint 1 / MLS parity — Task A1. An OWNER is an agency owner who
+  // sees every agent in their `Office`. Defaults to AGENT-scoped
+  // visibility when no office is attached.
+  OWNER
 }
 
 enum AuthProvider {
@@ -104,6 +108,23 @@ enum MarketingReminderFrequency {
   MONTHLY
 }
 
+// ─── Offices ───────────────────────────────────────────────────────────────
+// Sprint 1 / MLS parity — Task A1. A real-estate office groups multiple
+// agents under one `OWNER`-role user. `officeId` on User is nullable to
+// keep the existing single-agent flow working; owners see rows where
+// `agentId IN (office members)`, agents still scope to their own.
+model Office {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  address   String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members User[]
+}
+
 // ─── Users ─────────────────────────────────────────────────────────────────
 model User {
   id                   String       @id @default(cuid())
@@ -133,6 +154,14 @@ model User {
   googleRefreshToken    String?
   googleTokenExpiresAt  DateTime?
   googleCalendarEnabled Boolean   @default(false)
+
+  // Sprint 1 / MLS parity — Task A1. Office membership. Null for the
+  // legacy solo-agent flow; populated once an OWNER invites an agent
+  // into their office. Deleting an office doesn't delete the users —
+  // it just detaches them.
+  officeId String?
+  office   Office? @relation(fields: [officeId], references: [id], onDelete: SetNull)
+
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
@@ -158,6 +187,7 @@ model User {
   leadMeetings      LeadMeeting[]      @relation("AgentMeetings")
 
   @@index([role])
+  @@index([officeId])
 }
 
 model AgentProfile {

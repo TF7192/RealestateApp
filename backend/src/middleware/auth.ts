@@ -26,6 +26,10 @@ declare module 'fastify' {
   interface FastifyInstance {
     requireAuth: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
     requireAgent: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    // Sprint 1 / MLS parity — Task A1. `requireOwner` gates routes that
+    // only an office owner can use (e.g. listing every agent in the
+    // office). AGENT-role users are rejected with 403.
+    requireOwner: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
@@ -56,8 +60,20 @@ const plugin: FastifyPluginAsync = async (app) => {
     if (!u) {
       return reply.code(401).send({ error: { message: 'Unauthorized' } });
     }
-    if (u.role !== 'AGENT') {
+    // OWNER is a superset of AGENT for the purpose of accessing the
+    // agent-facing CRM.
+    if (u.role !== 'AGENT' && u.role !== 'OWNER') {
       reply.code(403).send({ error: { message: 'Agent role required' } });
+    }
+  });
+
+  app.decorate('requireOwner', async (req: FastifyRequest, reply: FastifyReply) => {
+    const u = getUser(req);
+    if (!u) {
+      return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    }
+    if (u.role !== 'OWNER') {
+      reply.code(403).send({ error: { message: 'Office owner role required' } });
     }
   });
 };

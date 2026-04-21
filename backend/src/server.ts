@@ -30,6 +30,7 @@ import { registerTemplateRoutes } from './routes/templates.js';
 import { registerGeoRoutes } from './routes/geo.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerOwnerRoutes } from './routes/owners.js';
+import { registerOfficeRoutes } from './routes/office.js';
 import { storageBackend, resolveUpload } from './lib/storage.js';
 import { track as phTrack, captureException as phCapture, shutdownAnalytics } from './lib/analytics.js';
 import { getUser } from './middleware/auth.js';
@@ -215,6 +216,7 @@ export async function build() {
   await app.register(registerYad2Routes,  { prefix: '/api/integrations/yad2' });
   await app.register(registerProspectRoutes, { prefix: '/api' });
   await app.register(registerCalendarRoutes, { prefix: '/api/integrations/calendar' });
+  await app.register(registerOfficeRoutes, { prefix: '/api/office' });
 
   // Request lifecycle observability — assigns a request_id, logs
   // method/route/status/duration, and sends an api_request event to
