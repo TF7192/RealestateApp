@@ -9,10 +9,10 @@ export async function initStatusBar() {
       await StatusBar.setBackgroundColor({ color: '#0d0f14' });
     }
     await StatusBar.setOverlaysWebView({ overlay: false });
-  } catch {}
+  } catch { /* ignore */ }
 }
 
 export async function setStatusBarDark() {
   if (!isNative()) return;
-  try { await StatusBar.setStyle({ style: Style.Dark }); } catch {}
+  try { await StatusBar.setStyle({ style: Style.Dark }); } catch { /* ignore */ }
 }

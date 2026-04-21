@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { X, Save, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';

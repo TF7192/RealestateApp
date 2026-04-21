@@ -18,7 +18,7 @@ import {
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
 import useBeforeUnload from '../hooks/useBeforeUnload';
-import { cityNames, streetNames } from '../data/mockData';
+import { cityNames } from '../data/mockData';
 import StickyActionBar from '../components/StickyActionBar';
 import OwnerPicker from '../components/OwnerPicker';
 import AddressField from '../components/AddressField';
@@ -27,7 +27,6 @@ import { useDraftAutosave, readDraft } from '../hooks/mobile';
 import { relLabel } from '../lib/relativeDate';
 import {
   inputPropsForName,
-  inputPropsForAddress,
   inputPropsForCity,
 } from '../lib/inputProps';
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
@@ -351,7 +350,7 @@ export default function NewProperty() {
       let geo;
       try {
         geo = await api.reverseGeocode(latitude, longitude);
-      } catch (e) {
+      } catch {
         toast.error('שירות המיקום אינו זמין כרגע — נסה שוב מאוחר יותר');
         return;
       }
@@ -377,7 +376,7 @@ export default function NewProperty() {
         formattedAddress: geo?.fullAddress || p.formattedAddress || null,
       }));
       toast.success(`המיקום הוזן: ${[street, city].filter(Boolean).join(', ')}`);
-    } catch (e) {
+    } catch {
       toast.error('איתור המיקום נכשל');
     } finally {
       setGeoLoading(false);
@@ -551,7 +550,7 @@ export default function NewProperty() {
         try {
           // eslint-disable-next-line no-await-in-loop
           await api.uploadPropertyImage(propertyId, p.file);
-        } catch (_) { /* continue on per-file failure */ }
+        } catch { /* continue on per-file failure */ }
       }
       photoFiles.forEach((p) => URL.revokeObjectURL(p.url));
       if (!isEdit) clearDraft();

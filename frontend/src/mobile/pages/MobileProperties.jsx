@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search, SlidersHorizontal, Navigation, MapPin, X, Plus,
@@ -34,12 +34,11 @@ function buildWaMessage(prop) {
 }
 
 export default function MobileProperties() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const [search, setSearch] = useState('');
   const [assetClass, setAssetClass] = useState(params.get('assetClass') || 'all');
   const [category, setCategory] = useState(params.get('category') || 'all');
   const [filterOpen, setFilterOpen] = useState(false);
-  const [sortOpen, setSortOpen] = useState(false);
   const [locationQuery, setLocationQuery] = useState('');
   const [radius, setRadius] = useState(5);
   const [view, setView] = useState('list'); // 'list' | 'map'

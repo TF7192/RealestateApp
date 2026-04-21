@@ -3,7 +3,7 @@ import { isNative } from './platform';
 
 const safe = async (fn) => {
   if (!isNative()) return;
-  try { await fn(); } catch {}
+  try { await fn(); } catch { /* ignore */ }
 };
 
 export const tap = () => safe(() => Haptics.impact({ style: ImpactStyle.Light }));

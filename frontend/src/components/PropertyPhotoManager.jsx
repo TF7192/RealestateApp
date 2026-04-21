@@ -55,7 +55,7 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
       const next = r.property?.imageList || [];
       setImages([...next].sort((a, b) => a.sortOrder - b.sortOrder));
       onChange?.(next);
-    } catch (_) { /* ignore */ }
+    } catch { /* ignore */ }
   };
 
   const uploadOne = async (file, pendingId) => {

@@ -29,7 +29,6 @@ import {
 import api from '../lib/api';
 import { formatFloor, formatFloorOutOf } from '../lib/formatFloor';
 import WhatsAppIcon from '../components/WhatsAppIcon';
-import { useViewportMobile } from '../hooks/mobile';
 import './CustomerPropertyView.css';
 
 // ── Money & shape helpers ─────────────────────────────────────────────
@@ -127,7 +126,6 @@ export default function CustomerPropertyView() {
   const [error, setError] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
   const [lightbox, setLightbox] = useState(false);
-  const isMobile = useViewportMobile();
 
   useEffect(() => {
     let cancelled = false;

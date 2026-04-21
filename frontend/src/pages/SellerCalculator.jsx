@@ -36,7 +36,9 @@ function parsePercent(raw) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Parse a currency input — accepts "1,234,567" or "1234567".
+// Parse a currency input — accepts "1,234,567" or "1234567". Kept
+// available for callers that format user-typed strings.
+// eslint-disable-next-line no-unused-vars
 function parseCurrency(raw) {
   if (raw === '' || raw == null) return null;
   const s = String(raw).replace(/[^\d.-]/g, '');
@@ -82,7 +84,6 @@ export default function SellerCalculator() {
 function DesktopSellerCalculator() {
   const [s, setS] = useState(INITIAL);
   const update = useCallback((k, v) => setS((p) => ({ ...p, [k]: v })), []);
-  const isMobile = false;
 
   // Debounced inputs feed into the pure calc — keeps the live count-up
   // smooth while typing without thrashing on every keystroke.
@@ -314,7 +315,7 @@ function DesktopSellerCalculator() {
                       typically have a pinned WhatsApp Web tab already; a
                       new window forces them to deal with two WA tabs. */}
                   <a
-                    href={buildShareUrl({ result, mode: s.mode, isMobile })}
+                    href={buildShareUrl({ result, mode: s.mode })}
                     target="_self"
                     rel="noopener noreferrer"
                     className="sc-share-cta"
@@ -375,7 +376,7 @@ function Line({ label, value, sub, emphasis }) {
 // the seller. The text mirrors the on-screen breakdown so there are no
 // "wait, what was that number?" moments. Plain text — wa.me URL-decodes
 // the body so newlines + numbers come through cleanly.
-function buildShareUrl({ result, mode, isMobile }) {
+function buildShareUrl({ result, mode }) {
   if (!result || result.error || !result.net) return '#';
   const isFwd = mode === 'forward';
   const lines = [

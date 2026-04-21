@@ -333,7 +333,7 @@ export default function Customers() {
           },
         },
       });
-    } catch (_) { /* ignore */ }
+    } catch { /* ignore */ }
     setDeleting(false);
   };
 

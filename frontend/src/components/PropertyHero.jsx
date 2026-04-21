@@ -44,7 +44,6 @@ export default function PropertyHero({
   copied,
   wazeHref,
   customerLink,
-  isMobile,
   formatPrice,
   dragOver,
   onDragOver,
@@ -52,14 +51,6 @@ export default function PropertyHero({
   onDrop,
 }) {
   const stripRef = useRef(null);
-
-  const goTo = (i) => {
-    onSelectImage(i);
-    if (stripRef.current) {
-      const w = stripRef.current.clientWidth;
-      stripRef.current.scrollTo({ left: -(i * w), behavior: 'smooth' });
-    }
-  };
 
   const handleStripScroll = () => {
     const el = stripRef.current;

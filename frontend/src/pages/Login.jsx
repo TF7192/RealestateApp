@@ -15,7 +15,7 @@ const agentFeatures = [
 ];
 
 export default function Login() {
-  const { login, signup, loginWithGoogle } = useAuth();
+  const { login, signup } = useAuth();
   const [flow, setFlow] = useState(null); // null | 'email-login' | 'email-signup'
   const [form, setForm] = useState({
     email: '',
