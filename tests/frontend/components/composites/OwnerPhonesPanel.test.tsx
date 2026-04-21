@@ -1,15 +1,13 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { render, screen, userEvent, waitFor } from '../../setup/test-utils';
+import { render, screen, userEvent, waitFor, within } from '../../setup/test-utils';
 import { server } from '../../setup/msw-server';
 import OwnerPhonesPanel from '@estia/frontend/components/OwnerPhonesPanel.jsx';
 
 describe('<OwnerPhonesPanel>', () => {
-  beforeEach(() => {
-    // window.confirm is called by the delete path; default to true
-    // so the DELETE actually fires unless overridden.
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-  });
+  // NOTE: the delete path now routes through the shared <ConfirmDialog>
+  // instead of window.confirm (a11y + RTL parity). Each delete test
+  // clicks the "מחק" button inside the dialog to acknowledge.
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -143,14 +141,17 @@ describe('<OwnerPhonesPanel>', () => {
     await waitFor(() =>
       expect(screen.getByDisplayValue('050-1111111')).toBeInTheDocument()
     );
+    // Open the ConfirmDialog…
     await user.click(
       screen.getByRole('button', { name: /מחק את המספר 050-1111111/ })
     );
+    // …then acknowledge the destructive action.
+    const dialog = await screen.findByRole('dialog', { name: /מחיקת מספר טלפון/ });
+    await user.click(within(dialog).getByRole('button', { name: 'מחק' }));
     await waitFor(() => expect(deleted).toBe(true));
   });
 
-  it('H — skips delete if confirm is cancelled', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('H — skips delete if the confirm dialog is cancelled', async () => {
     const user = userEvent.setup();
     let deleted = false;
     server.use(
@@ -180,6 +181,9 @@ describe('<OwnerPhonesPanel>', () => {
     await user.click(
       screen.getByRole('button', { name: /מחק את המספר 050-1111111/ })
     );
+    // Click "ביטול" inside the ConfirmDialog instead of confirming.
+    const dialog = await screen.findByRole('dialog', { name: /מחיקת מספר טלפון/ });
+    await user.click(within(dialog).getByRole('button', { name: 'ביטול' }));
     // Give the event loop a moment so a runaway DELETE would register.
     await new Promise((r) => setTimeout(r, 50));
     expect(deleted).toBe(false);

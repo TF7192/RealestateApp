@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { Phone, Trash2, Plus } from 'lucide-react';
 import api from '../lib/api';
 import { PhoneField, SelectField } from './SmartFields';
+import ConfirmDialog from './ConfirmDialog';
 import EmptyState from './EmptyState';
 import { useToast } from '../lib/toast.jsx';
 import './OwnerPhonesPanel.css';
@@ -33,6 +34,10 @@ export default function OwnerPhonesPanel({ ownerId }) {
   const [addLabel, setAddLabel] = useState('');
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  // Gate destructive deletes through a ConfirmDialog (shared component) so
+  // the UX matches the rest of the app instead of the browser's native
+  // `window.confirm` prompt.
+  const [pendingDelete, setPendingDelete] = useState(null);
   const addPhoneId = useId();
   const addKindId = useId();
   const addLabelId = useId();
@@ -95,8 +100,14 @@ export default function OwnerPhonesPanel({ ownerId }) {
     }
   };
 
-  const remove = async (id, phone) => {
-    if (!window.confirm(`למחוק את המספר ${phone}?`)) return;
+  const remove = (id, phone) => {
+    setPendingDelete({ id, phone });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const { id } = pendingDelete;
+    setPendingDelete(null);
     setBusyId(id);
     try {
       await api.deleteOwnerPhone(id);
@@ -207,6 +218,17 @@ export default function OwnerPhonesPanel({ ownerId }) {
           </button>
         </div>
       </form>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="מחיקת מספר טלפון"
+          message={`למחוק את המספר ${pendingDelete.phone}? הפעולה אינה הפיכה.`}
+          confirmLabel="מחק"
+          onConfirm={confirmDelete}
+          onClose={() => setPendingDelete(null)}
+          busy={busyId === pendingDelete.id}
+        />
+      )}
     </section>
   );
 }
