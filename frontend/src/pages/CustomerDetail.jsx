@@ -18,7 +18,19 @@ import {
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import LeadMeetingDialog from '../components/LeadMeetingDialog';
+import TagPicker from '../components/TagPicker';
+import RemindersPanel from '../components/RemindersPanel';
+import MatchingList from '../components/MatchingList';
+import ActivityPanel from '../components/ActivityPanel';
+import LeadSearchProfilesEditor from '../components/LeadSearchProfilesEditor';
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
+import {
+  CUSTOMER_STATUS_LABELS,
+  QUICK_LEAD_STATUS_LABELS,
+  SERIOUSNESS_LABELS,
+  CUSTOMER_PURPOSE_LABELS,
+  labelsToOptions,
+} from '../lib/mlsLabels';
 import {
   inputPropsForName,
   inputPropsForEmail,
@@ -220,18 +232,41 @@ export default function CustomerDetail() {
         />
       )}
 
+      {/* H3 lead-side / A2 tags / D1 reminders / C3 matching / K4 profiles
+          — all additive. The existing edit form + derived timeline move
+          left; the new MLS-parity panels stack in the right column. */}
       <div className="cd-grid">
-        <CustomerEditForm
-          lead={lead}
-          onSaved={async (next) => {
-            setLead((cur) => ({ ...cur, ...next }));
-            toast.success('הפרטים נשמרו');
-            // Re-fetch to pick up any server-derived fields
-            try { await loadLead(); } catch { /* ignore */ }
-          }}
-          toast={toast}
-        />
-        <ActivityTimeline lead={lead} />
+        <div className="cd-form-col">
+          <section className="cd-section cd-tags-section" aria-label="תגי לקוח">
+            <h3 className="cd-section-title">תגים</h3>
+            <TagPicker entityType="LEAD" entityId={lead.id} />
+          </section>
+          <CustomerEditForm
+            lead={lead}
+            onSaved={async (next) => {
+              setLead((cur) => ({ ...cur, ...next }));
+              toast.success('הפרטים נשמרו');
+              // Re-fetch to pick up any server-derived fields
+              try { await loadLead(); } catch { /* ignore */ }
+            }}
+            toast={toast}
+          />
+          <div className="cd-section cd-section-embedded">
+            <LeadSearchProfilesEditor leadId={lead.id} />
+          </div>
+        </div>
+        <div className="cd-timeline-col">
+          <div className="cd-section cd-section-embedded">
+            <RemindersPanel leadId={lead.id} />
+          </div>
+          <div className="cd-section cd-section-embedded">
+            <MatchingList leadId={lead.id} />
+          </div>
+          <div className="cd-section cd-section-embedded">
+            <ActivityPanel entityType="Lead" entityId={lead.id} />
+          </div>
+          <ActivityTimeline lead={lead} />
+        </div>
       </div>
     </div>
   );
@@ -265,6 +300,30 @@ function CustomerEditForm({ lead, onSaved, toast }) {
     status: lead.status || 'WARM',
     source: lead.source || '',
     notes: lead.notes || '',
+
+    // K1 — contact / identity.
+    firstName: lead.firstName || '',
+    lastName:  lead.lastName  || '',
+    companyName: lead.companyName || '',
+    address: lead.address || '',
+    cityText: lead.cityText || '',
+    zip: lead.zip || '',
+    primaryPhone: lead.primaryPhone || '',
+    phone1: lead.phone1 || '',
+    phone2: lead.phone2 || '',
+    fax: lead.fax || '',
+    personalId: lead.personalId || '',
+    description: lead.description || '',
+
+    // K2 — admin.
+    customerStatus: lead.customerStatus || 'ACTIVE',
+    commissionPct: lead.commissionPct ?? null,
+    isPrivate: !!lead.isPrivate,
+    purposes: Array.isArray(lead.purposes) ? lead.purposes : [],
+    seriousnessOverride: lead.seriousnessOverride || 'NONE',
+
+    // L1 — quick lead status.
+    leadStatus: lead.leadStatus || 'NEW',
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -298,6 +357,28 @@ function CustomerEditForm({ lead, onSaved, toast }) {
         status: form.status,
         source: form.source || null,
         notes: form.notes || null,
+
+        // K1 / K2 / L1 — mirror of NewLead submit shape.
+        firstName:   form.firstName?.trim()   || null,
+        lastName:    form.lastName?.trim()    || null,
+        companyName: form.companyName?.trim() || null,
+        address:     form.address?.trim()     || null,
+        cityText:    form.cityText?.trim()    || null,
+        zip:         form.zip?.trim()         || null,
+        primaryPhone: form.primaryPhone?.trim() || null,
+        phone1:      form.phone1?.trim()      || null,
+        phone2:      form.phone2?.trim()      || null,
+        fax:         form.fax?.trim()         || null,
+        personalId:  form.personalId?.trim()  || null,
+        description: form.description?.trim() || null,
+        customerStatus: form.customerStatus || 'ACTIVE',
+        commissionPct: form.commissionPct != null && form.commissionPct !== ''
+          ? Number(form.commissionPct)
+          : null,
+        isPrivate: !!form.isPrivate,
+        purposes: Array.isArray(form.purposes) ? form.purposes : [],
+        seriousnessOverride: form.seriousnessOverride || 'NONE',
+        leadStatus: form.leadStatus || 'NEW',
       };
       await api.updateLead(lead.id, body);
       onSaved(body);
@@ -422,6 +503,153 @@ function CustomerEditForm({ lead, onSaved, toast }) {
               value={form.notes}
               onChange={(e) => update('notes', e.target.value)}
             />
+          </div>
+        </div>
+
+        {/* K1 — contact identity block (additive). */}
+        <div className="cd-subsection">
+          <h4 className="cd-subsection-title">פרטים מורחבים</h4>
+          <div className="deal-form-grid">
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k1-first">שם פרטי</label>
+              <input id="cd-k1-first" className="form-input" dir="auto" value={form.firstName}
+                onChange={(e) => update('firstName', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k1-last">שם משפחה</label>
+              <input id="cd-k1-last" className="form-input" dir="auto" value={form.lastName}
+                onChange={(e) => update('lastName', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k1-company">שם חברה</label>
+              <input id="cd-k1-company" className="form-input" dir="auto" value={form.companyName}
+                onChange={(e) => update('companyName', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k1-pid">ת.ז / ח.פ</label>
+              <input id="cd-k1-pid" className="form-input" dir="ltr" inputMode="numeric" value={form.personalId}
+                onChange={(e) => update('personalId', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k1-address">כתובת</label>
+              <input id="cd-k1-address" className="form-input" dir="auto" value={form.address}
+                onChange={(e) => update('address', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k1-citytext">עיר (חופשי)</label>
+              <input id="cd-k1-citytext" className="form-input" dir="auto" value={form.cityText}
+                onChange={(e) => update('cityText', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k1-zip">מיקוד</label>
+              <input id="cd-k1-zip" className="form-input" dir="ltr" inputMode="numeric" value={form.zip}
+                onChange={(e) => update('zip', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">טלפון עיקרי</label>
+              <PhoneField value={form.primaryPhone} onChange={(v) => update('primaryPhone', v)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">טלפון נוסף 1</label>
+              <PhoneField value={form.phone1} onChange={(v) => update('phone1', v)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">טלפון נוסף 2</label>
+              <PhoneField value={form.phone2} onChange={(v) => update('phone2', v)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k1-fax">פקס</label>
+              <input id="cd-k1-fax" className="form-input" dir="ltr" inputMode="tel" value={form.fax}
+                onChange={(e) => update('fax', e.target.value)} />
+            </div>
+            <div className="form-group form-group-wide">
+              <label className="form-label" htmlFor="cd-k1-desc">תיאור</label>
+              <input id="cd-k1-desc" className="form-input" dir="auto" value={form.description}
+                onChange={(e) => update('description', e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* K2 + L1 — admin block. */}
+        <div className="cd-subsection">
+          <h4 className="cd-subsection-title">ניהול ולקוח</h4>
+          <div className="deal-form-grid">
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k2-cs">סטטוס לקוח</label>
+              <SelectField
+                id="cd-k2-cs"
+                value={form.customerStatus}
+                onChange={(v) => update('customerStatus', v)}
+                options={labelsToOptions(CUSTOMER_STATUS_LABELS)}
+                aria-label="סטטוס לקוח"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="cd-k2-ls">סטטוס ליד</label>
+              <SelectField
+                id="cd-k2-ls"
+                value={form.leadStatus}
+                onChange={(v) => update('leadStatus', v)}
+                options={labelsToOptions(QUICK_LEAD_STATUS_LABELS)}
+                aria-label="סטטוס ליד"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">אחוז עמלה</label>
+              <NumberField
+                value={form.commissionPct}
+                onChange={(n) => update('commissionPct', n)}
+                unit="%"
+                min={0}
+                max={100}
+                placeholder="2"
+                aria-label="אחוז עמלה"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">רצינות</label>
+              <Segmented
+                value={form.seriousnessOverride}
+                onChange={(v) => update('seriousnessOverride', v)}
+                options={labelsToOptions(SERIOUSNESS_LABELS)}
+                ariaLabel="רצינות"
+              />
+            </div>
+            <div className="form-group form-group-wide">
+              <span className="form-label">מטרת הרכישה</span>
+              <div className="checkbox-grid" role="group" aria-label="מטרת הרכישה">
+                {Object.keys(CUSTOMER_PURPOSE_LABELS).map((val) => {
+                  const checked = form.purposes?.includes(val);
+                  return (
+                    <label key={val} className="checkbox-item">
+                      <input
+                        type="checkbox"
+                        checked={!!checked}
+                        onChange={(e) => {
+                          const set = new Set(form.purposes || []);
+                          if (e.target.checked) set.add(val);
+                          else set.delete(val);
+                          update('purposes', Array.from(set));
+                        }}
+                      />
+                      <span className="checkbox-custom" />
+                      {CUSTOMER_PURPOSE_LABELS[val]}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="form-group form-group-wide">
+              <label className="checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={!!form.isPrivate}
+                  onChange={(e) => update('isPrivate', e.target.checked)}
+                />
+                <span className="checkbox-custom" />
+                לקוח פרטי (לא חשוף לשותפי משרד)
+              </label>
+            </div>
           </div>
         </div>
 
