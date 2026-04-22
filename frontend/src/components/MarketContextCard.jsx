@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TrendingUp, RefreshCw, Home, Key, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
