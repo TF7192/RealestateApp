@@ -154,10 +154,190 @@ a { color: inherit; text-decoration: none; }
   .h1 { font-size: 64px; }
 }
 
-/* phone mock (inline SVG — no network) */
-.device { position: relative; width: 100%; max-width: 340px; aspect-ratio: 360/740; margin-inline: auto;
-  filter: drop-shadow(0 28px 56px rgba(30,26,20,0.28)); }
-.device svg { width: 100%; height: 100%; display: block; }
+/* phone mock — pure HTML/CSS so Hebrew RTL renders correctly */
+.device {
+  position: relative; width: 100%; max-width: 340px; aspect-ratio: 360/740;
+  margin-inline: auto; filter: drop-shadow(0 28px 56px rgba(30,26,20,0.28));
+  background: linear-gradient(155deg, #2a261f 0%, #0d0f14 100%);
+  border-radius: 48px; padding: 10px; direction: rtl;
+}
+.device-screen {
+  position: relative; width: 100%; height: 100%;
+  background: var(--bg-primary); border-radius: 40px; overflow: hidden;
+  display: flex; flex-direction: column;
+  font-size: 12px; line-height: 1.35; color: var(--text-primary);
+}
+.device-island {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  width: 90px; height: 22px; background: #0d0f14; border-radius: 12px; z-index: 2;
+}
+.device-status {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 22px 4px; font-size: 11px; font-weight: 700;
+}
+.device-status .status-icons { display: inline-flex; gap: 4px; align-items: center; }
+.device-status .status-icons span {
+  display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #1e1a14;
+}
+.device-status .status-icons .bat { width: 16px; height: 8px; border-radius: 2px; background: #1e1a14; opacity: 0.75; }
+.device-body { flex: 1; padding: 28px 14px 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.device-tabbar {
+  margin-top: auto; background: #fff; border-top: 1px solid rgba(30,26,20,0.08);
+  padding: 8px 10px 12px; display: grid; grid-template-columns: repeat(5, 1fr);
+  align-items: end; text-align: center; font-size: 10px; font-weight: 700; color: var(--text-muted);
+}
+.device-tabbar .tab-active { color: var(--gold-readable); position: relative; }
+.device-tabbar .tab-active::before {
+  content: ''; position: absolute; top: -8px; right: 50%; transform: translateX(50%);
+  width: 18px; height: 3px; background: linear-gradient(90deg, #d3b27a, #8a6932); border-radius: 2px;
+}
+.device-tabbar .tab-fab {
+  width: 40px; height: 40px; margin: -18px auto 2px;
+  border-radius: 50%; background: linear-gradient(135deg, #d3b27a, #8a6932);
+  color: #1e1a14; display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 800;
+}
+/* dashboard variant */
+.dev-greet h4 { margin: 0; font-size: 17px; font-weight: 800; color: #1e1a14; }
+.dev-greet small { display: block; color: var(--text-muted); font-size: 10px; margin-top: 2px; }
+.dev-ai {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: linear-gradient(90deg, #fdf3de, #f8e1b8); border: 1px solid #d6b787;
+  border-radius: 12px;
+}
+.dev-ai .ai-badge {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #d3b27a, #8a6932); color: #1e1a14;
+  font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex: none;
+}
+.dev-ai b { display: block; font-size: 11px; color: #3b2e13; }
+.dev-ai span { font-size: 10px; color: #6b5026; }
+.dev-kpis { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.dev-kpi {
+  background: #fff; border: 1px solid rgba(30,26,20,0.08); border-radius: 12px;
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 2px;
+}
+.dev-kpi.is-gold { border-color: #d6b787; background: #fffdf8; }
+.dev-kpi .k-label { font-size: 9px; color: var(--text-muted); }
+.dev-kpi.is-gold .k-label { color: #6b5026; }
+.dev-kpi .k-value { font-size: 18px; font-weight: 800; color: #1e1a14; line-height: 1; }
+.dev-kpi.is-gold .k-value { color: #7a5c2c; font-size: 15px; }
+.dev-kpi .k-delta { font-size: 9px; font-weight: 700; color: #15803d; }
+.dev-section-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 800;
+}
+.dev-section-title .count {
+  background: linear-gradient(135deg, #d3b27a, #8a6932); color: #1e1a14;
+  min-width: 18px; height: 14px; border-radius: 7px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 9px;
+}
+.dev-leads { display: flex; flex-direction: column; gap: 6px; }
+.dev-lead {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border: 1px solid rgba(30,26,20,0.06); border-radius: 12px;
+  padding: 8px 10px;
+}
+.dev-lead .avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  color: #fff; font-weight: 800; font-size: 13px;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+}
+.dev-lead .lead-meta { flex: 1; min-width: 0; }
+.dev-lead .lead-meta b { display: block; font-size: 11px; color: #1e1a14; font-weight: 700; }
+.dev-lead .lead-meta span { font-size: 9px; color: var(--text-muted); display: block; }
+.dev-lead .pill {
+  font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 10px; flex: none;
+}
+.dev-lead .pill.hot { background: #fee2e2; color: #b91c1c; }
+.dev-lead .pill.meet { background: #fef3c7; color: #92400e; }
+.dev-calendar {
+  display: flex; align-items: center; gap: 10px;
+  background: #1e1a14; color: #f7f3ec; border-radius: 12px; padding: 8px 10px;
+}
+.dev-calendar .cal-date {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: linear-gradient(135deg, #d3b27a, #8a6932); color: #1e1a14;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none;
+  font-weight: 800; line-height: 1;
+}
+.dev-calendar .cal-date small { font-size: 8px; font-weight: 800; }
+.dev-calendar .cal-date b { font-size: 13px; }
+.dev-calendar .cal-meta { flex: 1; min-width: 0; }
+.dev-calendar .cal-meta b { display: block; font-size: 11px; font-weight: 700; }
+.dev-calendar .cal-meta span { font-size: 9px; color: rgba(247,243,236,0.7); display: block; }
+
+/* property variant */
+.dev-photo {
+  margin: -28px -14px 0; height: 180px; position: relative;
+  background: linear-gradient(155deg, #d3b27a 0%, #8a6932 55%, #2a261f 100%);
+  overflow: hidden;
+}
+.dev-photo::before, .dev-photo::after {
+  content: ''; position: absolute; bottom: 0; background: rgba(30,26,20,0.32);
+}
+.dev-photo::before {
+  inset-inline-start: 16%; width: 22%; height: 65%;
+  box-shadow: inset 6px 12px 0 rgba(247,243,236,0.18), inset 6px 26px 0 rgba(247,243,236,0.18), inset 6px 40px 0 rgba(247,243,236,0.18);
+}
+.dev-photo::after {
+  inset-inline-start: 44%; width: 28%; height: 82%;
+  box-shadow: inset 6px 14px 0 rgba(247,243,236,0.18), inset 6px 34px 0 rgba(247,243,236,0.18), inset 6px 54px 0 rgba(247,243,236,0.18), inset 18px 14px 0 rgba(247,243,236,0.14), inset 18px 34px 0 rgba(247,243,236,0.14);
+}
+.dev-photo .ph-badge {
+  position: absolute; top: 12px; inset-inline-end: 12px;
+  background: rgba(30,26,20,0.85); color: #d3b27a;
+  padding: 5px 12px; border-radius: 11px; font-size: 10px; font-weight: 800; z-index: 1;
+}
+.dev-photo .ph-count {
+  position: absolute; bottom: 12px; inset-inline-end: 12px;
+  background: rgba(30,26,20,0.65); color: #fff;
+  padding: 4px 10px; border-radius: 10px; font-size: 10px; font-weight: 700; z-index: 1;
+}
+.dev-title { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-top: 6px; }
+.dev-title .t-left { min-width: 0; }
+.dev-title .t-left small { color: var(--gold-readable); font-size: 10px; font-weight: 800; display: block; }
+.dev-title .t-left h4 { margin: 2px 0 2px; font-size: 16px; font-weight: 800; color: #1e1a14; }
+.dev-title .t-left span { font-size: 10px; color: var(--text-muted); }
+.dev-title .t-right { text-align: start; }
+.dev-title .t-right b { font-size: 16px; font-weight: 800; color: #1e1a14; display: block; }
+.dev-title .t-right span { font-size: 9px; color: var(--text-muted); }
+.dev-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.dev-chip {
+  background: rgba(30,26,20,0.06); color: #1e1a14;
+  font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 10px;
+}
+.dev-chip.is-gold { background: #f8edd8; color: #7a5c2c; border: 1px solid #d6b787; }
+.dev-owner {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border: 1px solid rgba(30,26,20,0.08); border-radius: 12px;
+  padding: 8px 10px;
+}
+.dev-owner .o-avatar {
+  width: 34px; height: 34px; border-radius: 50%; background: #b45309;
+  color: #fff; font-weight: 800; font-size: 14px; display: inline-flex;
+  align-items: center; justify-content: center; flex: none;
+}
+.dev-owner .o-meta { flex: 1; min-width: 0; }
+.dev-owner .o-meta b { display: block; font-size: 11px; color: #1e1a14; font-weight: 700; }
+.dev-owner .o-meta span { font-size: 9px; color: var(--text-muted); display: block; }
+.dev-owner .o-pill { background: rgba(21,128,61,0.14); color: #15803d; font-size: 9px; font-weight: 800; padding: 4px 8px; border-radius: 9px; flex: none; }
+.dev-actions { display: flex; gap: 6px; }
+.dev-actions .dev-wa {
+  flex: 1; background: #1a7f47; color: #fff;
+  padding: 11px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 800; text-align: center;
+}
+.dev-actions .dev-call {
+  width: 46px; background: #1e1a14; color: #f7f3ec;
+  border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.dev-hints { display: flex; gap: 6px; }
+.dev-hints .h-chip {
+  flex: 1; background: rgba(30,26,20,0.06); color: #54503e;
+  font-size: 10px; font-weight: 700; padding: 6px 8px; border-radius: 10px; text-align: center;
+}
+.dev-hints .h-chip.is-gold { background: #f8edd8; color: #7a5c2c; border: 1px solid #d6b787; font-weight: 800; }
 
 /* store badges (disabled placeholder) */
 .stores { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
@@ -384,112 +564,60 @@ a { color: inherit; text-decoration: none; }
     </div>
     <div class="hero-visual">
       <div class="device" role="img" aria-label="מסך הבית של אפליקציית Estia: לידים חמים, KPIs, יומן פגישות">
-        <!-- Inline SVG phone — self-contained, wider canvas so Hebrew fits cleanly. -->
-        <svg viewBox="0 0 360 740" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <linearGradient id="phone" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#2a261f"/><stop offset="100%" stop-color="#0d0f14"/>
-            </linearGradient>
-            <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#d3b27a"/><stop offset="100%" stop-color="#8a6932"/>
-            </linearGradient>
-            <linearGradient id="aiGlow" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="#fdf3de"/><stop offset="100%" stop-color="#f8e1b8"/>
-            </linearGradient>
-          </defs>
-          <!-- device frame -->
-          <rect x="0" y="0" width="360" height="740" rx="52" fill="url(#phone)"/>
-          <rect x="12" y="12" width="336" height="716" rx="42" fill="#f7f3ec"/>
-          <!-- dynamic island -->
-          <rect x="140" y="24" width="80" height="22" rx="11" fill="#0d0f14"/>
-
-          <!-- status bar -->
-          <text x="330" y="72" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="12" font-weight="700" fill="#1e1a14">9:41</text>
-          <circle cx="48" cy="68" r="5" fill="#1e1a14"/>
-          <rect x="56" y="64" width="18" height="10" rx="2" fill="#1e1a14" opacity="0.8"/>
-
-          <!-- greeting header -->
-          <text x="330" y="112" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="22" font-weight="800" fill="#1e1a14">שלום, יוסי</text>
-          <text x="330" y="134" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="12" fill="#6b6356">יום שלישי · 22 באפריל</text>
-
-          <!-- AI banner -->
-          <rect x="24" y="152" width="312" height="60" rx="14" fill="url(#aiGlow)"/>
-          <rect x="24" y="152" width="312" height="60" rx="14" fill="none" stroke="#d6b787" stroke-width="1"/>
-          <circle cx="310" cy="182" r="14" fill="url(#accent)"/>
-          <text x="310" y="187" text-anchor="middle" font-family="Assistant, Heebo, sans-serif" font-size="14" font-weight="800" fill="#1e1a14">✦</text>
-          <text x="288" y="180" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="13" font-weight="800" fill="#3b2e13">AI מציע 3 לידים</text>
-          <text x="288" y="198" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="11" fill="#6b5026">מתאימים לנכס החדש ברמלה</text>
-
-          <!-- KPI row -->
-          <g>
-            <rect x="24"  y="228" width="100" height="72" rx="14" fill="#fff" stroke="rgba(30,26,20,0.08)"/>
-            <text x="112" y="256" text-anchor="end" font-family="Assistant" font-size="11" fill="#6b6356">לידים פעילים</text>
-            <text x="112" y="286" text-anchor="end" font-family="Assistant" font-size="24" font-weight="800" fill="#1e1a14">24</text>
-            <text x="40"  y="286" font-family="Assistant" font-size="11" font-weight="700" fill="#15803d">+5</text>
-
-            <rect x="130" y="228" width="100" height="72" rx="14" fill="#fff" stroke="rgba(30,26,20,0.08)"/>
-            <text x="218" y="256" text-anchor="end" font-family="Assistant" font-size="11" fill="#6b6356">נכסים</text>
-            <text x="218" y="286" text-anchor="end" font-family="Assistant" font-size="24" font-weight="800" fill="#1e1a14">12</text>
-            <text x="146" y="286" font-family="Assistant" font-size="11" font-weight="700" fill="#6b6356">3 בלעדיים</text>
-
-            <rect x="236" y="228" width="100" height="72" rx="14" fill="#fff" stroke="#d6b787"/>
-            <text x="324" y="256" text-anchor="end" font-family="Assistant" font-size="11" fill="#6b5026">צנרת</text>
-            <text x="324" y="286" text-anchor="end" font-family="Assistant" font-size="22" font-weight="800" fill="#7a5c2c">₪8.4M</text>
-          </g>
-
-          <!-- section title -->
-          <text x="330" y="340" text-anchor="end" font-family="Assistant" font-size="14" font-weight="800" fill="#1e1a14">לידים חמים היום</text>
-          <rect x="24" y="326" width="28" height="18" rx="9" fill="url(#accent)"/>
-          <text x="38" y="339" text-anchor="middle" font-family="Assistant" font-size="11" font-weight="800" fill="#1e1a14">4</text>
-
-          <!-- lead rows -->
-          <g font-family="Assistant, Heebo, sans-serif">
-            <rect x="24" y="356" width="312" height="58" rx="14" fill="#fff" stroke="rgba(30,26,20,0.06)"/>
-            <circle cx="306" cy="385" r="18" fill="#b91c1c"/>
-            <text x="306" y="391" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">ד</text>
-            <text x="282" y="380" text-anchor="end" font-size="14" font-weight="700" fill="#1e1a14">דוד לוי</text>
-            <text x="282" y="398" text-anchor="end" font-size="11" fill="#6b6356">4 חד׳ · רמת גן · עד ₪2.8M</text>
-            <rect x="34" y="374" width="40" height="22" rx="11" fill="#fee2e2"/>
-            <text x="54" y="389" text-anchor="middle" font-size="10" font-weight="800" fill="#b91c1c">חם</text>
-
-            <rect x="24" y="422" width="312" height="58" rx="14" fill="#fff" stroke="rgba(30,26,20,0.06)"/>
-            <circle cx="306" cy="451" r="18" fill="#b45309"/>
-            <text x="306" y="457" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">מ</text>
-            <text x="282" y="446" text-anchor="end" font-size="14" font-weight="700" fill="#1e1a14">מיכל בן-עמי</text>
-            <text x="282" y="464" text-anchor="end" font-size="11" fill="#6b6356">פגישה היום · 14:30</text>
-            <rect x="34" y="440" width="62" height="22" rx="11" fill="#fef3c7"/>
-            <text x="65" y="455" text-anchor="middle" font-size="10" font-weight="800" fill="#92400e">פגישה</text>
-
-            <rect x="24" y="488" width="312" height="58" rx="14" fill="#fff" stroke="rgba(30,26,20,0.06)"/>
-            <circle cx="306" cy="517" r="18" fill="#b91c1c"/>
-            <text x="306" y="523" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">י</text>
-            <text x="282" y="512" text-anchor="end" font-size="14" font-weight="700" fill="#1e1a14">יונתן כהן</text>
-            <text x="282" y="530" text-anchor="end" font-size="11" fill="#6b6356">מרפסת · ראשון לציון · ₪3.4M</text>
-            <rect x="34" y="506" width="40" height="22" rx="11" fill="#fee2e2"/>
-            <text x="54" y="521" text-anchor="middle" font-size="10" font-weight="800" fill="#b91c1c">חם</text>
-          </g>
-
-          <!-- calendar strip -->
-          <rect x="24" y="564" width="312" height="56" rx="14" fill="#1e1a14"/>
-          <rect x="36" y="576" width="32" height="32" rx="8" fill="url(#accent)"/>
-          <text x="52" y="590" text-anchor="middle" font-family="Assistant" font-size="9" font-weight="700" fill="#1e1a14">אפר׳</text>
-          <text x="52" y="602" text-anchor="middle" font-family="Assistant" font-size="14" font-weight="800" fill="#1e1a14">22</text>
-          <text x="322" y="588" text-anchor="end" font-family="Assistant" font-size="13" font-weight="700" fill="#f7f3ec">פגישה · מיכל בן-עמי</text>
-          <text x="322" y="606" text-anchor="end" font-family="Assistant" font-size="11" fill="rgba(247,243,236,0.7)">14:30 · הרצל 42, רמלה</text>
-
-          <!-- tab bar -->
-          <rect x="12" y="668" width="336" height="60" fill="#fff"/>
-          <line x1="12" y1="668" x2="348" y2="668" stroke="rgba(30,26,20,0.08)"/>
-          <g font-family="Assistant" font-size="11" font-weight="700" text-anchor="middle">
-            <text x="52"  y="708" fill="#7a5c2c">בית</text>
-            <rect x="40" y="678" width="24" height="3" rx="2" fill="url(#accent)"/>
-            <text x="116" y="708" fill="#6b6356">לידים</text>
-            <circle cx="180" cy="694" r="22" fill="url(#accent)"/>
-            <text x="180" y="701" fill="#1e1a14" font-size="22" font-weight="800">+</text>
-            <text x="244" y="708" fill="#6b6356">נכסים</text>
-            <text x="308" y="708" fill="#6b6356">יומן</text>
-          </g>
-        </svg>
+        <div class="device-island" aria-hidden="true"></div>
+        <div class="device-screen">
+          <div class="device-status">
+            <span>9:41</span>
+            <span class="status-icons"><span></span><span></span><span></span><span class="bat"></span></span>
+          </div>
+          <div class="device-body">
+            <div class="dev-greet">
+              <h4>שלום, יוסי 👋</h4>
+              <small>יום שלישי · 22 באפריל</small>
+            </div>
+            <div class="dev-ai">
+              <span class="ai-badge">✦</span>
+              <div><b>AI מציע 3 לידים</b><span>מתאימים לנכס החדש ברמלה</span></div>
+            </div>
+            <div class="dev-kpis">
+              <div class="dev-kpi"><span class="k-label">לידים</span><span class="k-value">24</span><span class="k-delta">+5 השבוע</span></div>
+              <div class="dev-kpi"><span class="k-label">נכסים</span><span class="k-value">12</span><span class="k-delta" style="color:#6b6356">3 בלעדיים</span></div>
+              <div class="dev-kpi is-gold"><span class="k-label">צנרת</span><span class="k-value">₪8.4M</span><span class="k-delta" style="color:#8a6932">+12%</span></div>
+            </div>
+            <div class="dev-section-title">
+              <span class="count">4</span>
+              <span>לידים חמים היום</span>
+            </div>
+            <div class="dev-leads">
+              <div class="dev-lead">
+                <span class="pill hot">חם</span>
+                <div class="lead-meta"><b>דוד לוי</b><span>4 חד׳ · רמת גן · עד ₪2.8M</span></div>
+                <span class="avatar" style="background:#b91c1c">ד</span>
+              </div>
+              <div class="dev-lead">
+                <span class="pill meet">פגישה</span>
+                <div class="lead-meta"><b>מיכל בן-עמי</b><span>פגישה היום · 14:30</span></div>
+                <span class="avatar" style="background:#b45309">מ</span>
+              </div>
+              <div class="dev-lead">
+                <span class="pill hot">חם</span>
+                <div class="lead-meta"><b>יונתן כהן</b><span>מרפסת · ראשון לציון · ₪3.4M</span></div>
+                <span class="avatar" style="background:#b91c1c">י</span>
+              </div>
+            </div>
+            <div class="dev-calendar">
+              <div class="cal-date"><small>אפר׳</small><b>22</b></div>
+              <div class="cal-meta"><b>פגישה · מיכל בן-עמי</b><span>14:30 · הרצל 42, רמלה</span></div>
+            </div>
+          </div>
+          <div class="device-tabbar">
+            <span class="tab-active">בית</span>
+            <span>לידים</span>
+            <span><span class="tab-fab">+</span></span>
+            <span>נכסים</span>
+            <span>יומן</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -548,108 +676,56 @@ a { color: inherit; text-decoration: none; }
   <div class="container mobile-grid">
     <div class="hero-visual">
       <div class="device" role="img" aria-label="דף נכס באפליקציית Estia: תמונה, מחיר, פרטים, וכפתור שיתוף ללקוח בוואטסאפ">
-        <svg viewBox="0 0 360 740" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <linearGradient id="phone2" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#2a261f"/><stop offset="100%" stop-color="#0d0f14"/>
-            </linearGradient>
-            <linearGradient id="photo" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#d3b27a"/><stop offset="55%" stop-color="#8a6932"/><stop offset="100%" stop-color="#2a261f"/>
-            </linearGradient>
-            <linearGradient id="accent2" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#d3b27a"/><stop offset="100%" stop-color="#8a6932"/>
-            </linearGradient>
-          </defs>
-          <!-- device frame -->
-          <rect x="0" y="0" width="360" height="740" rx="52" fill="url(#phone2)"/>
-          <rect x="12" y="12" width="336" height="716" rx="42" fill="#f7f3ec"/>
-          <rect x="140" y="24" width="80" height="22" rx="11" fill="#0d0f14"/>
-          <text x="330" y="72" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="12" font-weight="700" fill="#1e1a14">14:02</text>
-
-          <!-- photo hero -->
-          <rect x="12" y="88" width="336" height="200" fill="url(#photo)"/>
-          <!-- stylized building silhouettes on the photo -->
-          <g opacity="0.28" fill="#1e1a14">
-            <rect x="60"  y="180" width="46" height="100"/>
-            <rect x="112" y="150" width="62" height="130"/>
-            <rect x="182" y="170" width="50" height="110"/>
-            <rect x="240" y="140" width="58" height="140"/>
-          </g>
-          <g opacity="0.55" fill="#f7f3ec">
-            <rect x="68"  y="190" width="6" height="6"/>
-            <rect x="82"  y="190" width="6" height="6"/>
-            <rect x="68"  y="210" width="6" height="6"/>
-            <rect x="82"  y="210" width="6" height="6"/>
-            <rect x="120" y="160" width="6" height="6"/>
-            <rect x="134" y="160" width="6" height="6"/>
-            <rect x="148" y="160" width="6" height="6"/>
-            <rect x="120" y="180" width="6" height="6"/>
-            <rect x="134" y="180" width="6" height="6"/>
-            <rect x="190" y="180" width="6" height="6"/>
-            <rect x="204" y="180" width="6" height="6"/>
-            <rect x="250" y="150" width="6" height="6"/>
-            <rect x="264" y="150" width="6" height="6"/>
-            <rect x="278" y="150" width="6" height="6"/>
-          </g>
-          <!-- badges over photo -->
-          <rect x="260" y="104" width="76" height="26" rx="13" fill="rgba(30,26,20,0.85)"/>
-          <text x="298" y="122" text-anchor="middle" font-family="Assistant" font-size="12" font-weight="800" fill="#d3b27a">★ בלעדי</text>
-          <rect x="24" y="250" width="56" height="26" rx="13" fill="rgba(30,26,20,0.7)"/>
-          <text x="52" y="268" text-anchor="middle" font-family="Assistant" font-size="11" font-weight="700" fill="#fff">1 / 14</text>
-
-          <!-- title + price -->
-          <text x="336" y="318" text-anchor="end" font-family="Assistant" font-size="12" font-weight="800" fill="#7a5c2c">דירה · מכירה</text>
-          <text x="336" y="348" text-anchor="end" font-family="Assistant" font-size="19" font-weight="800" fill="#1e1a14">הרצל 42, רמת גן</text>
-          <text x="336" y="368" text-anchor="end" font-family="Assistant" font-size="12" fill="#6b6356">הבורסה · מרפסת שמש</text>
-          <text x="24"  y="348" font-family="Assistant" font-size="19" font-weight="800" fill="#1e1a14">₪2,850,000</text>
-          <text x="24"  y="368" font-family="Assistant" font-size="11" fill="#6b6356">₪29,689 למ״ר</text>
-
-          <!-- chips -->
-          <g font-family="Assistant" font-size="12" font-weight="700">
-            <rect x="24"  y="388" width="74" height="30" rx="15" fill="rgba(30,26,20,0.06)"/>
-            <text x="61"  y="408" text-anchor="middle" fill="#1e1a14">4 חד׳</text>
-            <rect x="104" y="388" width="80" height="30" rx="15" fill="rgba(30,26,20,0.06)"/>
-            <text x="144" y="408" text-anchor="middle" fill="#1e1a14">96 מ״ר</text>
-            <rect x="190" y="388" width="80" height="30" rx="15" fill="rgba(30,26,20,0.06)"/>
-            <text x="230" y="408" text-anchor="middle" fill="#1e1a14">קומה 3/5</text>
-            <rect x="276" y="388" width="60" height="30" rx="15" fill="#f8edd8" stroke="#d6b787"/>
-            <text x="306" y="408" text-anchor="middle" fill="#7a5c2c">חדש</text>
-          </g>
-
-          <!-- owner card -->
-          <rect x="24" y="434" width="312" height="66" rx="14" fill="#fff" stroke="rgba(30,26,20,0.08)"/>
-          <circle cx="306" cy="467" r="20" fill="#b45309"/>
-          <text x="306" y="473" text-anchor="middle" font-family="Assistant" font-size="16" font-weight="800" fill="#fff">ש</text>
-          <text x="278" y="462" text-anchor="end" font-family="Assistant" font-size="14" font-weight="700" fill="#1e1a14">שמעון כהן</text>
-          <text x="278" y="480" text-anchor="end" font-family="Assistant" font-size="11" fill="#6b6356">בעלים · בלעדיות עד 7/25</text>
-          <rect x="34" y="460" width="76" height="20" rx="10" fill="rgba(21,128,61,0.14)"/>
-          <text x="72" y="474" text-anchor="middle" font-family="Assistant" font-size="11" font-weight="700" fill="#15803d">פנוי מיידי</text>
-
-          <!-- action row -->
-          <rect x="24" y="516" width="236" height="54" rx="14" fill="#1a7f47"/>
-          <text x="142" y="549" text-anchor="middle" font-family="Assistant" font-size="14" font-weight="800" fill="#fff">שליחה בוואטסאפ ללקוח</text>
-          <rect x="268" y="516" width="68" height="54" rx="14" fill="#1e1a14"/>
-          <text x="302" y="550" text-anchor="middle" font-family="Assistant" font-size="18" fill="#f7f3ec">📞</text>
-
-          <!-- AI hint chips -->
-          <rect x="24"  y="586" width="156" height="30" rx="15" fill="rgba(30,26,20,0.06)"/>
-          <text x="102" y="606" text-anchor="middle" font-family="Assistant" font-size="12" font-weight="700" fill="#54503e">✓ 3 לקוחות מתאימים</text>
-          <rect x="188" y="586" width="148" height="30" rx="15" fill="#f8edd8" stroke="#d6b787"/>
-          <text x="262" y="606" text-anchor="middle" font-family="Assistant" font-size="12" font-weight="800" fill="#7a5c2c">✦ תיאור AI חדש</text>
-
-          <!-- tab bar -->
-          <rect x="12" y="668" width="336" height="60" fill="#fff"/>
-          <line x1="12" y1="668" x2="348" y2="668" stroke="rgba(30,26,20,0.08)"/>
-          <g font-family="Assistant" font-size="11" font-weight="700" text-anchor="middle">
-            <text x="52"  y="708" fill="#6b6356">בית</text>
-            <text x="116" y="708" fill="#7a5c2c">נכסים</text>
-            <rect x="104" y="678" width="24" height="3" rx="2" fill="url(#accent2)"/>
-            <circle cx="180" cy="694" r="22" fill="url(#accent2)"/>
-            <text x="180" y="701" fill="#1e1a14" font-size="22" font-weight="800">+</text>
-            <text x="244" y="708" fill="#6b6356">לקוחות</text>
-            <text x="308" y="708" fill="#6b6356">יומן</text>
-          </g>
-        </svg>
+        <div class="device-island" aria-hidden="true"></div>
+        <div class="device-screen">
+          <div class="device-status">
+            <span>14:02</span>
+            <span class="status-icons"><span></span><span></span><span></span><span class="bat"></span></span>
+          </div>
+          <div class="device-body">
+            <div class="dev-photo">
+              <span class="ph-badge">★ בלעדי</span>
+              <span class="ph-count">1 / 14</span>
+            </div>
+            <div class="dev-title">
+              <div class="t-left">
+                <small>דירה · מכירה</small>
+                <h4>הרצל 42, רמת גן</h4>
+                <span>הבורסה · מרפסת שמש</span>
+              </div>
+              <div class="t-right">
+                <b>₪2,850,000</b>
+                <span>₪29,689 למ״ר</span>
+              </div>
+            </div>
+            <div class="dev-chips">
+              <span class="dev-chip">4 חד׳</span>
+              <span class="dev-chip">96 מ״ר</span>
+              <span class="dev-chip">קומה 3/5</span>
+              <span class="dev-chip is-gold">חדש</span>
+            </div>
+            <div class="dev-owner">
+              <span class="o-pill">פנוי מיידי</span>
+              <div class="o-meta"><b>שמעון כהן</b><span>בעלים · בלעדיות עד 7/25</span></div>
+              <span class="o-avatar">ש</span>
+            </div>
+            <div class="dev-actions">
+              <span class="dev-call">📞</span>
+              <div class="dev-wa">שליחה בוואטסאפ ללקוח</div>
+            </div>
+            <div class="dev-hints">
+              <span class="h-chip">✓ 3 לקוחות מתאימים</span>
+              <span class="h-chip is-gold">✦ תיאור AI חדש</span>
+            </div>
+          </div>
+          <div class="device-tabbar">
+            <span>בית</span>
+            <span class="tab-active">נכסים</span>
+            <span><span class="tab-fab">+</span></span>
+            <span>לקוחות</span>
+            <span>יומן</span>
+          </div>
+        </div>
       </div>
     </div>
     <div>
