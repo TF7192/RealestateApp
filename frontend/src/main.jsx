@@ -137,28 +137,57 @@ if (typeof window !== 'undefined') {
     return false;
   };
 
-  // Only scroll the document when the focused input is ACTUALLY
-  // covered by the keyboard — and scroll the minimum amount needed.
-  // All other page chrome (FABs, headers, tab bars) stays put because
-  // they're position:fixed relative to the viewport, which is
-  // unchanged (Capacitor's Keyboard.resize is "none", so the WebView
-  // itself doesn't resize when the keyboard opens).
+  // Measure any `position: fixed` bottom-pinned chrome (mobile tab
+  // bar, StickyActionBar with "שמור והמשך", quick-create FAB, Yad2
+  // banner, etc.) that sits between the keyboard and the content.
+  // Their combined height has to come OUT of the "visible area" so
+  // the nudge lifts the focused input above THEM, not just above the
+  // raw keyboard rectangle.
   //
-  // kbHeight is filled in by the Capacitor Keyboard plugin above.
-  // On web (desktop Safari / Chrome / Firefox) we fall back to the
-  // visualViewport API, which shrinks naturally when virtual keyboards
-  // appear — the same math works both places.
+  // We query by selector rather than walk every element in the DOM
+  // to keep the cost bounded. Each selector covers one known
+  // bottom-fixed piece of chrome; merge their union bounding box.
+  const BOTTOM_CHROME_SELECTORS = [
+    '.mtb',           // MobileTabBar
+    '.sab',           // StickyActionBar (שמור והמשך lives here)
+    '.bulk-bar',      // Properties bulk-action bar
+    '.qcfab-trigger', // QuickCreateFab
+    '.owners-fab',    // Owners page FAB
+    '.y2b',           // Yad2ScanBanner
+    '.sticky-cta',    // landing sticky CTA
+  ];
+  const bottomChromeHeight = (viewportH) => {
+    let topmost = viewportH;
+    for (const sel of BOTTOM_CHROME_SELECTORS) {
+      document.querySelectorAll(sel).forEach((el) => {
+        // Skip hidden / unmounted / offscreen chrome.
+        if (!el.offsetParent && getComputedStyle(el).position !== 'fixed') return;
+        const r = el.getBoundingClientRect();
+        // Only care about chrome anchored at the BOTTOM of the viewport
+        // — skip rows that happen to scroll into view.
+        if (r.bottom > viewportH - 2 && r.top < viewportH) {
+          if (r.top < topmost) topmost = r.top;
+        }
+      });
+    }
+    return Math.max(0, viewportH - topmost);
+  };
+
+  // Only scroll the document when the focused input is ACTUALLY
+  // covered — by the keyboard OR by any bottom-fixed chrome on top of
+  // it. Scroll the minimum amount needed. Top/side chrome never moves.
   const nudgeIfCovered = (el) => {
     if (!el) return;
     const vv = window.visualViewport;
     const viewportH = vv?.height ?? window.innerHeight;
-    // On native iOS the WebView stays full-height (resize:none), so
-    // visualViewport.height equals window.innerHeight. We have to
-    // subtract the real keyboard height from the plugin to find the
-    // true visible area.
-    const visibleBottom = viewportH - kbHeight;
+    // On native iOS the WebView stays full-height (Keyboard.resize
+    // "none"), so visualViewport.height == window.innerHeight. We have
+    // to subtract BOTH the real keyboard height AND any bottom-fixed
+    // chrome height to find the true visible area.
+    const chromeH = bottomChromeHeight(viewportH);
+    const visibleBottom = viewportH - kbHeight - chromeH;
     const rect = el.getBoundingClientRect();
-    const buffer = 24;
+    const buffer = 16;
     if (rect.bottom > visibleBottom - buffer) {
       const delta = Math.ceil(rect.bottom - (visibleBottom - buffer));
       // Instant scroll — smooth-scroll inside WKWebView is a software
@@ -167,8 +196,8 @@ if (typeof window !== 'undefined') {
     } else if (rect.top < buffer) {
       window.scrollBy(0, rect.top - buffer);
     }
-    // If the input was already visible above the keyboard, we do
-    // NOTHING — the screen stays exactly where it was, no jumps.
+    // Already visible above the keyboard + bottom chrome → zero scroll,
+    // screen stays put.
   };
 
   document.addEventListener('focusin', (e) => {
