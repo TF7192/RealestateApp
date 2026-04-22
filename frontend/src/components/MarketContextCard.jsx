@@ -38,29 +38,35 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
     setByKind((prev) => ({ ...prev, [k]: { ...(prev[k] || {}), ...patch } }));
   }, []);
 
-  // On mount + on kind switch: fetch the cached row (no live call).
+  // On mount + on kind switch: silently fetch the cached row. Never
+  // block the UI — the card shows its CTA empty state immediately,
+  // and if there's cached data it swaps in when the fetch resolves.
+  //
+  // The earlier version watched `byKind` in deps which re-ran the
+  // effect on every state write, relying on a guard to bail — any
+  // glitch in that guard put the card into an infinite fetch loop
+  // and left the agent staring at "טוען…" before they ever clicked.
+  // Tracking completion in a ref keeps the effect's deps minimal.
+  const loadedKindsRef = useRef(new Set());
   useEffect(() => {
     if (!propertyId) return;
-    // Track a `loaded` flag rather than keying off `data` — 204/no-cache
-    // responses legitimately come back null, and checking `data` falsiness
-    // put the component into an infinite fetch loop that kept the card
-    // permanently stuck on "טוען…" even before the agent hit משוך נתונים.
-    if (byKind[kind]?.loaded || byKind[kind]?.loading) return;
+    const mark = `${propertyId}:${kind}`;
+    if (loadedKindsRef.current.has(mark)) return;
+    loadedKindsRef.current.add(mark);
     let cancelled = false;
-    setKindState(kind, { loading: true, error: null });
     (async () => {
       try {
         const res = await api.marketContextGet(propertyId, kind);
         if (cancelled) return;
-        // 204 → res is empty/undefined; treat as "no cache yet".
-        setKindState(kind, { loading: false, loaded: true, data: res || null });
-      } catch (e) {
+        setKindState(kind, { data: res || null });
+      } catch {
         if (cancelled) return;
-        setKindState(kind, { loading: false, loaded: true, error: e?.message || 'שגיאה' });
+        // Silent — cached fetch failing isn't worth a visible error.
+        // The CTA still works; the agent can pull fresh data.
       }
     })();
     return () => { cancelled = true; };
-  }, [propertyId, kind, byKind, setKindState]);
+  }, [propertyId, kind, setKindState]);
 
   // Subscribe to the global market-scan store so the button state /
   // spinner reflect an in-flight crawl even if the agent navigated away
