@@ -150,19 +150,77 @@ body {
   -webkit-user-select: text;
 }
 
-/* Native iOS (Capacitor WKWebView) specific: make sure html + body fill
-   the WKWebView viewport so document-level scroll has something to
-   scroll against. `-webkit-fill-available` on iOS resolves to the
-   actual visible viewport (unlike 100vh which is the largest possible
-   viewport and can leave content laid out but non-scrollable). Scoped
-   to the iOS @supports block so Android / web are untouched. */
+/* ── Native iOS (Capacitor WKWebView) scroll + perf fixes ──────
+   The symptom we're chasing: rubber-band engages (touch registered)
+   but the document doesn't actually scroll, everywhere in the app.
+   Root cause: when Capacitor's keyboard.resize="body" and iOS
+   contentInset="never" combine, the WKWebView's scrollView can end
+   up with contentSize == frameSize so there's nothing to scroll
+   against. Fixes, all iOS-only:
+
+   1. html, body = `-webkit-fill-available` (not 100vh) so the
+      viewport matches what the user actually sees.
+   2. `overflow-y: scroll` on html forces the scrollView's
+      contentSize calculation to account for overflow explicitly.
+   3. `-webkit-overflow-scrolling: touch` keeps the old-iOS momentum
+      scroll code path alive (harmless on new iOS).
+   4. Promote the document scroll layer to GPU via
+      `transform: translateZ(0)` — this is the key 120fps hint for
+      ProMotion-capable iPhones; without it, complex card layouts
+      fall back to CPU compositing at 60fps. */
 @supports (-webkit-touch-callout: none) {
-  html { min-height: -webkit-fill-available; }
-  body { min-height: -webkit-fill-available; }
+  html {
+    min-height: -webkit-fill-available;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+  body {
+    min-height: -webkit-fill-available;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* GPU-promote the main scroll region so scroll frames aren't
+     blocked on heavy paints (shadows, blurs). Applied to every known
+     top-level container; harmless if any of them aren't present. */
+  .main-content,
+  .dashboard,
+  .properties-page,
+  .customers-page,
+  .owners-page {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
 }
 
 button, a, [role="button"] {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ── ProMotion / 120Hz friendliness ──────────────────────────────
+   iPhone 13 Pro+ can render up to 120Hz, but WKWebView only actually
+   hits that cadence when:
+     (a) animations run on the compositor (transform / opacity only),
+     (b) nothing else on the main thread blocks the frame.
+   The rules below:
+     - Cap our shared transition defaults to transform/opacity so any
+       ":hover { background: … }" style hover doesn't trigger a repaint.
+     - Mark every ".animate-in" entrance animation with will-change so
+       the browser sets up a dedicated GPU layer up front instead of
+       mid-animation (which causes the first-frame jank users notice).
+     - Add content-visibility on offscreen card lists so iOS can skip
+       layout/paint work for rows the user hasn't scrolled to yet —
+       this is the single biggest win for scroll-smoothness on long
+       /properties and /customers pages. */
+.animate-in, .animate-in-delay-1, .animate-in-delay-2,
+.animate-in-delay-3, .animate-in-delay-4, .animate-in-delay-5 {
+  will-change: transform, opacity;
+}
+/* Scoped content-visibility: skip offscreen rendering for card rows
+   and table rows in the big lists. `contain-intrinsic-size` gives the
+   browser a realistic placeholder height so scrollbar + anchor maths
+   don't lurch when rows hydrate on scroll. */
+.property-card, .customer-card, .owner-card, .data-table tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
 }
 
 /* Smoother scrolling inside any overflow container (lists, kanban, etc.) */
