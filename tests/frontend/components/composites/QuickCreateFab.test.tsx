@@ -22,7 +22,7 @@ describe('<QuickCreateFab>', () => {
     expect(screen.getByRole('button', { name: 'יצירה מהירה' })).toBeInTheDocument();
   });
 
-  it('opens a role="menu" popover with three menuitems on click', async () => {
+  it('opens a role="menu" popover with two menuitems on click', async () => {
     const user = userEvent.setup();
     render(<QuickCreateFab />, { route: '/' });
     await user.click(screen.getByRole('button', { name: 'יצירה מהירה' }));
@@ -30,10 +30,11 @@ describe('<QuickCreateFab>', () => {
     const menu = await screen.findByRole('menu', { name: 'יצירה מהירה' });
     expect(menu).toBeInTheDocument();
     const items = screen.getAllByRole('menuitem');
-    expect(items).toHaveLength(3);
+    // F-1 — "עסקה חדשה" shortcut removed. Only property + lead remain.
+    expect(items).toHaveLength(2);
     expect(screen.getByRole('menuitem', { name: /נכס חדש/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /ליד חדש/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /עסקה חדשה/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /עסקה חדשה/ })).not.toBeInTheDocument();
   });
 
   it('aria-expanded flips true when the menu opens', async () => {
@@ -70,8 +71,7 @@ describe('<QuickCreateFab>', () => {
     menu.focus();
     await user.keyboard('{ArrowDown}');
     await waitFor(() => expect(items[1]).toHaveAttribute('tabindex', '0'));
-    await user.keyboard('{ArrowDown}');
-    await waitFor(() => expect(items[2]).toHaveAttribute('tabindex', '0'));
+    // F-1 — only 2 items now; ArrowDown wraps back to the first.
     await user.keyboard('{ArrowDown}');
     await waitFor(() => expect(items[0]).toHaveAttribute('tabindex', '0'));
   });
@@ -85,7 +85,8 @@ describe('<QuickCreateFab>', () => {
     await waitFor(() => expect(items[0]).toHaveAttribute('tabindex', '0'));
     menu.focus();
     await user.keyboard('{ArrowUp}');
-    await waitFor(() => expect(items[2]).toHaveAttribute('tabindex', '0'));
+    // F-1 — wrap goes to items[1] (the new last) instead of items[2].
+    await waitFor(() => expect(items[1]).toHaveAttribute('tabindex', '0'));
   });
 
   it('Enter on a menuitem closes the popover (navigates away)', async () => {
