@@ -3,9 +3,20 @@
 
 .chatw-btn {
   position: fixed;
-  bottom: calc(18px + env(safe-area-inset-bottom));
+  /* F-2 — stack below the gold QuickCreateFab so the two don't
+     overlap. QuickCreateFab anchors at inset-block-end: 28px on
+     ≥900px viewports and is 56px tall → chat sits at 28px (its own
+     resting bottom) with FAB floating 8px above it (84px inset for
+     the FAB). In the 820px–900px band the mobile tab bar is still
+     visible (~56px tall), so we lift the chat button above the bar
+     with calc(72px + safe-area) — same clearance the FAB uses for
+     its mobile anchor. Below 820px the chat launcher is hidden
+     entirely (it moved into the mobile header). */
+  bottom: calc(72px + env(safe-area-inset-bottom));
   inset-inline-end: 18px;
-  z-index: 900;
+  /* Below the FAB's z-index (900) — FAB must win if they ever sit
+     next to each other; we're one stacking layer behind. */
+  z-index: 890;
   width: 48px; height: 48px;
   border-radius: 50%;
   border: 1px solid var(--border);
@@ -17,6 +28,19 @@
   cursor: pointer;
   box-shadow: 0 8px 24px rgba(30, 26, 20, 0.14);
   transition: color 0.15s, border-color 0.15s, transform 0.1s, background 0.15s;
+}
+
+/* F-2 — on viewports wider than the mobile tab bar breakpoint (≥900px)
+   the QuickCreateFab uses its desktop anchor (28px / 28px). Keep chat
+   at the same inset-inline-end so they stack on a single column; chat
+   stays at bottom: 18px (roughly the tab-bar-less resting spot) and
+   the FAB floats above via its own CSS. Nothing to do here beyond
+   matching the inset-inline-end so the two buttons share a column. */
+@media (min-width: 900px) {
+  .chatw-btn {
+    inset-inline-end: 28px;
+    bottom: 28px;
+  }
 }
 
 /* Task 1 — On mobile the standalone fixed chat button used to sit on

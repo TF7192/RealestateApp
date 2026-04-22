@@ -259,6 +259,11 @@
 .dashboard-card {
   padding: 0;
   overflow: hidden;
+  /* D-3 — default grid items have min-width: auto (= content width),
+     which let long labels inside a card force the column wider and
+     shove neighboring content. Clamping to 0 lets the two-column grid
+     split evenly and the inner content wrap / ellipsis as designed. */
+  min-width: 0;
 }
 
 .dashboard-card:last-child {
@@ -791,7 +796,13 @@
   to   { background-position: -200% 0; }
 }
 
-/* ── Rich dashboard grid (replaces marketing-progress + hot-leads) ── */
+/* ── Rich dashboard grid (replaces marketing-progress + hot-leads) ──
+   D-1: ConversionFunnelCard removed.
+   D-2: MeetingsCard added (third card).
+   D-3: the old 1.2fr 1fr 1fr rule starved the pipeline card so the
+   status labels "חמים/פושרים/קרים" wrapped. Use equal 1fr columns and
+   let the pipeline span the full row on the middle (900–1200px) band
+   so its legend stays on one line. */
 .dashboard-grid-rich {
   display: grid;
   gap: 16px;
@@ -801,11 +812,12 @@
   .dashboard-grid-rich {
     grid-template-columns: 1fr 1fr;
   }
+  /* Pipeline card needs width for the 3-chip legend + stacked bar. */
   .dashboard-grid-rich .dash-pipeline { grid-column: 1 / -1; }
 }
 @media (min-width: 1200px) {
   .dashboard-grid-rich {
-    grid-template-columns: 1.2fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
   }
   .dashboard-grid-rich .dash-pipeline { grid-column: auto; }
 }
@@ -851,6 +863,9 @@
   flex-wrap: wrap;
   gap: 10px 18px;
   margin-bottom: 12px;
+  /* D-3 — let the legend shrink below its intrinsic width so the
+     three color chips wrap cleanly instead of pushing the card sideways. */
+  min-width: 0;
 }
 .dpl-item {
   display: inline-flex;
@@ -859,6 +874,8 @@
   font-size: 13px;
   color: var(--text-secondary, #54503e);
   text-decoration: none;
+  /* D-3 — same min-width guard for each legend chip. */
+  min-width: 0;
 }
 .dpl-item strong {
   color: var(--text-primary, #1e1a14);
@@ -945,64 +962,96 @@
   color: var(--text-muted, #6b6356);
   text-align: center;
 }
-
-/* Conversion Funnel */
-.dash-funnel-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.dash-funnel-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* D-4 — the "+N נוספות" text became a link to /activity so agents
+   with a long backlog have a single-tap escape hatch. */
+a.dash-aq-more-link {
+  display: block;
+  padding: 8px 4px;
+  border-radius: 8px;
   text-decoration: none;
-  padding: 4px 2px;
-  border-radius: 6px;
+  font-weight: 600;
+  color: var(--gold, #b48b4c);
+  transition: background 0.1s ease, color 0.1s ease;
+}
+a.dash-aq-more-link:hover {
+  background: var(--gold-glow, rgba(180, 139, 76, 0.08));
+  color: var(--gold, #b48b4c);
+}
+
+/* D-1 — Conversion Funnel CSS removed alongside its component. */
+
+/* Meetings (D-2) ------------------------------------------------ */
+.dash-meetings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px 10px;
+}
+.dash-meetings-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border, rgba(30,26,20,0.08));
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text-primary, #1e1a14);
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+.dash-meetings-row:hover {
+  background: var(--gold-glow, rgba(180,139,76,0.06));
+  border-color: var(--gold-border, rgba(180,139,76,0.25));
+}
+.dash-meetings-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: var(--gold-glow, rgba(180,139,76,0.12));
+  color: var(--gold, #b48b4c);
+}
+.dash-meetings-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dash-meetings-info strong {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary, #1e1a14);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-meetings-info span {
+  font-size: 12px;
+  color: var(--text-muted, #6b6356);
+  font-variant-numeric: tabular-nums;
+}
+.dash-meetings-empty {
+  padding: 14px 18px 18px;
+  font-size: 12.5px;
+  color: var(--text-muted, #6b6356);
+  text-align: center;
+}
+.dash-meetings-skel {
+  padding: 14px 18px;
+}
+.dash-meetings-more {
+  display: block;
+  padding: 10px 18px 14px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--gold, #b48b4c);
+  text-decoration: none;
+  font-weight: 600;
+  border-top: 1px solid var(--border, rgba(30,26,20,0.06));
   transition: background 0.1s ease;
 }
-.dash-funnel-row:hover { background: var(--bg-secondary, rgba(30,26,20,0.04)); }
-.dash-funnel-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-.dash-funnel-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary, #54503e);
-}
-.dash-funnel-count {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.dash-funnel-count strong {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--text-primary, #1e1a14);
-  font-variant-numeric: tabular-nums;
-}
-.dash-funnel-conv {
-  font-size: 11px;
-  font-weight: 700;
-  font-style: normal;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-variant-numeric: tabular-nums;
-}
-.dash-funnel-conv.good { background: rgba(21,128,61,0.12); color: #15803d; }
-.dash-funnel-conv.mid  { background: rgba(180,139,76,0.16); color: #7a5c2c; }
-.dash-funnel-conv.low  { background: rgba(185,28,28,0.10); color: #b91c1c; }
-.dash-funnel-bar {
-  height: 8px;
-  background: var(--bg-secondary, rgba(30,26,20,0.06));
-  border-radius: 999px;
-  overflow: hidden;
-}
-.dash-funnel-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #d3b27a, #8a6932);
-  border-radius: 999px;
-  transition: width 0.4s ease;
+.dash-meetings-more:hover {
+  background: var(--gold-glow, rgba(180,139,76,0.06));
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Building2, UserPlus, Handshake } from 'lucide-react';
+import { Plus, Building2, UserPlus } from 'lucide-react';
 import Portal from './Portal';
 import useFocusTrap from '../hooks/useFocusTrap';
 import './QuickCreateFab.css';
@@ -44,10 +44,12 @@ function shouldHideOn(pathname) {
   return HIDDEN_PREFIXES.some((p) => p.regex.test(pathname));
 }
 
+// F-1 — "עסקה חדשה" shortcut removed from the FAB. Deal creation lives
+// inside /deals and the flow needs a lead+property pre-selected; the raw
+// shortcut landed on the list page and was misleading.
 const MENU_ITEMS = [
-  { key: 'property', icon: Building2, label: 'נכס חדש',  to: '/properties/new' },
-  { key: 'lead',     icon: UserPlus,  label: 'ליד חדש',   to: '/customers/new' },
-  { key: 'deal',     icon: Handshake, label: 'עסקה חדשה', to: '/deals' },
+  { key: 'property', icon: Building2, label: 'נכס חדש', to: '/properties/new' },
+  { key: 'lead',     icon: UserPlus,  label: 'ליד חדש', to: '/customers/new' },
 ];
 
 export default function QuickCreateFab() {

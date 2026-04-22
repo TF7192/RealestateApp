@@ -75,6 +75,37 @@ import { api } from './lib/api';
 import { useNavigate } from 'react-router-dom';
 import './App.css';
 
+// D-6 — Unauthenticated user hit a protected route (e.g. /dashboard).
+// Redirect the URL to /login?from=<original> so (a) the address bar
+// reflects the state and (b) PostLoginRedirect can bounce them back
+// to where they were headed after a successful login. Public routes
+// (landing, /login, /p/:id, /a/:id, /agents/:slug, /public/p/:token,
+// /terms, /privacy) are handled above and never reach this component.
+function UnauthRedirect() {
+  const location = useLocation();
+  // Skip re-encoding /login itself — prevents a double-redirect loop
+  // in any code path that ever lands here while already on /login.
+  if (location.pathname === '/login') {
+    return <Login />;
+  }
+  const from = `${location.pathname}${location.search}`;
+  return <Navigate to={`/login?from=${encodeURIComponent(from)}`} replace />;
+}
+
+// D-6 — authed user on /login. Honor ?from= to land back where they
+// were if UnauthRedirect captured it; otherwise fall back to the SPA
+// dashboard alias (/ is served by static landing.html and would miss
+// the app shell entirely).
+function PostLoginRedirect() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const raw = params.get('from');
+  // Guardrail — only honor same-origin, in-app paths so a crafted
+  // ?from=https://evil.example/ can't redirect post-login traffic.
+  const safeFrom = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : null;
+  return <Navigate to={safeFrom || '/dashboard'} replace />;
+}
+
 /**
  * Single app shell — the same pages run on mobile and desktop.
  */
@@ -176,9 +207,15 @@ function AppRoutes() {
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
           <Route path="/p/:id" element={<CustomerPropertyView />} />
           <Route path="/a/:agentId" element={<AgentPortal />} />
-          {/* Anything else lands on the login page (backwards-compat for any
-              bookmarked authed URL visited while logged out). */}
-          <Route path="*" element={<Login />} />
+          {/* D-6 — anything else is a protected authed route. Redirect
+              the URL to /login?from=<pathname> so that (a) the address
+              bar reflects the fact that the user needs to log in, and
+              (b) after login we can bounce them back to exactly where
+              they tried to go instead of silently dropping them on the
+              dashboard. Rendering <Login /> here without updating the
+              URL was the source of the "reload on /dashboard lands on
+              /" bug — see PostLoginRedirect below. */}
+          <Route path="*" element={<UnauthRedirect />} />
         </Routes>
       </Suspense>
     );
@@ -261,10 +298,13 @@ function AppRoutes() {
             <Route path="/assets" element={<Navigate to="/properties" replace />} />
             <Route path="/assets/:id" element={<Navigate to="/properties" replace />} />
             <Route path="/deals" element={<Deals />} />
-            {/* If an already-authenticated user lands on /login (e.g.
-                after OAuth success redirected back there, or from a
-                bookmark), send them to the dashboard instead of 404. */}
-            <Route path="/login" element={<Navigate to="/" replace />} />
+            {/* D-6 — an already-authenticated user landing on /login
+                should bounce to the `from` URL they were originally
+                trying to reach (set by UnauthRedirect), or to the
+                dashboard if nothing was captured. `/` is served by
+                nginx's static landing page, so we send them to the SPA
+                dashboard alias. */}
+            <Route path="/login" element={<PostLoginRedirect />} />
           </Route>
           {/* SEO-friendly public routes */}
           <Route path="/agents/:agentSlug" element={<AgentPortal />} />

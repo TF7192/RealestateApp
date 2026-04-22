@@ -18,10 +18,12 @@ import {
   Sun,
   PhoneCall,
   Sparkles,
+  Calendar as CalendarIcon,
   Calculator as CalcIcon,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useToast } from '../lib/toast';
 import ShareCatalogDialog from '../components/ShareCatalogDialog';
 import PullRefresh from '../components/PullRefresh';
 import DeltaBadge from '../components/DeltaBadge';
@@ -307,11 +309,16 @@ export default function Dashboard() {
             properties={properties}
             staleThresholdDays={staleThresholdDays}
           />
-          <ConversionFunnelCard
-            leads={leads}
-            properties={properties}
-            dealStats={dealStats}
-          />
+          {/* D-2 — meetings for today + next 7 days (cap 5), with a
+              link to the full reminders/meetings view. */}
+          <MeetingsCard />
+          {/* D-1 — משפך המרה card removed. The conversion numbers it
+              showed (leads → hot → active → signed) repeated data
+              already surfaced across the KPI scroller above, and the
+              funnel's "signed deals" row was misleading for agents
+              still closing their first deal. Card + its CSS deleted
+              together so the grid reflows cleanly to the remaining
+              cards. */}
         </div>
       )}
       </div>
@@ -708,7 +715,11 @@ function ActionQueueCard({ leads = [], properties = [], staleThresholdDays = 30 
   }
 
   items.sort((a, b) => b.score - a.score);
-  const visible = items.slice(0, 6);
+  // D-4 — cap at 5 rows (was 6) and replace the silent "+N נוספות"
+  // label with an actionable "צפה בהכול" link to the activity page,
+  // so an agent with a long backlog has one tap to see the full list
+  // instead of a dead-end counter.
+  const visible = items.slice(0, 5);
 
   return (
     <div className="card dashboard-card dash-action-queue animate-in animate-in-delay-4">
@@ -740,51 +751,132 @@ function ActionQueueCard({ leads = [], properties = [], staleThresholdDays = 30 
         </div>
       )}
       {items.length > visible.length && (
-        <div className="dash-aq-more">+{items.length - visible.length} נוספות</div>
+        <Link
+          to="/activity"
+          className="dash-aq-more dash-aq-more-link"
+          onClick={() => haptics.tap()}
+        >
+          צפה בהכול ({items.length})
+        </Link>
       )}
     </div>
   );
 }
 
-// ── Conversion Funnel ────────────────────────────────────────────
-// Three-step funnel: Leads → Hot leads → Signed deals. Visualizes
-// drop-off ratios so the agent sees where the pipeline is leaking.
-// Counts come from in-memory data already loaded.
-function ConversionFunnelCard({ leads = [], properties = [], dealStats = {} }) {
-  const steps = [
-    { key: 'leads', label: 'לידים', count: leads.length, to: '/customers' },
-    { key: 'hot',   label: 'חמים',  count: leads.filter((l) => l.status === 'HOT').length, to: '/customers?filter=hot' },
-    { key: 'props', label: 'נכסים פעילים', count: properties.length, to: '/properties' },
-    { key: 'deals', label: 'עסקאות חתומות', count: dealStats.signed || 0, to: '/deals?tab=signed' },
-  ];
-  const max = Math.max(1, ...steps.map((s) => s.count));
+// ── Meetings (D-2) ───────────────────────────────────────────────
+// "פגישות השבוע" — reminders with a dueAt inside the [today, today+7d]
+// window. Capped at 5 rows. A link at the bottom opens /reminders for
+// the full list. Uses the shared toast on load-failure so the card
+// can't swallow errors silently.
+function MeetingsCard() {
+  const toast = useToast();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // Pull open reminders only; filter by dueAt on the client so
+        // we don't need a new backend query shape.
+        const res = await api.listReminders({ status: 'PENDING' });
+        if (cancelled) return;
+        // Window: start of today through end of day (today + 7).
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(startOfToday);
+        endOfWeek.setDate(endOfWeek.getDate() + 8); // 7 full days ahead
+        const filtered = (res?.items || []).filter((r) => {
+          if (!r.dueAt) return false;
+          const ts = new Date(r.dueAt).getTime();
+          return ts >= startOfToday.getTime() && ts < endOfWeek.getTime();
+        });
+        filtered.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+        setItems(filtered);
+      } catch {
+        if (cancelled) return;
+        toast.error('שגיאה בטעינת פגישות');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // toast identity is stable via context; re-running on re-render
+    // would double-fetch. Intentionally mount-only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const visible = items.slice(0, 5);
+
   return (
-    <div className="card dashboard-card dash-funnel animate-in animate-in-delay-5">
+    <div className="card dashboard-card dash-meetings animate-in animate-in-delay-5">
       <div className="card-header">
-        <h3>משפך המרה</h3>
-        <span className="badge">המרה {leads.length ? Math.round(((dealStats.signed || 0) / leads.length) * 100) : 0}%</span>
+        <h3>פגישות השבוע</h3>
+        <span className="badge badge-gold">{items.length}</span>
       </div>
-      <div className="dash-funnel-list">
-        {steps.map((s, i) => {
-          const pct = (s.count / max) * 100;
-          const prev = i > 0 ? steps[i - 1].count : null;
-          const conv = prev ? Math.round((s.count / prev) * 100) : null;
-          return (
-            <Link key={s.key} to={s.to} className="dash-funnel-row" onClick={() => haptics.tap()}>
-              <div className="dash-funnel-meta">
-                <span className="dash-funnel-label">{s.label}</span>
-                <span className="dash-funnel-count">
-                  <strong>{s.count}</strong>
-                  {conv != null && <em className={`dash-funnel-conv ${conv >= 30 ? 'good' : conv >= 10 ? 'mid' : 'low'}`}>{conv}%</em>}
-                </span>
+      {loading ? (
+        <div className="dash-meetings-skel">
+          <div className="skel skel-line w-70" style={{ margin: '8px 0' }} />
+          <div className="skel skel-line w-50" style={{ margin: '8px 0' }} />
+          <div className="skel skel-line w-60" style={{ margin: '8px 0' }} />
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="dash-meetings-empty">אין פגישות השבוע</div>
+      ) : (
+        <div className="dash-meetings-list">
+          {visible.map((m) => (
+            <Link
+              key={m.id}
+              to="/reminders"
+              className="dash-meetings-row"
+              onClick={() => haptics.tap()}
+            >
+              <span className="dash-meetings-icon" aria-hidden="true">
+                <CalendarIcon size={16} />
+              </span>
+              <div className="dash-meetings-info">
+                <strong>{m.title || 'פגישה'}</strong>
+                <span>{formatMeetingWhen(m.dueAt)}</span>
               </div>
-              <div className="dash-funnel-bar">
-                <div className="dash-funnel-bar-fill" style={{ width: `${pct}%` }} />
-              </div>
+              <ArrowUpLeft size={14} aria-hidden="true" />
             </Link>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+      {/* "צפה בכל הפגישות" — always rendered alongside data so an agent
+          can jump to the full list even when just 1–2 items are here. */}
+      <Link
+        to="/reminders"
+        className="dash-meetings-more"
+        onClick={() => haptics.tap()}
+      >
+        צפה בכל הפגישות
+      </Link>
     </div>
   );
 }
+
+// Formats a meeting's dueAt as "היום · 10:30" / "מחר · 14:00" /
+// "יום ג׳ · 09:00". Keeps the display calm — no seconds, no year.
+function formatMeetingWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const dayAfter = new Date(today);
+  dayAfter.setDate(dayAfter.getDate() + 2);
+  const time = d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  if (d >= today && d < tomorrow) return `היום · ${time}`;
+  if (d >= tomorrow && d < dayAfter) return `מחר · ${time}`;
+  const weekday = d.toLocaleDateString('he-IL', { weekday: 'short' });
+  return `${weekday} · ${time}`;
+}
+
+// D-1 — ConversionFunnelCard removed. Left this anchor for git-blame
+// readers: the component used to live here and drew a four-step
+// funnel (leads → hot → active → signed). The data duplicated the KPI
+// scroller and the "signed deals" row was demotivating for agents
+// still closing their first deal.
