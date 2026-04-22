@@ -75,32 +75,49 @@ if (typeof window !== 'undefined') {
 //      to another input — in which case we leave the page where it is so
 //      the next input doesn't provoke a second hop.
 if (typeof window !== 'undefined') {
+  // Scroll restoration target: when the keyboard closes (or focus
+  // leaves all inputs), we snap the document back here so the user
+  // isn't left mid-form-scroll.
   let preFocusScrollY = null;
-  // Keep --kb-h at 0 — we no longer push fixed elements up when the
-  // keyboard opens (user feedback: "I don't want anything to go up").
-  // Capacitor Keyboard.resize is now "none" so iOS doesn't shrink the
-  // webview either; the keyboard simply overlays the bottom of the
-  // page. Listeners below are no-ops but kept so the plugin doesn't
-  // log "no listener registered" warnings.
-  const setKb = () => {};
+
+  // Actual iOS keyboard height, from the Capacitor Keyboard plugin.
+  // Stays at 0 until the keyboard opens; updated on willShow/didShow
+  // and cleared on hide. We DON'T expose this as --kb-h anymore —
+  // nothing in CSS pushes elements up on keyboard-open (user feedback:
+  // "I don't want anything to go up"). We only use the height below,
+  // in the focusin handler, to decide whether the focused input is
+  // actually covered and needs a minimum-possible document scroll.
+  let kbHeight = 0;
   document.documentElement.style.setProperty('--kb-h', '0px');
 
   // Hook the Capacitor keyboard plugin when available (iPhone app).
   import('@capacitor/core').then(({ Capacitor }) => {
     if (!Capacitor?.isNativePlatform?.()) return;
     import('@capacitor/keyboard').then(({ Keyboard }) => {
-      Keyboard.addListener('keyboardWillShow', (info) => setKb(info.keyboardHeight));
-      Keyboard.addListener('keyboardDidShow',  (info) => setKb(info.keyboardHeight));
-      Keyboard.addListener('keyboardWillHide', () => setKb(0));
-      Keyboard.addListener('keyboardDidHide',  () => setKb(0));
-      // Note: we used to call `Keyboard.setScroll({ isDisabled: true })`
-      // here, intending to suppress the Keyboard plugin's auto-scroll-to-
-      // focused-input assist. But in practice it appears to also gate
-      // user-initiated document scroll in the WKWebView on some iOS
-      // versions — every scroll attempt rubber-banded without actually
-      // moving the page. Removed so iOS handles scroll natively; our
-      // focusin handler already does a more conservative input-into-view
-      // nudge that doesn't need the plugin's help.
+      const nudgeActive = () => {
+        // Re-run the cover check when the keyboard size actually
+        // changes (e.g. suggestion bar expands, split-keyboard). If
+        // the currently-focused input has just been covered, scroll.
+        const el = document.activeElement;
+        if (isTextInput(el)) nudgeIfCovered(el);
+      };
+      Keyboard.addListener('keyboardWillShow', (info) => {
+        kbHeight = info?.keyboardHeight || 0;
+      });
+      Keyboard.addListener('keyboardDidShow', (info) => {
+        kbHeight = info?.keyboardHeight || 0;
+        nudgeActive();
+      });
+      Keyboard.addListener('keyboardWillHide', () => { kbHeight = 0; });
+      Keyboard.addListener('keyboardDidHide', () => {
+        kbHeight = 0;
+        // Restore pre-focus scroll when the keyboard closes, so the
+        // agent isn't left halfway down a form that re-expanded.
+        if (preFocusScrollY != null) {
+          window.scrollTo(0, preFocusScrollY);
+          preFocusScrollY = null;
+        }
+      });
       // Hide the iOS "Previous / Next / Done" accessory bar; it takes
       // extra vertical space and causes cascading re-layouts on inputs.
       Keyboard.setAccessoryBarVisible?.({ isVisible: false }).catch(() => {});
@@ -113,7 +130,6 @@ if (typeof window !== 'undefined') {
     if (tag === 'select') return true;
     if (tag === 'input') {
       const t = (el.getAttribute('type') || 'text').toLowerCase();
-      // `button`/`checkbox`/`submit`/etc. don't open the keyboard — skip.
       return ['text', 'search', 'email', 'tel', 'url', 'password', 'number', 'date', 'datetime-local', 'time', 'month', 'week'].includes(t);
     }
     if (tag === 'textarea') return true;
@@ -121,73 +137,79 @@ if (typeof window !== 'undefined') {
     return false;
   };
 
-  // Scroll just enough to bring the focused input above the keyboard —
-  // NOT centered. Critical for the "feels like a native iPhone app"
-  // metric: use INSTANT scroll, not smooth. WKWebView's smooth-scroll
-  // animation is software-rendered and burns CPU — on every character
-  // the user types we were scheduling a 300ms animated scroll that
-  // read as input lag. Instant scroll is one layout pass, a few ms,
-  // and indistinguishable from native iOS keyboard behaviour.
-  const nudgeIntoView = (el) => {
+  // Only scroll the document when the focused input is ACTUALLY
+  // covered by the keyboard — and scroll the minimum amount needed.
+  // All other page chrome (FABs, headers, tab bars) stays put because
+  // they're position:fixed relative to the viewport, which is
+  // unchanged (Capacitor's Keyboard.resize is "none", so the WebView
+  // itself doesn't resize when the keyboard opens).
+  //
+  // kbHeight is filled in by the Capacitor Keyboard plugin above.
+  // On web (desktop Safari / Chrome / Firefox) we fall back to the
+  // visualViewport API, which shrinks naturally when virtual keyboards
+  // appear — the same math works both places.
+  const nudgeIfCovered = (el) => {
     if (!el) return;
     const vv = window.visualViewport;
     const viewportH = vv?.height ?? window.innerHeight;
+    // On native iOS the WebView stays full-height (resize:none), so
+    // visualViewport.height equals window.innerHeight. We have to
+    // subtract the real keyboard height from the plugin to find the
+    // true visible area.
+    const visibleBottom = viewportH - kbHeight;
     const rect = el.getBoundingClientRect();
     const buffer = 24;
-    if (rect.bottom > viewportH - buffer) {
-      const delta = Math.ceil(rect.bottom - (viewportH - buffer));
-      window.scrollBy(0, delta);            // instant
+    if (rect.bottom > visibleBottom - buffer) {
+      const delta = Math.ceil(rect.bottom - (visibleBottom - buffer));
+      // Instant scroll — smooth-scroll inside WKWebView is a software
+      // animation that reads as input lag. One layout pass.
+      window.scrollBy(0, delta);
     } else if (rect.top < buffer) {
-      window.scrollBy(0, rect.top - buffer); // instant
+      window.scrollBy(0, rect.top - buffer);
     }
+    // If the input was already visible above the keyboard, we do
+    // NOTHING — the screen stays exactly where it was, no jumps.
   };
 
-  // User feedback: "I want the screen to stay in the same place when
-  // I click on an input." iOS WKWebView already scrolls the content
-  // natively when a focused input would be covered by the keyboard —
-  // our JS nudge was doing its own scroll on top of that, which read
-  // as the page "jumping" on tap. Drop the manual focus-scroll
-  // entirely on native iOS. On web keep a very light rAF nudge so
-  // desktop Safari (which doesn't auto-scroll) still works.
-  const isNativeIOS = (() => {
-    try {
-      // Capacitor adds `ios` as the platform and sets navigator.userAgent
-      // with "EstiaApp/..." (per capacitor.config.json). Either check is
-      // fine; prefer the UA check so we don't import Capacitor eagerly.
-      return /EstiaApp\//.test(navigator.userAgent || '');
-    } catch { return false; }
-  })();
-  if (!isNativeIOS) {
-    document.addEventListener('focusin', (e) => {
-      const t = e.target;
-      if (!isTextInput(t)) return;
-      if (preFocusScrollY == null) preFocusScrollY = window.scrollY;
-      requestAnimationFrame(() => nudgeIntoView(t));
-    });
+  document.addEventListener('focusin', (e) => {
+    const t = e.target;
+    if (!isTextInput(t)) return;
+    if (preFocusScrollY == null) preFocusScrollY = window.scrollY;
+    // Run on the next frame so the browser has a chance to register
+    // the focus (layout may shift) before we measure.
+    requestAnimationFrame(() => nudgeIfCovered(t));
+  });
 
-    document.addEventListener('focusout', (e) => {
-      if (!isTextInput(e.target)) return;
-      setTimeout(() => {
-        const active = document.activeElement;
-        if (isTextInput(active)) return;
-        if (preFocusScrollY != null) {
-          window.scrollTo(0, preFocusScrollY);
-          preFocusScrollY = null;
-        }
-      }, 50);
-    });
+  document.addEventListener('focusout', (e) => {
+    if (!isTextInput(e.target)) return;
+    // If focus is moving to another input (tab / next-field), skip —
+    // the new focusin will handle positioning. Only restore when focus
+    // really left all inputs.
+    setTimeout(() => {
+      const active = document.activeElement;
+      if (isTextInput(active)) return;
+      if (preFocusScrollY != null && kbHeight === 0) {
+        // Only restore once the keyboard has actually closed; otherwise
+        // we'd fight the cover-check above.
+        window.scrollTo(0, preFocusScrollY);
+        preFocusScrollY = null;
+      }
+    }, 50);
+  });
 
-    let vvPending = false;
-    window.visualViewport?.addEventListener('resize', () => {
-      if (vvPending) return;
-      vvPending = true;
-      requestAnimationFrame(() => {
-        vvPending = false;
-        const el = document.activeElement;
-        if (isTextInput(el)) nudgeIntoView(el);
-      });
+  // Desktop Safari / mobile web: visualViewport shrinks when a virtual
+  // keyboard opens. Coalesce via rAF so typing doesn't re-trigger the
+  // nudge on every keystroke.
+  let vvPending = false;
+  window.visualViewport?.addEventListener('resize', () => {
+    if (vvPending) return;
+    vvPending = true;
+    requestAnimationFrame(() => {
+      vvPending = false;
+      const el = document.activeElement;
+      if (isTextInput(el)) nudgeIfCovered(el);
     });
-  }
+  });
 
   // Belt-and-suspenders: block multi-touch pinch-zoom + double-tap zoom.
   document.addEventListener('gesturestart', (e) => e.preventDefault());
