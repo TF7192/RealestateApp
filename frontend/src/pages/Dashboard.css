@@ -806,25 +806,36 @@
 .dashboard-grid-rich {
   display: grid;
   gap: 16px;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 900px) {
-  /* Three cards sit side-by-side from 900px onward so תור פעולות /
-     מצב הלידים / פגישות השבוע share the same row without any of
-     them going taller-than-necessary with padding. */
-  .dashboard-grid-rich {
-    grid-template-columns: 1fr 1fr 1fr;
-  }
+  /* Auto-fit: as many equal columns as can fit at 300px minimum each.
+     At narrow widths (mobile, tight desktop) the cards stack; at wide
+     widths all three share a row. The minmax floor of 300px gives
+     מצב הלידים enough space for its bar + 3-chip legend + budget row
+     without wrapping into a tall stack. */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
-/* Pipeline Health */
+/* Pipeline Health — the whole card gets min-width:0 so it can shrink
+   inside the dashboard grid without its segmented bar pushing the
+   card wider than its column. Without this, flex children
+   (.dashboard-grid-rich's 3 equal columns) default to min-content
+   width and the stacked-bar min-widths can force overflow on narrow
+   screens. */
+.dash-pipeline {
+  min-width: 0;
+  overflow: hidden;
+}
 .dash-pipeline-bar {
   display: flex;
   height: 28px;
+  width: 100%;
   background: var(--bg-secondary, rgba(30,26,20,0.04));
   border-radius: 999px;
   overflow: hidden;
   margin: 4px 0 14px;
+  /* Flex row with a hard max so no sum-of-segments overflow can push
+     siblings sideways. */
+  max-width: 100%;
+  min-width: 0;
 }
 .dash-pipeline-empty {
   width: 100%;
@@ -843,7 +854,14 @@
   color: #1e1a14;
   text-decoration: none;
   transition: filter 0.12s ease;
-  min-width: 28px;
+  /* Was min-width:28px which on small lead counts could push the bar
+     wider than its container and spill text out. Use shrinkable
+     defaults — if a segment's count would clip visually we just hide
+     the number via overflow on the parent (.dash-pipeline-bar). */
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .dpb-seg span {
   font-variant-numeric: tabular-nums;
@@ -890,15 +908,28 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--border, rgba(30,26,20,0.08));
   font-size: 13px;
   color: var(--text-muted, #6b6356);
+  /* Keep the label + value on one line without pushing the card
+     sideways on narrow phones. If the amount is huge, truncate the
+     label rather than the number. */
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.dash-pipeline-budget > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dash-pipeline-budget strong {
   font-size: 18px;
   color: var(--text-primary, #1e1a14);
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 /* Action Queue */
