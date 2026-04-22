@@ -231,6 +231,61 @@
 
 .sc-reset:hover { color: var(--text-primary); border-color: var(--gold-border); }
 
+/* C-1 — reset button sits on its own row BELOW the advanced collapsible
+   so it's visually separated from the input fields. */
+.sc-reset-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-block-start: 12px;
+  padding-block-start: 10px;
+  border-block-start: 1px dashed var(--border);
+}
+
+/* C-1 — hide/show toggle for the brokerage + lawyer blocks. Lives in
+   the row header next to the label. aria-pressed="true" when the
+   block is currently hidden. */
+.sc-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block-end: 6px;
+}
+
+.sc-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated, transparent);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+}
+.sc-toggle-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--gold-border);
+}
+.sc-toggle-btn[aria-pressed="true"] {
+  color: var(--text-primary);
+  border-color: var(--gold-border);
+  background: var(--gold-glow, transparent);
+}
+
+.sc-toggle-btn-inline {
+  margin-inline-start: auto;
+}
+
+.sc-agent-total-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-block: 4px;
+  list-style: none;
+}
+
 /* Summary card */
 .sc-error {
   display: inline-flex;

@@ -62,6 +62,14 @@ const INITIAL = {
   lawyerAmount: null,
   lawyerVatIncluded: false,
   additional: null,
+  // C-1 — hide/show flags mirror the desktop so the pure calc contract
+  // behaves identically across viewports. `showAgentTotal` isn't
+  // surfaced in mobile today — the hero card doesn't render an agent
+  // total — but we keep the field here so any future mobile refresh
+  // can adopt it without a state-shape diff.
+  showBrokerage: true,
+  showLawyer: true,
+  showAgentTotal: true,
 };
 
 export default function MobileSellerCalculator() {
@@ -80,6 +88,10 @@ export default function MobileSellerCalculator() {
     lawyerAmount: debounced.lawyerAmount || 0,
     lawyerVatIncluded: debounced.lawyerVatIncluded,
     additional: debounced.additional || 0,
+    // C-1 — contract parity with desktop even though the mobile UI
+    // doesn't currently surface the per-block toggles.
+    includeBrokerage: debounced.showBrokerage,
+    includeLawyer: debounced.showLawyer,
   }), [debounced]);
 
   const isFwd = s.mode === 'forward';
