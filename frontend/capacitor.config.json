@@ -21,7 +21,7 @@
     "backgroundColor": "#f7f3ec"
   },
   "server": {
-    "url": "https://estia.co.il",
+    "url": "https://estia.co.il/login",
     "cleartext": false,
     "androidScheme": "https",
     "iosScheme": "https",

@@ -226,8 +226,34 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       // hand it off via the app's custom URL scheme; the app will then
       // POST to /native-exchange from its own WebView, where the Set-Cookie
       // response _will_ stick.
+      //
+      // Why an HTML bounce instead of `reply.redirect('com.estia.agent://...')`:
+      //   SFSafariViewController (and many mobile Safari builds) does NOT
+      //   follow a server 302 whose Location: header is a non-http(s)
+      //   custom scheme. The user gets a blank page and the app never
+      //   opens. The reliable pattern is to serve 200 HTML that kicks
+      //   the scheme client-side — meta-refresh + setTimeout redirect
+      //   + an explicit fallback link if auto-open is blocked.
       const oneTime = issueNativeCode(user.id);
-      return reply.redirect(`${NATIVE_SCHEME}://auth?code=${encodeURIComponent(oneTime)}`);
+      const target = `${NATIVE_SCHEME}://auth?code=${encodeURIComponent(oneTime)}`;
+      const esc = (s: string) => s.replace(/[&<>"']/g, (c) => (
+        c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : '&#39;'
+      ));
+      const html = `<!DOCTYPE html><html lang="he" dir="rtl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="0;url=${esc(target)}">
+<title>מעביר לאפליקציה…</title>
+<style>body{margin:0;font:16px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:#f7f3ec;color:#1e1a14;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center}a{color:#7a5c2c;font-weight:700}.c{max-width:360px}</style>
+</head><body><div class="c">
+<h2 style="margin:0 0 8px">מעביר אותך לאפליקציה…</h2>
+<p style="margin:0 0 16px;color:#54503e">אם לא עבר תוך שנייה, לחץ/י על הכפתור:</p>
+<p><a href="${esc(target)}" style="display:inline-block;padding:12px 20px;background:#1e1a14;color:#f7f3ec;border-radius:10px;text-decoration:none">פתח את Estia</a></p>
+</div>
+<script>setTimeout(function(){location.href=${JSON.stringify(target)};},50);</script>
+</body></html>`;
+      reply.type('text/html; charset=utf-8');
+      return reply.send(html);
     }
 
     // Web flow (same origin as the WebView): set the JWT cookie directly.
