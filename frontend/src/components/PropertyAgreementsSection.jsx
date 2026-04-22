@@ -119,7 +119,23 @@ export default function PropertyAgreementsSection({ propertyId, leads = [] }) {
     );
   }
 
-  if (signed.length === 0) return null; // stay out of the way when empty
+  if (signed.length === 0) {
+    // Render a lightweight empty state so the feature is discoverable
+    // — previously the whole section was hidden until a signed
+    // prospect existed, which left agents wondering where the
+    // PDF surface was. Keep the chrome minimal so it doesn't
+    // compete with data-bearing cards.
+    return (
+      <section className="pd-agreements pd-agreements-empty" aria-label="הסכמי תיווך" dir="rtl">
+        <header className="pd-agr-head">
+          <h3><FileText size={16} aria-hidden /> הסכמי תיווך</h3>
+        </header>
+        <p className="pd-agr-empty-hint">
+          לאחר שמתעניין חותם על הסכם תיווך דרך הקישור הדיגיטלי, ה-PDF שלו יופיע כאן.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="pd-agreements animate-in animate-in-delay-3" aria-label="הסכמי תיווך" dir="rtl">

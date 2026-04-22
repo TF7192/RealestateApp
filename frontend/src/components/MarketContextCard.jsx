@@ -41,18 +41,22 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
   // On mount + on kind switch: fetch the cached row (no live call).
   useEffect(() => {
     if (!propertyId) return;
-    if (byKind[kind]?.data || byKind[kind]?.loading) return;
+    // Track a `loaded` flag rather than keying off `data` — 204/no-cache
+    // responses legitimately come back null, and checking `data` falsiness
+    // put the component into an infinite fetch loop that kept the card
+    // permanently stuck on "טוען…" even before the agent hit משוך נתונים.
+    if (byKind[kind]?.loaded || byKind[kind]?.loading) return;
     let cancelled = false;
     setKindState(kind, { loading: true, error: null });
     (async () => {
       try {
         const res = await api.marketContextGet(propertyId, kind);
         if (cancelled) return;
-        // 204 → res is empty/undefined; treat as "no cache yet"
-        setKindState(kind, { loading: false, data: res || null });
+        // 204 → res is empty/undefined; treat as "no cache yet".
+        setKindState(kind, { loading: false, loaded: true, data: res || null });
       } catch (e) {
         if (cancelled) return;
-        setKindState(kind, { loading: false, error: e?.message || 'שגיאה' });
+        setKindState(kind, { loading: false, loaded: true, error: e?.message || 'שגיאה' });
       }
     })();
     return () => { cancelled = true; };

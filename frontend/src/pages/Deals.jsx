@@ -19,6 +19,11 @@ import { useViewMode } from '../lib/useViewMode';
 import { runMutation } from '../lib/mutations';
 import { useToast } from '../lib/toast';
 import './Deals.css';
+// The create-deal modal reuses the `.agreement-backdrop` / `.agreement-modal`
+// classes from AgreementDialog. Without this CSS import the dialog
+// rendered as an inline div on the page instead of a fixed-position
+// modal with a backdrop.
+import '../components/AgreementDialog.css';
 
 const STATUS_OPTIONS = [
   { key: 'NEGOTIATING', label: 'משא ומתן' },
