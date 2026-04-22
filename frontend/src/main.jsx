@@ -121,8 +121,12 @@ if (typeof window !== 'undefined') {
   };
 
   // Scroll just enough to bring the focused input above the keyboard —
-  // NOT centered. Centering drags the page up unnecessarily and is the
-  // main cause of the "page jumps on focus" complaint.
+  // NOT centered. Critical for the "feels like a native iPhone app"
+  // metric: use INSTANT scroll, not smooth. WKWebView's smooth-scroll
+  // animation is software-rendered and burns CPU — on every character
+  // the user types we were scheduling a 300ms animated scroll that
+  // read as input lag. Instant scroll is one layout pass, a few ms,
+  // and indistinguishable from native iOS keyboard behaviour.
   const nudgeIntoView = (el) => {
     if (!el) return;
     const vv = window.visualViewport;
@@ -131,46 +135,52 @@ if (typeof window !== 'undefined') {
     const buffer = 24;
     if (rect.bottom > viewportH - buffer) {
       const delta = Math.ceil(rect.bottom - (viewportH - buffer));
-      window.scrollBy({ top: delta, behavior: 'smooth' });
+      window.scrollBy(0, delta);            // instant
     } else if (rect.top < buffer) {
-      window.scrollBy({ top: rect.top - buffer, behavior: 'smooth' });
+      window.scrollBy(0, rect.top - buffer); // instant
     }
-    // If the field was ALREADY visible, do nothing — page stays put.
   };
 
   document.addEventListener('focusin', (e) => {
     const t = e.target;
     if (!isTextInput(t)) return;
-    // Capture the pre-focus scroll position once per focus "session" —
-    // moving between several inputs keeps the first snapshot so a
-    // subsequent blur restores to the true original position.
     if (preFocusScrollY == null) preFocusScrollY = window.scrollY;
-    // Wait for the keyboard animation to complete before measuring.
-    setTimeout(() => nudgeIntoView(t), 320);
+    // Was: setTimeout(..., 320). That 320ms gap between tap and any
+    // visible response was the main "inputs feel laggy" complaint.
+    // The visualViewport.resize listener below catches the keyboard
+    // slide-up precisely when it ends, so there's no need to guess a
+    // delay. The rAF just lets this focus frame paint first.
+    requestAnimationFrame(() => nudgeIntoView(t));
   });
 
   document.addEventListener('focusout', (e) => {
     if (!isTextInput(e.target)) return;
-    // Focus could be moving to ANOTHER input (e.g. tab/next-field). In
-    // that case we don't restore — the next focusin will handle things.
-    // We check on the next tick because focusin for the new target fires
-    // after this focusout.
+    // Focus could be moving to another input (tab/next-field). In
+    // that case we don't restore — the next focusin handles things.
+    // We check on the next tick because focusin for the new target
+    // fires after this focusout.
     setTimeout(() => {
       const active = document.activeElement;
       if (isTextInput(active)) return;
       if (preFocusScrollY != null) {
-        window.scrollTo({ top: preFocusScrollY, behavior: 'smooth' });
+        window.scrollTo(0, preFocusScrollY);  // instant restore
         preFocusScrollY = null;
       }
     }, 50);
   });
 
-  // Visual-viewport resize fires when the keyboard slides up or down.
-  // Only nudge if the active input is now hidden — we no longer call
-  // scrollIntoView on every resize (which was the old "page hops" bug).
+  // Visual-viewport resize fires repeatedly while the keyboard slides
+  // up/down. Debounce via rAF so we do at most one nudge per frame
+  // (was one per resize event → layout thrash on ProMotion).
+  let vvPending = false;
   window.visualViewport?.addEventListener('resize', () => {
-    const el = document.activeElement;
-    if (isTextInput(el)) nudgeIntoView(el);
+    if (vvPending) return;
+    vvPending = true;
+    requestAnimationFrame(() => {
+      vvPending = false;
+      const el = document.activeElement;
+      if (isTextInput(el)) nudgeIntoView(el);
+    });
   });
 
   // Belt-and-suspenders: block multi-touch pinch-zoom + double-tap zoom.

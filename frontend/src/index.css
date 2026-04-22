@@ -592,8 +592,20 @@ a:hover {
   color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 14px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  /* Sub-100ms focus transition so the border+ring land visibly the
+     same frame the keyboard slides up. 200ms looked intentional on
+     desktop but read as "input didn't respond" on mobile touch. */
+  transition: border-color 0.1s ease, box-shadow 0.1s ease;
   direction: rtl;
+}
+/* Native iOS + Android: skip the transition entirely; the "feels
+   laggy" signature at 120Hz is ANY non-instant paint on tap. */
+@media (pointer: coarse) {
+  .form-input,
+  .form-select,
+  .form-textarea {
+    transition: none;
+  }
 }
 
 .form-input:focus,
