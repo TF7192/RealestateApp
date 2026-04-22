@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { tryServiceTokenAuth } from '../middleware/service-token.js';
 import { track as phTrack } from '../lib/analytics.js';
 import { evaluateLeadProperty } from '../lib/matching.js';
 import { logActivity } from '../lib/activity.js';
@@ -248,7 +249,7 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
     return { lead };
   });
 
-  app.post('/', { onRequest: [app.requireAgent] }, async (req) => {
+  app.post('/', { onRequest: [tryServiceTokenAuth, app.requireAgent] }, async (req) => {
     const body = leadInput.parse(req.body);
     const agentId = requireUser(req).id;
     const created = await prisma.lead.create({

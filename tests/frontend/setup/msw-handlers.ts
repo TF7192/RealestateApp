@@ -108,6 +108,25 @@ export const defaultHandlers = [
     HttpResponse.json({ limit: 3, remaining: 3, used: 0, resetAt: null, msUntilReset: 0 })
   ),
 
+  // Voice-to-lead AI — default handler returns a created lead so component
+  // tests render the success path. Tests exercising draft mode override
+  // with server.use(http.post('/api/ai/voice-lead', … mode: 'draft' …)).
+  http.post('/api/ai/voice-lead', ({ request }) => {
+    const url = new URL(request.url);
+    const kind = (url.searchParams.get('kind') || 'LEAD').toUpperCase();
+    return HttpResponse.json({
+      transcript: 'לקוח חדש שמחפש דירה של 4 חדרים בתל אביב',
+      extracted: kind === 'PROPERTY'
+        ? { street: 'הרצל 10', city: 'תל אביב', rooms: 4 }
+        : { name: 'דן לוי', phone: '050-1234567', interestType: 'PRIVATE', lookingFor: 'BUY', city: 'תל אביב' },
+      created: kind === 'PROPERTY'
+        ? { id: 'prop-voice-1', street: 'הרצל 10', city: 'תל אביב' }
+        : { id: 'lead-voice-1', name: 'דן לוי', agentId: DEMO_AGENT.id },
+      mode: 'created',
+      traceId: 'trace-msw-1',
+    });
+  }),
+
   // Calendar integration
   http.get('/api/integrations/calendar/status', () =>
     HttpResponse.json({ connected: false, expiresAt: null, configured: false })

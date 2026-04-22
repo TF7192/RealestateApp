@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import { requireUser } from '../middleware/auth.js';
+import { tryServiceTokenAuth } from '../middleware/service-token.js';
 import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
 import { track as phTrack } from '../lib/analytics.js';
@@ -276,7 +277,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     return created.id;
   }
 
-  app.post('/', { onRequest: [app.requireAgent] }, async (req) => {
+  app.post('/', { onRequest: [tryServiceTokenAuth, app.requireAgent] }, async (req) => {
     const body = propertyInput.parse(req.body);
     const agentId = requireUser(req).id;
     const data = normalize(body);
