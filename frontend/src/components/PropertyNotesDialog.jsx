@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, Save, StickyNote, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
+import Portal from './Portal';
 import './PropertyNotesDialog.css';
 
 // Floating notes editor for a property card. Opens over the list with
@@ -24,19 +25,33 @@ export default function PropertyNotesDialog({ property, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const textareaRef = useRef(null);
 
-  // Autofocus the textarea on open. Use a tick so the modal's fade-in
-  // animation doesn't fight the caret placement.
+  // Autofocus the textarea on open. `preventScroll: true` stops the
+  // browser from scrolling the page to bring the newly-focused field
+  // into view — which was happening because the dialog mounts inside
+  // the properties grid (even though visually it's centered), so
+  // focusing it re-centered the whole page around wherever the card
+  // the agent clicked was rendered. Using Portal below also renders
+  // the dialog at body root, so this belt-and-suspenders change is
+  // defensive against older browsers that ignore preventScroll.
   useEffect(() => {
     const t = setTimeout(() => {
       const el = textareaRef.current;
       if (!el) return;
-      el.focus();
-      // Place the caret at the end of the existing notes so the agent
-      // can keep typing rather than overwrite their prior note.
+      try { el.focus({ preventScroll: true }); }
+      catch { el.focus(); /* Safari < 17 ignores the options object */ }
       const len = el.value.length;
       try { el.setSelectionRange(len, len); } catch { /* ignore */ }
     }, 40);
     return () => clearTimeout(t);
+  }, []);
+
+  // Lock body scroll while the dialog is open — mirrors the OwnerEditDialog
+  // behavior. Without this, a tall page behind the fixed backdrop could
+  // still scroll under the modal.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
   }, []);
 
   // Escape closes. Cmd/Ctrl+Enter saves — matches the pattern agents
@@ -72,6 +87,7 @@ export default function PropertyNotesDialog({ property, onClose, onSaved }) {
   const dirty = (value || '') !== (property?.notes || '');
 
   return (
+    <Portal>
     <div
       className="pnd-backdrop"
       role="presentation"
@@ -138,5 +154,6 @@ export default function PropertyNotesDialog({ property, onClose, onSaved }) {
         </footer>
       </div>
     </div>
+    </Portal>
   );
 }
