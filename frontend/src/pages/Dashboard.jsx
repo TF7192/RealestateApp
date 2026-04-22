@@ -141,15 +141,9 @@ export default function Dashboard() {
   const ownersTotal = owners.length;
   const ownersActive = owners.filter((o) => (o.propertyCount || 0) > 0).length;
 
-  const hotLeads = leads.filter((l) => l.status === 'HOT').slice(0, 6);
-
-  // Marketing progress — only count actions on the user's own properties
-  const actions = properties.flatMap((p) =>
-    Object.values(p.marketingActions || {})
-  );
-  const completedActions = actions.filter(Boolean).length;
-  const totalActions = actions.length;
-  const progressPct = totalActions ? Math.round((completedActions / totalActions) * 100) : 0;
+  // Note: hot-leads-list and marketing-progress card were removed in
+  // favor of the richer 3-card grid (PipelineHealthCard, ActionQueueCard,
+  // ConversionFunnelCard). See lower in the file.
 
   const stats = [
     {
@@ -306,112 +300,18 @@ export default function Dashboard() {
           </div>
         </div>
       ) : (
-        <div className="dashboard-grid">
-          {/* Marketing progress — agent's own properties */}
-          <div className="card dashboard-card animate-in animate-in-delay-3">
-            <div className="card-header">
-              <h3>{t('marketingProgress')}</h3>
-              <span className="badge badge-gold">
-                {progressPct}%
-              </span>
-            </div>
-            <div className="marketing-progress">
-              <div className="progress-bar">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-              <span className="progress-text">
-                {t('marketingProgressFormat', { done: completedActions, total: totalActions })}
-              </span>
-            </div>
-
-            <div className="property-progress-list">
-              {properties.slice(0, 4).map((prop) => {
-                const acts = Object.values(prop.marketingActions || {});
-                const done = acts.filter(Boolean).length;
-                const total = acts.length || 1;
-                const pct = Math.round((done / total) * 100);
-                const updatedTs = prop.updatedAt || prop.createdAt;
-                const rel = updatedTs ? relativeDate(updatedTs) : null;
-                return (
-                  <Link
-                    key={prop.id}
-                    to={`/properties/${prop.id}?panel=marketing`}
-                    className="property-progress-item"
-                    onClick={() => haptics.tap()}
-                  >
-                    <div className="ppi-info">
-                      <span className="ppi-name">
-                        {prop.street}, {prop.city}
-                      </span>
-                      <span className="ppi-pct">{pct}%</span>
-                    </div>
-                    <div className="progress-bar small">
-                      <div className="progress-fill" style={{ width: `${pct}%` }} />
-                    </div>
-                    {rel && (
-                      <span className={`ppi-updated rel-${rel.severity}`}>
-                        {t('marketingUpdated', { label: rel.label })}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-              {properties.length === 0 && (
-                <div className="de-inline">{t('propertiesEmpty')}<Link to="/properties/new">{t('propertiesEmptyCta')}</Link></div>
-              )}
-            </div>
-          </div>
-
-          {/* Hot leads — pulled from the agent's own leads */}
-          <div className="card dashboard-card animate-in animate-in-delay-5">
-            <div className="card-header">
-              <h3>{t('hotLeadsTitle')}</h3>
-              <Link to="/customers" className="btn btn-ghost btn-sm">
-                {t('hotLeadsAll')}
-                <ArrowUpLeft size={14} />
-              </Link>
-            </div>
-            <div className="hot-leads-list">
-              {hotLeads.map((lead) => {
-                const lastTs = lead.lastContact || lead.updatedAt || lead.createdAt;
-                const rel = lastTs ? relativeDate(lastTs) : null;
-                return (
-                  <Link
-                    key={lead.id}
-                    to={`/customers?selected=${lead.id}`}
-                    className="hot-lead-item"
-                    onClick={() => haptics.tap()}
-                  >
-                    <div className="lead-avatar hot">
-                      {lead.name.charAt(0)}
-                    </div>
-                    <div className="lead-info">
-                      <span className="lead-name">{lead.name}</span>
-                      <span className="lead-details">
-                        {[lead.city, lead.rooms ? t('roomsFormat', { count: lead.rooms }) : null, lead.priceRangeLabel]
-                          .filter(Boolean).join(' · ')}
-                      </span>
-                      {rel && (
-                        <span className={`lead-last rel-${rel.severity}`}>
-                          {t('hotLeadsLastContact', { label: rel.label })}
-                        </span>
-                      )}
-                    </div>
-                    <Flame size={16} className="lead-flame" />
-                  </Link>
-                );
-              })}
-              {hotLeads.length === 0 && (
-                <div className="de-inline">
-                  {t('hotLeadsEmpty')}
-                  <Link to="/customers/new">{t('hotLeadsEmptyCta')}</Link>
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="dashboard-grid dashboard-grid-rich">
+          <PipelineHealthCard leads={leads} dealStats={dealStats} />
+          <ActionQueueCard
+            leads={leads}
+            properties={properties}
+            staleThresholdDays={staleThresholdDays}
+          />
+          <ConversionFunnelCard
+            leads={leads}
+            properties={properties}
+            dealStats={dealStats}
+          />
         </div>
       )}
       </div>
@@ -687,5 +587,204 @@ function WelcomeSection() {
         />
       )}
     </>
+  );
+}
+
+// ── Pipeline Health ──────────────────────────────────────────────
+// Distribution of leads across HOT / WARM / COLD as a horizontal
+// stacked bar. Each segment is a clickable Link that opens the
+// customers list pre-filtered to that status. Below the bar: 3 mini
+// stat tiles + the total pipeline value (sum of lead.budget).
+function PipelineHealthCard({ leads = [] }) {
+  const buckets = leads.reduce(
+    (acc, l) => {
+      const k = l.status === 'HOT' ? 'hot' : l.status === 'WARM' ? 'warm' : 'cold';
+      acc[k] += 1;
+      acc.budget += Number(l.budget) || 0;
+      return acc;
+    },
+    { hot: 0, warm: 0, cold: 0, budget: 0 },
+  );
+  const total = buckets.hot + buckets.warm + buckets.cold;
+  const pct = (n) => (total ? (n / total) * 100 : 0);
+  const fmtBudget = (n) => {
+    if (!n) return '—';
+    if (n >= 1_000_000) return `₪${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `₪${Math.round(n / 1_000)}K`;
+    return `₪${n.toLocaleString('he-IL')}`;
+  };
+
+  return (
+    <div className="card dashboard-card dash-pipeline animate-in animate-in-delay-3">
+      <div className="card-header">
+        <h3>מצב הלידים</h3>
+        <span className="badge badge-gold">{total} סה״כ</span>
+      </div>
+      <div className="dash-pipeline-bar" role="img" aria-label={`${buckets.hot} חמים, ${buckets.warm} פושרים, ${buckets.cold} קרים`}>
+        {total === 0 && <div className="dash-pipeline-empty">—</div>}
+        {buckets.hot > 0 && (
+          <Link to="/customers?filter=hot" className="dpb-seg dpb-hot" style={{ width: `${pct(buckets.hot)}%` }} title={`${buckets.hot} לידים חמים`}>
+            <span>{buckets.hot}</span>
+          </Link>
+        )}
+        {buckets.warm > 0 && (
+          <Link to="/customers?filter=warm" className="dpb-seg dpb-warm" style={{ width: `${pct(buckets.warm)}%` }} title={`${buckets.warm} פושרים`}>
+            <span>{buckets.warm}</span>
+          </Link>
+        )}
+        {buckets.cold > 0 && (
+          <Link to="/customers?filter=cold" className="dpb-seg dpb-cold" style={{ width: `${pct(buckets.cold)}%` }} title={`${buckets.cold} קרים`}>
+            <span>{buckets.cold}</span>
+          </Link>
+        )}
+      </div>
+      <div className="dash-pipeline-legend">
+        <Link to="/customers?filter=hot" className="dpl-item">
+          <span className="dpl-dot dpl-hot" /> חמים <strong>{buckets.hot}</strong>
+        </Link>
+        <Link to="/customers?filter=warm" className="dpl-item">
+          <span className="dpl-dot dpl-warm" /> פושרים <strong>{buckets.warm}</strong>
+        </Link>
+        <Link to="/customers?filter=cold" className="dpl-item">
+          <span className="dpl-dot dpl-cold" /> קרים <strong>{buckets.cold}</strong>
+        </Link>
+      </div>
+      <div className="dash-pipeline-budget">
+        <span>שווי צנרת לידים</span>
+        <strong>{fmtBudget(buckets.budget)}</strong>
+      </div>
+    </div>
+  );
+}
+
+// ── Action Queue ─────────────────────────────────────────────────
+// Mixed list of properties and leads needing the agent's attention,
+// sorted by urgency. Surfaces:
+//   - Properties with marketing < 30%
+//   - Leads with no contact in the last `staleThresholdDays` days
+//   - Properties with no marketing actions completed at all
+// Capped at 6 rows; click takes the agent straight to the detail page.
+function ActionQueueCard({ leads = [], properties = [], staleThresholdDays = 30 }) {
+  const now = Date.now();
+  const items = [];
+
+  // Stale leads — needs follow-up
+  for (const l of leads) {
+    if (l.status === 'COLD') continue;
+    if (!l.lastContact) continue;
+    const days = (now - new Date(l.lastContact).getTime()) / 86400000;
+    if (days >= staleThresholdDays) {
+      items.push({
+        kind: 'stale-lead',
+        id: l.id,
+        score: days,
+        title: l.name,
+        hint: `ללא מגע כבר ${Math.floor(days)} ימים`,
+        to: `/customers?selected=${l.id}`,
+        Icon: Clock3,
+        tone: 'warn',
+      });
+    }
+  }
+
+  // Properties with low marketing %
+  for (const p of properties) {
+    const acts = Object.values(p.marketingActions || {});
+    if (acts.length === 0) continue;
+    const done = acts.filter(Boolean).length;
+    const pct = Math.round((done / acts.length) * 100);
+    if (pct < 30) {
+      items.push({
+        kind: 'low-marketing',
+        id: p.id,
+        score: 100 - pct,
+        title: `${p.street}, ${p.city}`,
+        hint: `שיווק ${pct}% — נדרש דחיפה`,
+        to: `/properties/${p.id}?panel=marketing`,
+        Icon: Sparkles,
+        tone: 'info',
+      });
+    }
+  }
+
+  items.sort((a, b) => b.score - a.score);
+  const visible = items.slice(0, 6);
+
+  return (
+    <div className="card dashboard-card dash-action-queue animate-in animate-in-delay-4">
+      <div className="card-header">
+        <h3>תור פעולות</h3>
+        <span className="badge badge-gold">{items.length}</span>
+      </div>
+      {visible.length === 0 ? (
+        <div className="de-inline">
+          הכל מסודר ✦ אין פעולות דחופות
+        </div>
+      ) : (
+        <div className="dash-aq-list">
+          {visible.map((it) => (
+            <Link
+              key={`${it.kind}-${it.id}`}
+              to={it.to}
+              className={`dash-aq-row dash-aq-${it.tone}`}
+              onClick={() => haptics.tap()}
+            >
+              <span className="dash-aq-icon" aria-hidden="true"><it.Icon size={16} /></span>
+              <div className="dash-aq-info">
+                <strong>{it.title}</strong>
+                <span>{it.hint}</span>
+              </div>
+              <ArrowUpLeft size={14} aria-hidden="true" />
+            </Link>
+          ))}
+        </div>
+      )}
+      {items.length > visible.length && (
+        <div className="dash-aq-more">+{items.length - visible.length} נוספות</div>
+      )}
+    </div>
+  );
+}
+
+// ── Conversion Funnel ────────────────────────────────────────────
+// Three-step funnel: Leads → Hot leads → Signed deals. Visualizes
+// drop-off ratios so the agent sees where the pipeline is leaking.
+// Counts come from in-memory data already loaded.
+function ConversionFunnelCard({ leads = [], properties = [], dealStats = {} }) {
+  const steps = [
+    { key: 'leads', label: 'לידים', count: leads.length, to: '/customers' },
+    { key: 'hot',   label: 'חמים',  count: leads.filter((l) => l.status === 'HOT').length, to: '/customers?filter=hot' },
+    { key: 'props', label: 'נכסים פעילים', count: properties.length, to: '/properties' },
+    { key: 'deals', label: 'עסקאות חתומות', count: dealStats.signed || 0, to: '/deals?tab=signed' },
+  ];
+  const max = Math.max(1, ...steps.map((s) => s.count));
+  return (
+    <div className="card dashboard-card dash-funnel animate-in animate-in-delay-5">
+      <div className="card-header">
+        <h3>משפך המרה</h3>
+        <span className="badge">המרה {leads.length ? Math.round(((dealStats.signed || 0) / leads.length) * 100) : 0}%</span>
+      </div>
+      <div className="dash-funnel-list">
+        {steps.map((s, i) => {
+          const pct = (s.count / max) * 100;
+          const prev = i > 0 ? steps[i - 1].count : null;
+          const conv = prev ? Math.round((s.count / prev) * 100) : null;
+          return (
+            <Link key={s.key} to={s.to} className="dash-funnel-row" onClick={() => haptics.tap()}>
+              <div className="dash-funnel-meta">
+                <span className="dash-funnel-label">{s.label}</span>
+                <span className="dash-funnel-count">
+                  <strong>{s.count}</strong>
+                  {conv != null && <em className={`dash-funnel-conv ${conv >= 30 ? 'good' : conv >= 10 ? 'mid' : 'low'}`}>{conv}%</em>}
+                </span>
+              </div>
+              <div className="dash-funnel-bar">
+                <div className="dash-funnel-bar-fill" style={{ width: `${pct}%` }} />
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
   );
 }
