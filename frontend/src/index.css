@@ -375,32 +375,15 @@ button, a, [role="button"] {
   100% { background-position: 200% 0; }
 }
 
-/* iOS keyboard — while it's open, reserve extra space at the bottom of
-   scrollable areas so focused inputs never hide behind it. --kb-h is set by
-   main.jsx via the Capacitor Keyboard plugin. */
+/* iOS keyboard — the previous rules shifted every sticky FAB, tab
+   bar, and content edge up by the keyboard's height via --kb-h. User
+   feedback was "I don't want anything to go up when the keyboard
+   opens." Capacitor now runs with Keyboard.resize:"none", so iOS
+   doesn't shrink the WebView viewport; combined with the no-op
+   rules below, the keyboard simply overlays the bottom of the page.
+   Kept the --kb-h CSS variable at 0 so any stragglers that reference
+   it don't break. */
 :root { --kb-h: 0px; }
-
-body.kb-open {
-  /* VisualViewport-based scroll padding for any scrollable containers */
-  scroll-padding-bottom: calc(var(--kb-h) + 60px);
-}
-
-body.kb-open .main-content {
-  padding-bottom: calc(var(--kb-h) + env(safe-area-inset-bottom) + 24px) !important;
-}
-
-body.kb-open .mtb { display: none; }
-
-/* Login page — the form panel needs to scroll on its own when the keyboard
-   opens; otherwise the fixed-height flex container traps the inputs. */
-body.kb-open .login-page { height: auto; min-height: 100vh; }
-body.kb-open .login-container {
-  min-height: auto;
-  max-height: none;
-}
-body.kb-open .login-form-panel {
-  padding-bottom: calc(var(--kb-h) + 32px) !important;
-}
 
 /* Every input/textarea gets a scroll margin so scrollIntoView keeps it above
    the keyboard edge */

@@ -75,14 +75,15 @@ if (typeof window !== 'undefined') {
 //      to another input — in which case we leave the page where it is so
 //      the next input doesn't provoke a second hop.
 if (typeof window !== 'undefined') {
-  let kbHeight = 0;
   let preFocusScrollY = null;
-  const setKb = (h) => {
-    kbHeight = h || 0;
-    document.documentElement.style.setProperty('--kb-h', `${kbHeight}px`);
-    document.body.classList.toggle('kb-open', kbHeight > 0);
-  };
-  setKb(0);
+  // Keep --kb-h at 0 — we no longer push fixed elements up when the
+  // keyboard opens (user feedback: "I don't want anything to go up").
+  // Capacitor Keyboard.resize is now "none" so iOS doesn't shrink the
+  // webview either; the keyboard simply overlays the bottom of the
+  // page. Listeners below are no-ops but kept so the plugin doesn't
+  // log "no listener registered" warnings.
+  const setKb = () => {};
+  document.documentElement.style.setProperty('--kb-h', '0px');
 
   // Hook the Capacitor keyboard plugin when available (iPhone app).
   import('@capacitor/core').then(({ Capacitor }) => {
