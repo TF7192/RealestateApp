@@ -401,14 +401,19 @@
   transition: background 0.25s, color 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.25s;
 }
 
+/* A-3 — the Google button was pure white, which disappeared visually on
+   the light-theme card surface (also pale). A subtle off-white keeps
+   the Google wordmark/logo feeling "native" while giving the button a
+   clearly separated silhouette on both dark and light themes. Border
+   nudged darker for the same reason (was tuned for dark-surface only). */
 .auth-method-btn.google {
-  background: #fff;
+  background: #fafafa;
   color: #333;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
 .auth-method-btn.google:hover {
-  background: #f5f5f5;
+  background: #f0f0f0;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
