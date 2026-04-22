@@ -825,11 +825,21 @@
   overflow: hidden;
 }
 
-/* The card body has no wrapping padded container, so the bar / legend /
- * budget rows go edge-to-edge. Give each one the same horizontal padding
- * as the card header so the bar doesn't kiss the card rim and the
- * "0 ₪" value has visual breathing room from the inline-start edge. */
-.dash-pipeline > .dash-pipeline-bar,
+/* The card body has no wrapping padded container, so the text rows
+ * (legend + budget) need horizontal padding to breathe. The stacked
+ * progress bar, however, looks intentional only when it runs
+ * edge-to-edge — insetting it made the card feel half-built. So:
+ * bar stays full-width, text rows get the same 20px side padding as
+ * the card header so the "0 ₪" value isn't glued to the card rim.
+ *
+ * Add an outer margin on the bar so it's not touching the legend
+ * pill dots either. */
+.dash-pipeline > .dash-pipeline-bar {
+  /* Nudge the bar away from the card edge only slightly — 6px keeps
+   * the rounded ends from clipping on the card's border-radius while
+   * still reading as a full-width bar. */
+  margin-inline: 6px;
+}
 .dash-pipeline > .dash-pipeline-legend,
 .dash-pipeline > .dash-pipeline-budget {
   padding-inline: 20px;
