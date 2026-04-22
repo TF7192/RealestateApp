@@ -417,6 +417,19 @@
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* Sign in with Apple — iOS only. Apple's branding guidelines require
+   the button to match native SIWA styling: solid black pill, white
+   foreground, same corner radius as the other auth methods. */
+.auth-method-btn.apple {
+  background: #000000;
+  color: #ffffff;
+  border: 1px solid #000000;
+}
+.auth-method-btn.apple:hover {
+  background: #1a1a1a;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
 .auth-method-btn.phone-btn {
   border: 1px solid var(--border-light);
   color: var(--text-primary);

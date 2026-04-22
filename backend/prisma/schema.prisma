@@ -22,6 +22,7 @@ enum UserRole {
 enum AuthProvider {
   EMAIL
   GOOGLE
+  APPLE
 }
 
 enum AssetClass {
@@ -284,6 +285,7 @@ model User {
   role                  UserRole
   provider              AuthProvider @default(EMAIL)
   googleId              String?      @unique
+  appleId               String?      @unique
   displayName           String
   // Public, SEO-friendly identifier — used in /agents/<slug> URLs.
   slug                  String?      @unique

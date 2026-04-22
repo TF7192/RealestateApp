@@ -11,6 +11,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerGoogleOAuthRoutes } from './routes/oauth-google.js';
+import { registerAppleOAuthRoutes } from './routes/oauth-apple.js';
 import { registerPropertyRoutes } from './routes/properties.js';
 import { registerLeadRoutes } from './routes/leads.js';
 import { registerDealRoutes } from './routes/deals.js';
@@ -213,6 +214,7 @@ export async function build() {
 
   await app.register(registerAuthRoutes, { prefix: '/api/auth' });
   await app.register(registerGoogleOAuthRoutes, { prefix: '/api/auth' });
+  await app.register(registerAppleOAuthRoutes, { prefix: '/api/auth' });
   await app.register(registerMeRoutes, { prefix: '/api/me' });
   await app.register(registerPropertyRoutes, { prefix: '/api/properties' });
   await app.register(registerLeadRoutes, { prefix: '/api/leads' });

@@ -175,6 +175,12 @@ export const api = {
   googleMock: (body) => request('/auth/google/mock', { method: 'POST', body }),
   googleNativeExchange: (code) =>
     request('/auth/google/native-exchange', { method: 'POST', body: { code } }),
+  // Sign in with Apple — native-only. The iOS app calls
+  // AuthenticationServices via the @capacitor-community/apple-sign-in
+  // plugin and forwards the resulting payload here; the backend
+  // verifies Apple's identityToken JWT and sets the session cookie.
+  appleNativeExchange: (payload) =>
+    request('/auth/apple/native-exchange', { method: 'POST', body: payload }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   // A-1 — soft-deletes the authenticated agent's account. Server sets
   // `deletedAt = NOW()` and clears the session cookie. UI presents this

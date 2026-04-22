@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LogIn, Building2, Mail, Lock, ArrowLeft, UserPlus } from 'lucide-react';
+import { LogIn, Building2, Mail, Lock, ArrowLeft, UserPlus, Apple } from 'lucide-react';
 import { useAuth } from '../lib/auth';
-import { isNative } from '../native/platform';
+import { isNative, isIOS } from '../native/platform';
 import { Browser } from '@capacitor/browser';
+import api from '../lib/api';
 import './Login.css';
 
 const AGENT_IMG = 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=900&q=80';
@@ -74,6 +75,39 @@ export default function Login() {
     const onLogin = window.location.pathname === '/login';
     const redirect = (onLogin || window.location.pathname === '/') ? '/dashboard' : here;
     window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirect)}`;
+  };
+
+  // Sign in with Apple — required by App Store Guideline 4.8 when the
+  // app offers a third-party login service (we offer Google). iOS-only;
+  // we don't render the button on web/Android. The plugin presents
+  // Apple's native sheet; the backend verifies the identity token.
+  const handleApple = async () => {
+    if (!isIOS()) return;
+    try {
+      setError('');
+      const { SignInWithApple } = await import('@capacitor-community/apple-sign-in');
+      const res = await SignInWithApple.authorize({
+        clientId: 'com.estia.agent',
+        redirectURI: 'https://estia.co.il/api/auth/apple/native-exchange',
+        scopes: 'email name',
+        state: Math.random().toString(36).slice(2),
+      });
+      const r = res?.response || {};
+      await api.appleNativeExchange({
+        identityToken: r.identityToken,
+        user: r.user,
+        email: r.email,
+        givenName: r.givenName,
+        familyName: r.familyName,
+      });
+      window.location.href = '/dashboard';
+    } catch (err) {
+      // User-cancel codes vary by iOS version — .code / .error / string
+      // that includes 'canceled'. Don't show a scary error for those.
+      const msg = String(err?.message || err || '');
+      if (/cancel/i.test(msg) || err?.code === '1001') return;
+      setError(err?.message || t('errors.loginFailed'));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -153,6 +187,12 @@ export default function Login() {
 
           {!flow && (
             <div className="auth-methods">
+              {isIOS() && (
+                <button className="auth-method-btn apple" onClick={handleApple} type="button">
+                  <Apple size={20} aria-hidden="true" fill="currentColor" />
+                  <span>כניסה עם Apple</span>
+                </button>
+              )}
               <button className="auth-method-btn google" onClick={handleGoogle}>
                 <svg width="20" height="20" viewBox="0 0 48 48">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
