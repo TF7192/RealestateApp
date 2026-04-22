@@ -15,6 +15,8 @@ import { useToast } from '../lib/toast';
 import { telUrl } from '../lib/waLink';
 import { openWhatsApp } from '../native/share';
 import { relativeDate } from '../lib/relativeDate';
+import Pagination from '../components/Pagination';
+import { paginate } from '../lib/pagination';
 import haptics from '../lib/haptics';
 import ViewToggle from '../components/ViewToggle';
 import DataTable from '../components/DataTable';
@@ -103,6 +105,11 @@ export default function Owners() {
         (o.email || '').toLowerCase().includes(s),
     );
   }, [owners, search]);
+
+  // Client-side pagination at 8/page. Reset when the search narrows.
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [search]);
+  const paged = useMemo(() => paginate(filtered, { page, pageSize: 8 }), [filtered, page]);
 
   const onSaved = async (saved) => {
     setEditing(null);
@@ -223,7 +230,7 @@ export default function Owners() {
           </div>
         ) : isMobile ? (
           <div className="owners-list animate-in animate-in-delay-2">
-            {filtered.map((o) => {
+            {paged.slice.map((o) => {
               const createdRel = o.createdAt ? relativeDate(o.createdAt) : null;
               const swipeActions = [
                 {
@@ -307,7 +314,7 @@ export default function Owners() {
         ) : (viewMode === 'table' && !isMobile) ? (
           <DataTable
             ariaLabel="טבלת בעלי נכסים"
-            rows={filtered}
+            rows={paged.slice}
             rowKey={(o) => o.id}
             onRowClick={(o) => navigate(`/owners/${o.id}`)}
             columns={[
@@ -350,7 +357,7 @@ export default function Owners() {
           />
         ) : (
           <div className="owners-grid animate-in animate-in-delay-2">
-            {filtered.map((o) => {
+            {paged.slice.map((o) => {
               const previews = (o.properties || []).slice(0, 2);
               const createdRel = o.createdAt ? relativeDate(o.createdAt) : null;
               return (
@@ -406,6 +413,13 @@ export default function Owners() {
               );
             })}
           </div>
+        )}
+
+        {/* Pager — renders only when >8 items match. Sits between the
+            list/table and the mobile FAB so the "next" button is never
+            hidden under the FAB on small screens. */}
+        {paged.needsPager && (
+          <Pagination page={paged.page} pageCount={paged.pageCount} onPage={setPage} />
         )}
 
         {/* Mobile-only floating FAB — adds a new owner */}

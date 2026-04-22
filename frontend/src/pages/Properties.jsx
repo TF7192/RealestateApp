@@ -63,6 +63,8 @@ import DataTable from '../components/DataTable';
 import { useViewMode } from '../lib/useViewMode';
 import SavedSearchMenu from '../components/SavedSearchMenu';
 import AdvancedFilters from '../components/AdvancedFilters';
+import Pagination from '../components/Pagination';
+import { paginate } from '../lib/pagination';
 import './Properties.css';
 
 function formatPrice(price) {
@@ -521,6 +523,13 @@ export default function Properties() {
         return 0;
       });
   }, [items, filter, assetClassFilter, advFilters, debouncedSearch, locationCenter, locationRadius, unmarketedOnly, onlyFavorites, favoriteIds]);
+
+  // Client-side pagination — slice at 8/page once filters + sort are
+  // applied. Reset to page 1 whenever the filtered set changes so the
+  // agent doesn't end up stuck on page 5 of a now-2-page result.
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [filter, assetClassFilter, debouncedSearch, advFilters, locationCenter, locationRadius, unmarketedOnly, onlyFavorites]);
+  const paged = useMemo(() => paginate(filtered, { page, pageSize: 8 }), [filtered, page]);
 
   const cities = [...new Set(items.map((p) => p.city))];
 
@@ -1023,7 +1032,7 @@ export default function Properties() {
       ) : (viewMode === 'table' && !isMobile) ? (
         <DataTable
           ariaLabel="טבלת נכסים"
-          rows={filtered}
+          rows={paged.slice}
           rowKey={(p) => p.id}
           onRowClick={(p) => navigate(`/properties/${p.id}`)}
           columns={[
@@ -1092,7 +1101,7 @@ export default function Properties() {
         />
       ) : (
         <div className="properties-grid">
-          {filtered.map((prop, i) => {
+          {paged.slice.map((prop, i) => {
             // S-perf: the first card's image is the LCP on /properties.
             // Lighthouse flagged it as lazy + no fetchpriority; eager-load
             // the first one and let the rest stay lazy as before.
@@ -1471,6 +1480,14 @@ export default function Properties() {
             );
           })}
         </div>
+      )}
+
+      {/* Client-side pager — renders only when the filtered list has
+          more than 8 items (Pagination itself returns null if
+          pageCount <= 1). Sits between the grid/table and the empty-
+          state blocks so it never paints on an empty result. */}
+      {!loading && paged.needsPager && (
+        <Pagination page={paged.page} pageCount={paged.pageCount} onPage={setPage} />
       )}
 
       {/* F-4.1 — distinguish "first time, no properties yet" (onboarding,

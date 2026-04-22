@@ -1,0 +1,63 @@
+/* Client-side pager shared by Properties / Customers / Owners. */
+
+.pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-block: 16px;
+  padding-inline: 8px;
+  justify-content: center;
+  width: 100%;
+}
+
+.pager-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pager-btn:hover:not(:disabled) {
+  border-color: var(--gold-border, rgba(180, 139, 76, 0.4));
+  background: var(--bg-card-hover);
+}
+
+.pager-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.pager-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pager-num.is-active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #15100a;
+}
+
+.pager-nav {
+  color: var(--text-secondary);
+}
+
+.pager-gap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  color: var(--text-muted);
+}

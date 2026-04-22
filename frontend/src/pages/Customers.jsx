@@ -42,6 +42,8 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import { SERIOUSNESS_LABELS } from '../lib/mlsLabels';
 import ViewToggle from '../components/ViewToggle';
 import DataTable from '../components/DataTable';
+import Pagination from '../components/Pagination';
+import { paginate } from '../lib/pagination';
 import { useViewMode } from '../lib/useViewMode';
 import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
@@ -334,6 +336,11 @@ export default function Customers() {
       );
     });
   }, [leads, lookingForFilter, interestFilter, statusFilter, inactiveFilter, debouncedSearch, onlyFavorites, favoriteIds]);
+
+  // Client-side pagination at 8/page. Reset when filters / search change.
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [lookingForFilter, interestFilter, statusFilter, inactiveFilter, debouncedSearch, onlyFavorites]);
+  const paged = useMemo(() => paginate(filtered, { page, pageSize: 8 }), [filtered, page]);
 
   const handleWhatsApp = (lead) => {
     primeContactBump(lead.id);
@@ -737,7 +744,7 @@ export default function Customers() {
       ) : (viewMode === 'table' && !isMobile) ? (
         <DataTable
           ariaLabel="טבלת לקוחות"
-          rows={filtered}
+          rows={paged.slice}
           rowKey={(l) => l.id}
           onRowClick={(l) => navigate(`/customers/${l.id}`)}
           columns={[
@@ -806,7 +813,7 @@ export default function Customers() {
         />
       ) : (
       <div className="customers-grid animate-in animate-in-delay-3">
-        {filtered.map((lead) => {
+        {paged.slice.map((lead) => {
           const expanded = expandedId === lead.id;
 
           // ── Mobile: collapsed dense row + swipe actions + tap to expand ──
@@ -1305,6 +1312,9 @@ export default function Customers() {
               {t('list.newLead')}
             </Link>
           </div>
+        )}
+        {paged.needsPager && (
+          <Pagination page={paged.page} pageCount={paged.pageCount} onPage={setPage} />
         )}
       </div>
       )}
