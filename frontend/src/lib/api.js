@@ -561,6 +561,36 @@ export const api = {
   updateSavedSearch:   (id, body) => request(`/saved-searches/${id}`, { method: 'PATCH', body }),
   deleteSavedSearch:   (id) => request(`/saved-searches/${id}`, { method: 'DELETE' }),
 
+  // H3 — voice-to-lead. Uploads raw audio (multipart) to the LLM
+  // extraction endpoint and returns either a drafted object (for the
+  // caller to review + submit via createLead/createProperty) or a
+  // fully-created entity (the backend chose to persist because the
+  // extracted fields were complete enough).
+  //
+  // Response shape:
+  //   { transcript, extracted, created?, mode: 'created' | 'draft', traceId }
+  //
+  // Kept deliberately small because this surface is the main feature
+  // of this release — the backend contract is being written by a
+  // sibling agent; this method matches the agreed shape.
+  voiceLead: (audioBlob, kind = 'LEAD') => {
+    const fd = new FormData();
+    // Fall back filename so servers that key on upload.filename see
+    // something sensible in logs.
+    const ext = (audioBlob?.type || '').includes('mp4') ? 'm4a'
+              : (audioBlob?.type || '').includes('mpeg') ? 'mp3'
+              : 'webm';
+    fd.append('audio', audioBlob, `voice-${Date.now()}.${ext}`);
+    const k = kind === 'PROPERTY' ? 'PROPERTY' : 'LEAD';
+    return request(`/ai/voice-lead?kind=${k}`, {
+      method: 'POST',
+      body: fd,
+      // Voice extraction is slower than a typical write (upload + LLM);
+      // bump the timeout so we don't abort before the server responds.
+      timeoutMs: 90_000,
+    });
+  },
+
   // Favorites (B4)
   listFavorites:       (entityType) => {
     const qs = entityType ? `?${new URLSearchParams({ entityType }).toString()}` : '';

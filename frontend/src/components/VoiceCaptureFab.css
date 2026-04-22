@@ -1,0 +1,99 @@
+/* H3 — VoiceCaptureFab.
+ *
+ * Twin of QuickCreateFab but larger (48×48 rounded), opposite corner
+ * (bottom-inline-start) so both are reachable on mobile. Gradient fill
+ * is intentionally loud — this is the marquee feature for the release
+ * and the agents need to notice the mic.
+ *
+ * Logical CSS properties throughout; dir="rtl" at app root flips the
+ * inline-end/inline-start axis for free.
+ */
+
+.vc-fab {
+  position: fixed;
+  inset-block-end: calc(72px + env(safe-area-inset-bottom, 0px));
+  /* Opposite side from QuickCreateFab. In RTL, inline-start === right
+     edge (wait — no: inline-start in RTL is the right side; so to sit
+     opposite QCFab which is inline-end (=left in RTL), we use
+     inline-start. Both FABs end up on opposing sides and never collide). */
+  inset-inline-start: 20px;
+  z-index: 900;
+
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 0;
+
+  /* Gradient is the hero affordance. #FB7185 (rose-400) → #8B5CF6
+     (violet-500) is the same swatch the product team uses in marketing;
+     keeps the FAB aligned with the rest of the release collateral. */
+  background: linear-gradient(135deg, #FB7185 0%, #8B5CF6 100%);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(139, 92, 246, 0.35);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.vc-fab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(139, 92, 246, 0.42);
+}
+
+.vc-fab:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.6), 0 8px 22px rgba(139, 92, 246, 0.35);
+}
+
+/* Recording state — solid red + pulse so the agent can't miss that
+   the app is listening. The pulse is a pseudo-element so we don't
+   re-render the whole FAB. */
+.vc-fab.is-recording {
+  background: #DC2626;
+  box-shadow: 0 8px 22px rgba(220, 38, 38, 0.4);
+}
+.vc-fab.is-recording::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(220, 38, 38, 0.6);
+  animation: vc-pulse 1.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes vc-pulse {
+  0%   { transform: scale(1);   opacity: 0.9; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* Inline MM:SS timer next to the mic icon while recording. */
+.vc-fab-timer {
+  font: 600 11px/1 ui-monospace, 'SF Mono', Menlo, monospace;
+  margin-inline-start: 6px;
+  letter-spacing: 0.02em;
+}
+
+/* Push further from the edge on wide layouts to clear the sidebar. */
+@media (min-width: 900px) {
+  .vc-fab {
+    inset-block-end: 28px;
+    inset-inline-start: 28px;
+  }
+}
+
+/* Honor prefers-reduced-motion: keep the colour change, drop the pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .vc-fab,
+  .vc-fab:hover {
+    transition: none;
+    transform: none;
+  }
+  .vc-fab.is-recording::before {
+    animation: none;
+  }
+}

@@ -38,6 +38,7 @@ import MobileTabBar from './MobileTabBar';
 import MobileMoreSheet from './MobileMoreSheet';
 import { isPopoutWindow } from '../lib/popout';
 import QuickCreateFab from './QuickCreateFab';
+import VoiceCaptureFab from './VoiceCaptureFab';
 
 // Mirrors backend ADMIN_EMAILS default — anyone in this list sees the
 // admin chat link in the sidebar and the admin page loads for them.
@@ -549,6 +550,9 @@ export default function Layout({ onLogout }) {
       {/* H2 — global floating quick-create FAB. Mounts for every authed
           route; hides itself on pages that already own a sticky CTA. */}
       <QuickCreateFab />
+      {/* H3 — voice-to-lead mic FAB. Opposite corner so it never overlaps
+          the quick-create button; hides itself on login/public portals. */}
+      <VoiceCaptureFab />
 
       {/* Mobile chrome */}
       <MobileTabBar />
