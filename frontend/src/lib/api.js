@@ -177,6 +177,10 @@ export const api = {
     request('/auth/google/native-exchange', { method: 'POST', body: { code } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/me'),
+  // A-4 — submit first-login onboarding form (license + optional title /
+  // agency / phone). On success the server stamps `profileCompletedAt`
+  // and the SPA route guard stops redirecting to /onboarding.
+  submitOnboarding: (body) => request('/me/profile', { method: 'POST', body }),
   // keepalive ensures the POST survives a component unmount / page
   // navigation — without it the tutorial-complete request can get
   // cancelled when the tour component returns null right after the

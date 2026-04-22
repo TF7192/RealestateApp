@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 // F-8.6 — These modules are already statically imported from
 // native/share.js + Login.jsx, so the dynamic import below was being
 // rewritten by Vite into a static one anyway (the "INEFFECTIVE_DYNAMIC
@@ -25,6 +25,7 @@ import CustomerPropertyView from './pages/CustomerPropertyView';
 import ProspectSign from './pages/ProspectSign';
 import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
+import Onboarding from './pages/Onboarding';
 import Transfers from './pages/Transfers';
 // S13: Templates, AdminChats, CommandPalette are heavy and not on the
 // critical path for the first page paint. Lazy-load them so the main
@@ -82,6 +83,7 @@ function AppRoutes() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useScrollRestore();
   useDocumentTitle();
@@ -182,6 +184,22 @@ function AppRoutes() {
     );
   }
 
+  // A-4 — first-login onboarding gate. If the authed agent hasn't
+  // submitted the onboarding form yet (profileCompletedAt === null),
+  // hold them on /onboarding and deny every other route. The page
+  // itself calls api.submitOnboarding() then api.me() refresh, which
+  // flips this flag and releases the guard. Customers don't carry an
+  // onboarding requirement; the gate only fires for AGENT / OWNER.
+  const needsOnboarding =
+    (user.role === 'AGENT' || user.role === 'OWNER') &&
+    !user.profileCompletedAt;
+  if (needsOnboarding && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
+  }
+  if (needsOnboarding) {
+    return <Onboarding />;
+  }
+
   return (
     <>
       <OfflineBanner />
@@ -214,6 +232,10 @@ function AppRoutes() {
             <Route path="/customers/new" element={<NewLead />} />
             <Route path="/customers/:id" element={<CustomerDetail />} />
             <Route path="/profile" element={<Profile />} />
+            {/* A-4 — already-onboarded agents who navigate here manually
+                get bounced back to the dashboard; the active guard
+                above catches the "not onboarded yet" case. */}
+            <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
             <Route path="/transfers" element={<Transfers />} />
             <Route path="/templates" element={<Templates />} />
             <Route path="/admin/chats" element={<AdminChats />} />
