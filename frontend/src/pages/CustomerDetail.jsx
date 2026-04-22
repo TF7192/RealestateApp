@@ -356,17 +356,27 @@ function CustomerEditForm({ lead, onSaved, toast }) {
     setBusy(true);
     setErr(null);
     try {
+      // L-13 — coerce / drop values that would fail zod on the server:
+      // half-typed emails, non-integer budgets, whitespace-only strings.
+      const normalizedEmail =
+        typeof form.email === 'string' && form.email.trim()
+          ? form.email.trim()
+          : null;
+      const isLikelyEmail = normalizedEmail && /.+@.+\..+/.test(normalizedEmail);
+      const budgetNum = form.budget != null && form.budget !== ''
+        ? Math.max(0, Math.round(Number(form.budget)))
+        : null;
       const body = {
-        name: form.name,
-        phone: form.phone,
-        email: form.email || null,
+        name: form.name?.trim() || '',
+        phone: form.phone?.trim() || '',
+        email: isLikelyEmail ? normalizedEmail : null,
         interestType: form.interestType,
         lookingFor: form.lookingFor,
         city: form.city || null,
         street: form.street || null,
-        rooms: form.rooms || null,
+        rooms: (form.rooms && String(form.rooms).trim()) || null,
         priceRangeLabel: form.priceRangeLabel || null,
-        budget: form.budget != null && form.budget !== '' ? Number(form.budget) : null,
+        budget: Number.isFinite(budgetNum) ? budgetNum : null,
         sector: form.sector || null,
         schoolProximity: form.schoolProximity || null,
         balconyRequired: form.balconyRequired,

@@ -93,11 +93,23 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-elevated);
+  font-family: var(--font-body);
   font-size: 14px;
   color: var(--text-primary);
   outline: none;
   resize: vertical;
   min-height: 70px;
+}
+
+/* L-11 — explicit Hebrew RTL override for the notes textarea. Some
+   macOS themes were resolving `font-family: inherit` to a LTR-only
+   stack on the meeting dialog, producing backwards Hebrew inside the
+   textarea. Force the Hebrew body stack + RTL text direction. */
+.lmd-textarea-he {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: plaintext;
+  font-family: var(--font-body);
 }
 
 .lmd-opts {

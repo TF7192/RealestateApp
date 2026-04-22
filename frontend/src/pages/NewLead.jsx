@@ -551,34 +551,11 @@ export default function NewLead() {
 
         <div className="form-section">
           {/* K1 — contact / identity block. Optional: agents who only
-              have a phone number can leave the whole section blank. */}
+              have a phone number can leave the whole section blank.
+              L-4 — firstName / lastName removed here; the single "שם
+              מלא" at the top of the form is the canonical name and the
+              duplicate pair was causing confusion + split saves. */}
           <h3 className="form-section-title">{t('new.sections.extended')}</h3>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" htmlFor="k1-first">{t('new.fields.firstName')}</label>
-              <input
-                id="k1-first"
-                className="form-input"
-                dir="auto"
-                autoCapitalize="words"
-                enterKeyHint="next"
-                value={form.firstName}
-                onChange={(e) => update('firstName', e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="k1-last">{t('new.fields.lastName')}</label>
-              <input
-                id="k1-last"
-                className="form-input"
-                dir="auto"
-                autoCapitalize="words"
-                enterKeyHint="next"
-                value={form.lastName}
-                onChange={(e) => update('lastName', e.target.value)}
-              />
-            </div>
-          </div>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label" htmlFor="k1-company">{t('new.fields.companyName')}</label>
@@ -669,17 +646,9 @@ export default function NewLead() {
                 onChange={(e) => update('fax', e.target.value)}
               />
             </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="k1-desc">{t('new.fields.description')}</label>
-              <input
-                id="k1-desc"
-                className="form-input"
-                dir="auto"
-                enterKeyHint="next"
-                value={form.description}
-                onChange={(e) => update('description', e.target.value)}
-              />
-            </div>
+            {/* L-8 — "הוסף תיאור קצר" removed. Free-form copy belongs to
+                the single "הערות" textarea at the bottom of the form so
+                agents don't split the same content across two fields. */}
           </div>
         </div>
 

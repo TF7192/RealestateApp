@@ -13,6 +13,7 @@ import PageTour from '../components/PageTour';
 import { pageCache } from '../lib/pageCache';
 import { useToast } from '../lib/toast';
 import { telUrl } from '../lib/waLink';
+import { formatPhone } from '../lib/phone';
 import { openWhatsApp } from '../native/share';
 import { relativeDate } from '../lib/relativeDate';
 import Pagination from '../components/Pagination';
@@ -294,7 +295,7 @@ export default function Owners() {
                       </div>
                       <div className="owner-row-meta">
                         <strong className="owner-row-name">{o.name}</strong>
-                        <span className="owner-row-phone">{o.phone || '—'}</span>
+                        <span className="owner-row-phone">{o.phone ? formatPhone(o.phone) : '—'}</span>
                         {createdRel && (
                           <span className="owner-row-created">
                             נוסף {createdRel.label}
@@ -332,7 +333,7 @@ export default function Owners() {
               },
               {
                 key: 'phone', header: 'טלפון',
-                render: (o) => o.phone || <span className="cell-muted">—</span>,
+                render: (o) => o.phone ? formatPhone(o.phone) : <span className="cell-muted">—</span>,
               },
               {
                 key: 'email', header: 'אימייל',
@@ -390,7 +391,7 @@ export default function Owners() {
                     </div>
                     <div className="owner-card-info">
                       <strong className="owner-card-name">{o.name}</strong>
-                      <span className="owner-card-phone">{o.phone || '—'}</span>
+                      <span className="owner-card-phone">{o.phone ? formatPhone(o.phone) : '—'}</span>
                       {o.email && <span className="owner-card-email">{o.email}</span>}
                       {createdRel && (
                         <span className="owner-card-created">נוסף {createdRel.label}</span>

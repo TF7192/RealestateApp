@@ -1955,3 +1955,17 @@
   outline-offset: 1px;
 }
 
+
+/* L-A — inline AdvancedFilters panel toggle. Matches the properties
+   page's "סינון מתקדם" affordance (N-11). Sits between the filter
+   strip and the list body. */
+.customers-adv-toggle {
+  display: flex;
+  justify-content: flex-end;
+  margin-block: 8px 4px;
+  padding-inline: 4px;
+}
+.customers-adv-toggle .btn.is-active {
+  background: var(--gold-glow);
+  color: var(--text-primary);
+}

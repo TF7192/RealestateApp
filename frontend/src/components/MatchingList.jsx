@@ -30,7 +30,15 @@ export default function MatchingList({
   const resolvedTitle = title || (direction === 'lead' ? 'נכסים תואמים' : 'לקוחות תואמים');
 
   const load = useCallback(async () => {
-    if (!direction) return;
+    // L-9 (same shape as P-9): if neither anchor prop was passed we
+    // can't load anything — drop out of the loading state so the UI
+    // shows the empty state instead of an infinite spinner.
+    if (!direction) {
+      setItems([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -67,6 +75,16 @@ export default function MatchingList({
         <div className="ml-error" role="alert">
           <AlertCircle size={14} aria-hidden />
           <span>{error}</span>
+          {/* L-9 — inline retry so an agent whose first load failed
+              doesn't have to navigate away and back. */}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={load}
+            style={{ marginInlineStart: 'auto' }}
+          >
+            נסה שוב
+          </button>
         </div>
       ) : items.length === 0 ? (
         <EmptyState
