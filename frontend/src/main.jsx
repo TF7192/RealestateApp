@@ -180,6 +180,27 @@ if (typeof window !== 'undefined') {
   }, { passive: false });
 }
 
+// Vite dispatches `vite:preloadError` when a dynamic-chunk preload
+// (`<link rel=preload as=style|modulepreload>`) fails — classically
+// during deploys, when the new build renames chunks and the old
+// `index.html` in a user's browser points at files that just 404/503'd,
+// or when the edge briefly flaps to 503 as the nginx container
+// recreates. Without this listener the helper re-throws and React's
+// RootErrorBoundary renders "משהו השתבש". A single reload picks up the
+// fresh index.html and the current chunk names. Guarded by
+// sessionStorage so we don't loop if the reload itself fails the same
+// way (e.g. origin actually down).
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (e) => {
+    e.preventDefault();
+    const RELOAD_KEY = 'estia-preload-reload-at';
+    const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
+    if (Date.now() - last < 10_000) return; // already bounced once in last 10s
+    sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+    window.location.reload();
+  });
+}
+
 // F-2.1 — lazy import so the boundary itself doesn't regress first-paint.
 // It's tiny (<1 kB) but we keep the main-chunk policy consistent.
 import RootErrorBoundary from './components/RootErrorBoundary';
