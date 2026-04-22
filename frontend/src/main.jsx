@@ -141,47 +141,52 @@ if (typeof window !== 'undefined') {
     }
   };
 
-  document.addEventListener('focusin', (e) => {
-    const t = e.target;
-    if (!isTextInput(t)) return;
-    if (preFocusScrollY == null) preFocusScrollY = window.scrollY;
-    // Was: setTimeout(..., 320). That 320ms gap between tap and any
-    // visible response was the main "inputs feel laggy" complaint.
-    // The visualViewport.resize listener below catches the keyboard
-    // slide-up precisely when it ends, so there's no need to guess a
-    // delay. The rAF just lets this focus frame paint first.
-    requestAnimationFrame(() => nudgeIntoView(t));
-  });
-
-  document.addEventListener('focusout', (e) => {
-    if (!isTextInput(e.target)) return;
-    // Focus could be moving to another input (tab/next-field). In
-    // that case we don't restore — the next focusin handles things.
-    // We check on the next tick because focusin for the new target
-    // fires after this focusout.
-    setTimeout(() => {
-      const active = document.activeElement;
-      if (isTextInput(active)) return;
-      if (preFocusScrollY != null) {
-        window.scrollTo(0, preFocusScrollY);  // instant restore
-        preFocusScrollY = null;
-      }
-    }, 50);
-  });
-
-  // Visual-viewport resize fires repeatedly while the keyboard slides
-  // up/down. Debounce via rAF so we do at most one nudge per frame
-  // (was one per resize event → layout thrash on ProMotion).
-  let vvPending = false;
-  window.visualViewport?.addEventListener('resize', () => {
-    if (vvPending) return;
-    vvPending = true;
-    requestAnimationFrame(() => {
-      vvPending = false;
-      const el = document.activeElement;
-      if (isTextInput(el)) nudgeIntoView(el);
+  // User feedback: "I want the screen to stay in the same place when
+  // I click on an input." iOS WKWebView already scrolls the content
+  // natively when a focused input would be covered by the keyboard —
+  // our JS nudge was doing its own scroll on top of that, which read
+  // as the page "jumping" on tap. Drop the manual focus-scroll
+  // entirely on native iOS. On web keep a very light rAF nudge so
+  // desktop Safari (which doesn't auto-scroll) still works.
+  const isNativeIOS = (() => {
+    try {
+      // Capacitor adds `ios` as the platform and sets navigator.userAgent
+      // with "EstiaApp/..." (per capacitor.config.json). Either check is
+      // fine; prefer the UA check so we don't import Capacitor eagerly.
+      return /EstiaApp\//.test(navigator.userAgent || '');
+    } catch { return false; }
+  })();
+  if (!isNativeIOS) {
+    document.addEventListener('focusin', (e) => {
+      const t = e.target;
+      if (!isTextInput(t)) return;
+      if (preFocusScrollY == null) preFocusScrollY = window.scrollY;
+      requestAnimationFrame(() => nudgeIntoView(t));
     });
-  });
+
+    document.addEventListener('focusout', (e) => {
+      if (!isTextInput(e.target)) return;
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (isTextInput(active)) return;
+        if (preFocusScrollY != null) {
+          window.scrollTo(0, preFocusScrollY);
+          preFocusScrollY = null;
+        }
+      }, 50);
+    });
+
+    let vvPending = false;
+    window.visualViewport?.addEventListener('resize', () => {
+      if (vvPending) return;
+      vvPending = true;
+      requestAnimationFrame(() => {
+        vvPending = false;
+        const el = document.activeElement;
+        if (isTextInput(el)) nudgeIntoView(el);
+      });
+    });
+  }
 
   // Belt-and-suspenders: block multi-touch pinch-zoom + double-tap zoom.
   document.addEventListener('gesturestart', (e) => e.preventDefault());

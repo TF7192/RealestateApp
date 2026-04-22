@@ -208,21 +208,13 @@ export default function Layout({ onLogout }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [sidebarOpen]);
 
-  // P1-M15 — auto-hide mobile header on scroll-down, restore on scroll-up.
-  // Tab bar stays put because it IS the navigation target.
+  // Was: auto-hide mobile header on scroll-down, restore on scroll-up
+  // (P1-M15). On the native iPhone app this read as "the task bar
+  // moves when I scroll" — unexpected vs. real iOS apps, which keep
+  // the top bar pinned. Kept the headerHidden state for API stability
+  // but no longer bind it to scroll; the header stays visible always.
   useEffect(() => {
-    if (window.innerWidth > 900) return undefined;
-    let lastY = window.scrollY;
-    const onScroll = () => {
-      const y = window.scrollY;
-      if (y < 60) { setHeaderHidden(false); lastY = y; return; }
-      const delta = y - lastY;
-      if (delta > 6 && y > 80) setHeaderHidden(true);
-      else if (delta < -6) setHeaderHidden(false);
-      lastY = y;
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    setHeaderHidden(false);
   }, [location.pathname]);
 
   const isCustomerPage = location.pathname.startsWith('/p/');
