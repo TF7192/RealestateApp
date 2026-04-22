@@ -212,6 +212,11 @@ function AppRoutes() {
           {/* SEO-friendly public routes */}
           <Route path="/agents/:agentSlug" element={<AgentPortal />} />
           <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
+          {/* Public prospect-sign page — also mounted here so an agent
+              who clicks the generated "צור קישור" URL while signed in
+              reaches the kiosk page instead of a 404. ProspectSign is
+              self-contained (no Layout / nav), so no session leakage. */}
+          <Route path="/public/p/:token" element={<ProspectSign />} />
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
           <Route path="/p/:id" element={<CustomerPropertyView />} />
           <Route path="/a/:agentId" element={<AgentPortal />} />
