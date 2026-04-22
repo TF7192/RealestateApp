@@ -30,7 +30,8 @@ import {
   inputPropsForCity,
 } from '../lib/inputProps';
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
-import VoiceCaptureButton from '../components/VoiceCaptureButton';
+// VoiceCaptureButton removed — feature hidden until voice-to-lead
+// ships production-ready (see Layout.jsx note).
 import PageTour from '../components/PageTour';
 import PropertyPipelineBlock from '../components/PropertyPipelineBlock';
 import {
@@ -382,24 +383,8 @@ export default function NewProperty() {
   // onto a small, safe subset of the property form. We never clobber
   // anything the agent already typed — only fields that arrive get
   // written.
-  const hydrateFromVoice = (extracted) => {
-    if (!extracted || typeof extracted !== 'object') return;
-    if (extracted.__created) return;
-    setForm((prev) => {
-      const next = { ...prev };
-      if (extracted.city) next.city = extracted.city;
-      if (extracted.street) next.street = extracted.street;
-      if (extracted.marketingPrice != null) next.marketingPrice = Number(extracted.marketingPrice);
-      if (extracted.sqm != null) next.sqm = Number(extracted.sqm);
-      if (extracted.rooms != null) next.rooms = String(extracted.rooms);
-      if (extracted.floor != null) next.floor = Number(extracted.floor);
-      if (extracted.ownerName) next.owner = extracted.ownerName;
-      if (extracted.ownerPhone) next.ownerPhone = extracted.ownerPhone;
-      if (extracted.notes) next.notes = extracted.notes;
-      return next;
-    });
-    toast.success('השדות מולאו מההקלטה');
-  };
+  // Voice-to-property hydrator removed with the VoiceCaptureButton.
+  // See NewLead.jsx for the parallel comment.
 
   const setAssetClass = (cls) => {
     setForm((p) => ({
@@ -759,11 +744,7 @@ export default function NewProperty() {
           <h2>{headerTitle}</h2>
           <p>{headerSub}</p>
         </div>
-        {/* H3 — voice shortcut. Hidden in edit mode where the form is
-            already populated; only makes sense on a fresh create. */}
-        {!isEdit && (
-          <VoiceCaptureButton kind="PROPERTY" onExtracted={hydrateFromVoice} />
-        )}
+        {/* Voice shortcut removed with VoiceCaptureButton (see imports). */}
       </div>
 
       {draftBanner && !isEdit && (

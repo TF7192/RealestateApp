@@ -16,7 +16,8 @@ import {
   inputPropsForAddress,
 } from '../lib/inputProps';
 import { NumberField, PhoneField, PriceRange, Segmented, SelectField } from '../components/SmartFields';
-import VoiceCaptureButton from '../components/VoiceCaptureButton';
+// VoiceCaptureButton removed — feature hidden until voice-to-lead
+// ships production-ready (see Layout.jsx note).
 import {
   CUSTOMER_STATUS_LABELS,
   QUICK_LEAD_STATUS_LABELS,
@@ -167,31 +168,9 @@ export default function NewLead() {
   const update = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  // H3 — voice extraction hydrator. Takes the LLM's extracted JSON and
-  // merges compatible keys into the form state. We only touch fields
-  // that arrived; everything else stays at its current value so the
-  // agent's manual edits aren't clobbered.
-  const hydrateFromVoice = (extracted) => {
-    if (!extracted || typeof extracted !== 'object') return;
-    // Skip the "entity was created" escape hatch — that's for the FAB.
-    if (extracted.__created) return;
-    setForm((prev) => {
-      const next = { ...prev };
-      if (extracted.name) next.name = extracted.name;
-      if (extracted.phone) next.phone = extracted.phone;
-      if (extracted.email) next.email = extracted.email;
-      if (extracted.city) next.city = extracted.city;
-      if (extracted.street) next.street = extracted.street;
-      if (extracted.roomsMin != null) next.roomsMin = String(extracted.roomsMin);
-      if (extracted.roomsMax != null) next.roomsMax = String(extracted.roomsMax);
-      if (extracted.priceMin != null) next.priceMin = Number(extracted.priceMin);
-      if (extracted.priceMax != null) next.priceMax = Number(extracted.priceMax);
-      if (extracted.notes) next.notes = extracted.notes;
-      if (extracted.source) next.source = extracted.source;
-      return next;
-    });
-    toast.success(t('new.toasts.voiceFilled'));
-  };
+  // Voice-to-lead hydrator removed with the VoiceCaptureButton. The
+  // function was the only consumer; when we re-enable the feature we
+  // can restore it (git blame this line for the prior implementation).
 
   // F-1 (P0) — the previous handler navigated without persisting the
   // lead. Wire up api.createLead and surface success/failure properly.
@@ -286,10 +265,7 @@ export default function NewLead() {
           <h2>{t('new.title')}</h2>
           <p>{t('new.subtitle')}</p>
         </div>
-        {/* H3 — one-line voice shortcut. Agent can dictate details
-            instead of typing; extracted fields hydrate into this
-            form so they can still review/adjust before saving. */}
-        <VoiceCaptureButton kind="LEAD" onExtracted={hydrateFromVoice} />
+        {/* Voice shortcut removed with VoiceCaptureButton (see imports). */}
       </div>
 
       {draftBanner && (
