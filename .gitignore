@@ -32,3 +32,11 @@ test-results/
 coverage/
 tests/e2e/.auth/
 backend/uploads-test/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
