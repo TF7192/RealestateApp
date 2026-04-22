@@ -8,7 +8,7 @@ export default function MobileApp() {
     <section className="lp-section lp-mobile-section">
       <div className="lp-container lp-mobile-grid">
         <div className="lp-hero-visual">
-          <DeviceMockup ariaLabel={copy.mobile.screenshot_alt} variant="leads" />
+          <DeviceMockup ariaLabel={copy.mobile.screenshot_alt} variant="property" />
         </div>
         <div>
           <div className="lp-eyebrow">{copy.mobile.section_eyebrow}</div>

@@ -184,12 +184,18 @@ jobs:
           REMOTE
 
       - name: Smoke test
+        # Routed through SSH to the EC2 because Cloudflare blocks GitHub
+        # Actions egress IPs as suspicious, producing HTTP 000 from the
+        # runner on every probe. The EC2 has a direct path to the
+        # origin (127.0.0.1 → nginx) and to the public name via CF.
         run: |
+          ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" 'bash -s' <<'REMOTE'
+          set -u
           PASS=0
           for i in 1 2 3 4 5 6; do
             HEALTH=$(curl -s --max-time 5 https://estia.co.il/api/health || true)
-            ROOT=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' https://estia.co.il/ || true)
-            AUTH=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' https://estia.co.il/api/me || true)
+            ROOT=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" https://estia.co.il/ || true)
+            AUTH=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" https://estia.co.il/api/me || true)
             echo "attempt $i: /api/health=$HEALTH  /=$ROOT  /api/me=$AUTH"
             if echo "$HEALTH" | grep -q '"ok":true' && [ "$ROOT" = "200" ] && [ "$AUTH" = "401" ]; then
               PASS=1
@@ -202,6 +208,7 @@ jobs:
             exit 1
           fi
           echo "✓ smoke passed"
+          REMOTE
 
       - name: Deploy summary
         if: always()
