@@ -38,7 +38,7 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | F-1 | Remove new-deal from FAB | Sub-2 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | MENU_ITEMS is now 2 entries |
 | F-2 | Chat vs FAB overlap | Sub-2 | 🟢 | — | ✅ | ✅ (visual) | pending | FAB lifted to 84px; chat at 28/72px |
 | N-1..N-17 | Assets list polish | Sub-3 | 🟢 | ✅ | ✅ | ✅ (unit + e2e spec) | pending | 17/17 tasks shipped; 28 new unit + 3 Playwright baseline specs |
-| P-1..P-15 | Asset detail polish | Sub-4 | ⚪ | — | — | — | — | Large |
+| P-1..P-15 | Asset detail polish | Sub-4 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | 14 tasks shipped (P-8 not in scope); 31 new vitest cases; P-3 wires backend PDF route + new `PropertyAgreementsSection` |
 | O-1..O-10 | Owners | Sub-5 | ⚪ | — | — | — | — | |
 | L-1..L-13 | Leads | Sub-5 | ⚪ | — | — | — | — | |
 | E-1 | צור עסקה button + Deal model | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit + integration spec + E2E spec) | pending | Additive Prisma migration (buyerId/sellerId/closeDate + CLOSED/CANCELLED); runMutation save; creation dialog with Lead/Owner/Property pickers |
