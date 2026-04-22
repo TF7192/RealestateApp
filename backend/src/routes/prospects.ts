@@ -20,6 +20,22 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { getUser } from '../middleware/auth.js';
+import { autoLinkProspectToLead } from './prospect-pdf.js';
+
+// Per-agent sequential order number for the brokerage-services PDF.
+// Called inside a transaction so concurrent creates serialise on the
+// unique index (agentId, orderNumber) rather than racing.
+async function nextOrderNumber(
+  tx: { prospect: { findFirst: (args: unknown) => Promise<{ orderNumber: number | null } | null> } },
+  agentId: string
+): Promise<number> {
+  const last = await tx.prospect.findFirst({
+    where: { agentId, orderNumber: { not: null } },
+    select: { orderNumber: true },
+    orderBy: { orderNumber: 'desc' },
+  } as never);
+  return (last?.orderNumber ?? 0) + 1;
+}
 
 const ProspectInput = z.object({
   name: z.string().min(1).max(120),
@@ -72,16 +88,25 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(400).send({ error: { message: parsed.error.issues[0]?.message || 'Invalid input' } });
     }
     const { signatureDataUrl, email, ...rest } = parsed.data;
-    const prospect = await prisma.prospect.create({
-      data: {
-        propertyId,
-        agentId: u.id,
-        ...rest,
-        email: email || null,
-        signatureDataUrl: signatureDataUrl || null,
-        signedAt: signatureDataUrl ? new Date() : null,
-      },
+    const prospect = await prisma.$transaction(async (tx) => {
+      const orderNumber = await nextOrderNumber(tx as never, u.id);
+      return tx.prospect.create({
+        data: {
+          propertyId,
+          agentId: u.id,
+          ...rest,
+          email: email || null,
+          signatureDataUrl: signatureDataUrl || null,
+          signedAt: signatureDataUrl ? new Date() : null,
+          orderNumber,
+        },
+      });
     });
+    // In-person sign → try to auto-link to an existing lead. Best-
+    // effort; never blocks creation.
+    if (prospect.signedAt) {
+      try { await autoLinkProspectToLead(prospect.id); } catch { /* noop */ }
+    }
     return { prospect };
   });
 
@@ -107,15 +132,19 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(400).send({ error: { message: 'name required' } });
     }
     const publicToken = crypto.randomBytes(24).toString('base64url');
-    const prospect = await prisma.prospect.create({
-      data: {
-        propertyId,
-        agentId: u.id,
-        name: parsed.data.name,
-        phone: parsed.data.phone || null,
-        publicToken,
-        tokenExpiresAt: new Date(Date.now() + PUBLIC_TOKEN_TTL_MS),
-      },
+    const prospect = await prisma.$transaction(async (tx) => {
+      const orderNumber = await nextOrderNumber(tx as never, u.id);
+      return tx.prospect.create({
+        data: {
+          propertyId,
+          agentId: u.id,
+          name: parsed.data.name,
+          phone: parsed.data.phone || null,
+          publicToken,
+          tokenExpiresAt: new Date(Date.now() + PUBLIC_TOKEN_TTL_MS),
+          orderNumber,
+        },
+      });
     });
     const origin = process.env.PUBLIC_ORIGIN || 'https://estia.co.il';
     return {
@@ -205,6 +234,8 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
         tokenExpiresAt: null,
       },
     });
+    // Best-effort link to an existing Lead. Never blocks the sign flow.
+    try { await autoLinkProspectToLead(updated.id); } catch { /* noop */ }
     return { ok: true, prospect: { id: updated.id, signed: true } };
   });
 
