@@ -23,7 +23,10 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Critical path @critical', () => {
   test('login → dashboard → /properties without hitting the ErrorBoundary', async ({ page }) => {
-    await page.goto('/');
+    // `/` now shows the public landing page for unauthed users; Login
+    // moved to the explicit `/login` route. Critical path hits the
+    // login page directly so it still exercises the auth flow.
+    await page.goto('/login');
 
     // Login is two-step: pick email method, then fill the form.
     await emailMethodBtn(page).first().click();
