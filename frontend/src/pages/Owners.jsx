@@ -16,6 +16,9 @@ import { telUrl } from '../lib/waLink';
 import { openWhatsApp } from '../native/share';
 import { relativeDate } from '../lib/relativeDate';
 import haptics from '../lib/haptics';
+import ViewToggle from '../components/ViewToggle';
+import DataTable from '../components/DataTable';
+import { useViewMode } from '../lib/useViewMode';
 import './Owners.css';
 
 /**
@@ -24,6 +27,7 @@ import './Owners.css';
  */
 export default function Owners() {
   const isMobile = useViewportMobile(820);
+  const [viewMode, setViewMode] = useViewMode('owners', 'cards');
   const toast = useToast();
   const navigate = useNavigate();
   useRouteScrollRestore();
@@ -160,6 +164,7 @@ export default function Owners() {
             </p>
           </div>
           <div className="page-header-actions owners-header-actions-desktop">
+            <ViewToggle value={viewMode} onChange={setViewMode} />
             <button
               type="button"
               className="btn btn-primary"
@@ -299,6 +304,50 @@ export default function Owners() {
               );
             })}
           </div>
+        ) : (viewMode === 'table' && !isMobile) ? (
+          <DataTable
+            ariaLabel="טבלת בעלי נכסים"
+            rows={filtered}
+            rowKey={(o) => o.id}
+            onRowClick={(o) => navigate(`/owners/${o.id}`)}
+            columns={[
+              {
+                key: 'name', header: 'שם', sortable: true,
+                sortValue: (o) => o.name || '',
+                render: (o) => <strong>{o.name}</strong>,
+              },
+              {
+                key: 'phone', header: 'טלפון',
+                render: (o) => o.phone || <span className="cell-muted">—</span>,
+              },
+              {
+                key: 'email', header: 'אימייל',
+                render: (o) => o.email || <span className="cell-muted">—</span>,
+              },
+              {
+                key: 'propertyCount', header: 'נכסים', sortable: true, className: 'cell-num',
+                sortValue: (o) => o.propertyCount || 0,
+                render: (o) => <span className="cell-pill">{o.propertyCount || 0}</span>,
+              },
+              {
+                key: 'preview', header: 'כתובת ראשונה',
+                render: (o) => {
+                  const p = (o.properties || [])[0];
+                  return p
+                    ? <span className="cell-muted">{[p.street, p.city].filter(Boolean).join(', ')}</span>
+                    : <span className="cell-muted">—</span>;
+                },
+              },
+              {
+                key: 'created', header: 'נוסף', sortable: true,
+                sortValue: (o) => (o.createdAt ? new Date(o.createdAt).getTime() : 0),
+                render: (o) => {
+                  const r = o.createdAt ? relativeDate(o.createdAt) : null;
+                  return r ? <span className="cell-muted">{r.label}</span> : <span className="cell-muted">—</span>;
+                },
+              },
+            ]}
+          />
         ) : (
           <div className="owners-grid animate-in animate-in-delay-2">
             {filtered.map((o) => {

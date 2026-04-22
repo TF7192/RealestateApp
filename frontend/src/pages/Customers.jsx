@@ -40,6 +40,9 @@ import Chip from '../components/Chip';
 import Portal from '../components/Portal';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { SERIOUSNESS_LABELS } from '../lib/mlsLabels';
+import ViewToggle from '../components/ViewToggle';
+import DataTable from '../components/DataTable';
+import { useViewMode } from '../lib/useViewMode';
 import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import PullRefresh from '../components/PullRefresh';
@@ -153,6 +156,7 @@ export default function Customers() {
   const navigate = useNavigate();
   const toast = useToast();
   const isMobile = useViewportMobile(820);
+  const [viewMode, setViewMode] = useViewMode('customers', 'cards');
   useRouteScrollRestore();
   // Seed from cache so tab returns don't flash the empty state.
   const _cachedLeads = pageCache.get('customers');
@@ -545,6 +549,7 @@ export default function Customers() {
           {/* Sprint 2 C2 + Sprint 7 B3/B4 — advanced filter drawer,
               saved-search menu, and "only favorites" toggle sit here
               between the view switch and the primary "ליד חדש" CTA. */}
+          <ViewToggle value={viewMode} onChange={setViewMode} />
           <button
             type="button"
             className={`btn btn-ghost btn-sm ${serverFilterCount > 0 ? 'is-active' : ''}`}
@@ -728,6 +733,76 @@ export default function Customers() {
           onDelete={setDeleteTarget}
           onNavigate={(id) => navigate(`/customers/${id}`)}
           onBumpLastContact={(lead) => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: t('list.patchSuccess.lastContactUpdated') })}
+        />
+      ) : (viewMode === 'table' && !isMobile) ? (
+        <DataTable
+          ariaLabel="טבלת לקוחות"
+          rows={filtered}
+          rowKey={(l) => l.id}
+          onRowClick={(l) => navigate(`/customers/${l.id}`)}
+          columns={[
+            {
+              key: 'name', header: t('list.card.nameHeader', { defaultValue: 'שם' }), sortable: true,
+              sortValue: (l) => l.name,
+              render: (l) => <strong>{l.name}</strong>,
+            },
+            {
+              key: 'status', header: 'סטטוס', sortable: true,
+              sortValue: (l) => l.status || l.stage || '',
+              render: (l) => <span className="cell-muted">{l.status || l.stage || '—'}</span>,
+            },
+            {
+              key: 'lookingFor', header: 'מחפש', sortable: true,
+              sortValue: (l) => l.lookingFor || '',
+              render: (l) => (
+                <span className={`cell-pill ${l.lookingFor === 'RENT' ? 'is-blue' : 'is-gold'}`}>
+                  {l.lookingFor === 'RENT' ? 'השכרה' : 'קנייה'}
+                </span>
+              ),
+            },
+            {
+              key: 'interest', header: 'סוג', sortable: true,
+              sortValue: (l) => l.interestType || '',
+              render: (l) => <span className="cell-muted">{l.interestType === 'COMMERCIAL' ? 'מסחרי' : 'פרטי'}</span>,
+            },
+            {
+              key: 'city', header: 'עיר', sortable: true,
+              sortValue: (l) => l.city || '',
+              render: (l) => l.city || <span className="cell-muted">—</span>,
+            },
+            {
+              key: 'rooms', header: 'חד׳', sortable: true, className: 'cell-num',
+              sortValue: (l) => l.rooms,
+              render: (l) => l.rooms ?? '—',
+            },
+            {
+              key: 'budget', header: 'תקציב', sortable: true, className: 'cell-num',
+              sortValue: (l) => Number(l.budget) || 0,
+              render: (l) => (
+                <span>
+                  {l.priceRangeLabel
+                    || (l.budget ? `₪${Number(l.budget).toLocaleString('he-IL')}` : <span className="cell-muted">—</span>)}
+                </span>
+              ),
+            },
+            {
+              key: 'lastContact', header: 'מגע אחרון', sortable: true,
+              sortValue: (l) => (l.lastContact ? new Date(l.lastContact).getTime() : 0),
+              render: (l) => {
+                const d = stalePillDays(l);
+                const txt = l.lastContact ? new Date(l.lastContact).toLocaleDateString('he-IL') : '—';
+                return d
+                  ? <span className="cell-pill is-gold" title={`${d} ימים ללא מגע`}>{txt}</span>
+                  : <span className="cell-muted">{txt}</span>;
+              },
+            },
+            {
+              key: 'preApproval', header: 'אישור עקרוני',
+              render: (l) => l.preApproval
+                ? <span className="cell-pill is-green">יש</span>
+                : <span className="cell-muted">—</span>,
+            },
+          ]}
         />
       ) : (
       <div className="customers-grid animate-in animate-in-delay-3">

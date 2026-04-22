@@ -1,0 +1,39 @@
+.view-toggle {
+  display: inline-flex;
+  background: var(--bg-secondary, #efe9df);
+  border: 1px solid var(--border, rgba(30, 26, 20, 0.08));
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary, #54503e);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.view-toggle-btn:hover {
+  color: var(--text-primary, #1e1a14);
+}
+.view-toggle-btn.is-active {
+  background: var(--bg-card, #ffffff);
+  color: var(--text-primary, #1e1a14);
+  box-shadow: 0 1px 3px rgba(30, 26, 20, 0.08);
+}
+.view-toggle-btn:focus-visible {
+  outline: 2px solid var(--gold, #b48b4c);
+  outline-offset: 1px;
+}
+/* Hidden on narrow viewports — table view is unusable on phones */
+@media (max-width: 640px) {
+  .view-toggle { display: none; }
+}

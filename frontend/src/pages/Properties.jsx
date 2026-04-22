@@ -57,6 +57,9 @@ import {
 } from '../data/mockData';
 import { PriceRange, NumberField, SelectField } from '../components/SmartFields';
 import FavoriteStar from '../components/FavoriteStar';
+import ViewToggle from '../components/ViewToggle';
+import DataTable from '../components/DataTable';
+import { useViewMode } from '../lib/useViewMode';
 import SavedSearchMenu from '../components/SavedSearchMenu';
 import './Properties.css';
 
@@ -151,6 +154,8 @@ export default function Properties() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const isMobile = useViewportMobile(820);
+  // Desktop-only view-mode toggle. Mobile always uses compact cards.
+  const [viewMode, setViewMode] = useViewMode('properties', 'cards');
   // F-6.3 — preserve scroll when the agent goes deep into a property
   // card and pops back. Critical for 500-row lists on desktop.
   useRouteScrollRestore();
@@ -779,6 +784,7 @@ export default function Properties() {
             {/* F-4 — canonical header: primary rightmost, secondaries demoted.
                 Bulk-select and share-link move behind the ⋯ overflow so the
                 primary CTA ("קליטת נכס חדש") wins the visual hierarchy. */}
+            <ViewToggle value={viewMode} onChange={setViewMode} />
             {/* Sprint 7 B3 — saved-search menu for the current filter set. */}
             <SavedSearchMenu
               entityType="PROPERTY"
@@ -1003,6 +1009,76 @@ export default function Properties() {
         // the grid will appear, so fast fetches swap straight to real
         // data without a "loading" placeholder flash.
         null
+      ) : (viewMode === 'table' && !isMobile) ? (
+        <DataTable
+          ariaLabel="טבלת נכסים"
+          rows={filtered}
+          rowKey={(p) => p.id}
+          onRowClick={(p) => navigate(`/properties/${p.id}`)}
+          columns={[
+            {
+              key: 'thumb', header: '', className: 'cell-thumb',
+              render: (p) => p.images?.[0]
+                ? <img src={p.images[0]} alt="" loading="lazy" decoding="async" />
+                : <div className="cell-thumb-placeholder" aria-hidden="true" />,
+            },
+            {
+              key: 'address', header: 'כתובת', sortable: true,
+              sortValue: (p) => `${p.city || ''} ${p.street || ''}`.trim(),
+              render: (p) => <span>{p.street}{p.city ? `, ${p.city}` : ''}</span>,
+            },
+            {
+              key: 'type', header: 'סוג', sortable: true,
+              sortValue: (p) => p.type || '',
+              render: (p) => <span className="cell-muted">{p.type || '—'}</span>,
+            },
+            {
+              key: 'category', header: 'עסקה', sortable: true,
+              sortValue: (p) => p.category || '',
+              render: (p) => (
+                <span className={`cell-pill ${p.category === 'SALE' ? 'is-gold' : 'is-blue'}`}>
+                  {p.category === 'SALE' ? 'מכירה' : 'השכרה'}
+                </span>
+              ),
+            },
+            {
+              key: 'rooms', header: 'חד׳', sortable: true, className: 'cell-num',
+              sortValue: (p) => p.rooms,
+              render: (p) => p.rooms ?? '—',
+            },
+            {
+              key: 'sqm', header: 'מ״ר', sortable: true, className: 'cell-num',
+              sortValue: (p) => p.sqm,
+              render: (p) => p.sqm ?? '—',
+            },
+            {
+              key: 'price', header: 'מחיר', sortable: true, className: 'cell-num',
+              sortValue: (p) => p.marketingPrice,
+              render: (p) => <strong>{formatPrice(p.marketingPrice)}</strong>,
+            },
+            {
+              key: 'owner', header: 'בעלים', sortable: true,
+              sortValue: (p) => p.owner || '',
+              render: (p) => <span className="cell-muted">{p.owner || '—'}</span>,
+            },
+            {
+              key: 'progress', header: 'שיווק',
+              render: (p) => {
+                const done = Object.values(p.marketingActions || {}).filter(Boolean).length;
+                const total = Object.values(p.marketingActions || {}).length || 22;
+                const pct = Math.round((done / total) * 100);
+                return (
+                  <span className="cell-progress">
+                    <span className="cell-progress-bar">
+                      <span className="cell-progress-fill" style={{ width: `${pct}%` }} />
+                    </span>
+                    <span className="cell-progress-label">{pct}%</span>
+                  </span>
+                );
+              },
+            },
+          ]}
+        />
       ) : (
         <div className="properties-grid">
           {filtered.map((prop, i) => {
