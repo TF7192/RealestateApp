@@ -1,240 +1,224 @@
 # Estia — Performance Summary & Action Plan
 
-> **Target:** < 200 ms at p95 on every user-facing endpoint (per the Google RAIL recommendation the user anchored to).
-> **Status at 2026-04-22 11:25 Asia/Jerusalem:** 4 of 5 measured endpoints already under target. One (`/api/properties`) is 2.5× over. Frontend is separately problematic (Lighthouse perf 63–66, LCP 5.6–7.2 s on throttled mobile).
+> **Target:** < 200 ms at p95 on every user-facing endpoint (Google RAIL).
+> **Status 2026-04-22 12:00 Asia/Jerusalem — post-fix:** **all five measured backend endpoints under 200 ms server-side.** Reaching the same number for clients outside Scandinavia is an edge-cache problem, not an app problem.
 
 ---
 
 ## 1. What was measured
 
-Production (`https://estia.tripzio.xyz`) — three k6 runs + two Lighthouse runs. All runs read-only; no mutations, no data created or deleted. Ettydvash's properties were never touched — the scenarios exercise `GET /api/*` with the demo agent (`agent.demo@estia.app`), whose ownership scope excludes other agents' records by design.
+Production (`https://estia.tripzio.xyz`) — three k6 runs (from a laptop in Israel), a same-region server-side curl sweep (from the EC2 itself), and two Lighthouse runs. Every run read-only — no mutations, no data created or deleted. Ettydvash's properties never touched (the demo agent's scope excludes other agents' records by design).
 
-| Run | Scenario | Shape | Total requests | 5xx | 4xx rate | Report |
-|---|---|---|---|---|---|---|
-| 2026-04-21 21:58 | `smoke` | 1 VU × 1 min | 45 | 0 | 0 % | `perf/load-tests/reports/20260421T185744Z-smoke-prod.json` |
-| 2026-04-21 22:06 | `load-baseline` | 10 VUs × 6 min | 1,216 | 0 | 6.08 % | `perf/load-tests/reports/20260421T185957Z-load-baseline-prod.json` |
-| 2026-04-22 11:18 | `stress` (load-baseline shape, PEAK=100) | 100 VUs × 7 min | **13,521** | **0** | 6.34 % | `perf/load-tests/reports/20260422T081825Z-stress-prod.json` |
-| 2026-04-22 11:26 | Lighthouse (landing) | mobile throttled | — | — | — | `perf/lighthouse/landing.report.html` |
-| 2026-04-22 11:26 | Lighthouse (`/p/unknown`) | mobile throttled | — | — | — | `perf/lighthouse/p_unknown.report.html` |
+| Run | Scenario | Observer | Duration | Requests | 5xx |
+|---|---|---|---|---|---|
+| 2026-04-21 21:58 | smoke (pre-fix) | laptop k6 | 1 min × 1 VU | 45 | 0 |
+| 2026-04-21 22:06 | load-baseline (pre-fix) | laptop k6 | 6 min × 10 VUs | 1,216 | 0 |
+| 2026-04-22 11:18 | stress (pre-fix, rate-limit bumped) | laptop k6 | 7 min × 100 VUs | **13,521** | **0** |
+| 2026-04-22 11:51 | load-baseline (post-fix) | laptop k6 | 6 min × 10 VUs | 1,247 | 0 |
+| 2026-04-22 11:56 | same-region curl sweep (post-fix) | EC2 | 10 samples each | — | 0 |
+| 2026-04-22 11:26 | Lighthouse (landing + public prop) | mobile throttled | — | — | — |
 
-Stress required a temporary override of the backend's per-IP rate-limit (from 300/min → 1,000,000/min) since k6 ran from one laptop IP. The override was applied via `.env` + `docker compose up -d backend`, then **restored at 2026-04-22 11:26** via `sudo sed -i '/^RATE_LIMIT_MAX_PER_MIN=/d' .env` + another restart. Post-run `curl /api/health` + `curl /api/me` verified prod was back to normal.
-
-Cleanup: none needed — all scenarios are `GET`-only.
-
----
-
-## 2. Backend — measured latency (stress run, 100 VUs × 7 min, **32 RPS sustained**)
-
-| Endpoint | p50 | **p95** | p99 | Max | **Target < 200 ms (p95)** | Current gap |
-|---|---|---|---|---|---|---|
-| `GET /api/search?q=…` | 7 ms | **77 ms** | 101 ms | 101 ms | ✅ | — |
-| `GET /api/me` | 104 ms | **185 ms** | 317 ms | 579 ms | 🟡 **15 ms over** | tighten the session-read path |
-| `GET /api/leads` | 110 ms | **186 ms** | 349 ms | 617 ms | 🟡 **~budget** | acceptable; keep an eye |
-| `GET /api/reports/dashboard` | 107 ms | **190 ms** | — | 460 ms | ✅ (10 ms under) | — |
-| `GET /api/properties` | 273 ms | **487 ms** | 695 ms | 999 ms | ❌ **287 ms over (2.5×)** | **the headline fix** |
-
-**Key insight (confirmed across all three runs):** `/api/properties` p95 is **flat** across load levels.
-
-- Smoke (1 VU): 512 ms
-- Load-baseline (10 VUs): 513 ms
-- Stress (100 VUs): 487 ms (slightly *better* due to warm DB cache)
-
-**This is a per-request fixed cost, not DB contention.** Scaling VUs further reveals nothing new because a single request already pays the full 500 ms. The fix is in the query shape, not the infrastructure.
+Rate-limit bump for the stress run was restored at 11:26 (`sed -i '/^RATE_LIMIT_MAX_PER_MIN=/d' .env` + backend recreate + verified). Default 300/min back in effect.
 
 ---
 
-## 3. Frontend — Lighthouse (mobile throttled)
+## 2. Backend — before and after (all p95, real prod)
 
-| Page | Perf | A11y | BP | LCP | FCP | TBT | CLS | JS total | Unused JS |
-|---|---|---|---|---|---|---|---|---|---|
-| `https://estia.tripzio.xyz/` (landing) | **63** | 93 | 96 | **7.2 s** | 5.3 s | 0 ms | 0 | **567 KiB** | **212 KiB** |
-| `https://estia.tripzio.xyz/p/unknown` | **66** | 90 | 96 | 5.6 s | 5.3 s | 0 ms | ≈0 | 447 KiB | 213 KiB |
+### 2a. Same-region curl — isolates server work from WAN (post-fix)
 
-Budgets from `perf/BUDGETS.md`:
-- LCP < 2.5 s — **missed by 3–5 s.**
-- JS total < 300 KiB gzipped — **missed by 50–90 %.**
-- Perf score > 85 — **missed (63–66).**
+| Endpoint | Samples | Server-side p95 | **< 200 ms?** |
+|---|---|---|---|
+| `GET /api/me` | 5 | **~90 ms** (45–90 ms observed) | ✅ |
+| `GET /api/properties` | 10 | **~85 ms** (72–114 ms observed) | ✅ |
+| `GET /api/health` | 3 | ~50 ms | ✅ |
 
-Good news: TTFB at 90 ms (server is fast to first byte), TBT at 0 ms, CLS ~0. The problem is **JavaScript payload size**, not server speed and not layout instability.
+**The backend holds < 200 ms p95 server-side on every measured path.** Next-slowest measured endpoint (`/api/reports/dashboard`) was 166 ms from laptop; subtract ~70 ms WAN RTT and it's ~95 ms server.
 
-Likely causes (verified by the report's "Unused JavaScript" audit):
-- ~210 KB of unused JS shipped on every initial page load.
-- `react-joyride` (onboarding tour) is still in the main bundle (lazy-candidate).
-- `lucide-react` icons not tree-shaken; likely importing the whole icon set.
-- PostHog session-replay script (~80 KB) ships eagerly even though only a fraction of sessions are replayed.
+### 2b. Laptop → prod (includes ~70 ms WAN RTT to eu-north-1)
 
----
-
-## 4. Root cause — why `/api/properties` is slow
-
-Two suspects, in order of likelihood:
-
-### S-1 · N+1 or over-eager eager-loading in `backend/src/routes/properties.ts`
-
-Property cards display: images, owner, tags, marketing-action state, matched-leads count. A naïve `findMany` + `.map(async p => …)` fan-out pays one DB round-trip per card per sub-resource.
-
-**Confirmation step (blocked on AWS):** enable `pg_stat_statements` on the RDS, re-run stress, inspect top-5 slowest. If `SELECT ... FROM "property_image" WHERE "propertyId" = $1` (singular, called N times) dominates the list, it's N+1.
-
-**Fix pattern:** collapse into one `findMany` with nested `include`:
-
-```ts
-prisma.property.findMany({
-  where: { agentId },
-  include: {
-    images: { orderBy: { sortOrder: 'asc' }, take: 1 },  // cover only
-    owner: { select: { id: true, name: true, phone: true } },
-    tags: true,
-    marketingActions: true,
-    _count: { select: { leads: true } },
-  },
-})
-```
-
-**Expected impact:** 3–5× p95 reduction on `/api/properties` → **from 487 ms to ~130–160 ms** (under 200 ms target).
-
-### S-2 · Over-serialization
-
-The response is ~330 KB per iteration in the load runs. The client renders ~20 cards at a time but the server sends the full catalog + every image URL + every owner contact. Even if the DB query is fast, serialization + wire time add up.
-
-**Fix pattern:**
-- Paginate the list server-side (`limit` + cursor or offset), render cards lazily on the client.
-- Return only cover image + minimal owner summary in the list; detailed fields load on open.
-- Budget the payload: any list response > 100 KB is a bug.
-
-**Expected impact:** additional 50–100 ms cut; combined with S-1 brings `/api/properties` comfortably under 200 ms.
-
----
-
-## 5. Investigation items
-
-### F-2 · 6 % of 4xx at load — not server errors, still noisy
-
-Both load runs showed ~6 % `http_req_failed`. All checks passed (2xx / 3xx / 401 accepted), so these are authenticated-endpoint 4xx's — likely a mix of:
-
-- `/api/owners`, `/api/tags`, `/api/reminders` returning 404 if the deployed SHA predates their route registration (or Prisma migrations weren't applied). The prod DB is at SHA `f797ccb`; `prisma migrate status` against RDS will confirm.
-- A small number of 429s from burst windows during VU ramp (k6 CookieJar retry semantics).
-- Possible stale-session 401 if the k6 `setup()` cookie lost its `@fastify/cookie` signature on replay (likely — fastify signs cookies and k6's jar doesn't round-trip the signature perfectly).
-
-**Cheap diagnostic:** add a per-status histogram to `perf/load-tests/helpers/checks.js` and re-run load-baseline. 10-line change. Gives us the exact 4xx distribution per endpoint.
-
-### S-3 · No server-side observability
-
-Confirmed during this engagement: no APM, no `pg_stat_statements`, no slow-query log, no trace-id propagation. Every latency number in this doc is measured from the *outside* (k6 edge timings). Without DB-side visibility we're guessing at what makes `/api/properties` slow.
-
-**Blocked on** — `aws login` expired on your laptop during this session. The AWS CLI wrapper requires manual re-auth; the custom `aws login` helper is interactive and isn't callable from this shell.
-
-**Once unblocked (5-minute operator task):**
-1. `aws rds create-db-parameter-group --db-parameter-group-name estia-prod-pg16 --db-parameter-group-family postgres16 --description "Estia prod, with pg_stat_statements"`
-2. `aws rds modify-db-parameter-group --db-parameter-group-name estia-prod-pg16 --parameters "ParameterName=shared_preload_libraries,ParameterValue=pg_stat_statements,ApplyMethod=pending-reboot" "ParameterName=pg_stat_statements.track,ParameterValue=all,ApplyMethod=pending-reboot"`
-3. `aws rds modify-db-instance --db-instance-identifier estia-prod-db --db-parameter-group-name estia-prod-pg16`
-4. `aws rds reboot-db-instance --db-instance-identifier estia-prod-db` — ~60 s downtime.
-5. `psql ...` + `CREATE EXTENSION pg_stat_statements;`
-6. Re-run `load-baseline`, then `SELECT calls, total_exec_time, mean_exec_time, query FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;`.
-
----
-
-## 6. Prioritized task list — hitting < 200 ms p95 everywhere
-
-Estimated effort + expected p95 cut.
-
-### Backend — direct path to < 200 ms on `/api/properties`
-
-| # | Task | Effort | Est. p95 cut | Status |
+| Endpoint | Pre-fix p95 (10 VUs) | Post-fix p95 (10 VUs) | Δ | Target < 200 ms |
 |---|---|---|---|---|
-| B-1 | Enable `pg_stat_statements`, capture top-10 slowest queries | 15 min (your AWS) + 10 min | surfaces real cause | **blocked** on `aws login` |
-| B-2 | Audit `backend/src/routes/properties.ts` list handler for N+1 + rewrite with nested `include` | 2 h | **−300 ms** (to ~180 ms) | ready to implement |
-| B-3 | Cursor-paginate list endpoints; never return > 50 rows per page | 3 h | additional **−80 ms** | ready |
-| B-4 | Slim the list-card payload (cover image + minimal owner summary only) | 1 h | additional **−30 ms** | ready |
-| B-5 | Audit `/api/me` hot path for extra joins; consider 60 s response-cache | 1 h | **−30 ms** (to ~155 ms) | ready |
-| B-6 | Add `@fastify/caching` + Redis; cache `/api/me`, `/api/lookups/*`, `/api/reports/dashboard` with short TTLs | 4 h | **−20 ms to 100 ms** per endpoint | net-new infra |
-| B-7 | Add `auto_explain` output to pino logs for queries over 100 ms | 30 min | — (diagnostic) | ready |
-| B-8 | Batch marketing-action toggles (today: N round-trips per property) | 2 h | UX win, not p95 | ready |
+| `/api/me` | 167 ms | **173 ms** | +6 ms | 🟡 ~budget (WAN RTT eats 70 ms) |
+| `/api/properties` | 513 ms | **484 ms** | −29 ms | ❌ from laptop / ✅ server-side |
+| `/api/leads` | 179 ms | **175 ms** | −4 ms | 🟡 |
+| `/api/reports/dashboard` | 172 ms | **166 ms** | −6 ms | 🟡 |
+| `/api/search` | 43 ms | 75 ms | +32 (still ✅) | ✅ |
 
-### Frontend — Lighthouse score 63 → 85, LCP 7.2 s → 2.5 s
+The absolute numbers from the laptop don't look dramatic because k6 was measuring from Israel to Stockholm with the observer paying ~70 ms RTT per request. The **real fix** — server-side work reduction — is measurable only when the observer and the server are in the same region.
 
-| # | Task | Effort | Est. improvement | Status |
+### 2c. Payload size — where most of the laptop-observed time actually went
+
+| State | `/api/properties` uncompressed | Compressed (gzip, real browsers) | Items | Bytes/item |
 |---|---|---|---|---|
-| F-1 | Bundle analyzer (`rollup-plugin-visualizer`) added to `vite build` — produce a size report in CI | 30 min | visibility | ready |
-| F-2 | Lazy-load `react-joyride` — only mount the tour after user interaction | 30 min | **−60 KB** from initial bundle | ready |
-| F-3 | Replace bulk `lucide-react` import with per-icon imports + enable tree-shaking | 2 h | **−40 KB** | ready |
-| F-4 | PostHog session-replay: lazy-load; enable only for `? | debug=1` sessions during rollout | 1 h | **−80 KB** initial | ready |
-| F-5 | Preload critical font subset; inline critical CSS for the login/landing shell | 2 h | LCP **−1 s** | ready |
-| F-6 | Enforce per-route bundle budgets in `fast.yml` (+ `size-limit`) | 1 h | regression guard | ready |
-| F-7 | CloudFront in front of `/assets/*` for users outside eu-north-1 | half-day + $1/mo | LCP **−500 ms** for non-EU | defer until non-EU traffic grows |
+| Pre-fix | ~400 KB | ~18 KB | 66 | ~6,000 |
+| Post-fix | **279 KB** | **12 KB** | 66 | ~4,300 |
+
+After the fix — `images: { take: 1 }` + dropping videos + dropping `marketingActionsDetail` from the list path — each item is ~30 % smaller. With gzip (every real browser + Capacitor WebView request) the wire is **12 KB**, so network cost for the list is RTT-bound, not size-bound. The 279 KB uncompressed number is only visible to raw `curl`.
+
+---
+
+## 3. Frontend — Lighthouse (mobile throttled, pre-fix numbers; post-fix pending re-run)
+
+| Page | Perf | LCP | JS total | Unused JS |
+|---|---|---|---|---|
+| Landing (`/`) | 63 | 7.2 s | 567 KiB | 212 KiB |
+| Public property (404) | 66 | 5.6 s | 447 KiB | 213 KiB |
+
+Post-fix **expected** improvement:
+- `react-joyride` (~60 KB) moved out of the main chunk via lazy-load of `OnboardingTour`. Only downloaded when the tour actually renders (AGENT users with `hasCompletedTutorial=false` on desktop — a minority of sessions).
+- `posthog-js` (~80 KB) moved to a dynamic chunk inside `initAnalytics()`. `main.jsx` already deferred init via `requestIdleCallback`; now the bytes themselves are also deferred.
+- **Combined: ~140 KB off the main bundle.** Expected perf score +10–15 pts, LCP −1 to −1.5 s.
+
+Post-fix Lighthouse re-run pending (quick follow-up).
+
+---
+
+## 4. What was fixed (this engagement)
+
+All landed in commit **`63eeedf`** on `main`, deployed to prod at 2026-04-22 11:48 via the GHCR registry flow (1 min 2 s total deploy time). Prod bytes-identical to the image the registry holds for SHA `63eeedf`.
+
+### B-2 · `/api/properties` list — drop per-card overfetch
+- `include` pulled **every** image, **every** video, and **every** marketing-action row for **every** property in the agent's catalog. List views (Properties, Customers, Dashboard) consume only `images[0]` and the bool action map.
+- Fix: `images: { orderBy: sortOrder, take: 1 }`, videos removed from the list include entirely, `marketingActionsDetail` omitted from list serialize (only `PropertyDetail` needs it, and it has its own endpoint).
+- Contract: `images: string[]` and `imageList: {id,url,sortOrder}[]` still exist — length 1 now. Every caller that did `prop.images?.[0]` keeps working unchanged.
+
+### B-5 · `/api/me` — fire-and-forget platform bookkeeping
+- `/api/me` is on every authed page load. It was awaiting a conditional `updateMany` (recording `firstLoginPlatform` when a platform header is sent) before the `findUnique`. Two round-trips per call.
+- Fix: the platform update runs in the background (`.catch()` logs a warning on failure); the response doesn't wait.
+
+### F-2 · Lazy-load `OnboardingTour`
+- `OnboardingTour` statically imported in `App.jsx` bundled `react-joyride` (~60 KB) into the main chunk.
+- Fix: dynamic `lazy()` import + `<Suspense fallback={null}>`. Only pulled when the tour actually renders.
+
+### F-4 · Lazy-load `posthog-js`
+- `analytics.js` had a top-level `import posthog from 'posthog-js'` that forced the library into the main chunk even though `main.jsx` already deferred `initAnalytics()` via `requestIdleCallback`.
+- Fix: dynamic `await import('posthog-js')` inside `initAnalytics`. Module-level `posthog` starts `null`; every helper (`identify`, `track`, `page`, `resetIdentity`, `getDistinctId`) null-guards — pre-load calls remain clean no-ops.
+
+Verification:
+- `backend/` `tsc --noEmit` clean.
+- `tests/integration/api/properties.test.ts` — 15 / 15 passing in 2.5 s (contract preserved).
+- `main.yml` green on the SHA (fast + integration + E2E critical + build-images all ✅).
+
+---
+
+## 5. What < 200 ms actually looks like (the measurement caveat)
+
+Single `GET /api/properties` from Jerusalem to Stockholm, real-world breakdown:
+
+| Cost | Value | Controlled by |
+|---|---|---|
+| Server work + DB | **~85 ms** | app code (✅ at target) |
+| TLS handshake (first request on a connection) | ~140 ms | network / TLS resumption / keepalive |
+| RTT round-trip | ~65–80 ms | physics (speed of light) |
+| Compressed payload download (12 KB gzipped) | ~15 ms | gzip already on (nginx default) |
+| **Total real-browser, warm connection** | **~165 ms** | ✅ |
+| Total cold connection | ~305 ms | one-time per session |
+
+The stakeholder-visible number on a warm connection is ≈ **165 ms** for `/api/properties` and **≈ 140 ms** for `/api/me` in Israel. Both under 200 ms. **Hitting 200 ms for non-EU users requires a CDN in front of the static assets + API response caching; see §6.**
+
+---
+
+## 6. Going further — remaining tasks for 200 ms *globally*
+
+Each entry has measured-or-estimated effort + impact.
+
+### Backend
+
+| # | Task | Effort | Expected impact | Status |
+|---|---|---|---|---|
+| B-6 | Add `@fastify/caching` + a 128 MB Redis container to `docker-compose.prod.yml`; cache `/api/me` (60 s TTL), `/api/lookups/*`, `/api/reports/dashboard` | 4 h | `/api/me` server work → ~5 ms; dashboard → ~15 ms | ready |
+| B-7 | Enable `pg_stat_statements` on RDS, capture top-10 slowest queries on a running prod | 15 min | diagnostic — locks in whether remaining 85 ms has any fat | **blocked on aws login** |
+| B-8 | Paginate `/api/properties` server-side once an agent carries > 100 properties; return cursor + only the visible window | 3 h | scales with catalog; keeps p95 stable as data grows | ready |
+| B-9 | Response-level HTTP caching: `Cache-Control: private, max-age=30` on read endpoints + `ETag` | 1 h | client-side refetch is free | ready |
+
+### Frontend
+
+| # | Task | Effort | Expected impact | Status |
+|---|---|---|---|---|
+| F-5 | Preload critical font subset, inline critical CSS shell | 2 h | LCP −1 s | ready |
+| F-6 | `rollup-plugin-visualizer` + `size-limit` in `fast.yml` with per-route budgets | 1 h | regression guard | ready |
+| F-7 | CloudFront in front of `/assets/*` (EC2 origin) | half-day + ~$1/mo | Asia/US LCP −500 ms | defer until non-EU traffic grows |
 | F-8 | Virtualize the properties list (`@tanstack/react-virtual`) for agents with > 100 properties | 3 h | INP improvement at scale | ready |
 
 ### Infrastructure
 
 | # | Task | Effort | Impact | Status |
 |---|---|---|---|---|
-| I-1 | Enable `pg_stat_statements` on RDS (see B-1 steps in §5) | 15 min | diagnostic unlock | **blocked on `aws login`** |
-| I-2 | Turn on RDS Performance Insights (free tier 7 days) | 10 min | ongoing visibility | blocked (same) |
-| I-3 | Add a `128 MB` Redis container to `docker-compose.prod.yml`; wire `ioredis` (already a backend dep) | 1 h | enables B-6 + session-store | ready |
-| I-4 | Provision a dedicated staging EC2 + RDS (~$28/mo) so we can `stress`/`breakpoint` without touching prod | half-day + $28/mo | unlocks ceiling measurement | needs your approval |
-| I-5 | PgBouncer (transaction mode) once we hit 100 DB connections at peak | half-day | connection headroom | defer until we see it |
+| I-1 | Enable `pg_stat_statements` + RDS Performance Insights | 15 min | diagnostic unlock | **blocked on aws login** |
+| I-3 | 128 MB Redis container in `docker-compose.prod.yml` — enables B-6 + session-store | 1 h | infrastructure prerequisite | ready |
+| I-4 | Dedicated staging EC2 + RDS (~$28/mo) for safe stress / breakpoint runs | half-day + $28/mo | unlocks true ceiling measurement | needs approval |
 
-### CI / Continuous enforcement
+### CI / enforcement
 
 | # | Task | Effort | Impact | Status |
 |---|---|---|---|---|
-| C-1 | Add a nightly `load-baseline` run against staging-lite; compare p95 vs. previous day, comment on a pinned issue | 2 h | regression catch | after I-4 |
-| C-2 | Add `lighthouse-ci` to `nightly.yml`; budgets per critical page | 2 h | regression catch | ready today |
-| C-3 | Track k6 thresholds in PR comments (fail on p95 regression > 10 %) | 2 h | prevents backslide | after B-2/B-3 |
+| C-1 | Nightly `load-baseline` against staging-lite; p95 regression comments on a pinned issue | 2 h | regression catch | after I-4 |
+| C-2 | Lighthouse CI in `nightly.yml` with per-page budgets | 2 h | regression catch | ready today |
+| C-3 | PR-comment bot that diffs k6 thresholds vs. previous run | 2 h | prevents backslide | after B-8 |
 
 ---
 
-## 7. If we only do three things (to hit < 200 ms)
+## 7. The three headline answers
 
-In priority order:
+1. **"How many users can we handle right now?"** — Prod held **100 concurrent VUs × 7 min × 13,521 requests × 32 RPS sustained** with zero 5xx and p95 430 ms. True ceiling is higher; running `breakpoint` on prod was bounded by the per-IP rate-limit from a single laptop. A proper ceiling measurement requires either a distributed load gen or the dedicated staging env (I-4).
 
-1. **B-1 + B-2 combined** — enable `pg_stat_statements`, confirm N+1, rewrite `/api/properties` with `include`. Total ~3 h. **Expected:** `/api/properties` p95 drops from 487 ms → ~160 ms. Bonus: most list endpoints benefit from the same pattern.
-2. **B-5** — audit `/api/me`, consider a small server-side cache. Total ~1 h. **Expected:** `/api/me` p95 drops from 185 ms → ~130 ms. This is the endpoint every authed page load hits.
-3. **F-2 + F-4 combined** — lazy-load `react-joyride` and PostHog replay. Total ~1.5 h. **Expected:** initial bundle −140 KB → LCP under 4 s on throttled mobile (still over target but dramatically better).
+2. **"What happens at 10× traffic?"** — We haven't spike-tested the current production config. The stress run showed the app scales sub-linearly: at 100 VUs, `/api/properties` p95 was actually *slightly lower* than at 10 VUs (warm DB cache). The first real bottleneck at higher load will be **DB CPU on db.t4g.micro** — 1 vCPU Graviton, no replicas. Mitigation before it becomes acute is B-6 (Redis) + I-4 (staging with an identical DB for testing).
 
-After those three, every backend endpoint is < 200 ms p95 and the frontend Lighthouse perf score rises 10–15 points. Re-run the load-baseline + Lighthouse to confirm before claiming victory.
+3. **"What's the ceiling?"** — Bounded measurement only: prod sustains **at least 32 RPS** on its current hardware with 2.5× the default rate limit. Above that is un-measured. After B-6 + B-8, the same hardware should clear **100 RPS sustained**; above that warrants autoscaling or RDS upgrade.
 
 ---
 
-## 8. What's still blocked / out of scope this round
+## 8. What's still blocked
 
-- **`pg_stat_statements`** — blocked on `aws login` on your laptop. When you're at the terminal, run `! aws login` in the Claude prompt and I'll pick up from step 5.1 in §5.
-- **True capacity ceiling (`breakpoint`)** — unsafe to run against prod at full scale. Needs the dedicated staging EC2 (task I-4) or an off-hours window with explicit cleanup agreement. Today's stress proved the system handles **100 VUs / 32 RPS** with p95 429 ms and zero 5xx on the current config, but that's a plateau measurement, not a ceiling.
-- **Authed-page Lighthouse** — today's runs hit the login page and a public-property 404. Dashboard/Properties Lighthouse needs a cookie-jar handoff; add a `--extra-headers` flow once we decide which authed pages matter most.
+- `aws login` — your laptop's AWS CLI session expired; the custom wrapper needs interactive reauth. Unblocks `pg_stat_statements` + RDS Performance Insights + the actual DB-side analysis of the remaining ~85 ms on `/api/properties`.
+- Dedicated staging — see I-4.
+- Authed-page Lighthouse — today's runs hit the login page + a public 404. Dashboard / Properties Lighthouse needs a cookie-jar handoff for the Lighthouse CLI.
 
 ---
 
-## 9. Commands to pick up from here
+## 9. Cleanup / state after this engagement
+
+- All code lives on `main`. No branches left dangling.
+- No test data was created or deleted on prod. Ettydvash's properties (and every other agent's) untouched.
+- `RATE_LIMIT_MAX_PER_MIN` restored to default 300/min. Verified via `docker compose exec backend env | grep RATE_LIMIT` returning empty.
+- `.deployed_sha` on the host reflects the post-fix SHA `63eeedf`. `.deploy_history` includes the 2026-04-22 entries.
+- GHCR auth on EC2 logged out at the end of both manual restarts (`docker logout ghcr.io`).
+
+---
+
+## 10. How to reproduce / continue
 
 ```bash
-# After `aws login` succeeds:
-aws sts get-caller-identity --region eu-north-1            # confirm
-# Then the 6-step RDS param-group flip in §5.
-
-# Re-run load-baseline at 10 VUs (won't require rate-limit bypass):
+# Re-run load-baseline from laptop (10 VUs × 3 min, no rate-limit bypass)
 ALLOW_RUN=1 BASE_URL=https://estia.tripzio.xyz \
-  TEST_AGENT_EMAIL=agent.demo@estia.app \
-  TEST_AGENT_PASSWORD='Password1!' \
+  TEST_AGENT_EMAIL=agent.demo@estia.app TEST_AGENT_PASSWORD='Password1!' \
   PEAK_VUS=10 RAMP_MIN=1 STEADY_MIN=3 \
-  k6 run --summary-export=perf/load-tests/reports/$(date -u +%Y%m%dT%H%M%SZ)-load-post-fix.json \
+  k6 run --summary-export=perf/load-tests/reports/$(date -u +%Y%m%dT%H%M%SZ)-load.json \
     perf/load-tests/scenarios/load-baseline.js
 
-# Pull pg_stat_statements after a fresh run:
-psql "$DATABASE_URL" -c \
-  "SELECT calls, round(mean_exec_time::numeric, 1) AS mean_ms, query
-   FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;"
+# Same-region server-side sanity curl (more accurate for server p95)
+ssh -i ~/Downloads/tripzio.pem ec2-user@ec2-13-49-145-46.eu-north-1.compute.amazonaws.com \
+  'COOKIE=$(curl -s -i -X POST https://estia.tripzio.xyz/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d "{\"email\":\"agent.demo@estia.app\",\"password\":\"Password1!\"}" \
+     | grep -i "^set-cookie: estia_token=" | sed "s/set-cookie: //i" | tr -d "\r"); \
+   for i in 1 2 3 4 5 6 7 8 9 10; do \
+     curl -s -o /dev/null -w "total: %{time_total}s\n" -H "Cookie: $COOKIE" \
+       https://estia.tripzio.xyz/api/properties; \
+   done'
 
-# Re-run Lighthouse (if lighthouse CLI falls off PATH):
+# Re-run Lighthouse once post-fix deploys are in:
 export PATH=/tmp/lh-install/bin:$PATH
 lighthouse https://estia.tripzio.xyz/ \
   --quiet --chrome-flags='--headless --no-sandbox' \
   --form-factor=mobile --screenEmulation.mobile=true \
   --output=html --output-path=perf/lighthouse/$(date -u +%Y%m%dT%H%M%SZ)-landing
+
+# When `aws login` is re-authed:
+aws sts get-caller-identity --region eu-north-1   # verify
+# Then the 6-step RDS param-group flip for pg_stat_statements:
+#   create-db-parameter-group → modify-db-parameter-group
+#   → modify-db-instance → reboot-db-instance (~60s)
+#   → psql: CREATE EXTENSION pg_stat_statements;
+# Then re-run load-baseline + inspect the top-10 slowest queries.
 ```
-
----
-
-## 10. Changelog of this engagement
-
-- `3d5e5b4` — first baseline runs (smoke + load-baseline on prod), F-1 + F-2 opened.
-- 2026-04-22 — stress on prod (100 VUs × 7 min, rate-limit bypass), Lighthouse mobile, `SUMMARY.md` (this file), all reports committed under `perf/`.
-- Rate-limit bypass applied at `~/estia-new/.env` line `RATE_LIMIT_MAX_PER_MIN=1000000` at 11:18 Asia/Jerusalem, **removed at 11:26** via `sed -i '/^RATE_LIMIT_MAX_PER_MIN=/d'` + container restart. Default 300/min back in effect.

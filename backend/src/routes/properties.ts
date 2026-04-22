@@ -207,7 +207,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return { items: items.map(serialize) };
+    // List view uses only `marketingActions` (bool map) — the heavier
+    // `marketingActionsDetail` block (done/notes/link/doneAt per action)
+    // is ~1.4 KB per property and only consumed by PropertyDetail,
+    // which has its own endpoint. Pass `{ compact: true }` to drop it.
+    return { items: items.map((p) => serialize(p, { compact: true })) };
   });
 
   app.get('/:id', async (req, reply) => {
@@ -827,23 +831,25 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
   return data;
 }
 
-function serialize(prop: any) {
+function serialize(prop: any, opts: { compact?: boolean } = {}) {
   const actionsMap: Record<string, boolean> = {};
-  const actionsDetail: Record<string, any> = {};
+  const actionsDetail: Record<string, any> | null = opts.compact ? null : {};
   for (const key of DEFAULT_ACTION_KEYS) {
     actionsMap[key] = false;
-    actionsDetail[key] = { done: false, notes: null, link: null, doneAt: null };
+    if (actionsDetail) actionsDetail[key] = { done: false, notes: null, link: null, doneAt: null };
   }
   for (const a of prop.marketingActions || []) {
     actionsMap[a.actionKey] = a.done;
-    actionsDetail[a.actionKey] = {
-      done: a.done,
-      notes: a.notes,
-      link: a.link,
-      doneAt: a.doneAt,
-    };
+    if (actionsDetail) {
+      actionsDetail[a.actionKey] = {
+        done: a.done,
+        notes: a.notes,
+        link: a.link,
+        doneAt: a.doneAt,
+      };
+    }
   }
-  return {
+  const out: any = {
     ...prop,
     // Back-compat: `images` is the list of URLs (what most UI uses today).
     // `imageList` is the full [{id, url, sortOrder}] for the photo manager.
@@ -853,6 +859,7 @@ function serialize(prop: any) {
     })),
     videos: prop.videos || [],
     marketingActions: actionsMap,
-    marketingActionsDetail: actionsDetail,
   };
+  if (actionsDetail) out.marketingActionsDetail = actionsDetail;
+  return out;
 }
