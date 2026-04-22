@@ -21,10 +21,10 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | ID | Title | Owner | Status | Test | Fix | Verified | PR | Notes |
 |----|-------|-------|--------|------|-----|----------|-----|-------|
 | SEC-1 | Cross-user scan/notification leak | Main | 🟢 | ✅ | ✅ | ✅ (unit) | pending | 7 vitest cases; awaits push |
-| X-1 | Print universal helper | Main | ⚪ | — | — | — | — | Blocks subagents |
-| X-2 | Phone normalization utility | Main | ⚪ | — | — | — | — | Blocks subagents |
-| X-3 | Placeholder styling tokens | Main | ⚪ | — | — | — | — | Blocks subagents |
-| X-4 | Mutation/invalidation audit | Main | ⚪ | — | — | — | — | Blocks subagents |
+| X-1 | Print universal helper | Main | 🟢 | ✅ | ✅ | ✅ (unit) | pending | `lib/print.js` + css guards |
+| X-2 | Phone normalization utility | Main | 🟢 | ✅ | ✅ | ✅ (unit) | pending | `lib/phone.js` (26 cases) |
+| X-3 | Placeholder styling tokens | Main | 🟢 | ✅ | ✅ | ✅ (unit) | pending | `--placeholder-color` + rules |
+| X-4 | Mutation/invalidation audit | Main | 🟢 | ✅ | ✅ | ✅ (unit) | pending | `lib/mutations.js` helper |
 | LP-1 | Pricing cards alignment | Sub-1 | ⚪ | — | — | — | — | |
 | A-1 | Delete account | Sub-1 | ⚪ | — | — | — | — | Soft-delete, scary UX |
 | A-2 | Google on signup | Sub-1 | ⚪ | — | — | — | — | |
@@ -54,6 +54,21 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 
 - **2026-04-22T17:00Z** — Discovery answers captured in `fixes/DISCOVERY.md`.
   SEC-1 investigation starts next. No subagents until SEC-1 + X-1..X-4 ship.
+- **2026-04-22T20:59Z** — X-1..X-4 shared utilities shipped:
+  - **X-1** `frontend/src/lib/print.js` — `printPage({ before, after })`.
+    `print.css` now also lifts html/body/#root overflow + height caps
+    under `@media print` so the full document paginates (fixes the
+    "blank trailing pages" bug). 3 detail pages migrated.
+    6 new vitest cases.
+  - **X-2** `frontend/src/lib/phone.js` — `formatPhone` / `toE164` /
+    `digitsOnly`. Handles +972 / 972 / 00972 / 0501234567 /
+    landline 9-digit shapes. 26 cases.
+  - **X-3** Global `::placeholder` rule in `index.css` keyed off a new
+    `--placeholder-color` token (per-theme). 3 cases.
+  - **X-4** `frontend/src/lib/mutations.js` — `runMutation()` codifies
+    the `mutate → reload → toast → rollback` pattern so subagents can
+    stop copy-pasting it. 4 cases.
+  - Full `unit-frontend` suite: 160 tests pass.
 - **2026-04-22T20:45Z** — SEC-1 fix landed:
   - `yad2ScanStore.resetForLogout()` + `marketScanStore.resetForLogout()`
     — wipe in-memory state + sessionStorage on a session boundary.

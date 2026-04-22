@@ -47,16 +47,19 @@ describe('print.css', () => {
   });
 });
 
-// Integration-ish check: every detail page has a window.print() button.
+// Integration-ish check: every detail page wires a print button.
+// After X-1 the canonical path is `printPage()` from `lib/print.js`,
+// which itself calls `window.print()`. We accept either in the source
+// so old and new patterns both count as "has a print button."
 describe('detail pages wire in a print button', () => {
   const pages = ['PropertyDetail', 'CustomerDetail', 'OwnerDetail'];
   for (const page of pages) {
-    it(`${page}.jsx calls window.print()`, () => {
+    it(`${page}.jsx wires a print button`, () => {
       const src = readFileSync(
         path.join(here, `../../../frontend/src/pages/${page}.jsx`),
         'utf8',
       );
-      expect(src).toMatch(/window\.print\(\)/);
+      expect(src).toMatch(/printPage\(\)|window\.print\(\)/);
     });
   }
 });

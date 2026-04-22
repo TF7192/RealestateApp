@@ -14,6 +14,7 @@ import {
   Maximize2,
 } from 'lucide-react';
 import { popoutCurrentRoute } from '../lib/popout';
+import { printPage } from '../lib/print';
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -163,7 +164,7 @@ export default function OwnerDetail() {
               אימייל
             </a>
           )}
-          <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title="הדפס">
+          <button className="btn btn-ghost btn-sm" onClick={() => printPage()} title="הדפס">
             <Printer size={14} />
             הדפס
           </button>

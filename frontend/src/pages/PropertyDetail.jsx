@@ -35,6 +35,7 @@ import {
   Maximize2,
 } from 'lucide-react';
 import { popoutCurrentRoute } from '../lib/popout';
+import { printPage } from '../lib/print';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
 import { useAuth } from '../lib/auth';
@@ -623,7 +624,7 @@ export default function PropertyDetail() {
               <span>סטורי</span>
             </button>
           )}
-          <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title="הדפס">
+          <button className="btn btn-ghost btn-sm" onClick={() => printPage()} title="הדפס">
             <Printer size={14} />
             <span>הדפס</span>
           </button>

@@ -22,6 +22,26 @@
   body {
     background: #fff !important;
     color: #000 !important;
+    /* X-1 — the "blank page / only first page prints" regression was
+     * caused by app chrome CSS that clamps html/body height to the
+     * viewport and hides overflow. Under @media print this paginates
+     * to one page of content + blank trailing pages. Force the browser
+     * back to the print-default flow here. */
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  /* Same reason — any page-level scrollable wrapper must let the
+   * browser lay its content out across pages instead of clipping to
+   * the screen viewport. */
+  #root,
+  .app,
+  .main-content {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
   }
 
   /* App chrome — hide everything that isn't the content. */

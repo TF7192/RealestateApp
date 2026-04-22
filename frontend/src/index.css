@@ -50,6 +50,10 @@
      caption / helper / date text meets WCAG AA body contrast. */
   --text-muted: #6b6356;
   --text-accent: var(--gold);
+  /* X-3 — placeholder color token used by the global ::placeholder
+   * rule below. Muted enough to read as hint-not-value; opacity also
+   * applied so Chrome/Safari's own default weight doesn't override. */
+  --placeholder-color: #9a9387;
 
   --border: rgba(30, 26, 20, 0.08);
   --border-light: rgba(30, 26, 20, 0.14);
@@ -78,6 +82,7 @@
   --text-primary: #f0ece4;
   --text-secondary: #9a9aab;
   --text-muted: #5e5e72;
+  --placeholder-color: #6a6a82;
 
   --border: rgba(255, 255, 255, 0.06);
   --border-light: rgba(255, 255, 255, 0.1);
@@ -507,6 +512,29 @@ a:hover {
 
 .form-input::placeholder {
   color: var(--text-muted);
+}
+
+/* X-3 — global placeholder styling for every text-like input so the
+ * hint never reads as a real value. The `.form-input` rule above
+ * overrides for the design-system class; this catches all the bare
+ * <input> / <textarea> / <select> elements on pages that haven't
+ * migrated to SmartFields yet. */
+input::placeholder,
+textarea::placeholder {
+  color: var(--placeholder-color);
+  opacity: 0.8;
+}
+/* Safari/Firefox honor `opacity` on the placeholder pseudo only when
+ * explicitly reset — their UA sheets sometimes apply their own alpha. */
+input::-webkit-input-placeholder,
+textarea::-webkit-input-placeholder {
+  color: var(--placeholder-color);
+  opacity: 0.8;
+}
+input::-moz-placeholder,
+textarea::-moz-placeholder {
+  color: var(--placeholder-color);
+  opacity: 0.8;
 }
 
 .form-textarea {

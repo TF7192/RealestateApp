@@ -19,6 +19,7 @@ import {
   Maximize2,
 } from 'lucide-react';
 import { popoutCurrentRoute } from '../lib/popout';
+import { printPage } from '../lib/print';
 import api from '../lib/api';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import LeadMeetingDialog from '../components/LeadMeetingDialog';
@@ -233,7 +234,7 @@ export default function CustomerDetail() {
             <Calendar size={14} />
             {t('detail.toolbar.scheduleMeeting')}
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title={t('detail.toolbar.printTitle')}>
+          <button className="btn btn-ghost btn-sm" onClick={() => printPage()} title={t('detail.toolbar.printTitle')}>
             <Printer size={14} />
             {t('detail.toolbar.print')}
           </button>
