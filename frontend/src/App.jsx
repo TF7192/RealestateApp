@@ -197,6 +197,12 @@ function AppRoutes() {
         <Routes>
           <Route element={<Layout onLogout={logout} />}>
             <Route path="/" element={<Dashboard />} />
+            {/* `/dashboard` is an alias for the authenticated Dashboard.
+                Needed because `/` is served by the static landing.html in
+                nginx — authenticated post-login redirects target this
+                path so they land in the SPA instead of the marketing
+                page. */}
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/properties" element={<Properties />} />
             <Route path="/properties/new" element={<NewProperty />} />
             <Route path="/properties/:id/edit" element={<NewProperty />} />

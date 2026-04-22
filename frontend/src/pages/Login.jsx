@@ -62,11 +62,17 @@ export default function Login() {
       return;
     }
     // After OAuth success the backend redirects to this `redirect` param.
-    // If the user starts from /login, redirecting them back to /login
-    // lands them on a 404 in the authenticated router — send them to /
-    // (the dashboard) instead.
+    // Two gotchas:
+    //   - If the user starts from /login, bouncing back to /login lands
+    //     on a 404 in the authenticated router.
+    //   - `/` is served by the static marketing landing page (nginx),
+    //     NOT the SPA — so redirecting there after login shows the
+    //     landing, not the dashboard.
+    // Default post-login target is /dashboard, which is an SPA alias
+    // for Dashboard added exactly for this flow.
     const here = window.location.pathname + window.location.search;
-    const redirect = window.location.pathname === '/login' ? '/' : here;
+    const onLogin = window.location.pathname === '/login';
+    const redirect = (onLogin || window.location.pathname === '/') ? '/dashboard' : here;
     window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirect)}`;
   };
 
