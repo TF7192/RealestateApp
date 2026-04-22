@@ -1,21 +1,51 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Check, Pen, AlertCircle, Trash2, ArrowRight, FileSignature, Home } from 'lucide-react';
 import './ProspectSign.css';
 
-// Public prospect-sign kiosk. A two-step flow that mirrors the common
-// Israeli interested-party intake: landing card with the property +
-// agent context and a big CTA, then the form (full name, ת.ז./דרכון
-// radio + number, address, signature canvas).
+// Public prospect-sign kiosk. Two-step flow that mirrors the formal
+// Israeli "הזמנת שירותי תיווך" layout:
+//   Step 1: landing — agent header + property context + big CTA.
+//   Step 2: formal order — agent + client + property details, the
+//           agent's own brokerage terms (pulled from their profile),
+//           signature canvas.
 //
-// No login required; gated by the unguessable 24h token in the URL.
-
-const BRAND_MARK_URL = '/favicon.svg';
+// Gated by an unguessable 24h token. No login.
 
 function formatPrice(n) {
   if (n == null) return '';
   try { return new Intl.NumberFormat('he-IL').format(n); }
   catch { return String(n); }
+}
+
+// Very conservative allow-list for rendering the agent-supplied
+// brokerageTermsHtml. No <script>, no event handlers, no <iframe>.
+// Bold + italic + paragraphs + line breaks + lists + headings are
+// enough for a broker form.
+const ALLOWED_TAGS = new Set([
+  'P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI',
+  'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'SPAN', 'DIV',
+]);
+function sanitizeHtml(raw) {
+  if (!raw) return '';
+  const tpl = document.createElement('template');
+  tpl.innerHTML = String(raw);
+  const walk = (node) => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        if (!ALLOWED_TAGS.has(child.tagName)) {
+          child.replaceWith(...Array.from(child.childNodes));
+          continue;
+        }
+        // Strip every attribute — keeps inline handlers, javascript: URLs,
+        // and style-based exfil impossible.
+        for (const attr of Array.from(child.attributes)) child.removeAttribute(attr.name);
+        walk(child);
+      }
+    }
+  };
+  walk(tpl.content);
+  return tpl.innerHTML;
 }
 
 export default function ProspectSign() {
@@ -51,11 +81,7 @@ export default function ProspectSign() {
         }
         const json = await resp.json();
         setState(json);
-        // Pre-fill the agent-entered name so the prospect only needs to
-        // confirm / correct spelling instead of retyping from scratch.
-        if (json?.prospect?.name) {
-          setForm((p) => ({ ...p, fullName: json.prospect.name }));
-        }
+        if (json?.prospect?.name) setForm((p) => ({ ...p, fullName: json.prospect.name }));
       } catch {
         setErr('תקלת רשת');
       } finally {
@@ -64,7 +90,6 @@ export default function ProspectSign() {
     })();
   }, [token]);
 
-  // Re-size the signature canvas for high-DPI + responsive widths.
   useEffect(() => {
     if (step !== 'form' || !canvasRef.current) return undefined;
     const canvas = canvasRef.current;
@@ -151,18 +176,22 @@ export default function ProspectSign() {
     }
   };
 
-  // ── Shell (used by every state) ─────────────────────────────────
+  const agentTermsHtml = useMemo(
+    () => sanitizeHtml(state?.agent?.brokerageTermsHtml || ''),
+    [state?.agent?.brokerageTermsHtml],
+  );
+
   const Shell = ({ children }) => (
     <div className="psn-page" dir="rtl">
       <header className="psn-brand-bar">
-        <img src={BRAND_MARK_URL} alt="Estia" className="psn-brand-mark" />
+        <div className="psn-brand-mark" aria-hidden="true">◆</div>
         <div className="psn-brand-text">
           <strong>Estia</strong>
-          <span>טופס מתעניין</span>
+          <span>הזמנת שירותי תיווך</span>
         </div>
       </header>
       <main className="psn-main">{children}</main>
-      <footer className="psn-foot">מאובטח · החתימה נשמרת מוצפנת אצל הסוכן/ת</footer>
+      <footer className="psn-foot">מאובטח · החתימה נשמרת מוצפנת אצל המתווך/ת</footer>
     </div>
   );
 
@@ -195,7 +224,12 @@ export default function ProspectSign() {
         <div className="psn-card psn-done">
           <div className="psn-done-ring"><Check size={36} /></div>
           <h2>תודה!</h2>
-          <p>החתימה התקבלה. {state?.agent?.displayName ? `${state.agent.displayName} יחזור/תחזור אלייך בקרוב.` : 'ניצור איתך קשר בקרוב.'}</p>
+          <p>
+            החתימה התקבלה.
+            {state?.agent?.displayName
+              ? ` ${state.agent.displayName} יחזרו אלייך בהקדם.`
+              : ' ניצור עמך קשר בהקדם.'}
+          </p>
         </div>
       </Shell>
     );
@@ -203,13 +237,38 @@ export default function ProspectSign() {
 
   const { prospect, property, agent } = state;
 
-  // ── Step 1: intro landing ───────────────────────────────────────
+  // ── Agent header block (used on both steps) ────────────────────
+  const AgentHeader = () => (
+    <div className="psn-agent-head">
+      <div className="psn-agent-name">
+        {agent?.displayName || 'המתווך/ת'}
+        {agent?.agency && <span className="psn-agent-agency"> · {agent.agency}</span>}
+      </div>
+      {agent?.businessAddress && <div className="psn-agent-line">{agent.businessAddress}</div>}
+      {agent?.phone && <div className="psn-agent-line" dir="ltr">{agent.phone}</div>}
+      {(agent?.license || agent?.personalId) && (
+        <div className="psn-agent-line psn-agent-meta">
+          {agent.license  && <span>מ.ר. {agent.license}</span>}
+          {agent.license && agent.personalId && <span aria-hidden="true"> · </span>}
+          {agent.personalId && <span>ת.ז. {agent.personalId}</span>}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Step 1: intro landing ──────────────────────────────────────
   if (step === 'intro') {
     return (
       <Shell>
         <div className="psn-card psn-intro">
-          <div className="psn-intro-icon"><FileSignature size={28} /></div>
-          <h1>טופס התעניינות בנכס</h1>
+          <AgentHeader />
+          <div className="psn-rule" />
+          <div className="psn-intro-icon"><FileSignature size={24} /></div>
+          <h1>הזמנת שירותי תיווך</h1>
+          <p className="psn-law-cite">
+            נדרשת עפ"י חוק המתווכים במקרקעין, התשנ"ו-1996
+          </p>
+
           {property && (
             <div className="psn-prop">
               <Home size={16} aria-hidden="true" />
@@ -218,25 +277,18 @@ export default function ProspectSign() {
                   {property.type ? `${property.type} ` : ''}ב{property.street}, {property.city}
                 </div>
                 {property.neighborhood && <div className="psn-prop-sub">{property.neighborhood}</div>}
-                {property.marketingPrice
-                  ? <div className="psn-prop-price">₪ {formatPrice(property.marketingPrice)}</div>
-                  : null}
+                {property.marketingPrice != null && (
+                  <div className="psn-prop-price">₪ {formatPrice(property.marketingPrice)}</div>
+                )}
               </div>
             </div>
           )}
-          {agent?.displayName && (
-            <div className="psn-agent">
-              <span>הטופס הוכן עבור</span>
-              <strong>{prospect.name}</strong>
-              <span>ע"י</span>
-              <strong>{agent.displayName}</strong>
-              {agent.agency && <span className="psn-agent-agency">· {agent.agency}</span>}
-            </div>
-          )}
+
           <p className="psn-intro-copy">
-            בלחיצה על הכפתור תועברו לעמוד קצר למילוי פרטי זיהוי וחתימה דיגיטלית.
-            המילוי לוקח כדקה ומחייב חתימה על המסך.
+            שלום {prospect.name}, הטופס כולל פרטי זיהוי, התחייבויות עפ"י חוק המתווכים
+            וחתימה דיגיטלית. המילוי אורך כדקה.
           </p>
+
           <button
             type="button"
             className="btn btn-primary psn-cta psn-cta-hero"
@@ -245,6 +297,7 @@ export default function ProspectSign() {
             <Pen size={18} />
             <span>לחץ לחתימה</span>
           </button>
+
           <ul className="psn-checks">
             <li><Check size={14} /> קישור אישי ומוצפן</li>
             <li><Check size={14} /> תקף ל-24 שעות</li>
@@ -255,7 +308,7 @@ export default function ProspectSign() {
     );
   }
 
-  // ── Step 2: form ────────────────────────────────────────────────
+  // ── Step 2: formal order form ─────────────────────────────────
   const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   return (
@@ -270,17 +323,14 @@ export default function ProspectSign() {
           >
             <ArrowRight size={16} /> חזור
           </button>
-          <h2>פרטי המתעניין</h2>
+          <h2>הזמנת שירותי תיווך</h2>
         </div>
 
-        {property && (
-          <div className="psn-prop psn-prop-compact">
-            <Home size={14} aria-hidden="true" />
-            <span>
-              {property.type ? `${property.type} ` : ''}ב{property.street}, {property.city}
-            </span>
-          </div>
-        )}
+        <AgentHeader />
+        <div className="psn-rule" />
+
+        {/* ── Client details ────────────────────────────────── */}
+        <h3 className="psn-section-h">פרטי הלקוח/ה</h3>
 
         <label className="psn-label" htmlFor="psn-fullname">שם מלא *</label>
         <input
@@ -295,11 +345,7 @@ export default function ProspectSign() {
         />
 
         <label className="psn-label" id="psn-idtype-label">סוג מסמך זיהוי *</label>
-        <div
-          className="psn-segmented"
-          role="radiogroup"
-          aria-labelledby="psn-idtype-label"
-        >
+        <div className="psn-segmented" role="radiogroup" aria-labelledby="psn-idtype-label">
           {[
             { value: 'ID',       label: 'ת.ז.' },
             { value: 'PASSPORT', label: 'דרכון' },
@@ -359,6 +405,53 @@ export default function ProspectSign() {
           placeholder="name@example.com"
         />
 
+        {/* ── Property list ─────────────────────────────────── */}
+        {property && (
+          <>
+            <h3 className="psn-section-h">הנכס</h3>
+            <div className="psn-prop-table" role="table">
+              <div className="psn-prop-row psn-prop-row-head" role="row">
+                <span role="columnheader">סוג</span>
+                <span role="columnheader">כתובת</span>
+                <span role="columnheader">מחיר מבוקש</span>
+              </div>
+              <div className="psn-prop-row" role="row">
+                <span role="cell">{property.type || '—'}</span>
+                <span role="cell">{property.street}, {property.city}</span>
+                <span role="cell">
+                  {property.marketingPrice != null
+                    ? `₪ ${formatPrice(property.marketingPrice)}`
+                    : '—'}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Brokerage terms (agent-supplied or fallback) ─── */}
+        <h3 className="psn-section-h">תנאי הזמנת שירותי תיווך</h3>
+        {agentTermsHtml ? (
+          <div
+            className="psn-terms psn-terms-html"
+            dangerouslySetInnerHTML={{ __html: agentTermsHtml }}
+          />
+        ) : (
+          <div className="psn-terms">
+            <p>
+              הלקוח/ה מזמין/ה בזאת מהמתווך שירותי תיווך בקשר לנכס המפורט לעיל,
+              בהתאם להוראות חוק המתווכים במקרקעין, התשנ"ו-1996.
+            </p>
+            <p>
+              הלקוח/ה מתחייב/ת להודיע למתווך באופן מיידי על כל משא ומתן או חתימה
+              על הסכם מחייב ביחס לנכס, ועל תשלום דמי תיווך כמוסכם בינו לבין
+              המתווך מיד עם ביצוע העסקה.
+            </p>
+            <p className="psn-terms-note">
+              * זהו נוסח כללי. ניתן להחליפו בנוסח ברוקרז' מלא שלך בהגדרות חשבון המתווך.
+            </p>
+          </div>
+        )}
+
         <label className="psn-label" htmlFor="psn-notes">הערות (אופציונלי)</label>
         <textarea
           id="psn-notes"
@@ -368,9 +461,10 @@ export default function ProspectSign() {
           autoCapitalize="sentences"
           value={form.notes}
           onChange={(e) => update('notes', e.target.value)}
-          placeholder="פרטים נוספים שחשוב שהסוכן/ת ידעו"
+          placeholder="פרטים נוספים שחשוב שהמתווך/ת ידעו"
         />
 
+        {/* ── Signature ─────────────────────────────────────── */}
         <div className="psn-sign-head">
           <label className="psn-label">חתימה *</label>
           <button type="button" className="psn-clear" onClick={clear}>
@@ -395,7 +489,7 @@ export default function ProspectSign() {
             onClick={submit}
             disabled={busy}
           >
-            <Check size={16} /> {busy ? 'שומר…' : 'שמור וסיים'}
+            <Check size={16} /> {busy ? 'שומר…' : 'אישור וחתימה'}
           </button>
         </div>
       </div>

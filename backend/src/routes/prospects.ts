@@ -140,7 +140,19 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
     });
     const agent = await prisma.user.findUnique({
       where: { id: prospect.agentId },
-      select: { displayName: true, phone: true, agentProfile: { select: { agency: true } } },
+      select: {
+        displayName: true,
+        phone: true,
+        agentProfile: {
+          select: {
+            agency: true,
+            license: true,
+            personalId: true,
+            businessAddress: true,
+            brokerageTermsHtml: true,
+          },
+        },
+      },
     });
     return {
       prospect: {
@@ -153,9 +165,13 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
       property,
       agent: agent
         ? {
-            displayName: agent.displayName,
-            phone: agent.phone,
-            agency: agent.agentProfile?.agency || null,
+            displayName:        agent.displayName,
+            phone:              agent.phone,
+            agency:             agent.agentProfile?.agency          || null,
+            license:            agent.agentProfile?.license         || null,
+            personalId:         agent.agentProfile?.personalId      || null,
+            businessAddress:    agent.agentProfile?.businessAddress || null,
+            brokerageTermsHtml: agent.agentProfile?.brokerageTermsHtml || null,
           }
         : null,
     };

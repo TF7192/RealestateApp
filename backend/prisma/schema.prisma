@@ -362,6 +362,14 @@ model AgentProfile {
   title   String?
   license String?
   bio     String?
+  // Formal intake-form header fields.
+  personalId         String? // ת.ז. of the agent, printed on the order header
+  businessAddress    String? // e.g. "אלון 18א', נס ציונה"
+  // Agent's own brokerage-intake legal text — rendered on the public
+  // prospect-sign form. Agents paste the exact copy they use on paper
+  // (or let product supply a sensible default). HTML so multi-paragraph
+  // formatting survives; we sanitize on render.
+  brokerageTermsHtml String?
 }
 
 model CustomerProfile {

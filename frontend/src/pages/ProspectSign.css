@@ -1,33 +1,43 @@
-/* Prospect-sign kiosk — branded, mobile-first, two-step.
-   Opened by the prospect on their own phone via a 24h token link.
-   Touch targets >=44px; visual voice quiet so the signature is the hero. */
+/* Prospect-sign kiosk — Estia gold brand, mobile-first, two-step.
+   Matches the gold/cream palette used in Layout.css:
+     --gold #b48b4c   --gold-dim #8a6932
+     --bg-primary #f7f3ec   --bg-card #ffffff
+     --text-primary #1e1a14
+   Touch targets >=44px; 16px input font (prevents iOS focus-zoom). */
 
 .psn-page {
   min-height: 100dvh;
+  /* Subtle gold wash on cream — matches the app's warm brand */
   background:
-    radial-gradient(ellipse at top left,  rgba(134, 59, 255, 0.08), transparent 55%),
-    radial-gradient(ellipse at top right, rgba(71, 191, 255, 0.08), transparent 55%),
-    #faf9fc;
+    radial-gradient(ellipse at top left,  rgba(180, 139, 76, 0.10), transparent 60%),
+    radial-gradient(ellipse at top right, rgba(201, 163, 108, 0.08), transparent 60%),
+    #f7f3ec;
   display: flex;
   flex-direction: column;
-  font-family: var(--font-body, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial);
+  font-family: 'Assistant', 'Heebo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #1e1a14;
   padding-block-start: max(12px, env(safe-area-inset-top));
   padding-block-end:   max(12px, env(safe-area-inset-bottom));
   padding-inline:      max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
 }
 
-/* ── Brand bar ──────────────────────────────────────────────── */
+/* ── Brand bar: gold diamond + Estia wordmark ──────────────── */
 .psn-brand-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 8px 4px 16px;
 }
 .psn-brand-mark {
-  width: 34px;
-  height: 34px;
-  filter: drop-shadow(0 2px 8px rgba(126, 20, 255, 0.18));
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #b48b4c 0%, #8a6932 100%);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  color: #f7f3ec;
+  box-shadow: 0 6px 16px -6px rgba(180, 139, 76, 0.55);
 }
 .psn-brand-text {
   display: flex;
@@ -35,14 +45,17 @@
   line-height: 1.1;
 }
 .psn-brand-text strong {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   color: #1e1a14;
   letter-spacing: 0.2px;
+  font-family: 'Assistant', 'Heebo', sans-serif;
 }
 .psn-brand-text span {
   font-size: 12px;
-  color: #6b6680;
+  color: #8a6932;
+  font-weight: 500;
+  margin-block-start: 2px;
 }
 
 .psn-main {
@@ -56,125 +69,155 @@
 .psn-foot {
   text-align: center;
   font-size: 11px;
-  color: #8c879c;
+  color: #8c8270;
   padding: 18px 8px 0;
 }
 
 /* ── Card ──────────────────────────────────────────────────── */
 .psn-card {
   width: 100%;
-  max-width: 520px;
-  background: #fff;
-  border-radius: 20px;
+  max-width: 560px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(180, 139, 76, 0.18);
   box-shadow:
-    0 1px 2px rgba(25, 20, 60, 0.05),
-    0 12px 40px -12px rgba(126, 20, 255, 0.18);
-  padding: 28px 22px;
+    0 1px 2px rgba(30, 26, 20, 0.04),
+    0 12px 40px -14px rgba(180, 139, 76, 0.25);
+  padding: 26px 22px;
   animation: psn-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-
 @keyframes psn-in {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Intro (step 1) ───────────────────────────────────────────── */
+/* ── Agent header block ────────────────────────────────────── */
+.psn-agent-head {
+  text-align: start;
+  font-size: 13px;
+  color: #54503e;
+  line-height: 1.55;
+}
+.psn-agent-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e1a14;
+}
+.psn-agent-agency {
+  color: #8a6932;
+  font-weight: 500;
+}
+.psn-agent-line { color: #54503e; }
+.psn-agent-meta { font-size: 12px; color: #8c8270; margin-block-start: 2px; }
+
+.psn-rule {
+  height: 1px;
+  background: linear-gradient(
+    to left,
+    transparent 0%,
+    rgba(180, 139, 76, 0.28) 20%,
+    rgba(180, 139, 76, 0.28) 80%,
+    transparent 100%
+  );
+  margin: 16px 0;
+}
+
+/* ── Intro (step 1) ────────────────────────────────────────── */
 .psn-intro { text-align: center; }
 .psn-intro-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #863bff, #47bfff);
-  color: #fff;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #b48b4c 0%, #8a6932 100%);
+  color: #f7f3ec;
   display: grid;
   place-items: center;
-  margin: 0 auto 14px;
-  box-shadow: 0 10px 30px -10px rgba(126, 20, 255, 0.5);
+  margin: 4px auto 12px;
+  box-shadow: 0 10px 26px -10px rgba(180, 139, 76, 0.5);
 }
 .psn-intro h1 {
-  font-size: 22px;
-  margin: 0 0 14px;
+  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 6px;
   line-height: 1.25;
   color: #1e1a14;
 }
+.psn-law-cite {
+  font-size: 12px;
+  color: #8a6932;
+  margin: 0 0 16px;
+  font-style: italic;
+}
+
 .psn-prop {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: #f5f2fa;
-  border: 1px solid #ece6f6;
-  border-radius: 12px;
+  background: #faf6ec;
+  border: 1px solid rgba(180, 139, 76, 0.22);
+  border-radius: 10px;
   padding: 12px 14px;
   text-align: start;
   margin: 6px 0 14px;
 }
-.psn-prop svg { flex: 0 0 auto; margin-block-start: 2px; color: #863bff; }
+.psn-prop svg  { flex: 0 0 auto; margin-block-start: 2px; color: #b48b4c; }
 .psn-prop-title { font-weight: 600; font-size: 15px; color: #1e1a14; }
-.psn-prop-sub   { font-size: 12px; color: #6b6680; margin-block-start: 2px; }
-.psn-prop-price { font-size: 13px; color: #47bfff; margin-block-start: 4px; font-weight: 600; }
-
-.psn-agent {
-  font-size: 13px;
-  color: #4a465a;
-  margin: 10px 0 16px;
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  justify-content: center;
-  align-items: baseline;
-}
-.psn-agent strong { color: #1e1a14; font-weight: 600; }
-.psn-agent-agency { color: #8c879c; font-size: 12px; }
+.psn-prop-sub   { font-size: 12px; color: #8c8270; margin-block-start: 2px; }
+.psn-prop-price { font-size: 13px; color: #8a6932; margin-block-start: 4px; font-weight: 700; }
 
 .psn-intro-copy {
   font-size: 14px;
-  line-height: 1.6;
-  color: #4a465a;
-  margin: 10px 4px 18px;
+  line-height: 1.65;
+  color: #54503e;
+  margin: 14px 4px 20px;
 }
 
+/* ── CTA (hero + form submit) ──────────────────────────────── */
 .psn-cta {
   width: 100%;
   min-height: 52px;
   font-size: 16px;
-  font-weight: 600;
-  border-radius: 14px;
+  font-weight: 700;
+  border-radius: 12px;
   gap: 8px;
+  font-family: inherit;
 }
 .psn-cta-hero {
-  background: linear-gradient(135deg, #863bff, #5a1fdb);
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 14px 28px -12px rgba(126, 20, 255, 0.55);
+  background: linear-gradient(135deg, #b48b4c 0%, #8a6932 100%);
+  border: 1px solid #8a6932;
+  color: #f7f3ec;
+  box-shadow: 0 12px 24px -10px rgba(180, 139, 76, 0.55);
 }
 .psn-cta-hero:hover,
 .psn-cta-hero:focus-visible {
   filter: brightness(1.05);
-  box-shadow: 0 16px 32px -10px rgba(126, 20, 255, 0.7);
+  box-shadow: 0 16px 32px -10px rgba(180, 139, 76, 0.7);
 }
 
 .psn-checks {
   list-style: none;
   padding: 0;
-  margin: 16px 0 0;
+  margin: 18px 0 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   justify-content: center;
   font-size: 12px;
-  color: #6b6680;
+  color: #8c8270;
 }
 .psn-checks li {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #f5f2fa;
+  background: #faf6ec;
+  border: 1px solid rgba(180, 139, 76, 0.18);
   padding: 4px 10px;
   border-radius: 100px;
 }
-.psn-checks svg { color: #863bff; }
+.psn-checks svg { color: #b48b4c; }
 
-/* Form (step 2) ────────────────────────────────────────────── */
+/* ── Form (step 2) ─────────────────────────────────────────── */
 .psn-form-head {
   display: flex;
   align-items: center;
@@ -182,26 +225,30 @@
   margin-block-end: 4px;
 }
 .psn-form-head h2 {
-  font-size: 18px;
+  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-size: 20px;
   margin: 0;
   flex: 1;
   color: #1e1a14;
+  font-weight: 700;
 }
 .psn-back {
   min-height: 40px;
   padding: 6px 12px;
-  color: #4a465a;
+  color: #54503e;
   gap: 6px;
 }
 
-.psn-prop-compact {
-  padding: 8px 12px;
-  margin: 8px 0 14px;
-  font-size: 13px;
-  color: #4a465a;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.psn-section-h {
+  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #8a6932;
+  letter-spacing: 0.3px;
+  text-transform: none;
+  margin: 22px 0 10px;
+  padding-block-end: 6px;
+  border-block-end: 1px solid rgba(180, 139, 76, 0.2);
 }
 
 .psn-label {
@@ -209,7 +256,7 @@
   font-size: 13px;
   font-weight: 600;
   color: #2b273a;
-  margin: 16px 0 6px;
+  margin: 14px 0 6px;
 }
 
 .psn-input,
@@ -219,27 +266,27 @@
   font-size: 16px; /* iOS: >=16px prevents auto-zoom on focus */
   line-height: 1.4;
   padding: 12px 14px;
-  border: 1px solid #e0dae9;
-  border-radius: 12px;
-  background: #fff;
+  border: 1px solid rgba(180, 139, 76, 0.28);
+  border-radius: 10px;
+  background: #ffffff;
   color: #1e1a14;
   transition: border-color 0.15s, box-shadow 0.15s;
   font-family: inherit;
 }
-.psn-textarea { min-height: 92px; resize: vertical; }
-
+.psn-textarea { min-height: 88px; resize: vertical; }
 .psn-input:focus,
 .psn-textarea:focus {
   outline: none;
-  border-color: #863bff;
-  box-shadow: 0 0 0 4px rgba(134, 59, 255, 0.15);
+  border-color: #b48b4c;
+  box-shadow: 0 0 0 3px rgba(180, 139, 76, 0.18);
 }
 
 .psn-segmented {
   display: inline-flex;
   padding: 4px;
-  background: #f5f2fa;
-  border-radius: 12px;
+  background: #faf6ec;
+  border: 1px solid rgba(180, 139, 76, 0.22);
+  border-radius: 10px;
   gap: 4px;
 }
 .psn-seg-btn {
@@ -247,20 +294,71 @@
   min-height: 40px;
   padding: 8px 16px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
-  color: #4a465a;
+  color: #54503e;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
 }
 .psn-seg-btn.is-on {
-  background: #fff;
+  background: #ffffff;
   color: #1e1a14;
-  box-shadow: 0 1px 3px rgba(25, 20, 60, 0.1);
+  box-shadow: 0 1px 3px rgba(30, 26, 20, 0.1);
 }
 
+/* ── Property table ────────────────────────────────────────── */
+.psn-prop-table {
+  border: 1px solid rgba(180, 139, 76, 0.22);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #faf6ec;
+}
+.psn-prop-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #1e1a14;
+}
+.psn-prop-row + .psn-prop-row { border-block-start: 1px solid rgba(180, 139, 76, 0.18); }
+.psn-prop-row-head {
+  background: #f3ecd8;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a6932;
+  text-transform: none;
+  letter-spacing: 0.3px;
+}
+
+/* ── Brokerage terms block ─────────────────────────────────── */
+.psn-terms {
+  background: #faf6ec;
+  border: 1px solid rgba(180, 139, 76, 0.2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #2b2721;
+}
+.psn-terms p { margin: 0 0 10px; }
+.psn-terms p:last-child { margin-block-end: 0; }
+.psn-terms ul, .psn-terms ol { padding-inline-start: 20px; margin: 6px 0 10px; }
+.psn-terms li { margin-block-end: 4px; }
+.psn-terms strong { color: #1e1a14; }
+.psn-terms-note {
+  font-size: 11px;
+  color: #8c8270;
+  font-style: italic;
+  border-block-start: 1px dashed rgba(180, 139, 76, 0.28);
+  padding-block-start: 8px;
+  margin-block-start: 8px;
+}
+
+/* ── Signature ─────────────────────────────────────────────── */
 .psn-sign-head {
   display: flex;
   justify-content: space-between;
@@ -269,7 +367,7 @@
 }
 .psn-clear {
   font-size: 12px;
-  color: #a44;
+  color: #b91c1c;
   background: none;
   border: none;
   padding: 6px 8px;
@@ -278,6 +376,7 @@
   align-items: center;
   gap: 4px;
   border-radius: 8px;
+  font-family: inherit;
 }
 .psn-clear:hover { background: #fef2f2; }
 
@@ -285,14 +384,14 @@
   position: relative;
   aspect-ratio: 2 / 1;
   max-height: 220px;
-  background: #fff;
-  border: 2px dashed #d8d1e8;
-  border-radius: 14px;
+  background: #ffffff;
+  border: 2px dashed rgba(180, 139, 76, 0.4);
+  border-radius: 12px;
   overflow: hidden;
   touch-action: none;
   transition: border-color 0.15s, background 0.15s;
 }
-.psn-canvas-wrap:focus-within { border-color: #863bff; background: #fcfbff; }
+.psn-canvas-wrap:focus-within { border-color: #b48b4c; background: #fffdf8; }
 .psn-canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 .psn-canvas-hint {
   position: absolute;
@@ -302,12 +401,12 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  color: #b5aecf;
+  color: rgba(180, 139, 76, 0.55);
   pointer-events: none;
   font-size: 13px;
 }
 
-.psn-form-actions { margin-block-start: 18px; }
+.psn-form-actions { margin-block-start: 20px; }
 
 .psn-err-inline {
   display: inline-flex;
@@ -323,76 +422,97 @@
   width: 100%;
 }
 
-/* Done ─────────────────────────────────────────────────────── */
+/* ── Done / error / loading ────────────────────────────────── */
 .psn-done, .psn-err { text-align: center; }
 .psn-done-ring {
   width: 72px; height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #22c55e, #16a34a);
-  color: #fff;
+  background: linear-gradient(135deg, #b48b4c 0%, #8a6932 100%);
+  color: #f7f3ec;
   display: grid;
   place-items: center;
   margin: 4px auto 16px;
-  box-shadow: 0 12px 30px -10px rgba(34, 197, 94, 0.55);
+  box-shadow: 0 12px 28px -10px rgba(180, 139, 76, 0.55);
   animation: psn-pop 360ms cubic-bezier(0.22, 1.6, 0.36, 1) both;
 }
 @keyframes psn-pop {
   0%   { transform: scale(0.4); opacity: 0; }
   100% { transform: scale(1);   opacity: 1; }
 }
-.psn-done h2, .psn-err h2 { font-size: 22px; margin: 4px 0 8px; }
-.psn-done p, .psn-err p { font-size: 15px; color: #4a465a; line-height: 1.5; margin: 0 4px; }
+.psn-done h2, .psn-err h2 {
+  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-size: 22px;
+  margin: 4px 0 8px;
+  font-weight: 700;
+}
+.psn-done p, .psn-err p { font-size: 15px; color: #54503e; line-height: 1.5; margin: 0 4px; }
 .psn-err svg { color: #b91c1c; margin-block-end: 8px; }
 
-/* Loading ──────────────────────────────────────────────────── */
-.psn-loading-card { text-align: center; padding: 40px 20px; color: #6b6680; }
+.psn-loading-card { text-align: center; padding: 40px 20px; color: #8c8270; }
 .psn-spinner {
   width: 32px; height: 32px;
   margin: 0 auto 12px;
   border-radius: 50%;
-  border: 3px solid #ece6f6;
-  border-block-start-color: #863bff;
+  border: 3px solid rgba(180, 139, 76, 0.2);
+  border-block-start-color: #b48b4c;
   animation: psn-spin 700ms linear infinite;
 }
 @keyframes psn-spin { to { transform: rotate(360deg); } }
 
 /* ── Tight phone viewports ──────────────────────────────────── */
 @media (max-width: 420px) {
-  .psn-card { padding: 22px 18px; border-radius: 18px; }
-  .psn-intro h1 { font-size: 20px; }
+  .psn-card { padding: 22px 18px; border-radius: 14px; }
+  .psn-intro h1 { font-size: 22px; }
   .psn-cta-hero { min-height: 56px; font-size: 17px; }
   .psn-seg-btn { min-width: 76px; min-height: 44px; }
   .psn-canvas-wrap { max-height: 180px; }
+  .psn-prop-row { grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; }
+  .psn-prop-row-head { display: none; }
+  .psn-prop-row > span:first-child { font-weight: 700; color: #8a6932; }
 }
 
 /* ── Dark mode ──────────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
   .psn-page {
     background:
-      radial-gradient(ellipse at top left,  rgba(134, 59, 255, 0.18), transparent 55%),
-      radial-gradient(ellipse at top right, rgba(71, 191, 255, 0.14), transparent 55%),
-      #0e0b16;
-    color: #f1eef7;
+      radial-gradient(ellipse at top left,  rgba(180, 139, 76, 0.18), transparent 55%),
+      radial-gradient(ellipse at top right, rgba(201, 163, 108, 0.12), transparent 55%),
+      #14110b;
+    color: #f3ecd8;
   }
-  .psn-brand-text strong { color: #f1eef7; }
-  .psn-brand-text span, .psn-foot { color: #8c879c; }
+  .psn-brand-text strong { color: #f3ecd8; }
+  .psn-brand-text span,
+  .psn-foot { color: #c9a36c; }
   .psn-card {
-    background: #191324;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 40px -12px rgba(126, 20, 255, 0.35);
+    background: #1f1a10;
+    border-color: rgba(201, 163, 108, 0.22);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 40px -12px rgba(180, 139, 76, 0.3);
   }
+  .psn-agent-name,
   .psn-intro h1,
   .psn-prop-title,
   .psn-form-head h2,
   .psn-done h2, .psn-err h2,
   .psn-label,
   .psn-seg-btn.is-on,
-  .psn-input, .psn-textarea { color: #f1eef7; }
-  .psn-prop { background: #20192e; border-color: #2c2440; }
-  .psn-prop-sub, .psn-agent, .psn-intro-copy { color: #b5aecf; }
-  .psn-segmented { background: #20192e; }
-  .psn-seg-btn { color: #b5aecf; }
-  .psn-seg-btn.is-on { background: #2c2440; }
-  .psn-input, .psn-textarea { background: #20192e; border-color: #2c2440; }
-  .psn-canvas-wrap { background: #fcfbff; border-color: #3a3152; }
-  .psn-checks li { background: #20192e; color: #b5aecf; }
+  .psn-input, .psn-textarea { color: #f3ecd8; }
+  .psn-agent-line, .psn-agent-meta,
+  .psn-law-cite,
+  .psn-intro-copy,
+  .psn-done p, .psn-err p,
+  .psn-terms { color: #c9a36c; }
+  .psn-prop,
+  .psn-prop-table,
+  .psn-terms,
+  .psn-segmented,
+  .psn-checks li { background: #2a2113; border-color: rgba(201, 163, 108, 0.22); }
+  .psn-prop-row-head { background: #332716; }
+  .psn-prop-sub { color: #8c7c5a; }
+  .psn-seg-btn { color: #c9a36c; }
+  .psn-seg-btn.is-on { background: #332716; }
+  .psn-input, .psn-textarea {
+    background: #2a2113;
+    border-color: rgba(201, 163, 108, 0.22);
+  }
+  .psn-canvas-wrap { background: #f3ecd8; border-color: rgba(201, 163, 108, 0.35); }
 }

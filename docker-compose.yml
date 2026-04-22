@@ -6,9 +6,20 @@
 #   • DB backups→ AWS S3              (s3://estia-prod/db-backups/, 14-day rotation)
 #   • Secrets   → AWS Secrets Manager (estia/prod/db-password, estia/prod/jwt-secret)
 #
-# The EC2 host runs only the backend + frontend containers, with no
-# persistent volumes. If a container or the host is replaced, no data
-# is lost — every byte of state lives in AWS-managed services.
+# The EC2 host runs the backend + frontend. The AI stack (whisper /
+# dicta / agent) is opt-in via `--profile ai` because it needs a GPU
+# host — the default `docker compose up` on t3.small skips it.
+#
+# AI network isolation:
+#   • `ai-internal`   — whisper + dicta + agent talk to each other here.
+#     No external egress beyond HuggingFace on first-boot weight pull.
+#   • `ai-to-backend` — agent reaches the backend ONLY through this
+#     network. The backend is the gate; the agent authenticates with
+#     ESTIA_SERVICE_TOKEN and X-Agent-Actor-Id, and the service-token
+#     middleware limits it to POST /api/leads + /api/properties.
+#   • The agent is NOT on the default `app` network — so it cannot
+#     reach the frontend, nginx, any other container, or the open
+#     internet directly.
 
 services:
   backend:
@@ -27,6 +38,9 @@ services:
       # files would land here and disappear on container restart — that's by
       # design (production = S3 always).
       UPLOADS_DIR: /app/uploads
+      # Reachable when the AI stack is running under --profile ai.
+      AI_AGENT_URL: http://estia-ai-agent:8080
+    networks: [ default, ai-to-backend ]
     ports:
       - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT:-6002}:4000"
     logging:
@@ -50,3 +64,109 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+  # ── AI stack (opt-in: docker compose --profile ai up) ─────────────
+  # Boots only on hosts with GPU capacity. Weights are cached to the
+  # `ai-models` named volume so re-creates don't re-download the model.
+
+  estia-ai-whisper:
+    build:
+      context: ./ai/whisper
+      dockerfile: Dockerfile
+    image: estia-ai-whisper:local
+    container_name: estia-ai-whisper
+    restart: unless-stopped
+    profiles: [ ai ]
+    environment:
+      MODELS_DIR: /models
+      # Turn off on the CPU-only fallback path so the container boots even
+      # when no CUDA is present (dev / CI).
+      ESTIA_WHISPER_SKIP_LOAD: "0"
+    volumes:
+      - ai-models:/models
+    networks: [ ai-internal ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).getcode() == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 5
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  estia-ai-dicta:
+    build:
+      context: ./ai/dicta
+      dockerfile: Dockerfile
+    image: estia-ai-dicta:local
+    container_name: estia-ai-dicta
+    restart: unless-stopped
+    profiles: [ ai ]
+    environment:
+      MODEL_ID: ${DICTA_MODEL_ID:-dicta-il/dictalm2.0-instruct}
+      MODELS_DIR: /models
+      DICTA_SKIP_LOAD: "0"
+    volumes:
+      - ai-models:/models
+    networks: [ ai-internal ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).getcode() == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 180s
+      retries: 5
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  estia-ai-agent:
+    build:
+      context: ./ai/agent
+      dockerfile: Dockerfile
+    image: estia-ai-agent:local
+    container_name: estia-ai-agent
+    restart: unless-stopped
+    profiles: [ ai ]
+    depends_on:
+      estia-ai-whisper: { condition: service_healthy }
+      estia-ai-dicta:   { condition: service_healthy }
+    environment:
+      WHISPER_URL:         http://estia-ai-whisper:8080
+      DICTA_URL:           http://estia-ai-dicta:8080
+      # The backend is on the `ai-to-backend` network only — no wider
+      # egress from the agent container.
+      ESTIA_API_URL:       http://backend:4000
+      ESTIA_SERVICE_TOKEN: ${ESTIA_SERVICE_TOKEN}
+      PORT: 8080
+    # Two distinct networks: internal for whisper/dicta, a dedicated
+    # one to reach the backend. No default bridge → no internet egress.
+    networks: [ ai-internal, ai-to-backend ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).getcode() == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+networks:
+  default:
+    name: estia-app
+  # Closed network shared only by the AI trio. No inet gateway available
+  # unless operators explicitly add one — first-boot HuggingFace pulls
+  # happen via the default network the image build uses.
+  ai-internal:
+    name: estia-ai-internal
+    internal: true
+  # Agent ↔ backend only. The frontend + nginx are NOT on this network,
+  # so an AI-side compromise cannot reach public HTTP surfaces.
+  ai-to-backend:
+    name: estia-ai-to-backend
+    internal: true
+
+volumes:
+  ai-models:
+    name: estia-ai-models
