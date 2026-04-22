@@ -178,17 +178,16 @@ body {
     min-height: -webkit-fill-available;
     -webkit-overflow-scrolling: touch;
   }
-  /* GPU-promote the main scroll region so scroll frames aren't
-     blocked on heavy paints (shadows, blurs). Applied to every known
-     top-level container; harmless if any of them aren't present. */
-  .main-content,
-  .dashboard,
-  .properties-page,
-  .customers-page,
-  .owners-page {
-    transform: translateZ(0);
-    backface-visibility: hidden;
-  }
+  /* NOTE: we used to set `transform: translateZ(0)` on the top-level
+     page containers (.main-content, .dashboard, etc.) as a 120fps
+     compositor hint. That reliably broke `position: fixed` — the
+     mobile header and tab bar became relative to the transformed
+     ancestor instead of the viewport, so they scrolled WITH the
+     content. `transform: translateZ(0)` on ANY ancestor creates a
+     new containing block for fixed children (CSS2.1). The hint has
+     to live somewhere that's neither an ancestor of nor a fixed
+     element — the obvious safe spot is specific card/row elements,
+     already GPU-promoted via content-visibility below. */
 }
 
 button, a, [role="button"] {
@@ -214,13 +213,35 @@ button, a, [role="button"] {
 .animate-in-delay-3, .animate-in-delay-4, .animate-in-delay-5 {
   will-change: transform, opacity;
 }
-/* Scoped content-visibility: skip offscreen rendering for card rows
-   and table rows in the big lists. `contain-intrinsic-size` gives the
-   browser a realistic placeholder height so scrollbar + anchor maths
-   don't lurch when rows hydrate on scroll. */
-.property-card, .customer-card, .owner-card, .data-table tbody tr {
+/* Scoped content-visibility: skip offscreen rendering for long
+   data-table rows. We DO NOT apply it to .property-card /
+   .customer-card / .owner-card — those have dynamic heights and
+   get a visible "pop" when they hydrate on scroll, which reads as
+   jank. Table rows are uniform-height enough to make content-
+   visibility a pure win. */
+.data-table tbody tr {
   content-visibility: auto;
-  contain-intrinsic-size: auto 120px;
+  contain-intrinsic-size: auto 56px;
+}
+
+/* Snappy touch feedback — the single biggest "feels like an iPhone
+   app" win for a WKWebView. On any interactive element, a 98% scale
+   on :active fires on touchstart (before the tap is even committed),
+   giving the immediate press response that's the hallmark of native
+   UX. We gate on (pointer: coarse) so desktop-hover stays still.
+   Transition is transform-only so it's composited on GPU. */
+@media (pointer: coarse) {
+  button:active,
+  a:active,
+  [role="button"]:active,
+  .btn:active,
+  .card:active,
+  .property-card:active,
+  .customer-card:active,
+  .owner-card:active {
+    transform: scale(0.97);
+    transition: transform 80ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
 }
 
 /* Smoother scrolling inside any overflow container (lists, kanban, etc.) */
