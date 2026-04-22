@@ -784,6 +784,8 @@ model Lead {
   extraAgents     LeadAgent[]
   // Sprint 2 / MLS parity — Task K4. Repeatable "הנכס המבוקש" profiles.
   searchProfiles  LeadSearchProfile[]
+  // Reverse of Prospect.lead — signed prospects linked to this lead.
+  prospects       Prospect[]
 
   @@index([agentId])
   @@index([status])
@@ -938,10 +940,20 @@ model Prospect {
   // Public sign-from-phone flow tokens.
   publicToken      String?   @unique
   tokenExpiresAt   DateTime?
+  // Optional link to an existing Lead in the agent's CRM. Set either
+  // by the auto-link heuristic on signing (exact-one phone/email
+  // match under the same agent) or manually from PropertyDetail.
+  leadId           String?
+  lead             Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  // Per-agent sequential order number printed on the brokerage-services
+  // agreement PDF. Back-filled for legacy rows by the migration.
+  orderNumber      Int?
   createdAt        DateTime  @default(now())
 
+  @@unique([agentId, orderNumber])
   @@index([propertyId])
   @@index([agentId])
+  @@index([leadId])
 }
 
 // 7.2 — Meetings scheduled with a lead, optionally mirrored to the
