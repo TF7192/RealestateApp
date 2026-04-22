@@ -65,6 +65,19 @@ export default function Yad2Import() {
     api.yad2Quota().then(setScanQuota).catch(() => {});
   }, []);
 
+  // Y-4 — once the import succeeds, reset the scan store + URL input so
+  // the agent can't immediately re-import the same agency by clicking
+  // "סרוק" again. The "done" step renders a fresh "ייבא סוכנות נוספת"
+  // CTA that brings them back to paste; this hook makes sure the
+  // underlying state they'd return to is actually clean.
+  useEffect(() => {
+    if (step !== 'done') return;
+    clearScan();
+    initPickedRef.current = false;
+    setPicked(new Set());
+    setUrl('');
+  }, [step]);
+
   // Group listings by section so the review screen reads as
   // "מכירה (12), השכרה (5), מסחרי (2)" — clearer than a flat list.
   const grouped = useMemo(() => {
@@ -112,6 +125,11 @@ export default function Yad2Import() {
     setStep('paste');
     setResult(null);
     setImportErr(null);
+    // Y-4 — clear the URL input too. Without this the agent returns to
+    // the paste step with the previous URL still populated and a fresh
+    // "סרוק" click would re-import the same agency. Force them to
+    // paste a new link deliberately.
+    setUrl('');
   };
 
   const importPicked = async () => {
