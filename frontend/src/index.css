@@ -140,10 +140,25 @@ body {
   -webkit-tap-highlight-color: transparent;
   text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
-  /* Disable pinch-zoom gesture without breaking scroll/tap */
-  touch-action: pan-x pan-y;
+  /* `manipulation` disables double-tap zoom while keeping native scroll
+     fully intact. `pan-x pan-y` is the equivalent per-axis form but
+     some Capacitor WKWebView builds treated it as "scroll is
+     JavaScript's problem" and rubber-banded the document without
+     actually scrolling. `manipulation` avoids that edge case. */
+  touch-action: manipulation;
   /* Prevents iOS from zooming the viewport when input gains focus */
   -webkit-user-select: text;
+}
+
+/* Native iOS (Capacitor WKWebView) specific: make sure html + body fill
+   the WKWebView viewport so document-level scroll has something to
+   scroll against. `-webkit-fill-available` on iOS resolves to the
+   actual visible viewport (unlike 100vh which is the largest possible
+   viewport and can leave content laid out but non-scrollable). Scoped
+   to the iOS @supports block so Android / web are untouched. */
+@supports (-webkit-touch-callout: none) {
+  html { min-height: -webkit-fill-available; }
+  body { min-height: -webkit-fill-available; }
 }
 
 button, a, [role="button"] {
