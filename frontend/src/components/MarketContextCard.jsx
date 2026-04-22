@@ -161,6 +161,18 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
         <div className="market-error" role="alert">
           <AlertCircle size={14} aria-hidden="true" />
           <span>{state.error}</span>
+          {/* P-14 — retry is a first-class affordance inside the error
+              panel so agents don't have to hunt for the refresh button
+              in the header when a scrape fails. */}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm market-retry"
+            onClick={handleRefresh}
+            disabled={scanning}
+          >
+            <RefreshCw size={13} aria-hidden="true" />
+            נסה שוב
+          </button>
         </div>
       )}
 

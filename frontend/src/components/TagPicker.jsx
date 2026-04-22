@@ -174,7 +174,11 @@ export default function TagPicker({ entityType, entityId, readonly = false, onCh
 
 function chipStyle(color) {
   if (!color) return undefined;
-  // Soft-tint a hex color for the chip background. Keep it simple —
-  // if color isn't a #RRGGBB we fall back to the token default.
-  return { borderColor: color, color };
+  // P-15 — the N-5 chip CSS reads `--tag-color` (custom property) and
+  // derives fill + border + text from it via color-mix(). Setting it here
+  // is what makes newly-added tags actually paint instead of rendering as
+  // a transparent sliver (which was the "says added but doesn't appear"
+  // regression). Inline CSS custom properties work with React as plain
+  // string-keyed style entries.
+  return { '--tag-color': color };
 }

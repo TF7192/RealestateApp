@@ -34,15 +34,15 @@ import VoiceCaptureButton from '../components/VoiceCaptureButton';
 import PageTour from '../components/PageTour';
 import PropertyPipelineBlock from '../components/PropertyPipelineBlock';
 import {
-  PROPERTY_CONDITION_LABELS,
   HEATING_TYPE_LABELS,
-  labelsToOptions,
 } from '../lib/mlsLabels';
 import { getPositionDetailed } from '../native/geolocation';
 import './Forms.css';
 import './NewProperty.css';
 
-const CONDITION_OPTIONS = labelsToOptions(PROPERTY_CONDITION_LABELS);
+// P-10/P-11 — CONDITION_OPTIONS was the "מצב נכס" select that duplicated
+// the `renovated` control earlier in the form. The control was removed;
+// form.condition still ships in API payloads for back-compat.
 const HEATING_TYPES = Object.keys(HEATING_TYPE_LABELS);
 
 const DRAFT_KEY = 'estia-draft:new-property';
@@ -1395,21 +1395,16 @@ export default function NewProperty() {
             </div>
           )}
 
-          {/* ── J4–J7 — Nadlan parity extras ───────────────────────── */}
+          {/* ── Nadlan parity extras (was labelled J4–J7 — internal
+                codes leaked to the UI; stripped per P-10. Also P-11:
+                the "מצב נכס" row here duplicated the "מצב" select
+                earlier in the form, so we drop it. form.condition still
+                exists in state / API shape for back-compat but the
+                agent sets the condition via the primary "מצב" control
+                upstream). */}
           <div className="form-section">
-            <h3 className="form-section-title">פרטים נוספים (J4–J7)</h3>
+            <h3 className="form-section-title">פרטים נוספים</h3>
             <div className="form-row form-row-3">
-              <div className="form-group">
-                <label className="form-label" htmlFor="np-condition">מצב נכס</label>
-                <SelectField
-                  id="np-condition"
-                  value={form.condition}
-                  onChange={(v) => update('condition', v)}
-                  options={CONDITION_OPTIONS}
-                  placeholder="בחר…"
-                  aria-label="מצב הנכס"
-                />
-              </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="np-half-rooms">חצאי חדרים</label>
                 <NumberField

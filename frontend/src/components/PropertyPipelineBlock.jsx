@@ -168,17 +168,14 @@ export default function PropertyPipelineBlock({
             aria-label="עמלת סוכן באחוזים"
           />
         </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="ppb-excl">תאריך סיום בלעדיות</label>
-          <input
-            id="ppb-excl"
-            type="date"
-            className="form-input"
-            value={v.exclusivityExpire}
-            onChange={(e) => set('exclusivityExpire', e.target.value)}
-            aria-label="תאריך סיום בלעדיות"
-          />
-        </div>
+        {/* P-12 — "תאריך סיום בלעדיות" lived in two places: here, AND in
+            the "בלעדיות והערות" section of NewProperty where it pairs
+            with the start-date and the relative "+3m / +6m / +12m" chips.
+            Having both let agents disagree with themselves. The
+            בלעדיות-והערות section is canonical (start + end + chips +
+            days-left hint); the pipeline block keeps the field in state
+            so existing data round-trips on save but no longer renders
+            the input. */}
         <div className="form-group">
           <label className="form-label" htmlFor="ppb-seriousness">רצינות מוכר</label>
           <SelectField
