@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { RoomsChips } from '../components/MobilePickers';
 import {
   UserPlus,
@@ -103,12 +104,16 @@ function statusBadgeClass(status) {
   }[status] || 'badge-gold';
 }
 
-function statusLabel(status) {
-  return { HOT: 'חם', WARM: 'חמים', COLD: 'קר' }[status] || status;
+function statusLabel(t, status) {
+  return {
+    HOT: t('list.status.hot'),
+    WARM: t('list.status.warm'),
+    COLD: t('list.status.cold'),
+  }[status] || status;
 }
 
 // P2-M17: short reason pill — emoji + status word + relative-date suffix
-function statusReason(lead) {
+function statusReason(t, lead) {
   const status = lead.status || 'WARM';
   const lastContactLabel = lead.lastContact ? relativeDate(lead.lastContact).label : null;
   const daysSince = lead.lastContact
@@ -116,15 +121,15 @@ function statusReason(lead) {
     : null;
 
   if (status === 'HOT') {
-    return { emoji: '🔥', label: 'חם', suffix: lastContactLabel || 'חדש' };
+    return { emoji: '🔥', label: t('list.statusReason.hot'), suffix: lastContactLabel || t('list.statusReason.new') };
   }
   if (status === 'COLD') {
     if (daysSince != null && daysSince > 30) {
-      return { emoji: '❄️', label: 'קר', suffix: `${daysSince} ימים ללא קשר` };
+      return { emoji: '❄️', label: t('list.statusReason.cold'), suffix: t('list.statusReason.daysNoContact', { days: daysSince }) };
     }
-    return { emoji: '❄️', label: 'קר', suffix: lastContactLabel || 'ללא קשר' };
+    return { emoji: '❄️', label: t('list.statusReason.cold'), suffix: lastContactLabel || t('list.statusReason.noContact') };
   }
-  return { emoji: '🟡', label: 'חמים', suffix: lastContactLabel || 'חדש' };
+  return { emoji: '🟡', label: t('list.statusReason.warm'), suffix: lastContactLabel || t('list.statusReason.new') };
 }
 
 // S11: return the number of days since last contact IF it's stale enough to
@@ -143,6 +148,7 @@ function stalePillDays(lead) {
 }
 
 export default function Customers() {
+  const { t } = useTranslation('customers');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
@@ -288,10 +294,10 @@ export default function Customers() {
   // Breadcrumb shown when the user arrived via an incoming filter
   const incomingFilterLabel = (() => {
     const f = searchParams.get('filter');
-    if (f === 'hot') return 'לידים חמים';
-    if (f === 'warm') return 'לידים חמימים';
-    if (f === 'cold') return 'לידים קרים';
-    if (f && /^inactive(\d+)$/.test(f)) return `לידים ללא קשר ${f.match(/^inactive(\d+)$/)[1]}+ ימים`;
+    if (f === 'hot') return t('list.filters.incoming.hot');
+    if (f === 'warm') return t('list.filters.incoming.warm');
+    if (f === 'cold') return t('list.filters.incoming.cold');
+    if (f && /^inactive(\d+)$/.test(f)) return t('list.filters.incoming.inactive', { days: f.match(/^inactive(\d+)$/)[1] });
     return null;
   })();
 
@@ -328,7 +334,7 @@ export default function Customers() {
   const handleWhatsApp = (lead) => {
     primeContactBump(lead.id);
     haptics.tap();
-    window.open(waUrl(lead.phone, `שלום ${lead.name}`), '_blank');
+    window.open(waUrl(lead.phone, t('list.card.whatsappHello', { name: lead.name })), '_blank');
   };
 
   const handleTel = (lead) => {
@@ -383,8 +389,8 @@ export default function Customers() {
     setLeads((cur) => cur.map((l) => (l.id === leadId ? { ...l, ...patch } : l)));
     try {
       await optimisticUpdate(toast, {
-        label: label || 'שומר…',
-        success: success || 'נשמר',
+        label: label || t('list.patchSuccess.saving'),
+        success: success || t('list.patchSuccess.saved'),
         onSave: () => api.updateLead(leadId, patch),
       });
     } catch {
@@ -394,7 +400,7 @@ export default function Customers() {
   };
 
   const handleStatusChange = (lead, newStatus) =>
-    patchLead(lead.id, { status: newStatus }, { success: `סטטוס עודכן ל-${newStatus === 'HOT' ? 'חם' : newStatus === 'WARM' ? 'חמים' : 'קר'}` });
+    patchLead(lead.id, { status: newStatus }, { success: t('list.status.updatedTo', { status: statusLabel(t, newStatus) }) });
 
   // Sprint 7 B4 — toggle a lead's favorite state. We update the local
   // set optimistically before awaiting the API so the star flips as
@@ -420,7 +426,7 @@ export default function Customers() {
         else copy.add(leadId);
         return copy;
       });
-      toast.error(e?.message || 'שינוי המועדפים נכשל');
+      toast.error(e?.message || t('list.favorite.failed'));
     }
   };
 
@@ -449,10 +455,10 @@ export default function Customers() {
       await api.deleteLead(snapshot.id);
       setDeleteTarget(null);
       await loadLeads();
-      toast.success(`נמחק "${snapshot.name}"`, {
+      toast.success(t('list.delete.toastRemoved', { name: snapshot.name }), {
         duration: 10_000,
         action: {
-          label: 'בטל',
+          label: t('list.delete.undo'),
           onClick: async () => {
             try {
               await api.createLead({
@@ -467,9 +473,9 @@ export default function Customers() {
                 notes: snapshot.notes,
               });
               await loadLeads();
-              toast.success('הליד שוחזר');
+              toast.success(t('list.delete.restored'));
             } catch (e) {
-              toast.error(e?.message || 'שחזור נכשל');
+              toast.error(e?.message || t('list.delete.restoreFailed'));
             }
           },
         },
@@ -486,8 +492,8 @@ export default function Customers() {
       <div className="customers-page">
         <div className="page-header animate-in">
           <div className="page-header-info">
-            <h2>לקוחות</h2>
-            <p>טוען...</p>
+            <h2>{t('list.title')}</h2>
+            <p>{t('list.loading')}</p>
           </div>
         </div>
         <div className="customers-grid">
@@ -512,7 +518,7 @@ export default function Customers() {
       <div className="customers-page">
         <div className="page-header animate-in">
           <div className="page-header-info">
-            <h2>לקוחות</h2>
+            <h2>{t('list.title')}</h2>
           </div>
         </div>
       </div>
@@ -525,15 +531,15 @@ export default function Customers() {
       pageKey="customers"
       steps={[
         { target: 'body', placement: 'center',
-          title: 'הלקוחות שלך',
-          content: 'לקוחות מתעניינים לפי חום הליד (חם/פושר/קר). כשיש התאמה בין לקוח לנכס היא מופיעה אוטומטית בכרטיס הנכס.' },
+          title: t('list.tour.title'),
+          content: t('list.tour.content') },
       ]}
     />
     <div className="customers-page">
       <div className="page-header animate-in">
         <div className="page-header-info">
-          <h2>לקוחות</h2>
-          <p>{filtered.length} מתוך {leads.length} לקוחות</p>
+          <h2>{t('list.title')}</h2>
+          <p>{t('list.countFormat', { filtered: filtered.length, total: leads.length })}</p>
         </div>
         <div className="page-header-actions">
           {/* Sprint 2 C2 + Sprint 7 B3/B4 — advanced filter drawer,
@@ -543,11 +549,11 @@ export default function Customers() {
             type="button"
             className={`btn btn-ghost btn-sm ${serverFilterCount > 0 ? 'is-active' : ''}`}
             onClick={() => setAdvancedFilterOpen(true)}
-            aria-label={`סינון מתקדם${serverFilterCount > 0 ? ` (${serverFilterCount})` : ''}`}
-            title="סינון מתקדם"
+            aria-label={serverFilterCount > 0 ? t('list.filters.advancedAriaWithCount', { count: serverFilterCount }) : t('list.filters.advancedAria')}
+            title={t('list.filters.advancedTitle')}
           >
             <SlidersHorizontal size={14} aria-hidden="true" />
-            <span>סינון מתקדם</span>
+            <span>{t('list.filters.advanced')}</span>
             {serverFilterCount > 0 && (
               <span className="cust-filter-count" aria-hidden="true">{serverFilterCount}</span>
             )}
@@ -562,32 +568,32 @@ export default function Customers() {
             className={`btn btn-ghost btn-sm ${onlyFavorites ? 'is-active' : ''}`}
             onClick={() => setOnlyFavorites((v) => !v)}
             aria-pressed={onlyFavorites}
-            aria-label="רק מועדפים"
-            title="הצג רק מועדפים"
+            aria-label={t('list.filters.onlyFavorites')}
+            title={t('list.filters.onlyFavoritesTitle')}
           >
             <Star
               size={14}
               aria-hidden="true"
               fill={onlyFavorites ? 'currentColor' : 'none'}
             />
-            <span>רק מועדפים</span>
+            <span>{t('list.filters.onlyFavorites')}</span>
           </button>
-          <div className="view-toggle" role="group" aria-label="תצוגה">
+          <div className="view-toggle" role="group" aria-label={t('list.view.ariaLabel')}>
             <button
               className={`view-toggle-btn ${view === 'cards' ? 'active' : ''}`}
               onClick={() => changeView('cards')}
-              title="תצוגת כרטיסים"
+              title={t('list.view.cardsTitle')}
             >
               <LayoutGrid size={14} />
-              כרטיסים
+              {t('list.view.cards')}
             </button>
             <button
               className={`view-toggle-btn ${view === 'list' ? 'active' : ''}`}
               onClick={() => changeView('list')}
-              title="תצוגת רשימה"
+              title={t('list.view.listTitle')}
             >
               <ListIcon size={14} />
-              רשימה
+              {t('list.view.list')}
             </button>
           </div>
           {/* F-4 + F-16 — templates link removed from header. It duplicates
@@ -596,14 +602,14 @@ export default function Customers() {
               tertiary actions into overflow menus. */}
           <Link to="/customers/new" className="btn btn-primary">
             <UserPlus size={18} />
-            ליד חדש
+            {t('list.newLead')}
           </Link>
         </div>
       </div>
 
       {incomingFilterLabel && statusFilter !== 'all' && (
         <div className="filter-breadcrumb animate-in">
-          <span>מוצג: {incomingFilterLabel}</span>
+          <span>{t('list.filters.incoming.showing', { label: incomingFilterLabel })}</span>
           <button
             className="fb-clear"
             onClick={() => {
@@ -611,7 +617,7 @@ export default function Customers() {
               window.history.replaceState({}, '', '/customers');
             }}
           >
-            נקה סינון
+            {t('list.filters.incoming.clear')}
           </button>
         </div>
       )}
@@ -628,7 +634,7 @@ export default function Customers() {
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              placeholder="חיפוש לפי שם, עיר, טלפון..."
+              placeholder={t('list.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -641,10 +647,10 @@ export default function Customers() {
             type="button"
             className={`filters-pill ${activeFilterCount > 0 ? 'active' : ''}`}
             onClick={() => { haptics.tap(); setFilterSheetOpen(true); }}
-            aria-label="פתח סינון"
+            aria-label={t('list.filters.openSort')}
           >
             <SlidersHorizontal size={16} aria-hidden="true" />
-            <span>סנן{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
+            <span>{activeFilterCount > 0 ? t('list.filters.filterWithCount', { count: activeFilterCount }) : t('list.filters.filter')}</span>
           </button>
           {activeFilterCount > 0 && (
             <button
@@ -652,7 +658,7 @@ export default function Customers() {
               className="filters-clear-link"
               onClick={() => { haptics.tap(); clearFilters(); }}
             >
-              נקה סינון
+              {t('list.filters.clear')}
             </button>
           )}
         </div>
@@ -661,9 +667,9 @@ export default function Customers() {
         <div className="filters-desktop">
           <div className="filter-tabs">
             {[
-              { key: 'all', label: 'הכל' },
-              { key: 'BUY', label: 'קונים' },
-              { key: 'RENT', label: 'שוכרים' },
+              { key: 'all', label: t('list.filters.lookingFor.all') },
+              { key: 'BUY', label: t('list.filters.lookingFor.buy') },
+              { key: 'RENT', label: t('list.filters.lookingFor.rent') },
             ].map((f) => (
               <button
                 key={f.key}
@@ -676,9 +682,9 @@ export default function Customers() {
           </div>
           <div className="filter-tabs">
             {[
-              { key: 'all', label: 'כל הסוגים' },
-              { key: 'PRIVATE', label: 'פרטי' },
-              { key: 'COMMERCIAL', label: 'מסחרי' },
+              { key: 'all', label: t('list.filters.interest.all') },
+              { key: 'PRIVATE', label: t('list.filters.interest.private') },
+              { key: 'COMMERCIAL', label: t('list.filters.interest.commercial') },
             ].map((f) => (
               <button
                 key={f.key}
@@ -691,10 +697,10 @@ export default function Customers() {
           </div>
           <div className="filter-tabs">
             {[
-              { key: 'all', label: 'הכל' },
-              { key: 'HOT', label: 'חם' },
-              { key: 'WARM', label: 'חמים' },
-              { key: 'COLD', label: 'קר' },
+              { key: 'all', label: t('list.filters.status.all') },
+              { key: 'HOT', label: t('list.filters.status.hot') },
+              { key: 'WARM', label: t('list.filters.status.warm') },
+              { key: 'COLD', label: t('list.filters.status.cold') },
             ].map((f) => (
               <button
                 key={f.key}
@@ -721,7 +727,7 @@ export default function Customers() {
           onEdit={setEditDialog}
           onDelete={setDeleteTarget}
           onNavigate={(id) => navigate(`/customers/${id}`)}
-          onBumpLastContact={(lead) => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: 'קשר אחרון עודכן' })}
+          onBumpLastContact={(lead) => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: t('list.patchSuccess.lastContactUpdated') })}
         />
       ) : (
       <div className="customers-grid animate-in animate-in-delay-3">
@@ -733,24 +739,24 @@ export default function Customers() {
             const swipeActions = [
               {
                 icon: Phone,
-                label: 'התקשר',
+                label: t('list.swipe.call'),
                 color: 'gold',
                 onClick: () => handleTel(lead),
               },
               {
                 icon: WhatsAppIcon,
-                label: 'וואטסאפ',
+                label: t('list.swipe.whatsapp'),
                 color: 'green',
                 onClick: () => handleWhatsApp(lead),
               },
               {
                 icon: MessageSquare,
-                label: 'SMS',
+                label: t('list.swipe.sms'),
                 color: 'blue',
                 onClick: () => handleSms(lead),
               },
             ];
-            const reason = statusReason(lead);
+            const reason = statusReason(t, lead);
             const reasonStatusClass = `ccm-reason-${lead.status || 'WARM'}`;
             const matchCountMobile = matchCountByLead[lead.id] || 0;
             return (
@@ -800,7 +806,7 @@ export default function Customers() {
                               <span className="ccm-reason-suffix">{reason.suffix}</span>
                             </span>
                             {lead.preApproval && (
-                              <span className="ccm-active-pill" title="אישור עקרוני">
+                              <span className="ccm-active-pill" title={t('list.card.preApprovalTitle')}>
                                 <CheckCircle2 size={10} />
                               </span>
                             )}
@@ -818,11 +824,11 @@ export default function Customers() {
                                   className="ccm-stale-pill"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: 'קשר אחרון עודכן' });
+                                    patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: t('list.patchSuccess.lastContactUpdated') });
                                   }}
-                                  title="לחץ לעדכון קשר אחרון לעכשיו"
+                                  title={t('list.card.stalePillTitle')}
                                 >
-                                  {stale} ימים ללא קשר
+                                  {t('list.card.stalePill', { days: stale })}
                                 </button>
                               );
                             })()}
@@ -831,7 +837,7 @@ export default function Customers() {
                                 to={`/properties${lead.city ? `?city=${encodeURIComponent(lead.city)}` : ''}`}
                                 onClick={(e) => e.stopPropagation()}
                                 className="cc-match-pill cc-match-pill-mobile"
-                                title={`${matchCountMobile} נכסים תואמים`}
+                                title={t('list.card.matchPillTitle', { count: matchCountMobile })}
                               >
                                 <Sparkles size={10} />
                                 <strong>{matchCountMobile}</strong>
@@ -841,9 +847,9 @@ export default function Customers() {
                           <div className="ccm-sub">
                             {[
                               lead.city,
-                              lead.rooms && `${lead.rooms} חד׳`,
+                              lead.rooms && t('list.card.roomsShort', { count: lead.rooms }),
                               lead.priceRangeLabel,
-                            ].filter(Boolean).join(' · ') || '—'}
+                            ].filter(Boolean).join(' · ') || t('list.placeholders.dash')}
                           </div>
                         </div>
                         <span className={`ccm-chev ${expanded ? 'open' : ''}`} aria-hidden="true">
@@ -864,10 +870,10 @@ export default function Customers() {
                               e.stopPropagation();
                               setStatusSheetLead(lead);
                             }}
-                            title={lead.statusExplanation || 'שנה סטטוס'}
+                            title={lead.statusExplanation || t('list.status.change')}
                           >
                             {statusIcon(lead.status)}
-                            {statusLabel(lead.status)}
+                            {statusLabel(t, lead.status)}
                             {lead.suggestedStatus && lead.status !== lead.suggestedStatus && (
                               <Sparkles size={11} className="sp-auto-hint" />
                             )}
@@ -878,7 +884,7 @@ export default function Customers() {
                               onChange={(value) => patchLead(
                                 lead.id,
                                 { seriousnessOverride: value },
-                                { success: `רצינות עודכנה ל-${SERIOUSNESS_LABELS[value] || value}` },
+                                { success: t('list.patchSuccess.seriousnessUpdated', { label: SERIOUSNESS_LABELS[value] || value }) },
                               )}
                             />
                           </span>
@@ -886,61 +892,61 @@ export default function Customers() {
 
                         <div className="customer-card-body">
                           <div className="cc-row">
-                            <span className="cc-label">מחפש</span>
+                            <span className="cc-label">{t('list.card.lookingForLabel')}</span>
                             <span className="cc-value">
-                              {lead.lookingFor === 'RENT' ? 'לשכור' : 'לקנות'} · {lead.interestType === 'COMMERCIAL' ? 'מסחרי' : 'פרטי'}
+                              {lead.lookingFor === 'RENT' ? t('list.card.lookingForRent') : t('list.card.lookingForBuy')} · {lead.interestType === 'COMMERCIAL' ? t('list.card.interestCommercial') : t('list.card.interestPrivate')}
                             </span>
                           </div>
                           <div className="cc-row">
-                            <span className="cc-label">עיר</span>
+                            <span className="cc-label">{t('list.card.cityLabel')}</span>
                             <span className="cc-value inline-edit">
                               <InlineText
                                 value={lead.city || ''}
-                                onCommit={(v) => patchLead(lead.id, { city: v || null }, { success: 'עיר עודכנה' })}
-                                placeholder="הוסף עיר"
+                                onCommit={(v) => patchLead(lead.id, { city: v || null }, { success: t('list.patchSuccess.cityUpdated') })}
+                                placeholder={t('list.card.addCityPlaceholder')}
                               />
                             </span>
                           </div>
                           <div className="cc-row">
-                            <span className="cc-label">חדרים</span>
+                            <span className="cc-label">{t('list.card.roomsLabel')}</span>
                             <span className="cc-value">
                               {/* F-11 — numeric chip picker replaces the
                                   free-text inline edit so values always
                                   match the numeric filter / match logic. */}
                               <RoomsInlinePicker
                                 value={lead.rooms}
-                                onChange={(v) => patchLead(lead.id, { rooms: v }, { success: 'חדרים עודכנו' })}
+                                onChange={(v) => patchLead(lead.id, { rooms: v }, { success: t('list.patchSuccess.roomsUpdated') })}
                               />
                             </span>
                           </div>
                           <div className="cc-row">
-                            <span className="cc-label">תקציב</span>
+                            <span className="cc-label">{t('list.card.budgetLabel')}</span>
                             <span className="cc-value inline-edit">
                               <InlineText
                                 value={lead.priceRangeLabel || ''}
                                 onCommit={(v) => patchLead(lead.id, { priceRangeLabel: v || null })}
-                                placeholder="הוסף תקציב"
+                                placeholder={t('list.card.addBudgetPlaceholder')}
                               />
                             </span>
                           </div>
                           {lead.sector && lead.sector !== 'כללי' && (
                             <div className="cc-row">
-                              <span className="cc-label">מגזר</span>
+                              <span className="cc-label">{t('list.card.sectorLabel')}</span>
                               <span className="cc-value">{lead.sector}</span>
                             </div>
                           )}
                           {lead.schoolProximity && (
                             <div className="cc-row">
-                              <span className="cc-label">קירבה לבית ספר</span>
+                              <span className="cc-label">{t('list.card.schoolLabel')}</span>
                               <span className="cc-value">{lead.schoolProximity}</span>
                             </div>
                           )}
                           <div className="cc-row">
-                            <span className="cc-label">אישור עקרוני</span>
+                            <span className="cc-label">{t('list.card.preApprovalLabel')}</span>
                             <span className="cc-value">
                               {lead.preApproval
-                                ? <span className="cc-pos">יש</span>
-                                : <span className="cc-muted">אין</span>}
+                                ? <span className="cc-pos">{t('list.card.preApprovalHas')}</span>
+                                : <span className="cc-muted">{t('list.card.preApprovalNone')}</span>}
                             </span>
                           </div>
                         </div>
@@ -951,7 +957,7 @@ export default function Customers() {
                             onCommit={(v) => patchLead(
                               lead.id,
                               { description: v || null },
-                              { success: 'תיאור עודכן' },
+                              { success: t('list.patchSuccess.descriptionUpdated') },
                             )}
                           />
                         </div>
@@ -959,10 +965,10 @@ export default function Customers() {
                         <div className="customer-notes">
                           <InlineText
                             value={lead.notes || ''}
-                            onCommit={(v) => patchLead(lead.id, { notes: v || null }, { success: 'הערות עודכנו' })}
+                            onCommit={(v) => patchLead(lead.id, { notes: v || null }, { success: t('list.patchSuccess.notesUpdated') })}
                             multiline
                             dir="auto"
-                            placeholder="הוסף הערות..."
+                            placeholder={t('list.card.notesPlaceholder')}
                             className="customer-notes-inline"
                           />
                         </div>
@@ -971,14 +977,14 @@ export default function Customers() {
                           <button
                             type="button"
                             className="cc-last-contact"
-                            title={lead.lastContact ? absoluteTime(lead.lastContact) : 'לחץ לעדכון קשר אחרון לעכשיו'}
+                            title={lead.lastContact ? absoluteTime(lead.lastContact) : t('list.card.lastContactTitle')}
                             onClick={(e) => {
                               e.stopPropagation();
-                              patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: 'קשר אחרון עודכן' });
+                              patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: t('list.patchSuccess.lastContactUpdated') });
                             }}
                           >
                             <Calendar size={12} />
-                            {lead.lastContact ? relativeTime(lead.lastContact) : 'ללא קשר'}
+                            {lead.lastContact ? relativeTime(lead.lastContact) : t('list.card.noContact')}
                           </button>
                         </div>
 
@@ -989,7 +995,7 @@ export default function Customers() {
                             class. */}
                         <div className="ccm-actions ccm-rail ccm-rail-xl">
                           <a
-                            href={waUrl(lead.phone, `שלום ${lead.name}`)}
+                            href={waUrl(lead.phone, t('list.card.whatsappHello', { name: lead.name }))}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="ccm-rail-btn ccm-rail-wa"
@@ -998,11 +1004,11 @@ export default function Customers() {
                               primeContactBump(lead.id);
                               haptics.tap();
                             }}
-                            aria-label={`וואטסאפ ל${lead.name}`}
-                            title={`וואטסאפ ל${lead.name}`}
+                            aria-label={t('list.card.whatsappTo', { name: lead.name })}
+                            title={t('list.card.whatsappTo', { name: lead.name })}
                           >
                             <WhatsAppIcon size={24} />
-                            <span className="ccm-rail-label">וואטסאפ</span>
+                            <span className="ccm-rail-label">{t('list.card.whatsapp')}</span>
                           </a>
                           <a
                             href={telUrl(lead.phone)}
@@ -1012,8 +1018,8 @@ export default function Customers() {
                               primeContactBump(lead.id);
                               haptics.tap();
                             }}
-                            aria-label={`התקשר ל${lead.name}`}
-                            title={`התקשר ל${lead.name}`}
+                            aria-label={t('list.card.callTo', { name: lead.name })}
+                            title={t('list.card.callTo', { name: lead.name })}
                           >
                             <Phone size={22} aria-hidden="true" />
                           </a>
@@ -1024,8 +1030,8 @@ export default function Customers() {
                               e.stopPropagation();
                               setOverflowLead(lead);
                             }}
-                            aria-label={`פעולות נוספות ל${lead.name}`}
-                            title="פעולות נוספות"
+                            aria-label={t('list.card.moreActionsTo', { name: lead.name })}
+                            title={t('list.card.moreActions')}
                           >
                             <MoreHorizontal size={22} aria-hidden="true" />
                           </button>
@@ -1040,9 +1046,9 @@ export default function Customers() {
 
           // ── Desktop: tighter 3-block card (left avatar / middle stats / right pre-approval) ──
           const matchCount = matchCountByLead[lead.id] || 0;
-          const lookingForLabel = lead.lookingFor === 'RENT' ? 'לשכור' : 'לקנות';
+          const lookingForLabel = lead.lookingFor === 'RENT' ? t('list.card.lookingForRent') : t('list.card.lookingForBuy');
           const interestLabel =
-            lead.interestType === 'COMMERCIAL' ? 'מסחרי' : 'פרטי';
+            lead.interestType === 'COMMERCIAL' ? t('list.card.interestCommercial') : t('list.card.interestPrivate');
           const InterestIcon = lead.interestType === 'COMMERCIAL' ? Briefcase : Home;
           return (
             <div
@@ -1070,7 +1076,7 @@ export default function Customers() {
                       onChange={(value) => patchLead(
                         lead.id,
                         { seriousnessOverride: value },
-                        { success: `רצינות עודכנה ל-${SERIOUSNESS_LABELS[value] || value}` },
+                        { success: t('list.patchSuccess.seriousnessUpdated', { label: SERIOUSNESS_LABELS[value] || value }) },
                       )}
                     />
                   </div>
@@ -1080,39 +1086,39 @@ export default function Customers() {
                   <div className="cc-v2-mid-row cc-v2-headline">
                     <InterestIcon size={12} />
                     <span>
-                      מחפש: <strong>{interestLabel}</strong> · <strong>{lookingForLabel}</strong>
+                      {t('list.card.lookingForLabel')}: <strong>{interestLabel}</strong> · <strong>{lookingForLabel}</strong>
                     </span>
                   </div>
                   <div className="cc-v2-mid-row">
                     <span className="cc-v2-chip">
-                      {lead.city || 'עיר ?'}
+                      {lead.city || t('list.card.cityUnknown')}
                     </span>
                     <span className="cc-v2-chip">
-                      {lead.rooms ? `${lead.rooms} חד׳` : '— חד׳'}
+                      {lead.rooms ? t('list.card.roomsShort', { count: lead.rooms }) : t('list.card.roomsUnknown')}
                     </span>
                     <span className="cc-v2-chip cc-v2-chip-budget">
                       {lead.priceRangeLabel
-                        || (lead.budget ? `₪${Number(lead.budget).toLocaleString('he-IL')}` : 'תקציב ?')}
+                        || (lead.budget ? `₪${Number(lead.budget).toLocaleString('he-IL')}` : t('list.card.budgetUnknown'))}
                     </span>
                   </div>
                   {matchCount > 0 && (
                     <Link
                       to={`/properties${lead.city ? `?city=${encodeURIComponent(lead.city)}` : ''}`}
                       className="cc-match-pill cc-v2-match-pill"
-                      title={`${matchCount} נכסים שלך עונים לקריטריונים של ${lead.name}`}
+                      title={t('list.card.matchPillDescTitle', { count: matchCount, name: lead.name })}
                     >
                       <Sparkles size={11} />
                       <strong>{matchCount}</strong>
-                      <span>נכסים תואמים</span>
+                      <span>{t('list.card.matchPillLabel')}</span>
                     </Link>
                   )}
                 </div>
 
                 <div className="cc-v2-right">
                   {lead.preApproval && (
-                    <span className="cc-v2-preapproval" title="אישור עקרוני למשכנתא">
+                    <span className="cc-v2-preapproval" title={t('list.card.preApprovalMortgageTitle')}>
                       <CheckCircle2 size={12} />
-                      אישור עקרוני
+                      {t('list.card.preApprovalLabel')}
                     </span>
                   )}
                   {(() => {
@@ -1122,10 +1128,10 @@ export default function Customers() {
                       <button
                         type="button"
                         className="cc-v2-stale-pill"
-                        onClick={() => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: 'קשר אחרון עודכן' })}
-                        title="לחץ לעדכון קשר אחרון לעכשיו"
+                        onClick={() => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: t('list.patchSuccess.lastContactUpdated') })}
+                        title={t('list.card.stalePillTitle')}
                       >
-                        {stale} ימים ללא קשר
+                        {t('list.card.stalePill', { days: stale })}
                       </button>
                     );
                   })()}
@@ -1138,7 +1144,7 @@ export default function Customers() {
                   onCommit={(v) => patchLead(
                     lead.id,
                     { description: v || null },
-                    { success: 'תיאור עודכן' },
+                    { success: t('list.patchSuccess.descriptionUpdated') },
                   )}
                 />
               </div>
@@ -1146,10 +1152,10 @@ export default function Customers() {
               <div className="customer-notes cc-v2-notes">
                 <InlineText
                   value={lead.notes || ''}
-                  onCommit={(v) => patchLead(lead.id, { notes: v || null }, { success: 'הערות עודכנו' })}
+                  onCommit={(v) => patchLead(lead.id, { notes: v || null }, { success: t('list.patchSuccess.notesUpdated') })}
                   multiline
                   dir="auto"
-                  placeholder="הוסף הערות..."
+                  placeholder={t('list.card.notesPlaceholder')}
                   className="customer-notes-inline"
                 />
               </div>
@@ -1158,11 +1164,11 @@ export default function Customers() {
                 <div className="customer-dates">
                   <button
                     className="cc-last-contact"
-                    title={lead.lastContact ? absoluteTime(lead.lastContact) : 'לחץ לעדכון קשר אחרון לעכשיו'}
-                    onClick={() => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: 'קשר אחרון עודכן' })}
+                    title={lead.lastContact ? absoluteTime(lead.lastContact) : t('list.card.lastContactTitle')}
+                    onClick={() => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: t('list.patchSuccess.lastContactUpdated') })}
                   >
                     <Calendar size={12} />
-                    {lead.lastContact ? relativeTime(lead.lastContact) : 'ללא קשר'}
+                    {lead.lastContact ? relativeTime(lead.lastContact) : t('list.card.noContact')}
                   </button>
                 </div>
                 <div className="customer-actions">
@@ -1172,22 +1178,22 @@ export default function Customers() {
                       an overflow menu so the destructive action can't be
                       fat-fingered. */}
                   <a
-                    href={waUrl(lead.phone, `שלום ${lead.name}`)}
+                    href={waUrl(lead.phone, t('list.card.whatsappHello', { name: lead.name }))}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-wa btn-sm"
-                    title="שלח בוואטסאפ"
-                    aria-label={`וואטסאפ ל${lead.name}`}
+                    title={t('list.card.whatsapp')}
+                    aria-label={t('list.card.whatsappTo', { name: lead.name })}
                     onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
                   >
                     <WhatsAppIcon size={14} />
-                    <span>וואטסאפ</span>
+                    <span>{t('list.card.whatsapp')}</span>
                   </a>
                   <a
                     href={telUrl(lead.phone)}
                     className="btn btn-ghost btn-sm"
                     title={lead.phone}
-                    aria-label={`התקשר ל${lead.name}`}
+                    aria-label={t('list.card.callTo', { name: lead.name })}
                     onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
                   >
                     <Phone size={14} />
@@ -1196,8 +1202,8 @@ export default function Customers() {
                   <button
                     className="btn btn-ghost btn-sm"
                     onClick={() => setOverflowLead(lead)}
-                    title="פעולות נוספות"
-                    aria-label={`פעולות נוספות ל${lead.name}`}
+                    title={t('list.card.moreActions')}
+                    aria-label={t('list.card.moreActionsTo', { name: lead.name })}
                   >
                     <MoreHorizontal size={14} />
                   </button>
@@ -1211,17 +1217,17 @@ export default function Customers() {
             <div className="ce-illustration">👥</div>
             <h3>
               {leads.length === 0
-                ? 'אין עדיין לקוחות במערכת'
-                : 'אין לקוחות בסינון הנוכחי'}
+                ? t('list.empty.noneTitle')
+                : t('list.empty.filteredTitle')}
             </h3>
             <p>
               {leads.length === 0
-                ? 'הוסף את הליד הראשון שלך כדי להתחיל לעקוב אחר הלקוחות הפוטנציאליים.'
-                : 'נסה לשנות את הסינון או לחפש לקוח בשם אחר.'}
+                ? t('list.empty.noneBody')
+                : t('list.empty.filteredBody')}
             </p>
             <Link to="/customers/new" className="btn btn-primary btn-lg">
               <UserPlus size={18} />
-              ליד חדש
+              {t('list.newLead')}
             </Link>
           </div>
         )}
@@ -1241,9 +1247,9 @@ export default function Customers() {
 
       {deleteTarget && (
         <ConfirmDialog
-          title="מחיקת לקוח"
-          message={`למחוק את "${deleteTarget.name}"? הפעולה אינה הפיכה.`}
-          confirmLabel="מחק"
+          title={t('list.delete.title')}
+          message={t('list.delete.message', { name: deleteTarget.name })}
+          confirmLabel={t('list.delete.confirm')}
           onConfirm={confirmDeleteLead}
           onClose={() => setDeleteTarget(null)}
           busy={deleting}
@@ -1260,30 +1266,30 @@ export default function Customers() {
         actions={overflowLead ? [
           {
             icon: User,
-            label: 'פתח כרטיס לקוח',
-            description: 'היסטוריה, התאמות, עריכה מלאה',
+            label: t('list.overflow.openCard'),
+            description: t('list.overflow.openCardDesc'),
             onClick: () => navigate(`/customers/${overflowLead.id}`),
           },
           {
             icon: Phone,
-            label: 'התקשר',
+            label: t('list.overflow.call'),
             description: overflowLead.phone,
             onClick: () => handleTel(overflowLead),
           },
           {
             icon: MessageSquare,
-            label: 'SMS',
+            label: t('list.overflow.sms'),
             description: overflowLead.phone,
             onClick: () => handleSms(overflowLead),
           },
           {
             icon: Edit3,
-            label: 'עריכה',
+            label: t('list.overflow.edit'),
             onClick: () => setEditDialog(overflowLead),
           },
           {
             icon: Trash2,
-            label: 'מחיקה',
+            label: t('list.overflow.delete'),
             color: 'danger',
             onClick: () => setDeleteTarget(overflowLead),
           },
@@ -1348,6 +1354,7 @@ function CustomerList({
   onNavigate,
   onBumpLastContact,
 }) {
+  const { t } = useTranslation('customers');
   // F-9 — persist sort in URL so back-nav and shareable links preserve
   // the agent's preferred order (typical: "stale first" = lastContact desc).
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1416,24 +1423,24 @@ function CustomerList({
           <thead>
             <tr>
               <th onClick={() => toggleSort('name')} className={`cl-th cl-th-sortable ${sortKey === 'name' ? 'sorted' : ''}`}>
-                <span>שם</span>{renderSortIcon('name')}
+                <span>{t('list.table.headerName')}</span>{renderSortIcon('name')}
               </th>
               <th onClick={() => toggleSort('city')} className={`cl-th cl-th-sortable ${sortKey === 'city' ? 'sorted' : ''}`}>
-                <span>עיר</span>{renderSortIcon('city')}
+                <span>{t('list.table.headerCity')}</span>{renderSortIcon('city')}
               </th>
               <th onClick={() => toggleSort('rooms')} className={`cl-th cl-th-sortable cl-th-num ${sortKey === 'rooms' ? 'sorted' : ''}`}>
-                <span>חדרים</span>{renderSortIcon('rooms')}
+                <span>{t('list.table.headerRooms')}</span>{renderSortIcon('rooms')}
               </th>
               <th onClick={() => toggleSort('budget')} className={`cl-th cl-th-sortable cl-th-num ${sortKey === 'budget' ? 'sorted' : ''}`}>
-                <span>תקציב</span>{renderSortIcon('budget')}
+                <span>{t('list.table.headerBudget')}</span>{renderSortIcon('budget')}
               </th>
               <th onClick={() => toggleSort('status')} className={`cl-th cl-th-sortable ${sortKey === 'status' ? 'sorted' : ''}`}>
-                <span>סטטוס</span>{renderSortIcon('status')}
+                <span>{t('list.table.headerStatus')}</span>{renderSortIcon('status')}
               </th>
               <th onClick={() => toggleSort('lastContact')} className={`cl-th cl-th-sortable cl-th-num ${sortKey === 'lastContact' ? 'sorted' : ''}`}>
-                <span>קשר אחרון</span>{renderSortIcon('lastContact')}
+                <span>{t('list.table.headerLastContact')}</span>{renderSortIcon('lastContact')}
               </th>
-              <th className="cl-th cl-th-actions">פעולות</th>
+              <th className="cl-th cl-th-actions">{t('list.table.headerActions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -1451,7 +1458,7 @@ function CustomerList({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') { e.preventDefault(); onNavigate?.(lead.id); }
                   }}
-                  title={`פתח כרטיס לקוח של ${lead.name}`}
+                  title={t('list.table.openCardTitle', { name: lead.name })}
                 >
                   <td className="cl-td cl-td-name">
                     {/* Sprint 7 B4 — star sits on the row so agents can
@@ -1468,21 +1475,21 @@ function CustomerList({
                     <span className="cl-avatar">{lead.name.charAt(0)}</span>
                     <span className="cl-name-text">
                       <strong>{lead.name}</strong>
-                      <small>{lead.source || '—'}</small>
+                      <small>{lead.source || t('list.placeholders.dash')}</small>
                     </span>
                     {matches > 0 && (
-                      <span className="cl-match-pill" title={`${matches} נכסים תואמים`}>
+                      <span className="cl-match-pill" title={t('list.card.matchPillTitle', { count: matches })}>
                         <Sparkles size={10} />
                         {matches}
                       </span>
                     )}
                   </td>
-                  <td className="cl-td cl-muted">{lead.city || '—'}</td>
-                  <td className="cl-td cl-td-num cl-muted">{lead.rooms || '—'}</td>
+                  <td className="cl-td cl-muted">{lead.city || t('list.placeholders.dash')}</td>
+                  <td className="cl-td cl-td-num cl-muted">{lead.rooms || t('list.placeholders.dash')}</td>
                   <td className="cl-td cl-td-num cl-muted">
                     {lead.budget
                       ? `₪${Number(lead.budget).toLocaleString('he-IL')}`
-                      : (lead.priceRangeLabel || '—')}
+                      : (lead.priceRangeLabel || t('list.placeholders.dash'))}
                   </td>
                   <td className="cl-td" onClick={(e) => e.stopPropagation()}>
                     <StatusPicker lead={lead} onChange={onStatusChange} />
@@ -1503,17 +1510,17 @@ function CustomerList({
                           <button
                             type="button"
                             className="cl-stale-pill"
-                            title="לחץ לעדכון קשר אחרון לעכשיו"
+                            title={t('list.table.stalePillTitle')}
                             onClick={(e) => {
                               e.stopPropagation();
                               onBumpLastContact(lead);
                             }}
                           >
-                            {stale} ימים ללא קשר
+                            {t('list.table.stalePill', { days: stale })}
                           </button>
                         );
                       }
-                      return lastRel ? lastRel.label : '—';
+                      return lastRel ? lastRel.label : t('list.placeholders.dash');
                     })()}
                   </td>
                   <td className="cl-td cl-td-actions" onClick={(e) => e.stopPropagation()}>
@@ -1521,26 +1528,26 @@ function CustomerList({
                       href={telUrl(lead.phone)}
                       className="cl-btn"
                       title={lead.phone}
-                      aria-label={`התקשר ל${lead.name}`}
+                      aria-label={t('list.card.callTo', { name: lead.name })}
                       onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
                     >
                       <Phone size={13} />
                     </a>
                     <a
-                      href={waUrl(lead.phone, `שלום ${lead.name}`)}
+                      href={waUrl(lead.phone, t('list.card.whatsappHello', { name: lead.name }))}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="cl-btn"
-                      title="וואטסאפ"
-                      aria-label={`וואטסאפ ל${lead.name}`}
+                      title={t('list.table.waTitle')}
+                      aria-label={t('list.card.whatsappTo', { name: lead.name })}
                       onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
                     >
                       <WhatsAppIcon size={13} className="wa-green" />
                     </a>
-                    <button className="cl-btn" title="עריכה" onClick={() => onEdit(lead)}>
+                    <button className="cl-btn" title={t('list.table.editTitle')} onClick={() => onEdit(lead)}>
                       <Edit3 size={13} />
                     </button>
-                    <button className="cl-btn danger" title="מחיקה" onClick={() => onDelete(lead)}>
+                    <button className="cl-btn danger" title={t('list.table.deleteTitle')} onClick={() => onDelete(lead)}>
                       <Trash2 size={13} />
                     </button>
                   </td>
@@ -1551,7 +1558,7 @@ function CustomerList({
         </table>
         {sorted.length === 0 && (
           <div className="customers-empty">
-            <p>אין לקוחות בסינון הנוכחי</p>
+            <p>{t('list.empty.filteredShort')}</p>
           </div>
         )}
       </div>
@@ -1579,7 +1586,7 @@ function CustomerList({
               <span className="cl-avatar">{lead.name.charAt(0)}</span>
               <span className="cl-name-text">
                 <strong>{lead.name}</strong>
-                <small>{lead.source || '—'}</small>
+                <small>{lead.source || t('list.placeholders.dash')}</small>
               </span>
             </span>
             <span>
@@ -1587,46 +1594,46 @@ function CustomerList({
             </span>
             <span className="cl-type">
               <Chip tone="neutral">
-                {lead.interestType === 'COMMERCIAL' ? 'מסחרי' : 'פרטי'}
+                {lead.interestType === 'COMMERCIAL' ? t('list.card.interestCommercial') : t('list.card.interestPrivate')}
               </Chip>
               <Chip tone={lead.lookingFor === 'RENT' ? 'rent' : 'buy'}>
-                {lead.lookingFor === 'RENT' ? 'שכירות' : 'קנייה'}
+                {lead.lookingFor === 'RENT' ? t('list.filters.lookingFor.rent') : t('list.filters.lookingFor.buy')}
               </Chip>
             </span>
-            <span className="cl-muted">{lead.city || '—'}</span>
-            <span className="cl-muted">{lead.rooms || '—'}</span>
-            <span className="cl-muted">{lead.priceRangeLabel || '—'}</span>
+            <span className="cl-muted">{lead.city || t('list.placeholders.dash')}</span>
+            <span className="cl-muted">{lead.rooms || t('list.placeholders.dash')}</span>
+            <span className="cl-muted">{lead.priceRangeLabel || t('list.placeholders.dash')}</span>
             <span
               className={`cl-muted ${stalePillDays(lead) ? 'cl-stale' : ''}`}
               title={lead.lastContact ? absoluteTime(lead.lastContact) : ''}
             >
-              {lead.lastContact ? relativeTime(lead.lastContact) : '—'}
+              {lead.lastContact ? relativeTime(lead.lastContact) : t('list.placeholders.dash')}
             </span>
             <span className="cl-actions">
               <a
                 href={telUrl(lead.phone)}
                 className="cl-btn"
                 title={lead.phone}
-                aria-label={`התקשר ל${lead.name}`}
+                aria-label={t('list.card.callTo', { name: lead.name })}
                 onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
               >
                 <Phone size={13} />
               </a>
               <a
-                href={waUrl(lead.phone, `שלום ${lead.name}`)}
+                href={waUrl(lead.phone, t('list.card.whatsappHello', { name: lead.name }))}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="cl-btn"
-                title="וואטסאפ"
-                aria-label={`וואטסאפ ל${lead.name}`}
+                title={t('list.table.waTitle')}
+                aria-label={t('list.card.whatsappTo', { name: lead.name })}
                 onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
               >
                 <WhatsAppIcon size={13} className="wa-green" />
               </a>
-              <button className="cl-btn" title="עריכה" onClick={() => onEdit(lead)}>
+              <button className="cl-btn" title={t('list.table.editTitle')} onClick={() => onEdit(lead)}>
                 <Edit3 size={13} />
               </button>
-              <button className="cl-btn danger" title="מחיקה" onClick={() => onDelete(lead)}>
+              <button className="cl-btn danger" title={t('list.table.deleteTitle')} onClick={() => onDelete(lead)}>
                 <Trash2 size={13} />
               </button>
             </span>
@@ -1635,7 +1642,7 @@ function CustomerList({
       })}
       {leads.length === 0 && (
         <div className="customers-empty">
-          <p>אין לקוחות בסינון הנוכחי</p>
+          <p>{t('list.empty.filteredShort')}</p>
         </div>
       )}
     </div>
@@ -1644,6 +1651,7 @@ function CustomerList({
 
 // Inline dropdown to pick HOT/WARM/COLD manually, with auto-suggestion badge.
 function StatusPicker({ lead, onChange }) {
+  const { t } = useTranslation('customers');
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const isAutoMatch = lead.suggestedStatus && lead.status === lead.suggestedStatus;
@@ -1671,21 +1679,21 @@ function StatusPicker({ lead, onChange }) {
       <button
         className={`badge ${statusBadgeClass(lead.status)} status-badge-btn`}
         onClick={() => setOpen((v) => !v)}
-        title={lead.statusExplanation || 'שנה סטטוס'}
+        title={lead.statusExplanation || t('list.status.change')}
         aria-expanded={open}
         aria-haspopup="menu"
       >
         {statusIcon(lead.status)}
-        {statusLabel(lead.status)}
+        {statusLabel(t, lead.status)}
         {lead.suggestedStatus && !isAutoMatch && (
-          <Sparkles size={11} className="sp-auto-hint" title="הצעה אוטומטית שונה מהסטטוס הנוכחי" />
+          <Sparkles size={11} className="sp-auto-hint" title={t('list.status.autoSuggestionDiffers')} />
         )}
       </button>
       {open && (
         <div className="status-menu" role="menu">
           <div className="status-menu-hint">
             <HelpCircle size={12} />
-            <span>{lead.statusExplanation || 'בחר סטטוס לליד'}</span>
+            <span>{lead.statusExplanation || t('list.status.hint')}</span>
           </div>
           {['HOT', 'WARM', 'COLD'].map((s) => (
             <button
@@ -1698,8 +1706,8 @@ function StatusPicker({ lead, onChange }) {
               }}
             >
               {statusIcon(s)}
-              <span>{statusLabel(s)}</span>
-              {lead.suggestedStatus === s && <span className="sp-auto">הצעה אוטומטית</span>}
+              <span>{statusLabel(t, s)}</span>
+              {lead.suggestedStatus === s && <span className="sp-auto">{t('list.status.autoSuggestionLabel')}</span>}
             </button>
           ))}
         </div>
@@ -1713,6 +1721,7 @@ function StatusPicker({ lead, onChange }) {
 // closes. Replaces the free-text InlineText that let agents save "3-4"
 // and break numeric matching.
 function RoomsInlinePicker({ value, onChange }) {
+  const { t } = useTranslation('customers');
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -1728,7 +1737,7 @@ function RoomsInlinePicker({ value, onChange }) {
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
-  const label = value != null && value !== '' ? `${value} חד׳` : '—';
+  const label = value != null && value !== '' ? t('list.rooms.valueFormat', { count: value }) : t('list.placeholders.dash');
   return (
     <span className="rooms-inline" ref={ref}>
       <button
@@ -1750,7 +1759,7 @@ function RoomsInlinePicker({ value, onChange }) {
             className="rooms-inline-clear"
             onClick={() => { onChange?.(null); setOpen(false); }}
           >
-            נקה
+            {t('list.rooms.clear')}
           </button>
         </div>
       )}
@@ -1760,6 +1769,7 @@ function RoomsInlinePicker({ value, onChange }) {
 
 // Mobile status-chip bottom sheet. Shows full explanation + quick-switch rows.
 function StatusInfoSheet({ lead, onClose, onChange }) {
+  const { t } = useTranslation('customers');
   useEffect(() => {
     if (!lead) return undefined;
     const prev = document.body.style.overflow;
@@ -1770,9 +1780,9 @@ function StatusInfoSheet({ lead, onClose, onChange }) {
   if (!lead) return null;
 
   const statuses = [
-    { key: 'HOT', label: 'חם', icon: <Flame size={18} /> },
-    { key: 'WARM', label: 'חמים', icon: <Thermometer size={18} /> },
-    { key: 'COLD', label: 'קר', icon: <Snowflake size={18} /> },
+    { key: 'HOT', label: t('list.status.hot'), icon: <Flame size={18} /> },
+    { key: 'WARM', label: t('list.status.warm'), icon: <Thermometer size={18} /> },
+    { key: 'COLD', label: t('list.status.cold'), icon: <Snowflake size={18} /> },
   ];
 
   return (
@@ -1780,8 +1790,8 @@ function StatusInfoSheet({ lead, onClose, onChange }) {
       <div className="mpk-sheet mpk-overflow sis-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="mpk-handle" />
         <header className="mpk-head">
-          <h3>שנה סטטוס</h3>
-          <button className="mpk-close" onClick={onClose} aria-label="סגור">
+          <h3>{t('list.statusSheet.title')}</h3>
+          <button className="mpk-close" onClick={onClose} aria-label={t('list.statusSheet.close')}>
             <X size={18} />
           </button>
         </header>
@@ -1789,12 +1799,12 @@ function StatusInfoSheet({ lead, onClose, onChange }) {
           <div className="sis-current">
             <span className={`badge ${statusBadgeClass(lead.status)}`}>
               {statusIcon(lead.status)}
-              {statusLabel(lead.status)}
+              {statusLabel(t, lead.status)}
             </span>
             <span className="sis-current-name">{lead.name}</span>
           </div>
           <p className="sis-reason">
-            {lead.statusExplanation || 'לא זוהתה פעילות אחרונה. עדכן קשר או שלח וואטסאפ כדי לקדם את הליד.'}
+            {lead.statusExplanation || t('list.statusSheet.reasonFallback')}
           </p>
         </div>
         <div className="mpk-overflow-list">
@@ -1808,12 +1818,12 @@ function StatusInfoSheet({ lead, onClose, onChange }) {
               {s.icon}
               <div className="mpk-overflow-meta">
                 <strong>{s.label}</strong>
-                {lead.suggestedStatus === s.key && <small>הצעה אוטומטית</small>}
+                {lead.suggestedStatus === s.key && <small>{t('list.statusSheet.autoSuggestion')}</small>}
               </div>
             </button>
           ))}
         </div>
-        <button className="mpk-cancel" onClick={onClose}>ביטול</button>
+        <button className="mpk-cancel" onClick={onClose}>{t('list.statusSheet.cancel')}</button>
       </div>
     </div>
   );
@@ -1834,6 +1844,7 @@ function FilterSheet({
   onClear,
   onClose,
 }) {
+  const { t } = useTranslation('customers');
   const matchCount = useMemo(() => {
     const now = Date.now();
     const DAY = 86400000;
@@ -1879,39 +1890,39 @@ function FilterSheet({
       <div className="mpk-sheet mpk-overflow filter-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="mpk-handle" />
         <header className="mpk-head">
-          <h3>סינון לקוחות</h3>
-          <button className="mpk-close" onClick={onClose} aria-label="סגור">
+          <h3>{t('list.filterSheet.title')}</h3>
+          <button className="mpk-close" onClick={onClose} aria-label={t('list.filterSheet.close')}>
             <X size={18} />
           </button>
         </header>
         <div className="filter-sheet-body">
           <Group
-            title="חיפוש"
+            title={t('list.filterSheet.groupSearch')}
             options={[
-              { key: 'all', label: 'הכל' },
-              { key: 'BUY', label: 'קונים' },
-              { key: 'RENT', label: 'שוכרים' },
+              { key: 'all', label: t('list.filters.lookingFor.all') },
+              { key: 'BUY', label: t('list.filters.lookingFor.buy') },
+              { key: 'RENT', label: t('list.filters.lookingFor.rent') },
             ]}
             value={lookingForFilter}
             onChange={onLookingForChange}
           />
           <Group
-            title="סוג נכס"
+            title={t('list.filterSheet.groupPropertyType')}
             options={[
-              { key: 'all', label: 'כל הסוגים' },
-              { key: 'PRIVATE', label: 'פרטי' },
-              { key: 'COMMERCIAL', label: 'מסחרי' },
+              { key: 'all', label: t('list.filters.interest.all') },
+              { key: 'PRIVATE', label: t('list.filters.interest.private') },
+              { key: 'COMMERCIAL', label: t('list.filters.interest.commercial') },
             ]}
             value={interestFilter}
             onChange={onInterestChange}
           />
           <Group
-            title="סטטוס"
+            title={t('list.filterSheet.groupStatus')}
             options={[
-              { key: 'all', label: 'הכל' },
-              { key: 'HOT', label: 'חם' },
-              { key: 'WARM', label: 'חמים' },
-              { key: 'COLD', label: 'קר' },
+              { key: 'all', label: t('list.filters.status.all') },
+              { key: 'HOT', label: t('list.filters.status.hot') },
+              { key: 'WARM', label: t('list.filters.status.warm') },
+              { key: 'COLD', label: t('list.filters.status.cold') },
             ]}
             value={statusFilter}
             onChange={onStatusChange}
@@ -1923,14 +1934,14 @@ function FilterSheet({
             className="filter-sheet-clear"
             onClick={() => { onClear(); }}
           >
-            נקה סינון
+            {t('list.filterSheet.clear')}
           </button>
           <button
             type="button"
             className="filter-sheet-apply"
             onClick={onClose}
           >
-            הצג {matchCount} תוצאות
+            {t('list.filterSheet.showResults', { count: matchCount })}
           </button>
         </div>
       </div>
@@ -1944,6 +1955,7 @@ function FilterSheet({
 // the four enum options. Picking one invokes `onChange(value)` which
 // patches via api.updateLead; the host handles optimistic UI + rollback.
 function SeriousnessPicker({ lead, onChange }) {
+  const { t } = useTranslation('customers');
   const [open, setOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState(null);
   const triggerRef = useRef(null);
@@ -2013,8 +2025,8 @@ function SeriousnessPicker({ lead, onChange }) {
         }}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`רצינות: ${currentLabel}`}
-        title="שנה רצינות"
+        aria-label={t('list.seriousness.label', { label: currentLabel })}
+        title={t('list.seriousness.changeTitle')}
       >
         <span className="seriousness-chip-label">{currentLabel}</span>
       </button>
@@ -2025,11 +2037,11 @@ function SeriousnessPicker({ lead, onChange }) {
             className="seriousness-pop"
             role="dialog"
             aria-modal="true"
-            aria-label="בחר רצינות"
+            aria-label={t('list.seriousness.chooseAria')}
             style={popStyle}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="seriousness-pop-title">רצינות</div>
+            <div className="seriousness-pop-title">{t('list.seriousness.title')}</div>
             <div className="seriousness-pop-list" role="menu">
               {Object.entries(SERIOUSNESS_LABELS).map(([value, label]) => (
                 <button
@@ -2059,6 +2071,7 @@ function SeriousnessPicker({ lead, onChange }) {
 // Max length is 500 chars (matches backend validation for the Lead
 // description field).
 function DescriptionInline({ value, onCommit, maxLength = 500 }) {
+  const { t } = useTranslation('customers');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || '');
   const ref = useRef(null);
@@ -2116,8 +2129,8 @@ function DescriptionInline({ value, onCommit, maxLength = 500 }) {
         rows={2}
         dir="auto"
         maxLength={maxLength}
-        aria-label="תיאור"
-        placeholder="הוסף תיאור קצר"
+        aria-label={t('list.placeholders.descriptionAria')}
+        placeholder={t('list.placeholders.addDescription')}
       />
     );
   }
@@ -2136,9 +2149,9 @@ function DescriptionInline({ value, onCommit, maxLength = 500 }) {
         }
       }}
       dir="auto"
-      title="לחץ לעריכת תיאור"
+      title={t('list.placeholders.descriptionEditTitle')}
     >
-      {empty ? 'הוסף תיאור קצר' : value}
+      {empty ? t('list.placeholders.addDescription') : value}
     </span>
   );
 }
