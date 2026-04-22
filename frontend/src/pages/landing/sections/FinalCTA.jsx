@@ -14,11 +14,7 @@ export default function FinalCTA() {
       </a>
       <div className="lp-final-cta-sub-label">{copy.final_cta.secondary_label}</div>
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
-        <StoreBadges
-          appLabel={copy.hero.app_store_label}
-          playLabel={copy.hero.google_play_label}
-          note={null}
-        />
+        <StoreBadges note={null} />
       </div>
     </section>
   );

@@ -34,11 +34,7 @@ export default function Hero() {
               <span key={t} className="lp-hero-trust-item">{t}</span>
             ))}
           </div>
-          <StoreBadges
-            appLabel={copy.hero.app_store_label}
-            playLabel={copy.hero.google_play_label}
-            note={copy.hero.store_disabled_note}
-          />
+          <StoreBadges note={copy.hero.store_disabled_note} />
         </div>
 
         <div className="lp-hero-visual">

@@ -24,11 +24,7 @@ export default function MobileApp() {
               </li>
             ))}
           </ul>
-          <StoreBadges
-            appLabel={copy.hero.app_store_label}
-            playLabel={copy.hero.google_play_label}
-            note={copy.hero.store_disabled_note}
-          />
+          <StoreBadges note={copy.hero.store_disabled_note} />
           <div className="lp-qr" aria-hidden="true">
             <div className="lp-qr-box" />
             <div className="lp-qr-text">

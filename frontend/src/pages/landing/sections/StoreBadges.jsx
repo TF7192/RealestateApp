@@ -5,7 +5,7 @@
  * disabled (aria-disabled, pointer-events:none, visual dim). Swap in
  * real store URLs when the listings go live; drop the `disabled` prop.
  */
-export default function StoreBadges({ appLabel, playLabel, note, disabled = true }) {
+export default function StoreBadges({ note, disabled = true }) {
   const commonProps = disabled
     ? { 'aria-disabled': 'true', tabIndex: -1, onClick: (e) => e.preventDefault(), href: '#appstore-coming' }
     : {};
