@@ -92,6 +92,62 @@ describe('<Dashboard>', () => {
     });
   });
 
+  it('D-2 — meetings card shows reminders in the next 7 days, capped at 5, with the full-list link', async () => {
+    // Seed 6 PENDING reminders with dueAt inside [today, today+7d] and
+    // one outside the window — card should show 5 and hide the 6th +
+    // the out-of-window one, and render the "צפה בכל הפגישות" link.
+    const now = Date.now();
+    const HOUR = 3600_000;
+    const items = [
+      { id: 'r1', title: 'פגישה 1', dueAt: new Date(now + 1 * HOUR).toISOString(), status: 'PENDING' },
+      { id: 'r2', title: 'פגישה 2', dueAt: new Date(now + 2 * HOUR).toISOString(), status: 'PENDING' },
+      { id: 'r3', title: 'פגישה 3', dueAt: new Date(now + 3 * HOUR).toISOString(), status: 'PENDING' },
+      { id: 'r4', title: 'פגישה 4', dueAt: new Date(now + 4 * HOUR).toISOString(), status: 'PENDING' },
+      { id: 'r5', title: 'פגישה 5', dueAt: new Date(now + 5 * HOUR).toISOString(), status: 'PENDING' },
+      { id: 'r6', title: 'פגישה 6', dueAt: new Date(now + 6 * HOUR).toISOString(), status: 'PENDING' },
+      { id: 'r-far', title: 'פגישה רחוקה', dueAt: new Date(now + 30 * 24 * HOUR).toISOString(), status: 'PENDING' },
+    ];
+    server.use(
+      http.get('/api/reminders', () => HttpResponse.json({ items })),
+      // Seed at least one lead so the grid renders (it's hidden when
+      // hasAnyContent is false).
+      http.get('/api/leads', () =>
+        HttpResponse.json({ items: [{ id: 'l1', name: 'דן', status: 'HOT' }] })
+      ),
+    );
+    render(<Dashboard />);
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'פגישות השבוע' })).toBeInTheDocument()
+    );
+    // Exactly 5 meeting rows visible — the 6th and the far-future one
+    // must both be hidden from the card.
+    await waitFor(() => {
+      const rows = document.querySelectorAll('.dash-meetings-row');
+      expect(rows.length).toBe(5);
+    });
+    // "פגישה רחוקה" is outside the 7-day window and must not appear.
+    expect(screen.queryByText('פגישה רחוקה')).not.toBeInTheDocument();
+    // Full-list link exists with the Hebrew label and /reminders href.
+    const more = await screen.findByRole('link', { name: /צפה בכל הפגישות/ });
+    expect(more).toHaveAttribute('href', '/reminders');
+  });
+
+  it('D-2 — meetings card renders the empty state when there are no reminders this week', async () => {
+    server.use(
+      http.get('/api/reminders', () => HttpResponse.json({ items: [] })),
+      http.get('/api/leads', () =>
+        HttpResponse.json({ items: [{ id: 'l1', name: 'דן', status: 'HOT' }] })
+      ),
+    );
+    render(<Dashboard />);
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'פגישות השבוע' })).toBeInTheDocument()
+    );
+    await waitFor(() => {
+      expect(screen.getByText('אין פגישות השבוע')).toBeInTheDocument();
+    });
+  });
+
   it('D-4 — action queue caps at 5 rows with a "צפה בהכול" link to /activity', async () => {
     // Seed 7 stale leads — beyond the 5-row cap so the overflow link
     // has to render.

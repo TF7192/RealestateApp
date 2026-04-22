@@ -797,11 +797,12 @@
 }
 
 /* ── Rich dashboard grid (replaces marketing-progress + hot-leads) ──
-   D-1: ConversionFunnelCard removed; grid now holds two cards.
-   D-3: the 1200px+ rule used 1.2fr 1fr 1fr which starved
-   the pipeline card (status labels "חמים/פושרים/קרים" wrapped). With
-   two cards we can give each side an equal 1fr 1fr split, and the
-   legend rows get `min-width: 0` so flex kids don't overflow. */
+   D-1: ConversionFunnelCard removed.
+   D-2: MeetingsCard added (third card).
+   D-3: the old 1.2fr 1fr 1fr rule starved the pipeline card so the
+   status labels "חמים/פושרים/קרים" wrapped. Use equal 1fr columns and
+   let the pipeline span the full row on the middle (900–1200px) band
+   so its legend stays on one line. */
 .dashboard-grid-rich {
   display: grid;
   gap: 16px;
@@ -811,6 +812,14 @@
   .dashboard-grid-rich {
     grid-template-columns: 1fr 1fr;
   }
+  /* Pipeline card needs width for the 3-chip legend + stacked bar. */
+  .dashboard-grid-rich .dash-pipeline { grid-column: 1 / -1; }
+}
+@media (min-width: 1200px) {
+  .dashboard-grid-rich {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .dashboard-grid-rich .dash-pipeline { grid-column: auto; }
 }
 
 /* Pipeline Health */
@@ -970,3 +979,79 @@ a.dash-aq-more-link:hover {
 }
 
 /* D-1 — Conversion Funnel CSS removed alongside its component. */
+
+/* Meetings (D-2) ------------------------------------------------ */
+.dash-meetings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px 10px;
+}
+.dash-meetings-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border, rgba(30,26,20,0.08));
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text-primary, #1e1a14);
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+.dash-meetings-row:hover {
+  background: var(--gold-glow, rgba(180,139,76,0.06));
+  border-color: var(--gold-border, rgba(180,139,76,0.25));
+}
+.dash-meetings-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: var(--gold-glow, rgba(180,139,76,0.12));
+  color: var(--gold, #b48b4c);
+}
+.dash-meetings-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dash-meetings-info strong {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary, #1e1a14);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-meetings-info span {
+  font-size: 12px;
+  color: var(--text-muted, #6b6356);
+  font-variant-numeric: tabular-nums;
+}
+.dash-meetings-empty {
+  padding: 14px 18px 18px;
+  font-size: 12.5px;
+  color: var(--text-muted, #6b6356);
+  text-align: center;
+}
+.dash-meetings-skel {
+  padding: 14px 18px;
+}
+.dash-meetings-more {
+  display: block;
+  padding: 10px 18px 14px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--gold, #b48b4c);
+  text-decoration: none;
+  font-weight: 600;
+  border-top: 1px solid var(--border, rgba(30,26,20,0.06));
+  transition: background 0.1s ease;
+}
+.dash-meetings-more:hover {
+  background: var(--gold-glow, rgba(180,139,76,0.06));
+}
