@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { LogIn, Building2, Mail, Lock, ArrowLeft, UserPlus } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { isNative } from '../native/platform';
@@ -16,7 +17,12 @@ const agentFeatures = [
 
 export default function Login() {
   const { login, signup } = useAuth();
-  const [flow, setFlow] = useState(null); // null | 'email-login' | 'email-signup'
+  const [searchParams] = useSearchParams();
+  // Landing-page CTAs send `?flow=signup` so visitors arriving from the
+  // marketing page land directly on the signup form, skipping the
+  // Google/login choice screen.
+  const initialFlow = searchParams.get('flow') === 'signup' ? 'email-signup' : null;
+  const [flow, setFlow] = useState(initialFlow); // null | 'email-login' | 'email-signup'
   const [form, setForm] = useState({
     email: '',
     password: '',

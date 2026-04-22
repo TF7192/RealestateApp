@@ -1,18 +1,10 @@
-/**
- * Landing — Hebrew copy
- *
- * Every user-visible string on the landing page lives in this file so
- * a Hebrew-fluent reviewer can edit the whole page in one sitting without
- * hunting through JSX. Do not hardcode copy inside components.
- *
- * Naming convention: snake_case keys by section. `nav.*`, `hero.*`,
- * `features.*`, `mobile.*`, `how.*`, `pricing.*`, `faq.*`, `final_cta.*`,
- * `footer.*`, `meta.*`.
- *
- * Open items flagged inline with `TODO(landing):`.
- *   • App Store / Google Play URLs — none yet; buttons render disabled.
- *   • Screenshots — placeholder frames in components until final assets land.
- */
+// Hebrew copy for the landing page. One-file source of truth so a
+// Hebrew-fluent reviewer can edit the whole marketing surface without
+// hunting through JSX. Open items flagged inline as TODO(landing).
+//
+// Kept in sync with landing/content/copy.he.ts at the repo root; the
+// frontend bundle imports this .js copy so we don't bring TypeScript
+// into a JSX-only codebase.
 
 export const copy = {
   meta: {
@@ -46,7 +38,6 @@ export const copy = {
     primary_cta: 'התחלה חינם ל-30 יום',
     secondary_cta: 'כבר יש לי חשבון',
     trust: ['בלי כרטיס אשראי', 'ביטול בכל רגע', 'תמיכה בעברית'],
-    // TODO(landing): swap placeholder screenshot once final asset lands.
     screenshot_alt: 'מסך הבית של Estia: רשימת הלידים, הנכסים והיומן להיום.',
     app_store_label:   'הורדה מ-App Store',
     google_play_label: 'להורדה ב-Google Play',
@@ -129,7 +120,6 @@ export const copy = {
       'סנכרון מיידי עם הדסקטופ — ממשיכים מאיפה שעצרתם.',
     ],
     qr_label_desktop: 'סרקו כדי להוריד',
-    // TODO(landing): replace the placeholder device frame with final screenshots.
     screenshot_alt: 'מסך הלידים באפליקציית Estia — לחיצה אחת על ליד לפתיחת כרטיס מלא.',
   },
 
@@ -137,21 +127,9 @@ export const copy = {
     section_title: 'בעוד 2 דקות — אתם כבר עובדים',
     section_sub: 'הכנה זה לא מקצוע. עבודה — כן.',
     steps: [
-      {
-        n: 1,
-        title: 'נרשמים בדקה',
-        body: 'אימייל וסיסמה או התחברות עם Google. בלי כרטיס אשראי, בלי שיחת מכירה.',
-      },
-      {
-        n: 2,
-        title: 'מייבאים או מתחילים נקי',
-        body: 'ייבוא מ-Excel, או הקלדת הנכסים והלקוחות הראשונים — הבחירה שלכם.',
-      },
-      {
-        n: 3,
-        title: 'עובדים. 30 יום חינם.',
-        body: 'ביטול בכל רגע, בלי התחייבות, בלי הפתעות.',
-      },
+      { n: 1, title: 'נרשמים בדקה',            body: 'אימייל וסיסמה או התחברות עם Google. בלי כרטיס אשראי, בלי שיחת מכירה.' },
+      { n: 2, title: 'מייבאים או מתחילים נקי', body: 'ייבוא מ-Excel, או הקלדת הנכסים והלקוחות הראשונים — הבחירה שלכם.' },
+      { n: 3, title: 'עובדים. 30 יום חינם.',    body: 'ביטול בכל רגע, בלי התחייבות, בלי הפתעות.' },
     ],
   },
 
@@ -214,35 +192,13 @@ export const copy = {
     section_eyebrow: 'שאלות',
     section_title: 'שאלות ששואלים אותנו',
     items: [
-      {
-        q: 'האם באמת אין צורך בכרטיס אשראי?',
-        a: 'נכון. רושמים אימייל וסיסמה, נכנסים, עובדים. כרטיס אשראי מוזן רק אם החלטתם להמשיך אחרי 30 יום.',
-      },
-      {
-        q: 'מה קורה אחרי 30 יום?',
-        a: 'יום לפני סוף התקופה נשלח אימייל. אם לא בחרתם מסלול בתשלום, החשבון עובר למצב צפייה בלבד — הנתונים נשמרים ותוכלו לחזור בכל רגע.',
-      },
-      {
-        q: 'האם האפליקציה עובדת על אייפון ואנדרואיד?',
-        // TODO(landing): update wording once store listings are live.
-        a: 'כן — אפליקציה נטיבית לשני המכשירים. האפליקציות בתהליך פרסום בחנויות; מי שנרשם עכשיו מקבל גישה ראשון.',
-      },
-      {
-        q: 'מה ה-AI בדיוק עושה?',
-        a: 'שני דברים: כותב עבורכם תיאור נכס שיווקי מתוך הנתונים שהזנתם, ומציג התאמה חכמה בין לקוחות לנכסים — חוסך שעות של "מי מתאים למה".',
-      },
-      {
-        q: 'האם אפשר לייבא נתונים מ-Excel?',
-        a: 'כן. ייבוא מ-Excel בקליק — נכסים, לקוחות ובעלים עולים ביחד בלי העתק-הדבק.',
-      },
-      {
-        q: 'האם הנתונים שלי מאובטחים?',
-        a: 'הנתונים מוצפנים במעבר ובמנוחה, נשמרים על שרתים באירופה (AWS eu-north-1), וגיבויים אוטומטיים נשמרים 14 יום. אתם הבעלים של המידע — ניתן לייצא או למחוק אותו בכל רגע.',
-      },
-      {
-        q: 'מתאים גם לסוכן עצמאי או רק למשרדים?',
-        a: 'שניהם. המסלול "בסיס" מתאים לסוכן עצמאי; "מקצועי" מיועד למשרדים ולסוכנים בנפח גבוה.',
-      },
+      { q: 'האם באמת אין צורך בכרטיס אשראי?',        a: 'נכון. רושמים אימייל וסיסמה, נכנסים, עובדים. כרטיס אשראי מוזן רק אם החלטתם להמשיך אחרי 30 יום.' },
+      { q: 'מה קורה אחרי 30 יום?',                    a: 'יום לפני סוף התקופה נשלח אימייל. אם לא בחרתם מסלול בתשלום, החשבון עובר למצב צפייה בלבד — הנתונים נשמרים ותוכלו לחזור בכל רגע.' },
+      { q: 'האם האפליקציה עובדת על אייפון ואנדרואיד?', a: 'כן — אפליקציה נטיבית לשני המכשירים. האפליקציות בתהליך פרסום בחנויות; מי שנרשם עכשיו מקבל גישה ראשון.' },
+      { q: 'מה ה-AI בדיוק עושה?',                     a: 'שני דברים: כותב עבורכם תיאור נכס שיווקי מתוך הנתונים שהזנתם, ומציג התאמה חכמה בין לקוחות לנכסים — חוסך שעות של "מי מתאים למה".' },
+      { q: 'האם אפשר לייבא נתונים מ-Excel?',          a: 'כן. ייבוא מ-Excel בקליק — נכסים, לקוחות ובעלים עולים ביחד בלי העתק-הדבק.' },
+      { q: 'האם הנתונים שלי מאובטחים?',                a: 'הנתונים מוצפנים במעבר ובמנוחה, נשמרים על שרתים באירופה (AWS eu-north-1), וגיבויים אוטומטיים נשמרים 14 יום. אתם הבעלים של המידע — ניתן לייצא או למחוק אותו בכל רגע.' },
+      { q: 'מתאים גם לסוכן עצמאי או רק למשרדים?',     a: 'שניהם. המסלול "בסיס" מתאים לסוכן עצמאי; "מקצועי" מיועד למשרדים ולסוכנים בנפח גבוה.' },
     ],
   },
 
@@ -268,7 +224,6 @@ export const copy = {
       {
         title: 'חברה',
         links: [
-          // TODO(landing): wire real routes for terms / privacy when drafted.
           { label: 'צור קשר',       href: 'mailto:hello@estia.tripzio.xyz' },
           { label: 'תנאי שימוש',    href: '#' },
           { label: 'מדיניות פרטיות', href: '#' },
@@ -284,6 +239,4 @@ export const copy = {
     anchor_to_pricing: 'לראות מחירים',
     coming_soon: 'בקרוב',
   },
-} as const;
-
-export type Copy = typeof copy;
+};

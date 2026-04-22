@@ -53,6 +53,11 @@ import OfflineBanner from './components/OfflineBanner';
 // (hasCompletedTutorial=true) or are on mobile (where the tour is
 // silenced), so the main bundle doesn't need to pay for it up-front.
 const OnboardingTour = lazy(() => import('./components/OnboardingTour'));
+
+// Public marketing landing page. Lazy so unauthed visitors who arrive
+// on a share-link route (e.g. /agents/:slug/:property) never pay the
+// landing's CSS + hero weight; same for authed sessions.
+const Landing = lazy(() => import('./pages/landing/Landing'));
 import ChatWidget from './components/ChatWidget';
 import Yad2ScanBanner from './components/Yad2ScanBanner';
 import { useScrollRestore } from './hooks/mobile';
@@ -147,17 +152,26 @@ function AppRoutes() {
 
   if (!user) {
     return (
-      <Routes>
-        {/* SEO-friendly public routes */}
-        <Route path="/agents/:agentSlug" element={<AgentPortal />} />
-        <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
-        {/* Public prospect sign page (1.5) — no login required. */}
-        <Route path="/public/p/:token" element={<ProspectSign />} />
-        {/* Legacy short routes — kept forever for shared-link backwards-compat */}
-        <Route path="/p/:id" element={<CustomerPropertyView />} />
-        <Route path="/a/:agentId" element={<AgentPortal />} />
-        <Route path="*" element={<Login />} />
-      </Routes>
+      <Suspense fallback={<div className="app-loading"><div className="app-loading-spinner" /></div>}>
+        <Routes>
+          {/* Public landing page — mobile-first Hebrew marketing surface */}
+          <Route path="/" element={<Landing />} />
+          {/* Explicit login route; the landing CTAs link here.
+              `/login?flow=signup` preselects the signup tab inside Login.jsx. */}
+          <Route path="/login" element={<Login />} />
+          {/* SEO-friendly public routes */}
+          <Route path="/agents/:agentSlug" element={<AgentPortal />} />
+          <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
+          {/* Public prospect sign page (1.5) — no login required. */}
+          <Route path="/public/p/:token" element={<ProspectSign />} />
+          {/* Legacy short routes — kept forever for shared-link backwards-compat */}
+          <Route path="/p/:id" element={<CustomerPropertyView />} />
+          <Route path="/a/:agentId" element={<AgentPortal />} />
+          {/* Anything else lands on the login page (backwards-compat for any
+              bookmarked authed URL visited while logged out). */}
+          <Route path="*" element={<Login />} />
+        </Routes>
+      </Suspense>
     );
   }
 
