@@ -14,6 +14,19 @@
   .y2-page { padding-bottom: 16px; }
 }
 
+/* Y-3 — back link sits on its own row above the page headline.
+   Previously the <header> had no layout, so the flex-row default of
+   inline content put "חזור לנכסים" and "ייבוא נכסים מ-Yad2" on the
+   same line. Stacking them vertically matches the other detail pages
+   (PropertyDetail, CustomerDetail) and reads better in RTL. */
+.y2-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.y2-head .y2-back { align-self: flex-start; }
+
 .y2-back {
   display: inline-flex;
   align-items: center;

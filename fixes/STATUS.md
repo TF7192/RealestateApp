@@ -44,11 +44,11 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | E-1..E-3 | Deals | Sub-6 | ⚪ | — | — | — | — | |
 | C-1 | Calculator layout | Sub-6 | ⚪ | — | — | — | — | |
 | R-1 | Reports rebuild | Sub-6 | ⚪ | — | — | — | — | |
-| Y-1 | Durable Yad2 notification | Sub-7 | ⚪ | — | — | — | — | Rehydrate by jobId |
-| Y-2 | Async download | Sub-7 | ⚪ | — | — | — | — | Already async job; polish |
-| Y-3 | Yad2 heading layout | Sub-7 | ⚪ | — | — | — | — | |
-| Y-4 | Post-import reset | Sub-7 | ⚪ | — | — | — | — | |
-| U-1 | Notification position + close | Sub-7 | ⚪ | — | — | — | — | |
+| Y-1 | Durable Yad2 notification | Sub-7 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | Rehydrate by jobId; RUNNING_SCAN_KEY |
+| Y-2 | Async download | Sub-7 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | RUNNING_IMPORT_KEY + yad2-import-complete |
+| Y-3 | Yad2 heading layout | Sub-7 | 🟢 | — | ✅ | ✅ (manual) | pending | .y2-head flex-column |
+| Y-4 | Post-import reset | Sub-7 | 🟢 | — | ✅ | ✅ (manual) | pending | Clear URL on step=done + resetAndRescan |
+| U-1 | Notification position + close | Sub-7 | 🟢 | ✅ | ✅ | ✅ (e2e) | pending | Bottom-center; dismiss while running |
 
 ## Log (append-only)
 
@@ -69,6 +69,36 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
     the `mutate → reload → toast → rollback` pattern so subagents can
     stop copy-pasting it. 4 cases.
   - Full `unit-frontend` suite: 160 tests pass.
+- **2026-04-22T21:15Z** — Sub-7 lane shipped (Y-1/Y-2/Y-3/Y-4/U-1):
+  - **Y-1** `yad2ScanStore.js` persists running preview jobs under
+    `estia-yad2-running-scan` (`{status, jobId, url, startedAt}`).
+    On module init, if a running entry exists, calls `yad2JobStatus(jobId)`:
+    done/error → apply + fire `yad2-scan-complete`; running → re-attach
+    poll loop (status reflected as 'running' so banner reattaches);
+    404 → drop key + idle. Key cleared on every terminal path. Added
+    to `resetForLogout()` to preserve SEC-1.
+  - **Y-2** Same pattern for import jobs under
+    `estia-yad2-running-import`. `startImport()` now dispatches
+    `yad2-import-complete` on terminal states. Banner owns the toast.
+    No fake progress — backend progress field isn't exposed yet.
+  - **Y-3** `.y2-head` becomes `flex-column` so the page headline sits
+    on its own row beneath the back link.
+  - **Y-4** `Yad2Import.jsx` clears URL input + scan store on
+    `step === 'done'` and in `resetAndRescan()`. Agent must explicitly
+    paste a new URL to re-scan.
+  - **U-1** `Yad2ScanBanner.css` → bottom-center layout, full-width
+    mobile, max-width 480px centered on desktop. Outer element switched
+    from nested `<button>` to `<div role="button">` so the close button
+    can be a real `<button>`. Close is always visible (works while
+    running too). Completion toasts key off finishedAt so a newer scan
+    re-arms.
+  - 7 new vitest cases in `tests/unit/frontend/yad2-durable-jobs.test.js`
+    — all pass. Preexisting 4 `@capacitor/core`-missing failures in
+    `sec-user-scoped-stores.test.js` are a worktree-env issue, not a
+    regression.
+  - Playwright baseline spec at
+    `tests/e2e/yad2/scan-banner-position.spec.ts` covers the
+    bottom-center position assertion and dismiss-persists flow.
 - **2026-04-22T20:45Z** — SEC-1 fix landed:
   - `yad2ScanStore.resetForLogout()` + `marketScanStore.resetForLogout()`
     — wipe in-memory state + sessionStorage on a session boundary.
