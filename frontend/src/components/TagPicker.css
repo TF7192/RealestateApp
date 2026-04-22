@@ -23,18 +23,32 @@
   font-size: 12px;
 }
 
+/* N-5 — tag chip visibility. Fill and border derive from the tag's own
+ * color via the `--tag-color` custom property (set inline by the host:
+ * `style={{ '--tag-color': tag.color }}`). The fill is an 18% mix with
+ * the surface so pale tag colors still read against both themes; border
+ * and text darken for WCAG AA contrast. Chips without --tag-color fall
+ * back to the legacy neutral chip look. */
 .tag-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
+  padding: 3px 10px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
+  border: 1px solid color-mix(in srgb, var(--tag-color, var(--border)) 45%, transparent);
+  background: color-mix(in srgb, var(--tag-color, var(--bg-card)) 18%, transparent);
   font-size: 12px;
+  font-weight: 600;
   line-height: 1.3;
-  color: var(--text-primary);
+  color: color-mix(in srgb, var(--tag-color, var(--text-primary)) 82%, var(--text-primary));
   white-space: nowrap;
+}
+
+[data-theme="dark"] .tag-chip {
+  /* Darker backgrounds need a brighter tint to stay readable. */
+  background: color-mix(in srgb, var(--tag-color, var(--bg-card)) 28%, transparent);
+  color: color-mix(in srgb, var(--tag-color, var(--text-primary)) 70%, #fff);
+  border-color: color-mix(in srgb, var(--tag-color, var(--border)) 55%, transparent);
 }
 
 .tag-chip-label { font-weight: 500; }

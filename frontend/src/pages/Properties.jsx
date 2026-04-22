@@ -10,6 +10,7 @@ import {
   LinkIcon,
   Check,
   SlidersHorizontal,
+  Star,
   X,
   Navigation,
   Trash2,
@@ -21,6 +22,7 @@ import {
   Square,
   Copy,
   Edit3,
+  StickyNote,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
@@ -55,12 +57,12 @@ import {
   resolveLocation,
   allLocationNames,
 } from '../data/mockData';
-import { PriceRange, NumberField, SelectField } from '../components/SmartFields';
 import FavoriteStar from '../components/FavoriteStar';
 import ViewToggle from '../components/ViewToggle';
 import DataTable from '../components/DataTable';
 import { useViewMode } from '../lib/useViewMode';
 import SavedSearchMenu from '../components/SavedSearchMenu';
+import AdvancedFilters from '../components/AdvancedFilters';
 import './Properties.css';
 
 function formatPrice(price) {
@@ -142,12 +144,20 @@ export function leadMatchesProperty(lead, property) {
   return true;
 }
 
-function buildShareUrl(filters) {
+// N-9 — "קישור ללקוח" previously pointed at `/share?...` which isn't a
+// registered route (404). The correct public-facing destination is the
+// agent's own portal (`/agents/:slug` or `/a/:agentId`) with filter
+// query params the portal hydrates into its own state.
+function buildShareUrl(agent, filters) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, val]) => {
     if (val && val !== 'all') params.set(key, val);
   });
-  return `${window.location.origin}/share?${params.toString()}`;
+  const base = agent?.slug
+    ? `${window.location.origin}/agents/${encodeURI(agent.slug)}`
+    : `${window.location.origin}/a/${agent?.id || ''}`;
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
 }
 
 export default function Properties() {
@@ -190,6 +200,11 @@ export default function Properties() {
   }));
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // N-10 — "רק מועדפים" toggle state. Declared UP HERE (not next to the
+  // other favorite state lower in the component) because the URL-sync
+  // effect below depends on it; the bundle minifier TDZ trap that F-6.5
+  // already warns about would otherwise crash the /properties route.
+  const [onlyFavorites, setOnlyFavorites] = useState(() => searchParams.get('fav') === '1');
 
   // F-6.5 — write filters back to the URL so refresh / share link /
   // back-forward all land on the same view. MUST sit after the state
@@ -213,13 +228,14 @@ export default function Properties() {
     if (advFilters.maxRooms)        next.set('maxR', String(advFilters.maxRooms));
     if (advFilters.minSqm)          next.set('minS', String(advFilters.minSqm));
     if (advFilters.maxSqm)          next.set('maxS', String(advFilters.maxSqm));
+    if (onlyFavorites)              next.set('fav', '1');
     const nextStr = next.toString();
     const curStr = searchParams.toString();
     if (nextStr !== curStr) {
       setSearchParams(next, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, filter, assetClassFilter, showAdvanced, locationQuery, locationRadius, advFilters]);
+  }, [search, filter, assetClassFilter, showAdvanced, locationQuery, locationRadius, advFilters, onlyFavorites]);
 
   // Bulk selection mode. When `selectMode` is true, card taps toggle
   // membership in `selectedIds` instead of navigating to the detail page.
@@ -345,7 +361,8 @@ export default function Properties() {
   const [overflowFor, setOverflowFor] = useState(null); // prop for ⋯ menu
   const [similarFor, setSimilarFor] = useState(null); // prop for "חפש דומים"
   const [transferProp, setTransferProp] = useState(null);
-  const [pageOverflowOpen, setPageOverflowOpen] = useState(false); // P1-M16
+  // N-7 removed the page-level ⋯ sheet; `pageOverflowOpen` is gone and the
+  // two actions it hid now live in the toolbar as direct buttons.
   const [matchesPickerFor, setMatchesPickerFor] = useState(null); // P3-M8: { prop, leads }
 
   // Sprint 7 B4 — favorites for properties. Seed the id set once so each
@@ -484,6 +501,9 @@ export default function Properties() {
           const anyDone = acts.some((v) => !!v);
           if (anyDone) return false;
         }
+        // N-10 — favorites-only toggle narrows the list to the starred
+        // property set. Mirrors the pattern already on /customers.
+        if (onlyFavorites && !favoriteIds.has(p.id)) return false;
         if (locationCenter && p._distance != null && p._distance > locationRadius) return false;
         if (debouncedSearch) {
           const s = debouncedSearch.toLowerCase();
@@ -500,7 +520,7 @@ export default function Properties() {
         if (a._distance != null && b._distance != null) return a._distance - b._distance;
         return 0;
       });
-  }, [items, filter, assetClassFilter, advFilters, debouncedSearch, locationCenter, locationRadius, unmarketedOnly]);
+  }, [items, filter, assetClassFilter, advFilters, debouncedSearch, locationCenter, locationRadius, unmarketedOnly, onlyFavorites, favoriteIds]);
 
   const cities = [...new Set(items.map((p) => p.city))];
 
@@ -583,8 +603,9 @@ export default function Properties() {
       minSqm: advFilters.minSqm,
       maxSqm: advFilters.maxSqm,
     };
-    const url = buildShareUrl(shareFilters);
+    const url = buildShareUrl(user, shareFilters);
     navigator.clipboard.writeText(url);
+    toast?.success?.('הקישור הועתק');
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 3000);
   };
@@ -600,7 +621,10 @@ export default function Properties() {
     (locationQuery ? 1 : 0)
   );
   const hasActiveFilters = activeFilterCount > 0;
-  const anyFilterActive = hasActiveFilters || filter !== 'all' || assetClassFilter !== 'all' || (search || '').trim().length > 0;
+  const anyFilterActive = hasActiveFilters || filter !== 'all' || assetClassFilter !== 'all' || (search || '').trim().length > 0 || onlyFavorites;
+  // N-12 — "נקה סינון" not only resets the fields but also COLLAPSES the
+  // `סינון מתקדם` panel. Previously the panel stayed open after clearing,
+  // forcing the agent to close it manually.
   const clearAllFilters = () => {
     setSearch('');
     setFilter('all');
@@ -608,6 +632,7 @@ export default function Properties() {
     setAdvFilters({ city: '', minRooms: '', maxRooms: '', minSqm: null, maxSqm: null, minPrice: null, maxPrice: null });
     setLocationQuery('');
     setLocationRadius(5);
+    setOnlyFavorites(false);
     setShowAdvanced(false);
   };
 
@@ -781,9 +806,10 @@ export default function Properties() {
             <p>{filtered.length} מתוך {items.length} נכסים</p>
           </div>
           <div className="page-header-actions">
-            {/* F-4 — canonical header: primary rightmost, secondaries demoted.
-                Bulk-select and share-link move behind the ⋯ overflow so the
-                primary CTA ("קליטת נכס חדש") wins the visual hierarchy. */}
+            {/* N-7 — the top-left ⋯ menu previously hid "בחירה מרובה" and
+                "קישור ללקוח" inside a popover. Per the punch list both are
+                now exposed as direct toolbar buttons so the action surface
+                is always visible. The ⋯ is gone entirely on desktop. */}
             <ViewToggle value={viewMode} onChange={setViewMode} />
             {/* Sprint 7 B3 — saved-search menu for the current filter set. */}
             <SavedSearchMenu
@@ -791,14 +817,36 @@ export default function Properties() {
               currentFilters={currentSavedFilters}
               onLoad={handleLoadSavedSearch}
             />
+            {/* N-10 — favorites-only toggle, same pattern as /customers. */}
             <button
               type="button"
-              className="btn btn-ghost"
-              onClick={() => setPageOverflowOpen(true)}
-              aria-label="פעולות נוספות"
-              title="פעולות נוספות"
+              className={`btn btn-ghost btn-sm ${onlyFavorites ? 'is-active' : ''}`}
+              onClick={() => setOnlyFavorites((v) => !v)}
+              aria-pressed={onlyFavorites}
+              aria-label="רק מועדפים"
+              title="הצג רק נכסים במועדפים"
             >
-              <MoreHorizontal size={18} />
+              <Star size={14} aria-hidden="true" fill={onlyFavorites ? 'currentColor' : 'none'} />
+              <span>רק מועדפים</span>
+            </button>
+            <button
+              type="button"
+              className={`btn btn-ghost btn-sm ${selectMode ? 'is-active' : ''}`}
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              aria-pressed={selectMode}
+              title="בחר כמה נכסים בבת אחת"
+            >
+              <CheckSquare size={14} aria-hidden="true" />
+              <span>{selectMode ? 'יציאה מבחירה' : 'בחירה מרובה'}</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={handleGenerateLink}
+              title="העתק קישור ציבורי ללקוח עם הסינון הנוכחי"
+            >
+              {copiedLink ? <Check size={14} aria-hidden="true" /> : <LinkIcon size={14} aria-hidden="true" />}
+              <span>{copiedLink ? 'הקישור הועתק' : 'קישור ללקוח'}</span>
             </button>
             <Link to="/properties/new" className="btn btn-primary">
               <Plus size={18} />
@@ -809,19 +857,10 @@ export default function Properties() {
       )}
 
       <div className="filters-bar animate-in animate-in-delay-1">
-        {/* P1-M12 — sticky search wrapper */}
+        {/* P1-M12 — sticky search wrapper. N-7 removed the mobile ⋯ that
+            hid "בחירה מרובה" + "קישור ללקוח"; both are now exposed in
+            the filter bar below on every viewport. */}
         <div className="sticky-search properties-sticky-search">
-          {/* P1-M16 — page-level ⋯ on mobile (top-left of sticky search) */}
-          {isMobile && (
-            <button
-              type="button"
-              className="properties-page-overflow touch-target"
-              onClick={() => setPageOverflowOpen(true)}
-              aria-label="אפשרויות נוספות"
-            >
-              <MoreHorizontal size={18} />
-            </button>
-          )}
           <div className="search-box">
             <Search size={18} />
             <input
@@ -874,6 +913,46 @@ export default function Properties() {
           <SlidersHorizontal size={16} />
           {hasActiveFilters ? `סינון מתקדם · ${activeFilterCount}` : 'סינון מתקדם'}
         </button>
+        {/* N-10 — favorites-only toggle (mobile parity: desktop also shows
+            it here for discoverability, but the header-actions copy is the
+            "canonical" one). */}
+        {isMobile && (
+          <button
+            type="button"
+            className={`btn btn-ghost btn-sm ${onlyFavorites ? 'is-active' : ''}`}
+            onClick={() => setOnlyFavorites((v) => !v)}
+            aria-pressed={onlyFavorites}
+            aria-label="רק מועדפים"
+            title="הצג רק נכסים במועדפים"
+          >
+            <Star size={14} aria-hidden="true" fill={onlyFavorites ? 'currentColor' : 'none'} />
+            <span>רק מועדפים</span>
+          </button>
+        )}
+        {/* N-7 — mobile: direct "בחירה מרובה" + "קישור ללקוח" (no ⋯ menu). */}
+        {isMobile && (
+          <>
+            <button
+              type="button"
+              className={`btn btn-ghost btn-sm ${selectMode ? 'is-active' : ''}`}
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              aria-pressed={selectMode}
+              title="בחר כמה נכסים בבת אחת"
+            >
+              <CheckSquare size={14} aria-hidden="true" />
+              <span>{selectMode ? 'יציאה' : 'בחירה מרובה'}</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={handleGenerateLink}
+              title="העתק קישור ציבורי ללקוח עם הסינון הנוכחי"
+            >
+              {copiedLink ? <Check size={14} aria-hidden="true" /> : <LinkIcon size={14} aria-hidden="true" />}
+              <span>{copiedLink ? 'הועתק' : 'קישור ללקוח'}</span>
+            </button>
+          </>
+        )}
         {anyFilterActive && (
           <button
             type="button"
@@ -887,116 +966,48 @@ export default function Properties() {
       </div>
 
       {showAdvanced && (
-        <div className="agent-filters-panel animate-in">
-          <div className="agent-proximity-section">
-            <div className="agent-proximity-input">
-              <Navigation size={18} />
-              <input
-                type="search"
-                inputMode="search"
-                enterKeyHint="search"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                placeholder="הזן רחוב או עיר לחיפוש לפי קרבה..."
-                value={locationQuery}
-                onChange={(e) => setLocationQuery(e.target.value)}
-                list="agent-location-list"
-              />
-              <datalist id="agent-location-list">
-                {allLocationNames.map((n) => (<option key={n} value={n} />))}
-              </datalist>
-              {locationQuery && (
-                <button className="proximity-clear" onClick={() => setLocationQuery('')}>
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-            {locationCenter && (
-              <div className="agent-proximity-radius">
-                <span className="proximity-match">
-                  <MapPin size={13} />
-                  {locationCenter.label}
-                </span>
-                <div className="proximity-slider-wrap">
-                  <label className="form-label">רדיוס: {locationRadius} ק״מ</label>
-                  <input
-                    type="range"
-                    min={1}
-                    max={20}
-                    value={locationRadius}
-                    onChange={(e) => setLocationRadius(Number(e.target.value))}
-                    className="proximity-slider"
-                  />
-                </div>
-              </div>
-            )}
-            {locationQuery && !locationCenter && (
-              <span className="proximity-no-match">לא נמצא מיקום תואם</span>
-            )}
-          </div>
-
-          <div className="agent-filters-grid">
-            <div className="form-group">
-              <label className="form-label">עיר</label>
-              <SelectField
-                value={advFilters.city}
-                onChange={(v) => setAdvFilters({ ...advFilters, city: v })}
-                placeholder="כל הערים"
-                options={cities.map((c) => ({ value: c, label: c }))}
-              />
-            </div>
-            <div className="form-group" style={{ gridColumn: 'span 2' }}>
-              <label className="form-label">טווח מחיר</label>
-              <PriceRange
-                minVal={advFilters.minPrice}
-                maxVal={advFilters.maxPrice}
-                onChangeMin={(n) => setAdvFilters({ ...advFilters, minPrice: n })}
-                onChangeMax={(n) => setAdvFilters({ ...advFilters, maxPrice: n })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">חדרים מ-</label>
-              <NumberField
-                placeholder="3"
-                value={advFilters.minRooms === '' ? null : Number(advFilters.minRooms)}
-                onChange={(v) => setAdvFilters({ ...advFilters, minRooms: v == null ? '' : String(v) })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">חדרים עד</label>
-              <NumberField
-                placeholder="5"
-                value={advFilters.maxRooms === '' ? null : Number(advFilters.maxRooms)}
-                onChange={(v) => setAdvFilters({ ...advFilters, maxRooms: v == null ? '' : String(v) })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">שטח מ- (מ״ר)</label>
-              <NumberField
-                unit="מ״ר"
-                value={advFilters.minSqm}
-                onChange={(v) => setAdvFilters({ ...advFilters, minSqm: v })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">שטח עד (מ״ר)</label>
-              <NumberField
-                unit="מ״ר"
-                value={advFilters.maxSqm}
-                onChange={(v) => setAdvFilters({ ...advFilters, maxSqm: v })}
-              />
-            </div>
-          </div>
-          <div className="agent-filters-actions">
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => { setAdvFilters({ city: '', minPrice: null, maxPrice: null, minRooms: '', maxRooms: '', minSqm: null, maxSqm: null }); setLocationQuery(''); }}
-            >
-              <X size={14} /> נקה סינון
-            </button>
-          </div>
-        </div>
+        /* N-11 — extracted into <AdvancedFilters> so Sub-5 can reuse the
+         * shape for the leads page with lead-specific fields (rooms
+         * desired, category desired, seriousness). The panel is a dumb
+         * presentational component; this page still owns the state +
+         * URL sync. N-13 — proximity input now follows the .form-input
+         * theme (done inside AdvancedFilters.css). */
+        <AdvancedFilters
+          className="animate-in"
+          locations={allLocationNames}
+          config={{
+            fields: ['proximity', 'city', 'price', 'rooms', 'sqm'],
+            cities,
+          }}
+          values={{
+            city: advFilters.city,
+            minPrice: advFilters.minPrice,
+            maxPrice: advFilters.maxPrice,
+            minRooms: advFilters.minRooms,
+            maxRooms: advFilters.maxRooms,
+            minSqm: advFilters.minSqm,
+            maxSqm: advFilters.maxSqm,
+            locationQuery,
+            locationRadius,
+            locationCenter,
+          }}
+          onChange={(k, v) => {
+            if (k === 'locationQuery') setLocationQuery(v);
+            else if (k === 'locationRadius') setLocationRadius(v);
+            else setAdvFilters((prev) => ({ ...prev, [k]: v }));
+          }}
+          onClear={() => {
+            // N-12 — "נקה סינון" resets the fields AND collapses the
+            // advanced panel so the agent doesn't have to close it too.
+            setAdvFilters({
+              city: '', minPrice: null, maxPrice: null,
+              minRooms: '', maxRooms: '', minSqm: null, maxSqm: null,
+            });
+            setLocationQuery('');
+            setLocationRadius(5);
+            setShowAdvanced(false);
+          }}
+        />
       )}
 
       {loading && showPropsSkel ? (
@@ -1396,6 +1407,45 @@ export default function Properties() {
                   <WhatsAppIcon size={16} />
                   <span>שלח בוואטסאפ</span>
                 </button>
+                {/* N-3 — direct card actions. Duplicate + quick-edit icons
+                 * sit next to the ⋯ menu at the card's logical-end corner
+                 * (visual top-left). The overflow menu stays for the long
+                 * tail (transfer, similar, delete). */}
+                <div className="property-quick-actions" aria-label={`פעולות מהירות ${prop.street}`}>
+                  <button
+                    type="button"
+                    className="property-quick-btn"
+                    onClick={(e) => openQuickEdit(e, prop)}
+                    title="עריכה מהירה"
+                    aria-label={`עריכה מהירה ${prop.street}`}
+                  >
+                    <Edit3 size={14} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="property-quick-btn"
+                    onClick={(e) => handleDuplicate(e, prop)}
+                    disabled={duplicating === prop.id}
+                    title="שכפל נכס"
+                    aria-label={`שכפל ${prop.street}`}
+                  >
+                    <Copy size={14} aria-hidden="true" />
+                  </button>
+                </div>
+                {/* N-3 — share icon pinned to the bottom-left of the card. */}
+                <button
+                  type="button"
+                  className="property-share-btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleShareProp(prop);
+                  }}
+                  title="שתף נכס"
+                  aria-label={`שתף ${prop.street}`}
+                >
+                  <Share2 size={14} aria-hidden="true" />
+                </button>
                 <button
                   className="property-overflow-btn"
                   onClick={(e) => openOverflow(e, prop)}
@@ -1403,6 +1453,19 @@ export default function Properties() {
                   aria-label="אפשרויות נוספות"
                 >
                   <MoreHorizontal size={14} />
+                </button>
+                {/* N-14 — inline "הוסף הערות" affordance beneath the card,
+                 * mirroring the leads-card pattern. Opens the quick-edit
+                 * drawer scrolled to the notes field (the drawer already
+                 * exposes notes among its common fields). */}
+                <button
+                  type="button"
+                  className="property-add-note-btn"
+                  onClick={(e) => openQuickEdit(e, prop)}
+                  title="הוסף הערות לנכס"
+                >
+                  <StickyNote size={13} aria-hidden="true" />
+                  <span>{prop.notes ? 'עריכת הערות' : 'הוסף הערות'}</span>
                 </button>
               </div>
             );
@@ -1598,25 +1661,9 @@ export default function Properties() {
         />
       )}
 
-      {/* P1-M16 — page-level overflow on mobile */}
-      <OverflowSheet
-        open={pageOverflowOpen}
-        onClose={() => setPageOverflowOpen(false)}
-        title="נכסים"
-        actions={[
-          {
-            label: selectMode ? 'יציאה מבחירה מרובה' : 'בחירה מרובה',
-            description: selectMode ? null : 'מחק כמה נכסים בבת אחת',
-            icon: CheckSquare,
-            onClick: () => (selectMode ? exitSelect() : setSelectMode(true)),
-          },
-          {
-            label: copiedLink ? 'הקישור הועתק' : 'קישור ללקוח',
-            icon: copiedLink ? Check : LinkIcon,
-            onClick: handleGenerateLink,
-          },
-        ]}
-      />
+      {/* N-7 — the page-level ⋯ sheet was removed; its two actions
+          ("בחירה מרובה" + "קישור ללקוח") are now direct buttons in the
+          toolbar / filter bar on every viewport. */}
 
       {/* (FAB removed — the bottom tab bar's central "+" already exposes
        *  the create-property action; the floating button visually clung to

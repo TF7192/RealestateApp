@@ -29,13 +29,23 @@
   max-width: 360px;
   max-height: 60vh;
   overflow: auto;
-  background: var(--surface, #fff);
+  background: var(--surface, var(--bg-card, #fff));
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
   border-radius: 10px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
   padding: 10px;
-  z-index: 40;
+  /* N-6 — bump above the sticky search input + filter bar (both sit
+   * around z-index 10–20 depending on the host page). Keeping below the
+   * modal stack (z-index 900+) so dialogs still win. */
+  z-index: 120;
   animation: ss-menu-in 140ms ease;
+}
+
+/* Containing element must form its own stacking context so the popover
+ * escapes the `.page-header-actions` row without a different header
+ * element painting over the menu. */
+.ss-menu {
+  z-index: 1;
 }
 
 @keyframes ss-menu-in {
