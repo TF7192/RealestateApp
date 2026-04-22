@@ -4,17 +4,17 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="theme-color" content="#f7f3ec" />
-<title>CRM לסוכני נדל״ן · אפליקציה לאייפון ואנדרואיד · Estia</title>
-<meta name="description" content="CRM מודרני לסוכני נדל״ן בישראל: לקוחות, נכסים, פגישות, AI לתיאורי נכסים והתאמת לידים — בנייד. 30 יום חינם, בלי כרטיס אשראי." />
+<title>Estia · ה-CRM לסוכני נדל״ן בישראל — סוף לבלאגן בין WhatsApp, אקסל ויומן</title>
+<meta name="description" content="במקום WhatsApp, אקסל ויומן — מערכת אחת לסוכני נדל״ן בישראל. כל ליד, כל נכס, כל פגישה במקום אחד. בעברית. 30 יום חינם, בלי כרטיס אשראי." />
 <link rel="canonical" href="https://estia.co.il/" />
 <meta property="og:locale" content="he_IL" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://estia.co.il/" />
-<meta property="og:title" content="CRM לסוכני נדל״ן · אפליקציה לאייפון ואנדרואיד · Estia" />
-<meta property="og:description" content="CRM מודרני לסוכני נדל״ן בישראל: לקוחות, נכסים, פגישות, AI לתיאורי נכסים והתאמת לידים — בנייד. 30 יום חינם, בלי כרטיס אשראי." />
+<meta property="og:title" content="Estia · ה-CRM לסוכני נדל״ן בישראל" />
+<meta property="og:description" content="כל ליד, כל נכס, כל פגישה — במקום אחד, בעברית. 30 יום חינם, בלי כרטיס אשראי." />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="CRM לסוכני נדל״ן · Estia" />
-<meta name="twitter:description" content="CRM מודרני לסוכני נדל״ן בישראל. 30 יום חינם, בלי כרטיס אשראי." />
+<meta name="twitter:title" content="Estia · ה-CRM לסוכני נדל״ן" />
+<meta name="twitter:description" content="סוף לבלאגן בין WhatsApp, אקסל ויומן. 30 יום חינם." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=gd1" />
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=gd1" />
 
@@ -518,6 +518,130 @@ a { color: inherit; text-decoration: none; }
 .sticky-cta.is-visible { transform: translateY(0); }
 .sticky-cta .btn { width: 100%; box-shadow: 0 10px 30px rgba(30,26,20,0.35); }
 @media (min-width: 768px) { .sticky-cta { display: none; } }
+
+/* ── CRO additions ───────────────────────────────────────────── */
+/* Phase 1: hero CTA system */
+.btn-xl { padding: 18px 36px; font-size: 18px; min-height: 58px; }
+.btn-text {
+  display: inline-flex; align-items: center; padding: 10px 4px; min-height: 44px;
+  color: var(--text-secondary); font-size: 15px; font-weight: 600;
+}
+.btn-text:hover { color: var(--text-primary); }
+.hero-reassure {
+  margin: 18px 0 0; font-size: 13px; color: var(--text-muted); line-height: 1.7;
+  max-width: 560px;
+}
+
+/* Phase 2: beta / availability chip (replaces fake App-Store badges) */
+.beta-strip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-top: 24px; max-width: 560px;
+}
+.beta-pill {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px;
+  background: var(--bg-card); border: 1px solid var(--gold-border); border-radius: 999px;
+  color: var(--gold-readable); font-size: 12.5px; font-weight: 700;
+}
+.beta-pill::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); flex: none;
+}
+.beta-note { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+
+/* Phase 3: proof bar (safe placeholders, no fabricated claims) */
+.proof {
+  background: var(--bg-card); border-block: 1px solid var(--border);
+  padding-block: 28px;
+}
+.proof-inner {
+  display: grid; gap: 18px 44px; align-items: center; grid-template-columns: 1fr;
+}
+@media (min-width: 768px) { .proof-inner { grid-template-columns: auto 1fr; } }
+.proof-label {
+  font-size: 12px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.04em;
+  text-transform: none;
+}
+.proof-items {
+  display: grid; gap: 10px 20px; grid-template-columns: 1fr 1fr;
+  font-size: 14px; color: var(--text-secondary);
+}
+@media (min-width: 768px) { .proof-items { grid-template-columns: repeat(4, 1fr); } }
+.proof-item {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border: 1px dashed var(--border-light); border-radius: 12px;
+}
+.proof-item::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex: none;
+}
+.proof-item strong { color: var(--text-primary); font-weight: 800; }
+
+/* Phase 3: why-switch comparison */
+.switch-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .switch-grid { grid-template-columns: 1fr 1fr; gap: 24px; } }
+.switch-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 28px 24px;
+}
+.switch-card.is-before { background: var(--bg-secondary); border-style: dashed; }
+.switch-card.is-after { border-color: var(--gold); box-shadow: 0 10px 40px rgba(180,139,76,0.10); }
+.switch-tag {
+  display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 0.06em;
+  padding: 4px 10px; border-radius: 999px; margin-bottom: 14px;
+}
+.switch-card.is-before .switch-tag { background: rgba(30,26,20,0.08); color: var(--text-muted); }
+.switch-card.is-after .switch-tag { background: var(--gold-glow); color: var(--gold-readable); }
+.switch-card h3 { margin: 0 0 14px; font-size: 22px; font-weight: 800; }
+.switch-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.switch-list li {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 15px; color: var(--text-secondary); line-height: 1.55;
+}
+.switch-list li::before { content: '—'; color: var(--text-muted); font-weight: 700; flex: none; }
+.switch-card.is-after .switch-list li::before {
+  content: '✓'; color: var(--gold-readable); background: var(--gold-glow);
+  width: 20px; height: 20px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 12px; margin-top: 2px;
+}
+
+/* Phase 4: outcome-based feature clusters */
+.outcome-list { display: grid; gap: 24px; }
+.outcome {
+  display: grid; gap: 24px; align-items: center; grid-template-columns: 1fr;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-xl); padding: 32px 24px;
+}
+@media (min-width: 900px) {
+  .outcome { grid-template-columns: 1.2fr 1fr; padding: 40px; gap: 48px; }
+  .outcome.reverse { grid-template-columns: 1fr 1.2fr; }
+}
+.outcome-eyebrow { font-size: 13px; font-weight: 700; color: var(--gold-readable); letter-spacing: 0.04em; }
+.outcome h3 { font-size: 24px; font-weight: 800; margin: 6px 0 10px; line-height: 1.25; }
+@media (min-width: 768px) { .outcome h3 { font-size: 30px; } }
+.outcome p { font-size: 16px; color: var(--text-secondary); margin: 0 0 18px; line-height: 1.65; }
+.outcome-bullets { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.outcome-bullets li { display: flex; gap: 10px; font-size: 15px; color: var(--text-secondary); line-height: 1.55; }
+.outcome-bullets li::before {
+  content: '✓'; color: var(--gold-readable); background: var(--gold-glow);
+  width: 22px; height: 22px; border-radius: 999px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;
+  margin-top: 2px;
+}
+.outcome-visual {
+  position: relative; aspect-ratio: 4/3;
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  color: var(--text-muted); font-size: 13px;
+  background:
+    radial-gradient(600px 300px at 70% 30%, var(--gold-glow), transparent 60%),
+    var(--bg-secondary);
+  overflow: hidden;
+}
+.outcome-visual .vis-inner { padding: 18px; max-width: 80%; }
+.outcome-visual .vis-icon {
+  width: 56px; height: 56px; border-radius: 16px;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  color: #1e1a14; display: flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 800; margin: 0 auto 12px;
+}
 </style>
 </head>
 <body>
@@ -526,12 +650,13 @@ a { color: inherit; text-decoration: none; }
   <div class="container nav-inner">
     <a class="logo" href="/"><span class="logo-mark" aria-hidden="true">◆</span> Estia</a>
     <div class="nav-links" role="list">
-      <a href="#features">תכונות</a>
+      <a href="#why">למה Estia</a>
+      <a href="#features">מה יש במערכת</a>
       <a href="#pricing">מחירים</a>
       <a href="#faq">שאלות נפוצות</a>
     </div>
     <div class="nav-actions">
-      <a class="btn btn-ghost" href="/login">התחברות</a>
+      <a class="btn btn-ghost" href="/login?utm_source=landing&amp;utm_medium=nav_login">התחברות</a>
       <a class="btn btn-primary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=nav_cta">התחלה חינם</a>
     </div>
   </div>
@@ -542,26 +667,21 @@ a { color: inherit; text-decoration: none; }
 <header class="hero">
   <div class="container hero-grid">
     <div>
-      <span class="hero-eyebrow">ה-CRM לסוכני הנדל״ן בישראל</span>
+      <span class="hero-eyebrow">נבנה לסוכני נדל״ן בישראל</span>
       <h1 class="h1">
-        <span>ה-CRM של סוכני הנדל״ן.</span>
-        <span class="h1-accent">כולו בנייד שלך.</span>
+        <span>ליד אחד שפספסת</span>
+        <span class="h1-accent">שווה יותר מ-Estia לשנה.</span>
       </h1>
-      <p class="hero-sub">ניהול לקוחות, נכסים, פגישות ולידים — מהמקום שבו אתם באמת עובדים. עם AI שמבין נדל״ן, ו-30 יום חינם בלי כרטיס אשראי.</p>
+      <p class="hero-sub">סוף לבלאגן בין WhatsApp, אקסל ויומן. כל ליד, כל נכס וכל פגישה במקום אחד — גם במשרד, גם בשטח.</p>
       <div class="hero-cta-row">
-        <a class="btn btn-primary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=hero_cta">התחלה חינם ל-30 יום</a>
-        <a class="btn btn-secondary" href="/login?utm_source=landing&amp;utm_medium=hero_secondary">כבר יש לי חשבון</a>
+        <a class="btn btn-primary btn-xl" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=hero_cta">התחלה חינם ל-30 יום</a>
+        <a class="btn-text" href="/login?utm_source=landing&amp;utm_medium=hero_login">כבר יש לי חשבון ←</a>
       </div>
-      <div class="hero-trust">
-        <span class="hero-trust-item">בלי כרטיס אשראי</span>
-        <span class="hero-trust-item">ביטול בכל רגע</span>
-        <span class="hero-trust-item">תמיכה בעברית</span>
+      <p class="hero-reassure">בלי כרטיס אשראי · ביטול בכל רגע · עברית מלאה · ייבוא מ-Excel</p>
+      <div class="beta-strip">
+        <span class="beta-pill">אפליקציית iPhone ו-Android · בטא</span>
+        <p class="beta-note">המערכת מלאה ועובדת בדפדפן. האפליקציות הנטיביות בגישה מוקדמת למשתמשים רשומים.</p>
       </div>
-      <div class="stores" aria-label="חנויות אפליקציה">
-        <span class="store-btn" aria-disabled="true"><span><small>הורדה ב-</small><strong>App Store</strong></span></span>
-        <span class="store-btn" aria-disabled="true"><span><small>להורדה ב-</small><strong>Google Play</strong></span></span>
-      </div>
-      <p class="store-note">האפליקציות לאייפון ואנדרואיד בדרך — משתמשים רשומים יקבלו גישה ראשונים.</p>
     </div>
     <div class="hero-visual">
       <div class="device" role="img" aria-label="מסך הבית של אפליקציית Estia: לידים חמים, KPIs, יומן פגישות">
@@ -624,51 +744,161 @@ a { color: inherit; text-decoration: none; }
   </div>
 </header>
 
-<section id="features" class="section">
+<!-- Phase 3 — proof bar. Populate with real stats / logos / quotes
+     when they're available; in the meantime only facts that are
+     verifiable from the product itself (Hebrew, one-place, EU servers,
+     Excel import). TODO(proof): swap these four items for agency
+     logos or real usage numbers once we have them. -->
+<section class="proof" aria-label="עובדות על המערכת">
+  <div class="container proof-inner">
+    <span class="proof-label">בנוי לעבודה אמיתית של סוכן בישראל</span>
+    <div class="proof-items" role="list">
+      <span class="proof-item" role="listitem"><strong>עברית מלאה</strong> ו-RTL-first</span>
+      <span class="proof-item" role="listitem">נכסים, לידים ופגישות <strong>במקום אחד</strong></span>
+      <span class="proof-item" role="listitem">שרתים ב-<strong>EU (GDPR)</strong></span>
+      <span class="proof-item" role="listitem"><strong>ייבוא מ-Excel</strong> בקליק</span>
+    </div>
+  </div>
+</section>
+
+<!-- Phase 3 — why switch. Contrasts the agent's current tool-soup
+     workflow with Estia. No fabricated stats, just the common pain. -->
+<section id="why" class="section">
   <div class="container">
     <div class="section-head">
-      <span class="eyebrow">תכונות</span>
-      <h2 class="h2">כל הכלים שסוכן נדל״ן באמת צריך</h2>
-      <p class="sub">המערכת נבנתה מתוך עבודה אמיתית בשטח — כל מה שאתם עושים ביום-יום, במקום אחד, גם בדסקטופ וגם בנייד.</p>
+      <span class="eyebrow">למה סוכנים עוברים ל-Estia</span>
+      <h2 class="h2">כי ליד שמתאבד בצ׳אט — הוא עמלה שנעלמה.</h2>
+      <p class="sub">רוב הסוכנים בארץ עובדים בין חמש אפליקציות שונות. Estia מחליפה אותן באחת.</p>
     </div>
-    <div class="feature-grid">
-      <article class="card"><span class="card-icon" aria-hidden="true">✦</span>
-        <h3 class="card-title">AI שמבין נדל״ן</h3>
-        <p class="card-body">תיאור נכס מקצועי בלחיצה — AI כותב עבורכם טקסט שיווק מושלם מהנתונים. התאמת לידים חכמה שמראה לכם איזה לקוח מתאים לאיזה נכס, אוטומטית.</p>
+    <div class="switch-grid">
+      <article class="switch-card is-before">
+        <span class="switch-tag">איך זה היום</span>
+        <h3>חמש אפליקציות, אף סדר.</h3>
+        <ul class="switch-list">
+          <li>לידים מתפזרים בין WhatsApp, שיחות ופוסט-איטים.</li>
+          <li>פרטי נכסים בצ׳אט עם הבעלים — ונעלמים שם.</li>
+          <li>פגישות ביומן נפרד, בלי לקוח ובלי נכס צמודים.</li>
+          <li>אקסל שחיים ומתים עליו, בלי גיבוי ובלי היסטוריה.</li>
+          <li>תיאורי נכסים שכל פעם כותבים מחדש.</li>
+          <li>כל סוף-שבוע חצי שעה של "איפה הכל?".</li>
+        </ul>
       </article>
-      <article class="card"><span class="card-icon" aria-hidden="true">👥</span>
-        <h3 class="card-title">ניהול לקוחות ולידים</h3>
-        <p class="card-body">מעקב מלא על כל ליד — מהשיחה הראשונה ועד העסקה. חם/פושר/קר, תזכורות חכמות, והיסטוריה מלאה לכל לקוח במקום אחד.</p>
-      </article>
-      <article class="card"><span class="card-icon" aria-hidden="true">🏢</span>
-        <h3 class="card-title">נכסים, בעלים ובלעדיויות</h3>
-        <p class="card-body">תיק נכס מלא: תמונות, בעלים, מסלול שיווק, זכויות חתומות והסכמי בלעדיות. תמיד זמין לשליחה ללקוח בקישור אחד.</p>
-      </article>
-      <article class="card"><span class="card-icon" aria-hidden="true">📅</span>
-        <h3 class="card-title">יומן פגישות חכם</h3>
-        <p class="card-body">פגישה חדשה שואבת את הלקוח, הנכס והכתובת אוטומטית. סנכרון דו-כיווני ליומן גוגל — בנייד ובדסקטופ.</p>
-      </article>
-      <article class="card"><span class="card-icon" aria-hidden="true">₪</span>
-        <h3 class="card-title">מחשבון עמלות ועמלת תיווך</h3>
-        <p class="card-body">נטו למוכר או מחיר סגירה — דינמי, עם מע״מ, שכר טרחת עו״ד ועלויות נוספות. שיתוף תוצאה ללקוח בקישור אחד.</p>
-      </article>
-      <article class="card"><span class="card-icon" aria-hidden="true">📱</span>
-        <h3 class="card-title">אפליקציה לאייפון ולאנדרואיד</h3>
-        <p class="card-body">כל מה שיש באתר — גם בכיס שלכם. שיחות, WhatsApp ופגישות ישירות מהאפליקציה. עובדת במעלית, בנהיגה, בפגישה.</p>
+      <article class="switch-card is-after">
+        <span class="switch-tag">איך זה עם Estia</span>
+        <h3>מערכת אחת. שקט בראש.</h3>
+        <ul class="switch-list">
+          <li>כל ליד — עם סטטוס, היסטוריה ותזכורת הבאה.</li>
+          <li>תיק נכס מלא: תמונות, בעלים, בלעדיות, מסלול שיווק.</li>
+          <li>פגישה קופצת עם הלקוח, הנכס והכתובת מצמידים אוטומטית.</li>
+          <li>מחזירים את הלידים מ-Excel בקובץ אחד.</li>
+          <li>AI כותב תיאור נכס שיווקי מהנתונים — בלחיצה.</li>
+          <li>תמיד יודעים מה הצעד הבא, בלי לחשוב.</li>
+        </ul>
       </article>
     </div>
-    <div class="more">
-      <p class="more-title">וגם:</p>
-      <ul class="more-list">
-        <li>תבניות WhatsApp חכמות לשליחה מהירה</li>
-        <li>העברת נכסים ובלעדיות בין סוכנים</li>
-        <li>דף נכס ציבורי ללקוחות בקישור אחד</li>
-        <li>ייבוא נתונים מ-Excel</li>
-        <li>תזכורות ומשימות אוטומטיות</li>
-        <li>תיוג וסינון חכם של לקוחות ונכסים</li>
-        <li>דו״חות ביצועים לסוכן ולמשרד</li>
-        <li>תמיכה בעברית מלאה, RTL-first</li>
-      </ul>
+  </div>
+</section>
+
+<!-- Phase 4 — outcome-based feature clusters. Replaces the 6-icon
+     grid. Each cluster pairs a benefit statement with a concrete
+     product-screenshot slot (placeholder visuals today; swap for
+     real screenshots as they stabilize). -->
+<section id="features" class="section" style="background: var(--bg-secondary)">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">מה יש במערכת</span>
+      <h2 class="h2">ארבעה דברים שהמערכת עושה טוב יותר ממה שאתם עושים היום.</h2>
+      <p class="sub">לא פיצ׳רים — תוצאות. מה באמת משתנה בעבודה היומיומית אחרי שמתחילים ב-Estia.</p>
+    </div>
+
+    <div class="outcome-list">
+      <!-- 1. Lead follow-up -->
+      <article class="outcome">
+        <div>
+          <span class="outcome-eyebrow">מעקב לידים</span>
+          <h3>פחות לידים שנופלים בין הכיסאות.</h3>
+          <p>כל פנייה נכנסת עם סטטוס ברור, תאריך מעקב אוטומטי והיסטוריה שמצטברת אליה. אתם פותחים את האפליקציה בבוקר ויודעים עם מי לדבר — ולא נזכרים ביום שישי.</p>
+          <ul class="outcome-bullets">
+            <li>סטטוסים חם / פושר / קר עם תזכורת אוטומטית.</li>
+            <li>היסטוריית תקשורת לכל ליד — שיחות, הודעות, פגישות.</li>
+            <li>התאמה חכמה בין לידים לנכסים שיש לכם בתיק.</li>
+            <li>דף לקוח אחד — לא חמישה חיפושים.</li>
+          </ul>
+        </div>
+        <div class="outcome-visual" role="img" aria-label="דוגמה של ניהול לידים">
+          <div class="vis-inner">
+            <div class="vis-icon" aria-hidden="true">👥</div>
+            <strong>תצוגת לידים חמים</strong><br>
+            <span>סטטוס · תזכורת · תקציב · התאמה אוטומטית</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 2. Properties & owners -->
+      <article class="outcome reverse">
+        <div class="outcome-visual" role="img" aria-label="דוגמה של תיק נכס">
+          <div class="vis-inner">
+            <div class="vis-icon" aria-hidden="true">🏢</div>
+            <strong>תיק נכס מלא</strong><br>
+            <span>תמונות · בעלים · בלעדיות · מסלול שיווק</span>
+          </div>
+        </div>
+        <div>
+          <span class="outcome-eyebrow">נכסים ובעלים</span>
+          <h3>תיק נכס אחד — לא שיחת WhatsApp שנעלמה.</h3>
+          <p>כל מה שצריך כדי לסגור: תמונות, מחיר, בלעדיות, בעלים, מסמכים וקישור ציבורי ללקוח. לא עוד "רגע, איפה הטלפון שלו?" באמצע פגישה.</p>
+          <ul class="outcome-bullets">
+            <li>בלעדיות עם תאריך תפוגה והתראה לפני שפוקעת.</li>
+            <li>פרטי בעלים, תנאים וזכויות — תמיד מוצמדים לנכס.</li>
+            <li>AI כותב תיאור שיווקי ללקוח בלחיצה.</li>
+            <li>קישור ציבורי לדף נכס נקי — שולחים, סוגרים.</li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- 3. Field / mobile workflow -->
+      <article class="outcome">
+        <div>
+          <span class="outcome-eyebrow">עבודה בשטח</span>
+          <h3>במשרד ובפגישה — אותה מערכת, אותו מידע.</h3>
+          <p>Estia רץ בדפדפן וכאפליקציית נייד. כל מה שעשיתם בדסקטופ בבוקר — מסונכרן כבר בדרך לפגישה. שיחות ו-WhatsApp ללקוח ישירות מכרטיס הליד.</p>
+          <ul class="outcome-bullets">
+            <li>שיחה ו-WhatsApp ישירות מכרטיס הליד.</li>
+            <li>פרטי נכס עם ניווט וכתובת בלחיצה.</li>
+            <li>סנכרון מיידי בין דסקטופ לנייד — בלי &quot;לרענן&quot;.</li>
+            <li>אפליקציית iOS ו-Android בגישה מוקדמת למשתמשים רשומים.</li>
+          </ul>
+        </div>
+        <div class="outcome-visual" role="img" aria-label="דוגמה של עבודה בנייד">
+          <div class="vis-inner">
+            <div class="vis-icon" aria-hidden="true">📱</div>
+            <strong>דף נכס בנייד</strong><br>
+            <span>שיתוף בוואטסאפ · ניווט · תיאור AI</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 4. Office efficiency + AI -->
+      <article class="outcome reverse">
+        <div class="outcome-visual" role="img" aria-label="דוגמה של יעילות משרדית">
+          <div class="vis-inner">
+            <div class="vis-icon" aria-hidden="true">✦</div>
+            <strong>AI שמבין נדל״ן</strong><br>
+            <span>תיאורים · התאמות · תבניות WhatsApp</span>
+          </div>
+        </div>
+        <div>
+          <span class="outcome-eyebrow">יעילות משרד + AI</span>
+          <h3>פחות אדמיניסטרציה, יותר סגירות.</h3>
+          <p>AI לכתיבת תיאורי נכסים ולהתאמת לידים לנכסים, מחשבון עמלות עם מע״מ ושכ״ט עו״ד, תבניות WhatsApp, יומן מסונכרן ל-Google, והעברות נכסים פנימית בין סוכני המשרד.</p>
+          <ul class="outcome-bullets">
+            <li>AI כותב תיאור נכס שיווקי לפי הנתונים.</li>
+            <li>התאמת לידים לנכסים — מי מתאים למה, אוטומטית.</li>
+            <li>מחשבון עמלות ועמלת תיווך עם מע״מ ושכ״ט עו״ד.</li>
+            <li>תבניות WhatsApp ודו״חות ביצועים למשרד.</li>
+          </ul>
+        </div>
+      </article>
     </div>
   </div>
 </section>
@@ -732,17 +962,18 @@ a { color: inherit; text-decoration: none; }
     <div>
       <span class="eyebrow">האפליקציה</span>
       <h2 class="h2">כל הלידים שלכם — כבר עכשיו בכיס שלכם</h2>
-      <p class="sub">אפליקציה נטיבית לאייפון ולאנדרואיד. עובדת גם במעלית, גם בנהיגה, גם באמצע פגישה.</p>
+      <p class="sub">האפליקציות הנטיביות לאייפון ולאנדרואיד בגישה מוקדמת. המערכת המלאה כבר עובדת בדפדפן.</p>
       <ul class="mobile-bullets">
-        <li class="mobile-bullet">הודעות WhatsApp, שיחות ופגישות — ישירות מהאפליקציה.</li>
+        <li class="mobile-bullet">הודעות WhatsApp, שיחות ופגישות — ישירות מכרטיס הליד.</li>
         <li class="mobile-bullet">התראות חכמות שלא יגרמו לכם לפספס ליד חם.</li>
         <li class="mobile-bullet">תמונות, מיקום, ניווט — הכול בנגיעה אחת.</li>
         <li class="mobile-bullet">סנכרון מיידי עם הדסקטופ — ממשיכים מאיפה שעצרתם.</li>
       </ul>
-      <div class="stores" aria-label="חנויות אפליקציה">
-        <span class="store-btn" aria-disabled="true"><span><small>הורדה ב-</small><strong>App Store</strong></span></span>
-        <span class="store-btn" aria-disabled="true"><span><small>להורדה ב-</small><strong>Google Play</strong></span></span>
+      <div class="beta-strip">
+        <span class="beta-pill">iPhone &amp; Android · בטא סגורה</span>
+        <p class="beta-note">משתמשים רשומים מקבלים גישה מוקדמת לאפליקציה. מתחילים בדפדפן היום, עוברים לנייד ברגע שהבטא פתוחה לכם.</p>
       </div>
+      <a class="btn-text" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=mobile_section" style="margin-top: 18px">התחלה חינם — ולהיכנס לרשימת הבטא ←</a>
     </div>
   </div>
 </section>
@@ -750,13 +981,26 @@ a { color: inherit; text-decoration: none; }
 <section class="section">
   <div class="container">
     <div class="section-head">
-      <h2 class="h2">בעוד 2 דקות — אתם כבר עובדים</h2>
-      <p class="sub">הכנה זה לא מקצוע. עבודה — כן.</p>
+      <span class="eyebrow">מעבר בלי כאב ראש</span>
+      <h2 class="h2">מעבר מהאקסל של היום — ב-10 דקות, בלי לאבד שורה.</h2>
+      <p class="sub">רוב הסוכנים עולים לעבודה באותו היום. בלי מיגרציה מסובכת, בלי שיחת מכירה.</p>
     </div>
     <ol class="steps">
-      <li class="step"><div class="step-n">1</div><h3 class="step-title">נרשמים בדקה</h3><p class="step-body">אימייל וסיסמה או התחברות עם Google. בלי כרטיס אשראי, בלי שיחת מכירה.</p></li>
-      <li class="step"><div class="step-n">2</div><h3 class="step-title">מייבאים או מתחילים נקי</h3><p class="step-body">ייבוא מ-Excel, או הקלדת הנכסים והלקוחות הראשונים — הבחירה שלכם.</p></li>
-      <li class="step"><div class="step-n">3</div><h3 class="step-title">עובדים. 30 יום חינם.</h3><p class="step-body">ביטול בכל רגע, בלי התחייבות, בלי הפתעות.</p></li>
+      <li class="step">
+        <div class="step-n">1</div>
+        <h3 class="step-title">נרשמים בדקה</h3>
+        <p class="step-body">אימייל וסיסמה או התחברות עם Google. בלי כרטיס אשראי, בלי שיחת מכירה.</p>
+      </li>
+      <li class="step">
+        <div class="step-n">2</div>
+        <h3 class="step-title">מייבאים את האקסל בקליק</h3>
+        <p class="step-body">העלאת קובץ אחד → נכסים, לקוחות ובעלים עולים ביחד. מי שמעדיף — מתחיל נקי.</p>
+      </li>
+      <li class="step">
+        <div class="step-n">3</div>
+        <h3 class="step-title">עובדים באותו היום</h3>
+        <p class="step-body">ממשק בעברית, תמיכה בעברית, ייצוא של כל הנתונים שלכם בכל רגע. 30 יום חינם, ביטול בכל רגע.</p>
+      </li>
     </ol>
   </div>
 </section>
@@ -772,24 +1016,27 @@ a { color: inherit; text-decoration: none; }
       <div class="tier">
         <div>
           <h3 class="tier-name">בסיס</h3>
-          <p class="tier-lead">לסוכן נדל״ן עצמאי</p>
+          <p class="tier-lead">סוכן/ת נדל״ן עצמאי/ת</p>
+          <p class="tier-lead" style="color: var(--gold-readable); font-weight: 700">הכי מתאים אם: עובדים לבד, עד ~50 נכסים פעילים בכל רגע.</p>
         </div>
         <div class="tier-price"><span class="tier-c">₪</span><span class="tier-n">99</span><span class="tier-s">/ חודש · כולל מע״מ</span></div>
         <ul class="tier-bullets">
           <li>עד 50 נכסים פעילים</li>
           <li>עד 100 לקוחות/לידים</li>
           <li>AI לתיאורי נכסים ולהתאמת לידים</li>
-          <li>אפליקציה לאייפון ואנדרואיד</li>
+          <li>אפליקציית iOS ו-Android (בגישה מוקדמת)</li>
           <li>סנכרון ליומן גוגל</li>
           <li>תמיכה בעברית</li>
         </ul>
-        <a class="btn btn-secondary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=pricing_starter">התחלה חינם</a>
+        <a class="btn btn-secondary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=pricing_starter">התחלה חינם ל-30 יום</a>
+        <p style="font-size: 12px; color: var(--text-muted); text-align: center; margin: 0">בלי כרטיס אשראי · ביטול בכל רגע</p>
       </div>
       <div class="tier recommended">
         <span class="tier-badge">הכי פופולרי</span>
         <div>
           <h3 class="tier-name">מקצועי</h3>
-          <p class="tier-lead">למשרד או לסוכן נדל״ן בנפח גבוה</p>
+          <p class="tier-lead">משרד או סוכן/ת בנפח גבוה</p>
+          <p class="tier-lead" style="color: var(--gold-readable); font-weight: 700">הכי מתאים אם: יש משרד עם כמה סוכנים, העברות נכסים פנימיות ודו״חות ביצועים.</p>
         </div>
         <div class="tier-price"><span class="tier-c">₪</span><span class="tier-n">249</span><span class="tier-s">/ חודש · כולל מע״מ</span></div>
         <ul class="tier-bullets">
@@ -802,7 +1049,8 @@ a { color: inherit; text-decoration: none; }
           <li>העברות נכסים בין סוכנים</li>
           <li>עדיפות תמיכה</li>
         </ul>
-        <a class="btn btn-primary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=pricing_pro">התחלה חינם</a>
+        <a class="btn btn-primary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=pricing_pro">התחלה חינם ל-30 יום</a>
+        <p style="font-size: 12px; color: var(--text-muted); text-align: center; margin: 0">בלי כרטיס אשראי · ביטול בכל רגע</p>
       </div>
     </div>
     <p class="pricing-vat">כל המחירים כוללים מע״מ</p>
@@ -824,7 +1072,7 @@ a { color: inherit; text-decoration: none; }
     <div class="faq-list">
       <details class="faq-item"><summary>האם באמת אין צורך בכרטיס אשראי?</summary><div class="faq-body">נכון. רושמים אימייל וסיסמה, נכנסים, עובדים. כרטיס אשראי מוזן רק אם החלטתם להמשיך אחרי 30 יום.</div></details>
       <details class="faq-item"><summary>מה קורה אחרי 30 יום?</summary><div class="faq-body">יום לפני סוף התקופה נשלח אימייל. אם לא בחרתם מסלול בתשלום, החשבון עובר למצב צפייה בלבד — הנתונים נשמרים ותוכלו לחזור בכל רגע.</div></details>
-      <details class="faq-item"><summary>האם האפליקציה עובדת על אייפון ואנדרואיד?</summary><div class="faq-body">כן — אפליקציה נטיבית לשני המכשירים. האפליקציות בתהליך פרסום בחנויות; מי שנרשם עכשיו מקבל גישה ראשון.</div></details>
+      <details class="faq-item"><summary>איפה המערכת רצה היום ומתי יש אפליקציה לנייד?</summary><div class="faq-body">המערכת המלאה עובדת בדפדפן (דסקטופ ונייד) כבר היום. יש אפליקציות iOS ו-Android בבטא סגורה — משתמשים רשומים מקבלים גישה מוקדמת אליהן לפני שהן ייצאו לחנויות.</div></details>
       <details class="faq-item"><summary>מה ה-AI בדיוק עושה?</summary><div class="faq-body">שני דברים: כותב עבורכם תיאור נכס שיווקי מתוך הנתונים שהזנתם, ומציג התאמה חכמה בין לקוחות לנכסים — חוסך שעות של "מי מתאים למה".</div></details>
       <details class="faq-item"><summary>האם אפשר לייבא נתונים מ-Excel?</summary><div class="faq-body">כן. ייבוא מ-Excel בקליק — נכסים, לקוחות ובעלים עולים ביחד בלי העתק-הדבק.</div></details>
       <details class="faq-item"><summary>האם הנתונים שלי מאובטחים?</summary><div class="faq-body">הנתונים מוצפנים במעבר ובמנוחה, נשמרים על שרתים באירופה (AWS eu-north-1), וגיבויים אוטומטיים נשמרים 14 יום. אתם הבעלים של המידע — ניתן לייצא או למחוק אותו בכל רגע.</div></details>
@@ -834,9 +1082,9 @@ a { color: inherit; text-decoration: none; }
 </section>
 
 <section class="final-cta">
-  <h2>מוכנים לנהל את העסק שלכם אחרת?</h2>
+  <h2>תפסיקו לחפש לידים בצ׳אט.</h2>
   <p>30 יום חינם. בלי כרטיס אשראי. בלי התחייבות.</p>
-  <a class="btn btn-primary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=final_cta">להתחלה חינם</a>
+  <a class="btn btn-primary btn-xl" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=final_cta">התחלה חינם ל-30 יום</a>
 </section>
 
 </main>
