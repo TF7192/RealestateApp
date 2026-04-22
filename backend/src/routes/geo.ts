@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { createLruTtlCache, normalizeCacheKeyPart } from '../lib/lruTtlCache.js';
 
 /**
  * Reverse-geocode proxy.
@@ -126,6 +127,20 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
   let lastSearchAt = 0;
   const searchMinGapMs = 250;
 
+  // ── N-17 · in-memory LRU TTL cache for /search results ───────────────
+  // AddressField hits this endpoint on every debounced keystroke. The same
+  // agent typing the same first letters over and over (+ the same city
+  // filter applied most of the day) hammered Photon even though answers
+  // are essentially static. Cache by (normalizedQuery, city, lang, limit);
+  // TTL 24h; cap ~1000 entries. Implementation lives in a shared
+  // `createLruTtlCache` helper so it's unit-testable in isolation.
+  const searchCache = createLruTtlCache<unknown[]>({
+    max: 1000,
+    ttlMs: 24 * 60 * 60 * 1000,
+  });
+  const cacheKey = (q: string, city: string | undefined, lang: string, limit: number) =>
+    `${lang}|${limit}|${normalizeCacheKeyPart(city)}|${normalizeCacheKeyPart(q)}`;
+
   app.get('/search', async (req, reply) => {
     const parsed = SearchQ.safeParse(req.query);
     if (!parsed.success) {
@@ -136,6 +151,16 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
     // `he` returns HTTP 400. OSM returns Hebrew name tags regardless, so
     // mapping to `default` preserves Hebrew rendering for Israeli results.
     const lang = normalizePhotonLang(parsed.data.lang);
+
+    // N-17 — cache lookup BEFORE throttle. Hits never consume the Photon
+    // quota and never block on the 250ms gap; cold queries fall through.
+    const ck = cacheKey(q, city, lang, limit);
+    const cached = searchCache.get(ck);
+    if (cached) {
+      reply.header('x-geo-cache', 'hit');
+      return { items: cached };
+    }
+    reply.header('x-geo-cache', 'miss');
 
     const now = Date.now();
     const wait = Math.max(0, lastSearchAt + searchMinGapMs - now);
@@ -239,6 +264,10 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
       seen.add(k);
       return true;
     });
+
+    // N-17 — populate cache AFTER normalization so the same normalized
+    // response serves every subsequent hit for the next 24h.
+    searchCache.set(ck, items);
 
     return { items };
   });

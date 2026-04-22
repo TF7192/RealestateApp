@@ -436,7 +436,11 @@
   background: rgba(37, 211, 102, 0.22);
 }
 
-/* Overflow-menu button on desktop card (replaces legacy trash button) */
+/* Overflow-menu button on desktop card (replaces legacy trash button).
+ * N-3 — joined by duplicate + quick-edit icons grouped in
+ * .property-quick-actions. All three sit at the card's logical-end
+ * corner (visual top-LEFT in RTL). Hover/focus reveals them; they stay
+ * visible on mobile (below). */
 .property-overflow-btn {
   position: absolute;
   top: 10px;
@@ -468,6 +472,106 @@
   color: var(--bg-primary);
 }
 
+/* N-3 — direct duplicate + quick-edit icons. Grouped to the right of the
+ * ⋯ menu (visual left). Same visual family as .property-overflow-btn for
+ * a cohesive corner cluster. Revealed on hover; always visible on mobile. */
+.property-quick-actions {
+  position: absolute;
+  top: 10px;
+  left: 48px;
+  display: inline-flex;
+  gap: 6px;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.property-card:hover .property-quick-actions {
+  opacity: 1;
+}
+
+.property-quick-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.12s;
+}
+
+.property-quick-btn:hover:not(:disabled) {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--bg-primary);
+}
+
+.property-quick-btn:active:not(:disabled) { transform: scale(0.94); }
+
+.property-quick-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* N-3 — share icon pinned to the BOTTOM-LEFT (logical end, bottom) of
+ * the desktop card so it sits in the corner opposite the favorite star. */
+.property-share-btn {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  z-index: 3;
+  opacity: 0;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s, transform 0.12s;
+}
+
+.property-card:hover .property-share-btn { opacity: 1; }
+
+.property-share-btn:hover {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--bg-primary);
+}
+
+.property-share-btn:active { transform: scale(0.94); }
+
+/* N-14 — inline "הוסף הערות" pill below the card body. Low-chrome so
+ * it doesn't compete with the primary actions but stays tappable. */
+.property-add-note-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+  padding: 8px 12px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.property-add-note-btn:hover {
+  background: var(--gold-glow);
+  color: var(--gold);
+}
+
 /* Mobile tweaks */
 @media (max-width: 720px) {
   .properties-grid {
@@ -486,7 +590,9 @@
     aspect-ratio: 16 / 9;
   }
 
-  .property-overflow-btn {
+  .property-overflow-btn,
+  .property-quick-actions,
+  .property-share-btn {
     opacity: 1; /* always visible on mobile for the richer desktop card */
   }
 
@@ -1016,16 +1122,24 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
-/* ── Floating bulk action bar ────────────────────────────────── */
+/* ── Floating bulk action bar ──────────────────────────────────
+ * N-8 — centered at bottom via left: 50% + translateX(-50%) per
+ * product spec. Z-index ABOVE the FAB (900) and ChatWidget (890)
+ * so the bulk action bar wins the destructive-action affordance when
+ * selection mode is active.
+ *
+ * Sits above the mobile tab-bar (~64px) + safe-area on notched
+ * devices. Desktop has no bottom tab bar so 18px is fine. */
 .bulk-bar {
   position: fixed;
-  inset-inline: 0;
-  /* Sits above the mobile tab-bar (≈64px) + safe area on notched
-     devices. Desktop has no bottom tab bar so 18px is fine. */
+  left: 50%;
+  transform: translateX(-50%);
   bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
-  z-index: 800;
+  z-index: 950;
   display: flex;
   justify-content: center;
+  width: calc(100vw - 16px);
+  max-width: 560px;
   pointer-events: none;
   animation: bulk-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1135,15 +1249,16 @@
   }
 }
 
-/* Sprint 7 B4 — favorite star, top-left of the card (visual).
- * In RTL the visual left is the logical END edge, so
- * `inset-inline-end` is correct. z-index above the image + badges,
- * below modals. Circular chip matches `.property-overflow-btn` so the
- * two corner controls look part of the same family. */
+/* N-1 — favorite star pinned to the RTL LEADING edge (visual right).
+ * Previously anchored via `inset-inline-end` which placed it at the
+ * trailing/left edge under the ⋯ menu; product wants it on the leading
+ * edge so it's the first thing the eye lands on when skimming the grid.
+ * z-index above the image + badges, below modals. Circular chip keeps the
+ * ⋯-menu/chip visual family. */
 .property-fav-star {
   position: absolute;
   top: 10px;
-  inset-inline-end: 10px;
+  inset-inline-start: 10px;
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -1160,7 +1275,7 @@
 
 .property-fav-star-compact {
   top: 6px;
-  inset-inline-end: 6px;
+  inset-inline-start: 6px;
   width: 30px;
   height: 30px;
 }

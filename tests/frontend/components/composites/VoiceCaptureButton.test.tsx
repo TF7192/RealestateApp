@@ -66,36 +66,34 @@ describe('<VoiceCaptureButton>', () => {
     expect(screen.getByRole('button', { name: /נכס/ })).toBeInTheDocument();
   });
 
-  it('click starts recording; aria-pressed flips true', async () => {
+  // N-16 — recording no longer starts on click. The inline voice button
+  // is gated by the same "פיצ׳ר פרימיום" dialog as the floating mic FAB,
+  // so agents on non-premium plans never reach the AI extraction endpoint
+  // until product flips their flag. The original happy-path specs that
+  // walked start → stop → review-dialog are obsolete — we keep the
+  // "label reflects the kind prop" pieces plus the gate assertion.
+  it('N-16 — first click opens the premium-gate dialog instead of recording', async () => {
     const user = userEvent.setup();
     render(<VoiceCaptureButton kind="LEAD" onExtracted={() => {}} />);
     const trigger = screen.getByRole('button', { name: /ליד/ });
     await user.click(trigger);
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'עצור הקלטה' })).toHaveAttribute('aria-pressed', 'true');
-    });
+    expect(await screen.findByText(/פיצ׳ר פרימיום/)).toBeInTheDocument();
   });
 
-  it('after stop, opens review dialog and the extracted name appears', async () => {
+  it('N-16 — gate works on PROPERTY kind too', async () => {
     const user = userEvent.setup();
-    render(<VoiceCaptureButton kind="LEAD" onExtracted={() => {}} />);
-    await user.click(screen.getByRole('button', { name: /ליד/ }));
-    await user.click(await screen.findByRole('button', { name: 'עצור הקלטה' }));
-    await screen.findByRole('dialog');
-    await waitFor(() => {
-      expect(screen.getByLabelText('שם הלקוח')).toHaveValue('רות');
-    });
+    render(<VoiceCaptureButton kind="PROPERTY" onExtracted={() => {}} />);
+    await user.click(screen.getByRole('button', { name: /נכס/ }));
+    expect(await screen.findByText(/פיצ׳ר פרימיום/)).toBeInTheDocument();
   });
 
-  it('dismissing the dialog forwards the extracted payload to onExtracted', async () => {
+  it('N-16 — the gate never forwards anything to onExtracted', async () => {
     const onExtracted = vi.fn();
     const user = userEvent.setup();
     render(<VoiceCaptureButton kind="LEAD" onExtracted={onExtracted} />);
     await user.click(screen.getByRole('button', { name: /ליד/ }));
-    await user.click(await screen.findByRole('button', { name: 'עצור הקלטה' }));
-    await screen.findByRole('dialog');
-    await waitFor(() => expect(screen.getByLabelText('שם הלקוח')).toHaveValue('רות'));
-    await user.click(screen.getByRole('button', { name: 'בטל' }));
-    expect(onExtracted).toHaveBeenCalledWith(expect.objectContaining({ name: 'רות' }));
+    await screen.findByText(/פיצ׳ר פרימיום/);
+    // The AI-extraction path must stay unreachable while the gate is up.
+    expect(onExtracted).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,32 @@
+/* N-11 — Shared advanced filter panel. Structural CSS only; visual
+ * polish for the proximity input, grid layout, and actions comes from
+ * the `.agent-filters-panel` family already defined on Properties.css.
+ * These rules extend that base (N-13 — proximity input now follows
+ * the .form-input theme so it isn't unstyled). */
+
+/* N-13 — proximity input now picks up the canonical form-input treatment.
+ * The original version shared `background:none` with the parent section
+ * so it blended with the dark panel. Using `.form-input` gives it the
+ * same border/focus ring as every other field. */
+.adv-proximity-input.form-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.adv-proximity-input.form-input::placeholder {
+  color: var(--placeholder-color, var(--text-muted));
+}
+
+.adv-proximity-input.form-input:focus-visible {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-glow);
+}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   Search,
   MapPin,
@@ -30,22 +30,40 @@ export default function AgentPortal() {
   const params = useParams();
   const agentKey = params.agentSlug || params.agentId;
   const isSlugRoute = !!params.agentSlug;
+  // N-9 — "קישור ללקוח" from /properties produces URLs of the shape
+  // `/agents/:slug?assetClass=RESIDENTIAL&category=SALE&minPrice=…`. Seed
+  // the filter state from searchParams so the portal lands pre-filtered
+  // to what the agent was showing in their console. Absent params keep
+  // the "all" defaults.
+  const [searchParams] = useSearchParams();
   const [agent, setAgent] = useState(null);
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('all'); // all|SALE|RENT
-  const [assetClass, setAssetClass] = useState('all'); // all|RESIDENTIAL|COMMERCIAL
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [adv, setAdv] = useState({
-    city: '',
-    minPrice: '',
-    maxPrice: '',
-    minRooms: '',
-    maxRooms: '',
+  const [category, setCategory] = useState(() => {
+    const v = searchParams.get('category');
+    return v === 'SALE' || v === 'RENT' ? v : 'all';
   });
+  const [assetClass, setAssetClass] = useState(() => {
+    const v = searchParams.get('assetClass');
+    return v === 'RESIDENTIAL' || v === 'COMMERCIAL' ? v : 'all';
+  });
+  const [showAdvanced, setShowAdvanced] = useState(() => (
+    !!searchParams.get('city') ||
+    !!searchParams.get('minPrice') ||
+    !!searchParams.get('maxPrice') ||
+    !!searchParams.get('minRooms') ||
+    !!searchParams.get('maxRooms')
+  ));
+  const [adv, setAdv] = useState(() => ({
+    city:     searchParams.get('city')     || '',
+    minPrice: searchParams.get('minPrice') || '',
+    maxPrice: searchParams.get('maxPrice') || '',
+    minRooms: searchParams.get('minRooms') || '',
+    maxRooms: searchParams.get('maxRooms') || '',
+  }));
 
   useEffect(() => {
     let cancelled = false;

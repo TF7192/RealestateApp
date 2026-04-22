@@ -434,16 +434,24 @@ export default function Layout({ onLogout }) {
             )}
           </div>
 
-          {/* Sprint 7 B4 — sidebar favorites strip. Rendered only when
-              there is something to show; max 5 items. Each row links to
-              the favorited entity's detail page. */}
-          {favorites.length > 0 && (
-            <div className="nav-section nav-favorites">
-              <span className="nav-section-label">
-                <Heart size={12} style={{ marginInlineEnd: 4, verticalAlign: -1 }} />
-                {t('sections.favorites')}
+          {/* Sprint 7 B4 + N-15 — sidebar favorites strip. ALWAYS rendered,
+              including when empty, so the affordance stays discoverable.
+              Max 5 items; empty state shows a muted hint instructing the
+              agent to add favorites for quick access. */}
+          <div className="nav-section nav-favorites">
+            <span className="nav-section-label">
+              <Heart size={12} style={{ marginInlineEnd: 4, verticalAlign: -1 }} />
+              {t('sections.favorites')}
+            </span>
+            {favorites.length === 0 ? (
+              <span
+                className="nav-favorites-empty"
+                data-testid="nav-favorites-empty"
+              >
+                הוסף מועדפים לגישה מהירה
               </span>
-              {favorites.map((f) => (
+            ) : (
+              favorites.map((f) => (
                 <NavLink
                   key={f.key}
                   to={f.to}
@@ -456,9 +464,9 @@ export default function Layout({ onLogout }) {
                   <Heart size={14} />
                   <span className="nav-favorite-label">{f.label}</span>
                 </NavLink>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
 
           <div className="nav-section">
             <span className="nav-section-label">{t('sections.quickActions')}</span>

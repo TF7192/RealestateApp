@@ -37,7 +37,7 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | D-6 | Reload lands on dashboard | Sub-2 | 🟢 | ✅ | ✅ | ✅ (unit + e2e spec) | pending | UnauthRedirect + PostLoginRedirect |
 | F-1 | Remove new-deal from FAB | Sub-2 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | MENU_ITEMS is now 2 entries |
 | F-2 | Chat vs FAB overlap | Sub-2 | 🟢 | — | ✅ | ✅ (visual) | pending | FAB lifted to 84px; chat at 28/72px |
-| N-1..N-17 | Assets list polish | Sub-3 | ⚪ | — | — | — | — | Large |
+| N-1..N-17 | Assets list polish | Sub-3 | 🟢 | ✅ | ✅ | ✅ (unit + e2e spec) | pending | 17/17 tasks shipped; 28 new unit + 3 Playwright baseline specs |
 | P-1..P-15 | Asset detail polish | Sub-4 | ⚪ | — | — | — | — | Large |
 | O-1..O-10 | Owners | Sub-5 | ⚪ | — | — | — | — | |
 | L-1..L-13 | Leads | Sub-5 | ⚪ | — | — | — | — | |
@@ -214,3 +214,63 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
     `tests/integration/api/deals.test.ts` covers create + cross-agent
     FK rejection + list-includes-buyer-seller. Full `unit-frontend`
     suite: 162/166 (4 pre-existing worktree-env failures unchanged).
+- **2026-04-22T21:48Z** — Sub-3 lane complete (N-1 … N-17):
+  - **N-1** `.property-fav-star` now pinned to the RTL leading edge
+    (`inset-inline-start`). Compact-mobile variant updated too.
+  - **N-2** FavoriteStar already calls `e.stopPropagation()`; verified.
+  - **N-3** Desktop card grows direct-action icons: duplicate + quick-edit
+    group next to the ⋯ (`.property-quick-actions`); share pinned to the
+    bottom-LEFT (`.property-share-btn`). The ⋯ menu stays for the long
+    tail (transfer, similar, delete). Backend `/properties/:id/duplicate`
+    already ships metadata + image URL copies (see `properties.ts`
+    line 365). Mobile keeps the ⋯ overflow sheet (space is tight).
+  - **N-4** Whole `.property-card-link` was already a `<Link>` — icons
+    wrapped outside the link so their `stopPropagation` handlers win.
+  - **N-5** `.tag-chip` re-skinned to compute fill + border + text color
+    from `--tag-color` via `color-mix(… 18%, transparent)`; dark-theme
+    variant bumps the tint for WCAG AA. Hosts set `--tag-color: tag.color`
+    inline.
+  - **N-6** `.ss-menu-pop` z-index lifted from 40 → 120; added a stacking
+    context on `.ss-menu` so the popover escapes the page-header row.
+  - **N-7** Top-left ⋯ sheet (desktop + mobile) removed. "בחירה מרובה"
+    and "קישור ללקוח" now direct toolbar buttons on every viewport.
+  - **N-8** `.bulk-bar` → `position: fixed; left: 50%;
+    transform: translateX(-50%);` z-index 950 so it beats FAB(900) +
+    chat(890). Full-width on mobile, max-width 560px centered on desktop.
+  - **N-9** `buildShareUrl(agent, filters)` now targets `/agents/:slug`
+    (the public AgentPortal) with filter query params — previously
+    pointed at `/share?…` which 404'd. AgentPortal seeds its state from
+    `searchParams` so the link lands pre-filtered.
+  - **N-10** "רק מועדפים" toggle on the properties toolbar, matching the
+    leads pattern. URL-synced as `?fav=1`.
+  - **N-11** New `<AdvancedFilters>` shared component
+    (`frontend/src/components/AdvancedFilters.{jsx,css}`) — Sub-5 can
+    pass a different `config.fields` for the leads page without forking
+    the panel.
+  - **N-12** `clearAllFilters` + the panel's own "נקה סינון" both
+    `setShowAdvanced(false)` so the panel collapses after clearing.
+  - **N-13** Proximity input inherits `.form-input` theming via
+    `AdvancedFilters.css`.
+  - **N-14** Each desktop card now has a `.property-add-note-btn` pill
+    that opens the QuickEditDrawer (notes field is already exposed there).
+  - **N-15** `Layout.jsx` favorites section always renders; empty state
+    shows "הוסף מועדפים לגישה מהירה" (`.nav-favorites-empty`, muted
+    italic). Tested via `data-testid="nav-favorites-empty"`.
+  - **N-16** Premium gate moved into `<VoiceCaptureButton>` so BOTH
+    NewLead and NewProperty show the upgrade dialog (they share this
+    component). Copy matches `<VoiceCaptureFab>`.
+  - **N-17** Added `backend/src/lib/lruTtlCache.ts` (generic LRU+TTL
+    cache) and wired it into `/api/geo/search` keyed by
+    `(lang, limit, normalizedCity, normalizedQuery)` — TTL 24h, cap 1000.
+    Served hits short-circuit the 250ms Photon throttle gap.
+    `x-geo-cache: hit|miss` header for tracing.
+  - Tests: 28 new passing vitest cases (11 backend unit for
+    `lruTtlCache`, 5 frontend for Properties N-tasks, 3 frontend for
+    VoiceCaptureButton premium gate, 8 adjusted existing Layout +
+    VoiceCaptureButton; 1 adjusted Properties fixture). Playwright
+    baseline spec at `tests/e2e/properties/n-layout.spec.ts` covers
+    N-1 (star leading edge), N-8 (bulk-bar centering + z-index),
+    N-15 (favorites-empty hint).
+  - Pre-existing failures (SellerCalculator, yad2ScanStore,
+    VoiceCaptureFab review-dialog, Yad2ScanBanner close) were already
+    failing on this worktree before this lane started — unchanged.
