@@ -69,8 +69,9 @@ body {
 a { color: inherit; text-decoration: none; }
 .container { max-width: 1200px; margin-inline: auto; padding-inline: 20px; }
 @media (min-width: 768px) { .container { padding-inline: 32px; } }
-.section { padding-block: 72px; }
-@media (min-width: 768px) { .section { padding-block: 112px; } }
+.section { padding-block: 64px; }
+@media (min-width: 768px) { .section { padding-block: 96px; } }
+.section + .section { border-top: 1px solid transparent; }
 .eyebrow {
   display: inline-block; font-size: 13px; font-weight: 700;
   color: var(--gold-readable); letter-spacing: 0.04em; margin-bottom: 12px;
@@ -117,57 +118,59 @@ a { color: inherit; text-decoration: none; }
 
 /* hero */
 .hero {
-  padding-block: 48px 64px;
+  padding-block: 40px 56px;
   background:
-    radial-gradient(1000px 500px at 80% 0%, var(--gold-glow), transparent 60%),
-    radial-gradient(800px 400px at 20% 100%, var(--gold-glow), transparent 60%);
+    radial-gradient(1100px 520px at 85% 0%, var(--gold-glow), transparent 60%),
+    radial-gradient(900px 420px at 15% 100%, var(--gold-glow), transparent 60%);
 }
-.hero-grid { display: grid; gap: 36px; }
+.hero-grid { display: grid; gap: 40px; }
 .hero-eyebrow {
   display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px;
   background: var(--gold-glow); border: 1px solid var(--gold-border); color: var(--gold-readable);
   font-weight: 700; font-size: 13px; margin-bottom: 20px;
 }
 .h1 {
-  font-weight: 800; letter-spacing: -0.01em; color: var(--text-primary);
-  font-size: 40px; line-height: 1.1; margin: 0 0 20px;
+  font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary);
+  font-size: 38px; line-height: 1.08; margin: 0 0 20px;
 }
-.h1-accent { color: var(--gold); display: block; }
-.hero-sub { font-size: 18px; color: var(--text-secondary); line-height: 1.6; max-width: 540px; margin: 0 0 28px; }
-.hero-cta-row { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+.h1 > span { display: block; }
+.h1-accent { color: var(--gold); display: block; margin-top: 2px; }
+.hero-sub { font-size: 18px; color: var(--text-secondary); line-height: 1.65; max-width: 560px; margin: 0 0 28px; }
+.hero-cta-row { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
 .hero-cta-row .btn { width: 100%; }
-.hero-trust { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--text-muted); }
-.hero-trust-item { display: inline-flex; align-items: center; gap: 6px; }
-.hero-trust-item::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--success); }
-.hero-visual { order: 2; display: flex; justify-content: center; }
+.hero-trust { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 13px; color: var(--text-muted); }
+.hero-trust-item { display: inline-flex; align-items: center; gap: 8px; }
+.hero-trust-item::before { content: ''; width: 8px; height: 8px; border-radius: 999px; background: var(--success); flex: none; }
+.hero-visual { order: 2; display: flex; justify-content: center; margin-top: 8px; }
 @media (min-width: 768px) {
   .hero { padding-block: 80px 96px; }
-  .h1 { font-size: 56px; }
+  .h1 { font-size: 56px; line-height: 1.05; }
   .hero-cta-row { flex-direction: row; }
   .hero-cta-row .btn { width: auto; }
 }
 @media (min-width: 1024px) {
-  .hero-grid { grid-template-columns: 1.1fr 1fr; align-items: center; gap: 56px; }
-  .hero-visual { order: 0; }
+  .hero-grid { grid-template-columns: 1.1fr 1fr; align-items: center; gap: 64px; }
+  .hero-visual { order: 0; margin-top: 0; }
   .h1 { font-size: 64px; }
 }
 
 /* phone mock (inline SVG — no network) */
-.device { position: relative; width: 100%; max-width: 320px; aspect-ratio: 9/19; margin-inline: auto;
-  filter: drop-shadow(0 24px 48px rgba(30,26,20,0.22)); }
+.device { position: relative; width: 100%; max-width: 340px; aspect-ratio: 360/740; margin-inline: auto;
+  filter: drop-shadow(0 28px 56px rgba(30,26,20,0.28)); }
 .device svg { width: 100%; height: 100%; display: block; }
 
 /* store badges (disabled placeholder) */
-.stores { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.stores { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 .store-btn {
-  display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px;
+  display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px;
   background: #0d0f14; color: #f0ece4; border-radius: var(--radius-md);
-  font-size: 13px; opacity: 0.55; cursor: not-allowed; pointer-events: none;
-  min-height: 48px;
+  font-size: 13px; opacity: 0.6; cursor: not-allowed; pointer-events: none;
+  min-height: 52px; line-height: 1.2;
 }
-.store-btn strong { display: block; font-size: 15px; font-weight: 800; }
-.store-btn small { display: block; font-size: 11px; opacity: 0.75; }
-.store-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; max-width: 440px; }
+.store-btn > span { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: start; }
+.store-btn strong { display: block; font-size: 16px; font-weight: 800; letter-spacing: 0.01em; }
+.store-btn small { display: block; font-size: 11px; opacity: 0.8; }
+.store-note { font-size: 12px; color: var(--text-muted); margin-top: 12px; max-width: 440px; line-height: 1.55; }
 
 /* features */
 .section-head { text-align: center; margin-bottom: 48px; }
@@ -292,15 +295,22 @@ a { color: inherit; text-decoration: none; }
 .final-cta {
   background: linear-gradient(135deg, #1e1a14 0%, #0d0f14 100%);
   color: #f0ece4; text-align: center;
-  border-radius: var(--radius-xl); padding: 56px 28px;
-  margin: 20px; box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-xl); padding: 56px 24px;
+  margin: 24px 20px; box-shadow: var(--shadow-lg);
+  position: relative; overflow: hidden;
 }
-.final-cta h2 { color: #f0ece4; font-size: 30px; margin: 0 0 10px; font-weight: 800; }
-.final-cta p { color: #c4b597; margin: 0 0 24px; font-size: 17px; }
+.final-cta::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(600px 300px at 80% 0%, rgba(180,139,76,0.22), transparent 60%),
+              radial-gradient(500px 280px at 20% 100%, rgba(180,139,76,0.16), transparent 60%);
+}
+.final-cta > * { position: relative; }
+.final-cta h2 { color: #f0ece4; font-size: 30px; margin: 0 0 12px; font-weight: 800; line-height: 1.2; }
+.final-cta p { color: #c4b597; margin: 0 0 28px; font-size: 17px; line-height: 1.55; }
 .final-cta .btn-primary { min-width: 260px; }
 @media (min-width: 768px) {
-  .final-cta { padding: 72px 40px; margin: 32px; }
-  .final-cta h2 { font-size: 38px; }
+  .final-cta { padding: 80px 40px; margin: 40px 32px; }
+  .final-cta h2 { font-size: 40px; }
 }
 
 /* footer */
@@ -353,7 +363,7 @@ a { color: inherit; text-decoration: none; }
     <div>
       <span class="hero-eyebrow">ה-CRM לסוכני הנדל״ן בישראל</span>
       <h1 class="h1">
-        ה-CRM של סוכני הנדל״ן.<br>
+        <span>ה-CRM של סוכני הנדל״ן.</span>
         <span class="h1-accent">כולו בנייד שלך.</span>
       </h1>
       <p class="hero-sub">ניהול לקוחות, נכסים, פגישות ולידים — מהמקום שבו אתם באמת עובדים. עם AI שמבין נדל״ן, ו-30 יום חינם בלי כרטיס אשראי.</p>
@@ -374,78 +384,110 @@ a { color: inherit; text-decoration: none; }
     </div>
     <div class="hero-visual">
       <div class="device" role="img" aria-label="מסך הבית של אפליקציית Estia: לידים חמים, KPIs, יומן פגישות">
-        <!-- Inline SVG phone — self-contained. -->
-        <svg viewBox="0 0 288 608" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Inline SVG phone — self-contained, wider canvas so Hebrew fits cleanly. -->
+        <svg viewBox="0 0 360 740" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
           <defs>
             <linearGradient id="phone" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stop-color="#2a261f"/><stop offset="100%" stop-color="#0d0f14"/>
             </linearGradient>
             <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#c9a96e"/><stop offset="100%" stop-color="#8a6932"/>
+              <stop offset="0%" stop-color="#d3b27a"/><stop offset="100%" stop-color="#8a6932"/>
+            </linearGradient>
+            <linearGradient id="aiGlow" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#fdf3de"/><stop offset="100%" stop-color="#f8e1b8"/>
             </linearGradient>
           </defs>
-          <rect x="0" y="0" width="288" height="608" rx="42" ry="42" fill="url(#phone)"/>
-          <rect x="10" y="10" width="268" height="588" rx="32" ry="32" fill="#f7f3ec"/>
-          <rect x="104" y="20" width="80" height="18" rx="9" ry="9" fill="#0d0f14"/>
-          <!-- header -->
-          <text x="268" y="60" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="10" font-weight="700" fill="#1e1a14">9:41</text>
-          <text x="268" y="92" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="15" font-weight="800" fill="#1e1a14">שלום, יוסי 👋</text>
-          <text x="268" y="110" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="10" fill="#6b6356">יום שלישי · 22 באפריל</text>
+          <!-- device frame -->
+          <rect x="0" y="0" width="360" height="740" rx="52" fill="url(#phone)"/>
+          <rect x="12" y="12" width="336" height="716" rx="42" fill="#f7f3ec"/>
+          <!-- dynamic island -->
+          <rect x="140" y="24" width="80" height="22" rx="11" fill="#0d0f14"/>
+
+          <!-- status bar -->
+          <text x="330" y="72" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="12" font-weight="700" fill="#1e1a14">9:41</text>
+          <circle cx="48" cy="68" r="5" fill="#1e1a14"/>
+          <rect x="56" y="64" width="18" height="10" rx="2" fill="#1e1a14" opacity="0.8"/>
+
+          <!-- greeting header -->
+          <text x="330" y="112" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="22" font-weight="800" fill="#1e1a14">שלום, יוסי</text>
+          <text x="330" y="134" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="12" fill="#6b6356">יום שלישי · 22 באפריל</text>
+
           <!-- AI banner -->
-          <rect x="20" y="126" width="248" height="34" rx="10" ry="10" fill="#f8edd8" stroke="#d6b787"/>
-          <rect x="232" y="133" width="24" height="20" rx="5" ry="5" fill="url(#accent)"/>
-          <text x="222" y="142" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="10" font-weight="800" fill="#3b2e13">AI מציע:</text>
-          <text x="222" y="155" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="9" fill="#6b5026">3 לידים מתאימים לנכס ברמלה</text>
-          <!-- KPIs -->
+          <rect x="24" y="152" width="312" height="60" rx="14" fill="url(#aiGlow)"/>
+          <rect x="24" y="152" width="312" height="60" rx="14" fill="none" stroke="#d6b787" stroke-width="1"/>
+          <circle cx="310" cy="182" r="14" fill="url(#accent)"/>
+          <text x="310" y="187" text-anchor="middle" font-family="Assistant, Heebo, sans-serif" font-size="14" font-weight="800" fill="#1e1a14">✦</text>
+          <text x="288" y="180" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="13" font-weight="800" fill="#3b2e13">AI מציע 3 לידים</text>
+          <text x="288" y="198" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="11" fill="#6b5026">מתאימים לנכס החדש ברמלה</text>
+
+          <!-- KPI row -->
           <g>
-            <rect x="20" y="170" width="76" height="46" rx="9" ry="9" fill="#fff" stroke="rgba(30,26,20,0.08)"/>
-            <text x="88" y="188" text-anchor="end" font-family="Assistant" font-size="16" font-weight="800" fill="#1e1a14">24</text>
-            <text x="88" y="204" text-anchor="end" font-family="Assistant" font-size="9" fill="#6b6356">לידים פעילים</text>
-            <rect x="106" y="170" width="76" height="46" rx="9" ry="9" fill="#fff" stroke="rgba(30,26,20,0.08)"/>
-            <text x="174" y="188" text-anchor="end" font-family="Assistant" font-size="16" font-weight="800" fill="#1e1a14">12</text>
-            <text x="174" y="204" text-anchor="end" font-family="Assistant" font-size="9" fill="#6b6356">נכסים פעילים</text>
-            <rect x="192" y="170" width="76" height="46" rx="9" ry="9" fill="url(#accent)" opacity="0.15" stroke="#d6b787"/>
-            <text x="260" y="188" text-anchor="end" font-family="Assistant" font-size="14" font-weight="800" fill="#7a5c2c">₪8.4M</text>
-            <text x="260" y="204" text-anchor="end" font-family="Assistant" font-size="9" fill="#6b5026">בצנרת</text>
+            <rect x="24"  y="228" width="100" height="72" rx="14" fill="#fff" stroke="rgba(30,26,20,0.08)"/>
+            <text x="112" y="256" text-anchor="end" font-family="Assistant" font-size="11" fill="#6b6356">לידים פעילים</text>
+            <text x="112" y="286" text-anchor="end" font-family="Assistant" font-size="24" font-weight="800" fill="#1e1a14">24</text>
+            <text x="40"  y="286" font-family="Assistant" font-size="11" font-weight="700" fill="#15803d">+5</text>
+
+            <rect x="130" y="228" width="100" height="72" rx="14" fill="#fff" stroke="rgba(30,26,20,0.08)"/>
+            <text x="218" y="256" text-anchor="end" font-family="Assistant" font-size="11" fill="#6b6356">נכסים</text>
+            <text x="218" y="286" text-anchor="end" font-family="Assistant" font-size="24" font-weight="800" fill="#1e1a14">12</text>
+            <text x="146" y="286" font-family="Assistant" font-size="11" font-weight="700" fill="#6b6356">3 בלעדיים</text>
+
+            <rect x="236" y="228" width="100" height="72" rx="14" fill="#fff" stroke="#d6b787"/>
+            <text x="324" y="256" text-anchor="end" font-family="Assistant" font-size="11" fill="#6b5026">צנרת</text>
+            <text x="324" y="286" text-anchor="end" font-family="Assistant" font-size="22" font-weight="800" fill="#7a5c2c">₪8.4M</text>
           </g>
+
           <!-- section title -->
-          <text x="260" y="236" text-anchor="end" font-family="Assistant" font-size="11" font-weight="800" fill="#1e1a14">לידים חמים היום</text>
-          <rect x="20" y="226" width="28" height="14" rx="7" ry="7" fill="url(#accent)"/>
-          <text x="34" y="236" text-anchor="middle" font-family="Assistant" font-size="9" font-weight="800" fill="#1e1a14">4</text>
+          <text x="330" y="340" text-anchor="end" font-family="Assistant" font-size="14" font-weight="800" fill="#1e1a14">לידים חמים היום</text>
+          <rect x="24" y="326" width="28" height="18" rx="9" fill="url(#accent)"/>
+          <text x="38" y="339" text-anchor="middle" font-family="Assistant" font-size="11" font-weight="800" fill="#1e1a14">4</text>
+
           <!-- lead rows -->
           <g font-family="Assistant, Heebo, sans-serif">
-            <rect x="20" y="248" width="248" height="46" rx="10" ry="10" fill="#fff" stroke="rgba(30,26,20,0.06)"/>
-            <circle cx="246" cy="271" r="14" fill="#b91c1c"/>
-            <text x="246" y="275" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">ד</text>
-            <text x="226" y="267" text-anchor="end" font-size="11" font-weight="700" fill="#1e1a14">דוד לוי</text>
-            <text x="226" y="282" text-anchor="end" font-size="9" fill="#6b6356">4 חד׳ · רמת גן · עד ₪2.8M</text>
+            <rect x="24" y="356" width="312" height="58" rx="14" fill="#fff" stroke="rgba(30,26,20,0.06)"/>
+            <circle cx="306" cy="385" r="18" fill="#b91c1c"/>
+            <text x="306" y="391" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">ד</text>
+            <text x="282" y="380" text-anchor="end" font-size="14" font-weight="700" fill="#1e1a14">דוד לוי</text>
+            <text x="282" y="398" text-anchor="end" font-size="11" fill="#6b6356">4 חד׳ · רמת גן · עד ₪2.8M</text>
+            <rect x="34" y="374" width="40" height="22" rx="11" fill="#fee2e2"/>
+            <text x="54" y="389" text-anchor="middle" font-size="10" font-weight="800" fill="#b91c1c">חם</text>
 
-            <rect x="20" y="302" width="248" height="46" rx="10" ry="10" fill="#fff" stroke="rgba(30,26,20,0.06)"/>
-            <circle cx="246" cy="325" r="14" fill="#b45309"/>
-            <text x="246" y="329" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">מ</text>
-            <text x="226" y="321" text-anchor="end" font-size="11" font-weight="700" fill="#1e1a14">מיכל בן-עמי</text>
-            <text x="226" y="336" text-anchor="end" font-size="9" fill="#6b6356">פגישה היום · 14:30</text>
+            <rect x="24" y="422" width="312" height="58" rx="14" fill="#fff" stroke="rgba(30,26,20,0.06)"/>
+            <circle cx="306" cy="451" r="18" fill="#b45309"/>
+            <text x="306" y="457" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">מ</text>
+            <text x="282" y="446" text-anchor="end" font-size="14" font-weight="700" fill="#1e1a14">מיכל בן-עמי</text>
+            <text x="282" y="464" text-anchor="end" font-size="11" fill="#6b6356">פגישה היום · 14:30</text>
+            <rect x="34" y="440" width="62" height="22" rx="11" fill="#fef3c7"/>
+            <text x="65" y="455" text-anchor="middle" font-size="10" font-weight="800" fill="#92400e">פגישה</text>
 
-            <rect x="20" y="356" width="248" height="46" rx="10" ry="10" fill="#fff" stroke="rgba(30,26,20,0.06)"/>
-            <circle cx="246" cy="379" r="14" fill="#b91c1c"/>
-            <text x="246" y="383" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">י</text>
-            <text x="226" y="375" text-anchor="end" font-size="11" font-weight="700" fill="#1e1a14">יונתן כהן</text>
-            <text x="226" y="390" text-anchor="end" font-size="9" fill="#6b6356">מרפסת · ראשון לציון · ₪3.4M</text>
+            <rect x="24" y="488" width="312" height="58" rx="14" fill="#fff" stroke="rgba(30,26,20,0.06)"/>
+            <circle cx="306" cy="517" r="18" fill="#b91c1c"/>
+            <text x="306" y="523" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">י</text>
+            <text x="282" y="512" text-anchor="end" font-size="14" font-weight="700" fill="#1e1a14">יונתן כהן</text>
+            <text x="282" y="530" text-anchor="end" font-size="11" fill="#6b6356">מרפסת · ראשון לציון · ₪3.4M</text>
+            <rect x="34" y="506" width="40" height="22" rx="11" fill="#fee2e2"/>
+            <text x="54" y="521" text-anchor="middle" font-size="10" font-weight="800" fill="#b91c1c">חם</text>
           </g>
+
           <!-- calendar strip -->
-          <rect x="20" y="416" width="248" height="40" rx="10" ry="10" fill="#1e1a14"/>
-          <rect x="28" y="424" width="24" height="24" rx="6" ry="6" fill="url(#accent)"/>
-          <text x="260" y="435" text-anchor="end" font-family="Assistant" font-size="11" font-weight="700" fill="#f7f3ec">פגישה עם מיכל בן-עמי</text>
-          <text x="260" y="449" text-anchor="end" font-family="Assistant" font-size="9" fill="rgba(247,243,236,0.7)">14:30 · רחוב הרצל 42, רמלה</text>
+          <rect x="24" y="564" width="312" height="56" rx="14" fill="#1e1a14"/>
+          <rect x="36" y="576" width="32" height="32" rx="8" fill="url(#accent)"/>
+          <text x="52" y="590" text-anchor="middle" font-family="Assistant" font-size="9" font-weight="700" fill="#1e1a14">אפר׳</text>
+          <text x="52" y="602" text-anchor="middle" font-family="Assistant" font-size="14" font-weight="800" fill="#1e1a14">22</text>
+          <text x="322" y="588" text-anchor="end" font-family="Assistant" font-size="13" font-weight="700" fill="#f7f3ec">פגישה · מיכל בן-עמי</text>
+          <text x="322" y="606" text-anchor="end" font-family="Assistant" font-size="11" fill="rgba(247,243,236,0.7)">14:30 · הרצל 42, רמלה</text>
+
           <!-- tab bar -->
-          <rect x="10" y="550" width="268" height="48" fill="#fff"/>
-          <g font-family="Assistant" font-size="9" font-weight="700" text-anchor="middle">
-            <text x="38"  y="578" fill="#7a5c2c">בית</text>
-            <text x="90"  y="578" fill="#6b6356">לידים</text>
-            <circle cx="144" cy="566" r="18" fill="url(#accent)"/>
-            <text x="144" y="572" fill="#1e1a14" font-size="18" font-weight="800">+</text>
-            <text x="198" y="578" fill="#6b6356">פעולות</text>
-            <text x="250" y="578" fill="#6b6356">יומן</text>
+          <rect x="12" y="668" width="336" height="60" fill="#fff"/>
+          <line x1="12" y1="668" x2="348" y2="668" stroke="rgba(30,26,20,0.08)"/>
+          <g font-family="Assistant" font-size="11" font-weight="700" text-anchor="middle">
+            <text x="52"  y="708" fill="#7a5c2c">בית</text>
+            <rect x="40" y="678" width="24" height="3" rx="2" fill="url(#accent)"/>
+            <text x="116" y="708" fill="#6b6356">לידים</text>
+            <circle cx="180" cy="694" r="22" fill="url(#accent)"/>
+            <text x="180" y="701" fill="#1e1a14" font-size="22" font-weight="800">+</text>
+            <text x="244" y="708" fill="#6b6356">נכסים</text>
+            <text x="308" y="708" fill="#6b6356">יומן</text>
           </g>
         </svg>
       </div>
@@ -506,73 +548,106 @@ a { color: inherit; text-decoration: none; }
   <div class="container mobile-grid">
     <div class="hero-visual">
       <div class="device" role="img" aria-label="דף נכס באפליקציית Estia: תמונה, מחיר, פרטים, וכפתור שיתוף ללקוח בוואטסאפ">
-        <svg viewBox="0 0 288 608" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <svg viewBox="0 0 360 740" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
           <defs>
             <linearGradient id="phone2" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stop-color="#2a261f"/><stop offset="100%" stop-color="#0d0f14"/>
             </linearGradient>
             <linearGradient id="photo" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#c9a96e"/><stop offset="60%" stop-color="#8a6932"/><stop offset="100%" stop-color="#2a261f"/>
+              <stop offset="0%" stop-color="#d3b27a"/><stop offset="55%" stop-color="#8a6932"/><stop offset="100%" stop-color="#2a261f"/>
             </linearGradient>
             <linearGradient id="accent2" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#c9a96e"/><stop offset="100%" stop-color="#8a6932"/>
+              <stop offset="0%" stop-color="#d3b27a"/><stop offset="100%" stop-color="#8a6932"/>
             </linearGradient>
           </defs>
-          <rect x="0" y="0" width="288" height="608" rx="42" ry="42" fill="url(#phone2)"/>
-          <rect x="10" y="10" width="268" height="588" rx="32" ry="32" fill="#f7f3ec"/>
-          <rect x="104" y="20" width="80" height="18" rx="9" ry="9" fill="#0d0f14"/>
-          <text x="268" y="60" text-anchor="end" font-family="Assistant" font-size="10" font-weight="700" fill="#1e1a14">14:02</text>
+          <!-- device frame -->
+          <rect x="0" y="0" width="360" height="740" rx="52" fill="url(#phone2)"/>
+          <rect x="12" y="12" width="336" height="716" rx="42" fill="#f7f3ec"/>
+          <rect x="140" y="24" width="80" height="22" rx="11" fill="#0d0f14"/>
+          <text x="330" y="72" text-anchor="end" font-family="Assistant, Heebo, sans-serif" font-size="12" font-weight="700" fill="#1e1a14">14:02</text>
+
           <!-- photo hero -->
-          <rect x="10" y="70" width="268" height="140" fill="url(#photo)"/>
-          <text x="144" y="150" text-anchor="middle" font-size="54" fill="#fff" opacity="0.85">🏡</text>
-          <rect x="210" y="80" width="60" height="18" rx="9" ry="9" fill="url(#accent2)"/>
-          <text x="240" y="93" text-anchor="middle" font-family="Assistant" font-size="9" font-weight="800" fill="#1e1a14">★ בלעדי</text>
-          <rect x="210" y="188" width="46" height="14" rx="7" ry="7" fill="rgba(0,0,0,0.55)"/>
-          <text x="233" y="198" text-anchor="middle" font-family="Assistant" font-size="8" font-weight="700" fill="#fff">1 / 14</text>
-          <!-- title + price -->
-          <text x="268" y="240" text-anchor="end" font-family="Assistant" font-size="9" font-weight="700" fill="#7a5c2c">דירה · מכירה</text>
-          <text x="268" y="264" text-anchor="end" font-family="Assistant" font-size="16" font-weight="800" fill="#1e1a14">הרצל 42, רמת גן</text>
-          <text x="268" y="280" text-anchor="end" font-family="Assistant" font-size="9" fill="#6b6356">📍 הבורסה</text>
-          <text x="20" y="264" font-family="Assistant" font-size="16" font-weight="800" fill="#1e1a14">₪2,850,000</text>
-          <text x="20" y="280" font-family="Assistant" font-size="9" fill="#6b6356">₪29,689 למ״ר</text>
-          <!-- chips -->
-          <g font-family="Assistant" font-size="9" font-weight="700">
-            <rect x="20" y="298" width="62" height="20" rx="10" ry="10" fill="rgba(30,26,20,0.06)"/>
-            <text x="51" y="312" text-anchor="middle" fill="#1e1a14">4 חד׳</text>
-            <rect x="86" y="298" width="62" height="20" rx="10" ry="10" fill="rgba(30,26,20,0.06)"/>
-            <text x="117" y="312" text-anchor="middle" fill="#1e1a14">96 מ״ר</text>
-            <rect x="152" y="298" width="56" height="20" rx="10" ry="10" fill="rgba(30,26,20,0.06)"/>
-            <text x="180" y="312" text-anchor="middle" fill="#1e1a14">קומה 3/5</text>
-            <rect x="212" y="298" width="56" height="20" rx="10" ry="10" fill="#f8edd8" stroke="#d6b787"/>
-            <text x="240" y="312" text-anchor="middle" fill="#7a5c2c">מרפסת שמש</text>
+          <rect x="12" y="88" width="336" height="200" fill="url(#photo)"/>
+          <!-- stylized building silhouettes on the photo -->
+          <g opacity="0.28" fill="#1e1a14">
+            <rect x="60"  y="180" width="46" height="100"/>
+            <rect x="112" y="150" width="62" height="130"/>
+            <rect x="182" y="170" width="50" height="110"/>
+            <rect x="240" y="140" width="58" height="140"/>
           </g>
+          <g opacity="0.55" fill="#f7f3ec">
+            <rect x="68"  y="190" width="6" height="6"/>
+            <rect x="82"  y="190" width="6" height="6"/>
+            <rect x="68"  y="210" width="6" height="6"/>
+            <rect x="82"  y="210" width="6" height="6"/>
+            <rect x="120" y="160" width="6" height="6"/>
+            <rect x="134" y="160" width="6" height="6"/>
+            <rect x="148" y="160" width="6" height="6"/>
+            <rect x="120" y="180" width="6" height="6"/>
+            <rect x="134" y="180" width="6" height="6"/>
+            <rect x="190" y="180" width="6" height="6"/>
+            <rect x="204" y="180" width="6" height="6"/>
+            <rect x="250" y="150" width="6" height="6"/>
+            <rect x="264" y="150" width="6" height="6"/>
+            <rect x="278" y="150" width="6" height="6"/>
+          </g>
+          <!-- badges over photo -->
+          <rect x="260" y="104" width="76" height="26" rx="13" fill="rgba(30,26,20,0.85)"/>
+          <text x="298" y="122" text-anchor="middle" font-family="Assistant" font-size="12" font-weight="800" fill="#d3b27a">★ בלעדי</text>
+          <rect x="24" y="250" width="56" height="26" rx="13" fill="rgba(30,26,20,0.7)"/>
+          <text x="52" y="268" text-anchor="middle" font-family="Assistant" font-size="11" font-weight="700" fill="#fff">1 / 14</text>
+
+          <!-- title + price -->
+          <text x="336" y="318" text-anchor="end" font-family="Assistant" font-size="12" font-weight="800" fill="#7a5c2c">דירה · מכירה</text>
+          <text x="336" y="348" text-anchor="end" font-family="Assistant" font-size="19" font-weight="800" fill="#1e1a14">הרצל 42, רמת גן</text>
+          <text x="336" y="368" text-anchor="end" font-family="Assistant" font-size="12" fill="#6b6356">הבורסה · מרפסת שמש</text>
+          <text x="24"  y="348" font-family="Assistant" font-size="19" font-weight="800" fill="#1e1a14">₪2,850,000</text>
+          <text x="24"  y="368" font-family="Assistant" font-size="11" fill="#6b6356">₪29,689 למ״ר</text>
+
+          <!-- chips -->
+          <g font-family="Assistant" font-size="12" font-weight="700">
+            <rect x="24"  y="388" width="74" height="30" rx="15" fill="rgba(30,26,20,0.06)"/>
+            <text x="61"  y="408" text-anchor="middle" fill="#1e1a14">4 חד׳</text>
+            <rect x="104" y="388" width="80" height="30" rx="15" fill="rgba(30,26,20,0.06)"/>
+            <text x="144" y="408" text-anchor="middle" fill="#1e1a14">96 מ״ר</text>
+            <rect x="190" y="388" width="80" height="30" rx="15" fill="rgba(30,26,20,0.06)"/>
+            <text x="230" y="408" text-anchor="middle" fill="#1e1a14">קומה 3/5</text>
+            <rect x="276" y="388" width="60" height="30" rx="15" fill="#f8edd8" stroke="#d6b787"/>
+            <text x="306" y="408" text-anchor="middle" fill="#7a5c2c">חדש</text>
+          </g>
+
           <!-- owner card -->
-          <rect x="20" y="330" width="248" height="48" rx="10" ry="10" fill="#fff" stroke="rgba(30,26,20,0.08)"/>
-          <circle cx="246" cy="354" r="14" fill="#b45309"/>
-          <text x="246" y="358" text-anchor="middle" font-family="Assistant" font-size="12" font-weight="800" fill="#fff">ש</text>
-          <text x="226" y="350" text-anchor="end" font-family="Assistant" font-size="11" font-weight="700" fill="#1e1a14">שמעון כהן</text>
-          <text x="226" y="365" text-anchor="end" font-family="Assistant" font-size="9" fill="#6b6356">בעלים · מרץ 2023</text>
-          <rect x="28" y="346" width="68" height="16" rx="8" ry="8" fill="rgba(21,128,61,0.12)"/>
-          <text x="62" y="357" text-anchor="middle" font-family="Assistant" font-size="9" font-weight="700" fill="#15803d">פנוי מיידי</text>
+          <rect x="24" y="434" width="312" height="66" rx="14" fill="#fff" stroke="rgba(30,26,20,0.08)"/>
+          <circle cx="306" cy="467" r="20" fill="#b45309"/>
+          <text x="306" y="473" text-anchor="middle" font-family="Assistant" font-size="16" font-weight="800" fill="#fff">ש</text>
+          <text x="278" y="462" text-anchor="end" font-family="Assistant" font-size="14" font-weight="700" fill="#1e1a14">שמעון כהן</text>
+          <text x="278" y="480" text-anchor="end" font-family="Assistant" font-size="11" fill="#6b6356">בעלים · בלעדיות עד 7/25</text>
+          <rect x="34" y="460" width="76" height="20" rx="10" fill="rgba(21,128,61,0.14)"/>
+          <text x="72" y="474" text-anchor="middle" font-family="Assistant" font-size="11" font-weight="700" fill="#15803d">פנוי מיידי</text>
+
           <!-- action row -->
-          <rect x="20" y="390" width="190" height="44" rx="10" ry="10" fill="#1a7f47"/>
-          <text x="115" y="418" text-anchor="middle" font-family="Assistant" font-size="12" font-weight="800" fill="#fff">שליחה ללקוח בוואטסאפ</text>
-          <rect x="216" y="390" width="52" height="44" rx="10" ry="10" fill="#1e1a14"/>
-          <text x="242" y="418" text-anchor="middle" font-family="Assistant" font-size="14" fill="#f7f3ec">📞</text>
-          <!-- mini chips -->
-          <rect x="20" y="446" width="108" height="20" rx="10" ry="10" fill="rgba(30,26,20,0.06)"/>
-          <text x="74" y="460" text-anchor="middle" font-family="Assistant" font-size="9" font-weight="700" fill="#54503e">3 לקוחות מתאימים</text>
-          <rect x="134" y="446" width="96" height="20" rx="10" ry="10" fill="#f8edd8" stroke="#d6b787"/>
-          <text x="182" y="460" text-anchor="middle" font-family="Assistant" font-size="9" font-weight="700" fill="#7a5c2c">✦ תיאור חדש AI</text>
+          <rect x="24" y="516" width="236" height="54" rx="14" fill="#1a7f47"/>
+          <text x="142" y="549" text-anchor="middle" font-family="Assistant" font-size="14" font-weight="800" fill="#fff">שליחה בוואטסאפ ללקוח</text>
+          <rect x="268" y="516" width="68" height="54" rx="14" fill="#1e1a14"/>
+          <text x="302" y="550" text-anchor="middle" font-family="Assistant" font-size="18" fill="#f7f3ec">📞</text>
+
+          <!-- AI hint chips -->
+          <rect x="24"  y="586" width="156" height="30" rx="15" fill="rgba(30,26,20,0.06)"/>
+          <text x="102" y="606" text-anchor="middle" font-family="Assistant" font-size="12" font-weight="700" fill="#54503e">✓ 3 לקוחות מתאימים</text>
+          <rect x="188" y="586" width="148" height="30" rx="15" fill="#f8edd8" stroke="#d6b787"/>
+          <text x="262" y="606" text-anchor="middle" font-family="Assistant" font-size="12" font-weight="800" fill="#7a5c2c">✦ תיאור AI חדש</text>
+
           <!-- tab bar -->
-          <rect x="10" y="550" width="268" height="48" fill="#fff"/>
-          <g font-family="Assistant" font-size="9" font-weight="700" text-anchor="middle">
-            <text x="38"  y="578" fill="#6b6356">בית</text>
-            <text x="90"  y="578" fill="#7a5c2c">נכסים</text>
-            <circle cx="144" cy="566" r="18" fill="url(#accent2)"/>
-            <text x="144" y="572" fill="#1e1a14" font-size="18" font-weight="800">+</text>
-            <text x="198" y="578" fill="#6b6356">לקוחות</text>
-            <text x="250" y="578" fill="#6b6356">יומן</text>
+          <rect x="12" y="668" width="336" height="60" fill="#fff"/>
+          <line x1="12" y1="668" x2="348" y2="668" stroke="rgba(30,26,20,0.08)"/>
+          <g font-family="Assistant" font-size="11" font-weight="700" text-anchor="middle">
+            <text x="52"  y="708" fill="#6b6356">בית</text>
+            <text x="116" y="708" fill="#7a5c2c">נכסים</text>
+            <rect x="104" y="678" width="24" height="3" rx="2" fill="url(#accent2)"/>
+            <circle cx="180" cy="694" r="22" fill="url(#accent2)"/>
+            <text x="180" y="701" fill="#1e1a14" font-size="22" font-weight="800">+</text>
+            <text x="244" y="708" fill="#6b6356">לקוחות</text>
+            <text x="308" y="708" fill="#6b6356">יומן</text>
           </g>
         </svg>
       </div>
