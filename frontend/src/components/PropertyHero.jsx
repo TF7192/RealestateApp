@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -60,6 +60,38 @@ export default function PropertyHero({
     if (idx !== currentImage && idx < images.length) onSelectImage(idx);
   };
 
+  // P-6 — when the carousel index changes programmatically (via the
+  // prev/next buttons, keyboard arrows, or dot-nav in the future), scroll
+  // the strip to the matching slide. Without this the buttons update the
+  // counter/dots but the strip stays parked on the visible slide. In RTL
+  // the strip's scrollLeft is negative (Chromium/Firefox) or positive
+  // (Safari inverted) depending on engine — scrollTo with an absolute
+  // value of `slideIndex * slideWidth` works everywhere because the
+  // browser clamps the sign correctly on write.
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const w = el.clientWidth;
+    if (!w) return;
+    const currentIdx = Math.round(Math.abs(el.scrollLeft) / w);
+    if (currentIdx === currentImage) return;
+    const isRtl = getComputedStyle(el).direction === 'rtl';
+    const target = currentImage * w * (isRtl ? -1 : 1);
+    try {
+      el.scrollTo({ left: target, behavior: 'smooth' });
+    } catch {
+      el.scrollLeft = target;
+    }
+  }, [currentImage]);
+
+  // P-6 — wrap prev/next handlers so the chevron click can't bubble into
+  // the underlying slide's "open lightbox" handler.
+  const stopAnd = (fn) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fn?.();
+  };
+
   const summaryParts = [];
   if (property.rooms != null) summaryParts.push(`${property.rooms} חד׳`);
   if (property.sqm) summaryParts.push(`${property.sqm} מ״ר`);
@@ -93,16 +125,38 @@ export default function PropertyHero({
               onClick={() => onOpenLightbox(i)}
               aria-label={`פתח תמונה ${i + 1}`}
             >
-              <img src={img} alt={`${property.street} — ${i + 1}`} loading="lazy" />
+              {/* P-7 — explicit width/height reserves layout space (no
+                  CLS); decoding=async keeps decode off the main thread;
+                  eager+high priority on slide 0 (the LCP element), lazy
+                  on the rest. */}
+              <img
+                src={img}
+                alt={`${property.street} — ${i + 1}`}
+                width="1400"
+                height="800"
+                loading={i === 0 ? 'eager' : 'lazy'}
+                decoding="async"
+                fetchpriority={i === 0 ? 'high' : 'low'}
+              />
             </button>
           ))}
         </div>
         {images.length > 1 && (
           <>
-            <button className="ph-nav prev" onClick={onPrev} aria-label="תמונה קודמת">
+            <button
+              type="button"
+              className="ph-nav prev"
+              onClick={stopAnd(onPrev)}
+              aria-label="תמונה קודמת"
+            >
               <ChevronRight size={20} />
             </button>
-            <button className="ph-nav next" onClick={onNext} aria-label="תמונה הבאה">
+            <button
+              type="button"
+              className="ph-nav next"
+              onClick={stopAnd(onNext)}
+              aria-label="תמונה הבאה"
+            >
               <ChevronLeft size={20} />
             </button>
           </>

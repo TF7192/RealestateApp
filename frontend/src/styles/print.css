@@ -34,10 +34,22 @@
 
   /* Same reason — any page-level scrollable wrapper must let the
    * browser lay its content out across pages instead of clipping to
-   * the screen viewport. */
+   * the screen viewport. P-1 extends coverage to every known detail-
+   * page wrapper that was clipping trailing content during print. */
   #root,
   .app,
-  .main-content {
+  .main-content,
+  .property-detail,
+  .pd-dashboard,
+  .pd-grid,
+  .pd-kpis,
+  .pd-matches,
+  .pd-panel-sheet,
+  .pd-agreements,
+  .dc,
+  .dc-body,
+  .customer-detail,
+  .owner-detail {
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;

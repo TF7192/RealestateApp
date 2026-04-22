@@ -94,6 +94,16 @@ export function DateQuickChips({ value, onChange, chips = ['today', '+6m'], base
   // Mark the chip that matches today's value so the agent can see what
   // they've picked at a glance. Comparing ISO yyyy-mm-dd strings is safe.
   const set = (chip) => onChange?.(chipToDate(chip, baseDate));
+  // P-13 — guards against "clicking היום scrolls the page to the top".
+  // Even with type="button", any ancestor form / anchor / delegated
+  // handler that doesn't preventDefault can cause a scroll-restore jump.
+  // Explicit preventDefault + stopPropagation kills those failure modes
+  // and is harmless in the happy path.
+  const onClick = (chip) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    set(chip);
+  };
   return (
     <div className="mpk-datechips">
       {chips.map((chip) => {
@@ -105,7 +115,7 @@ export function DateQuickChips({ value, onChange, chips = ['today', '+6m'], base
             key={chip}
             type="button"
             className={`mpk-datechip ${isSel ? 'sel' : ''}`}
-            onClick={() => set(chip)}
+            onClick={onClick(chip)}
           >
             {chip === 'today' && <Calendar size={12} />}
             {label}

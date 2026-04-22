@@ -236,6 +236,14 @@ export const api = {
   createProspectDigital: (propertyId, body) =>
     request(`/properties/${propertyId}/prospects/digital`, { method: 'POST', body }),
   deleteProspect:   (propertyId, id) => request(`/properties/${propertyId}/prospects/${id}`, { method: 'DELETE' }),
+  // P-3 — signed agreement PDF + lead-link endpoints. The PDF endpoint
+  // is a plain HTTP GET — we just expose the URL so it can be used as
+  // an anchor `href`, window.open target, or print source.
+  prospectAgreementUrl: (prospectId) => `${BASE}/prospects/${prospectId}/agreement.pdf`,
+  linkProspectLead:   (prospectId, leadId) =>
+    request(`/prospects/${prospectId}/link-lead`, { method: 'POST', body: { leadId } }),
+  unlinkProspectLead: (prospectId) =>
+    request(`/prospects/${prospectId}/unlink-lead`, { method: 'POST' }),
 
   // 7.1 — Google Calendar
   calendarStatus:     () => request('/integrations/calendar/status'),

@@ -24,7 +24,18 @@ export default function ActivityPanel({
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
-    if (!entityType || !entityId) return;
+    // P-9 — prior to this fix, missing entityType/entityId silently
+    // returned early WITHOUT clearing the loading flag. That left the
+    // tab stuck on its spinner forever whenever the parent forgot to
+    // wire props (see PropertyDetail before it was patched to pass
+    // entityType="PROPERTY" + entityId={property.id}). Now we short-
+    // circuit to the empty state with loading=false so the UX degrades
+    // to "no data" instead of "eternal spinner".
+    if (!entityType || !entityId) {
+      setLoading(false);
+      setItems([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -57,6 +68,11 @@ export default function ActivityPanel({
         <div className="ap-error" role="alert">
           <AlertCircle size={14} aria-hidden />
           <span>{error}</span>
+          {/* P-9 — inline retry. Cheap to offer, prevents "refresh the
+              whole page" as the only recovery path. */}
+          <button type="button" className="btn btn-ghost btn-sm ap-retry" onClick={load}>
+            נסה שוב
+          </button>
         </div>
       ) : items.length === 0 ? (
         <EmptyState

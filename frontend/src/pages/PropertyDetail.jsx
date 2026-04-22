@@ -62,6 +62,7 @@ import TagPicker from '../components/TagPicker';
 import RemindersPanel from '../components/RemindersPanel';
 import MatchingList from '../components/MatchingList';
 import ActivityPanel from '../components/ActivityPanel';
+import PropertyAgreementsSection from '../components/PropertyAgreementsSection';
 import { useCopyFeedback, useViewportMobile } from '../hooks/mobile';
 import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/share';
 import { isNative } from '../native/platform';
@@ -676,6 +677,11 @@ export default function PropertyDetail() {
         />
       )}
 
+      {/* P-3 — Signed brokerage agreements for this asset. Hides
+          itself when there are no signed prospects so the card doesn't
+          clutter fresh listings. */}
+      <PropertyAgreementsSection propertyId={property.id} leads={leads} />
+
       {/* KPI strip */}
       {/* UX review F-1.1 — Matched-leads quick dispatch.
           Surfaces top 3 leads that match this property as one-tap
@@ -911,7 +917,14 @@ export default function PropertyDetail() {
                   onClick={() => setLightboxIdx(i)}
                   aria-label={`פתח תמונה ${i + 1}`}
                 >
-                  <img src={img} alt="" loading="lazy" />
+                  <img
+                    src={img}
+                    alt=""
+                    width="280"
+                    height="210"
+                    loading="lazy"
+                    decoding="async"
+                  />
                   {i === 3 && property.images.length > 4 && (
                     <span className="dc-thumb-more">+{property.images.length - 4}</span>
                   )}
@@ -1422,7 +1435,7 @@ export default function PropertyDetail() {
           width="lg"
           onClose={() => setPanel(null)}
         >
-          <RemindersPanel scope={{ propertyId: property.id }} />
+          <RemindersPanel propertyId={property.id} />
         </PropertyPanelSheet>
       )}
 
@@ -1434,7 +1447,7 @@ export default function PropertyDetail() {
           width="lg"
           onClose={() => setPanel(null)}
         >
-          <ActivityPanel scope={{ propertyId: property.id }} />
+          <ActivityPanel entityType="PROPERTY" entityId={property.id} />
         </PropertyPanelSheet>
       )}
 
@@ -1575,6 +1588,9 @@ export default function PropertyDetail() {
           <img
             src={images[lightboxIdx]}
             alt={property.street}
+            width="1600"
+            height="1200"
+            decoding="async"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
