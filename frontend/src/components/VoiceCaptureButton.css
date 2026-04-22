@@ -1,0 +1,67 @@
+/* H3 — VoiceCaptureButton (inline variant).
+ *
+ * Sits at the top of NewLead / NewProperty as a secondary CTA that
+ * kicks off the same voice-record → review flow the FAB uses.
+ *
+ * Uses the canonical .btn btn-ghost base, then adds a gradient-border
+ * treatment so it's visually linked to the FAB without shouting over
+ * the form's primary save button.
+ */
+
+.vc-inline-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--color-surface-alt, rgba(139, 92, 246, 0.08));
+  color: var(--color-text, #f2f2f2);
+  font: 600 13px / 1 inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  /* Gradient border via double-background trick. Keeps the parent
+     background honest while painting a rose→violet ring. */
+  background-image:
+    linear-gradient(var(--color-surface-alt, rgba(139, 92, 246, 0.08)),
+                    var(--color-surface-alt, rgba(139, 92, 246, 0.08))),
+    linear-gradient(135deg, #FB7185 0%, #8B5CF6 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.vc-inline-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.25);
+}
+
+.vc-inline-btn:focus-visible {
+  outline: 2px solid #8B5CF6;
+  outline-offset: 2px;
+}
+
+.vc-inline-btn.is-recording {
+  background-image:
+    linear-gradient(rgba(220, 38, 38, 0.15), rgba(220, 38, 38, 0.15)),
+    linear-gradient(135deg, #DC2626, #B91C1C);
+  color: #fef2f2;
+}
+
+.vc-inline-btn .vc-inline-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vc-inline-btn-timer {
+  font: 600 12px/1 ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.02em;
+  margin-inline-start: 4px;
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-inline-btn { transition: none; }
+  .vc-inline-btn:hover { transform: none; }
+}
