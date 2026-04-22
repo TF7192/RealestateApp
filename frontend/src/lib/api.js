@@ -354,6 +354,29 @@ export const api = {
   // render the "X/3 left this hour, resets in Y min" chip.
   yad2Quota:         () => request('/integrations/yad2/quota'),
 
+  // Voice-to-lead — sends a recorded audio Blob (webm/ogg/m4a from the
+  // browser's MediaRecorder) to the backend, which forwards to the AI
+  // orchestrator. Resolves with { transcript, extracted, created, mode,
+  // traceId }. `mode` is 'created' when the backend inserted a Lead
+  // (or Property when kind='PROPERTY'); 'draft' when the extraction
+  // missed a required field and the UI should pre-fill a form from
+  // `extracted` and let the agent complete it manually.
+  voiceLead: (audioBlob, kind = 'LEAD') => {
+    const fd = new FormData();
+    // Filename + mimetype come from the Blob; default to .webm which is
+    // what MediaRecorder produces on Chrome/Firefox on both desktop and
+    // Android. iOS Safari records m4a — both are fine, whisper handles
+    // container detection.
+    const filename = audioBlob.name || 'voice.webm';
+    fd.append('audio', audioBlob, filename);
+    // Extended timeout — whisper can take ~30s for a 2-minute clip.
+    return request(`/ai/voice-lead?kind=${encodeURIComponent(kind)}`, {
+      method: 'POST',
+      body: fd,
+      timeoutMs: 90_000,
+    });
+  },
+
   // Task 2 — admin users table.
   adminUsers: (params = {}) => {
     const qs = new URLSearchParams();
