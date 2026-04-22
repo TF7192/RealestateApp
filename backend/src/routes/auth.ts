@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { slugify, ensureUniqueSlug } from '../lib/slug.js';
 import { track as phTrack, identify as phIdentify } from '../lib/analytics.js';
+import { requireUser } from '../middleware/auth.js';
 
 async function buildAgentSlug(displayName: string): Promise<string> {
   const base = slugify(displayName) || 'agent';
@@ -125,6 +126,13 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     if (!user || !user.passwordHash) {
       return reply.code(401).send({ error: { message: 'Invalid credentials' } });
     }
+    // A-1 — soft-deleted accounts must not be able to log in. Return the
+    // same "Invalid credentials" message we'd give for a wrong password;
+    // don't surface the deletion state — the agent was told the delete
+    // was irreversible, and the UI maintains that fiction.
+    if (user.deletedAt) {
+      return reply.code(401).send({ error: { message: 'Invalid credentials' } });
+    }
     const ok = await argon2.verify(user.passwordHash, body.password);
     if (!ok) {
       return reply.code(401).send({ error: { message: 'Invalid credentials' } });
@@ -149,6 +157,11 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     const displayName = body.displayName || (body.role === 'AGENT' ? 'יוסי כהן' : 'רינה שמעון');
 
     let user = await prisma.user.findUnique({ where: { email } });
+    // A-1 — same soft-delete gate as the email path. A deleted account
+    // can't come back via the Google shortcut either.
+    if (user?.deletedAt) {
+      return reply.code(401).send({ error: { message: 'Invalid credentials' } });
+    }
     if (!user) {
       const slug = body.role === 'AGENT' ? await buildAgentSlug(displayName) : null;
       user = await prisma.user.create({
@@ -176,6 +189,25 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/logout', async (_req, reply) => {
     reply.clearCookie(COOKIE_NAME, { path: '/' });
+    return { ok: true };
+  });
+
+  // A-1 — soft-delete the authenticated user's account and clear the
+  // cookie. UI already confirmed with a type-the-phrase dialog, so the
+  // contract here is "trust the authenticated caller, set deletedAt,
+  // drop the session". The row is preserved — co-owner agents keep
+  // seeing shared properties, a 30-day purge job (scheduled separately)
+  // hard-deletes the row later. The client must never learn this is
+  // recoverable; the UI presents it as permanent.
+  app.post('/delete-account', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const uid = requireUser(req).id;
+    // Idempotent: if already deleted, still clear the cookie and succeed.
+    await prisma.user.updateMany({
+      where: { id: uid, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+    reply.clearCookie(COOKIE_NAME, { path: '/' });
+    phTrack('account_deleted', uid, {});
     return { ok: true };
   });
 };

@@ -176,6 +176,11 @@ export const api = {
   googleNativeExchange: (code) =>
     request('/auth/google/native-exchange', { method: 'POST', body: { code } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  // A-1 — soft-deletes the authenticated agent's account. Server sets
+  // `deletedAt = NOW()` and clears the session cookie. UI presents this
+  // as permanent; the server preserves the row so co-owner agents keep
+  // seeing shared properties.
+  deleteAccount: () => request('/auth/delete-account', { method: 'POST' }),
   me: () => request('/me'),
   // A-4 — submit first-login onboarding form (license + optional title /
   // agency / phone). On success the server stamps `profileCompletedAt`
