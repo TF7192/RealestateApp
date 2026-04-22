@@ -1,0 +1,21 @@
+# FastAPI service
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+
+# Primary STT backend — CTranslate2-based, fast on CPU + GPU
+faster-whisper==1.1.1
+
+# Fallback STT backend — HF transformers, used if the ct2 model id
+# isn't available. Torch is CPU by default; GPU deployments override
+# via Dockerfile.gpu with the CUDA wheel.
+transformers==4.47.1
+torch==2.5.1
+accelerate==1.2.1
+
+# VAD pre-filter (used by faster-whisper when vad_filter=True)
+onnxruntime==1.20.1
+
+# Tests / dev
+httpx==0.28.1
+pytest==8.3.4
