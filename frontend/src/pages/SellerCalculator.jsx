@@ -102,7 +102,7 @@ function DesktopSellerCalculator() {
   }), [debounced]);
 
   const isForward = s.mode === 'forward';
-  const heroLabel = isForward ? 'הסכום שיישאר לבעלים' : 'מחיר לרישום';
+  const heroLabel = isForward ? 'נשאר ביד' : 'מחיר סגירה';
   const heroValue = isForward ? result.net : result.listingPrice;
 
   const reset = () => setS(INITIAL);
@@ -112,9 +112,9 @@ function DesktopSellerCalculator() {
       <header className="sc-head">
         <div className="sc-head-title">
           <Calculator size={22} />
-          <h1>מחשבון מוכר</h1>
+          <h1>מחשבון</h1>
         </div>
-        <p className="sc-head-sub">חישוב נטו / מחיר רישום אחרי עמלת תיווך, שכר טרחת עו״ד ועלויות נוספות.</p>
+        <p className="sc-head-sub">חישוב נטו / מחיר סגירה אחרי עמלת תיווך, שכר טרחת עו״ד ועלויות נוספות.</p>
       </header>
 
       <div className="sc-mode">
@@ -123,8 +123,8 @@ function DesktopSellerCalculator() {
           onChange={(v) => update('mode', v)}
           ariaLabel="מצב חישוב"
           options={[
-            { value: 'forward', label: 'מחיר מכירה → נטו' },
-            { value: 'reverse', label: 'נטו → מחיר רישום' },
+            { value: 'forward', label: 'מחיר → נטו' },
+            { value: 'reverse', label: 'נטו → מחיר סגירה' },
           ]}
         />
       </div>
@@ -134,7 +134,7 @@ function DesktopSellerCalculator() {
         <section className="sc-card sc-inputs">
           <div className="sc-row">
             <label className="sc-label" htmlFor="sc-amount">
-              {isForward ? 'מחיר מכירה (₪)' : 'הסכום שאת/ה רוצה לקבל ביד (₪)'}
+              {isForward ? 'מחיר (₪)' : 'הסכום שאת/ה רוצה לקבל ביד (₪)'}
             </label>
             {/* NumberField formats the value with IL thousand separators
                 live as you type — 280000 → 280,000 — and preserves caret
@@ -146,7 +146,7 @@ function DesktopSellerCalculator() {
               unit="₪"
               placeholder={isForward ? '2,800,000' : '2,700,000'}
               inputClassName="sc-input-amount"
-              aria-label={isForward ? 'מחיר מכירה' : 'סכום נטו'}
+              aria-label={isForward ? 'מחיר' : 'סכום נטו'}
               autoFocus
             />
           </div>
@@ -247,9 +247,9 @@ function DesktopSellerCalculator() {
             <div className="sc-error">
               <AlertCircle size={16} />
               {result.error === 'fees_exceed_100_percent'
-                ? 'העמלות עולות על 100% מהמחיר — לא ניתן לחשב מחיר רישום.'
+                ? 'העמלות עולות על 100% מהמחיר — לא ניתן לחשב מחיר סגירה.'
                 : result.error === 'fees_exceed_price'
-                  ? 'העמלות גבוהות יותר ממחיר המכירה — בדוק את הקלט.'
+                  ? 'העמלות גבוהות יותר מהמחיר — בדוק את הקלט.'
                   : 'הקלט אינו תקין.'}
             </div>
           ) : (
@@ -263,7 +263,7 @@ function DesktopSellerCalculator() {
 
               <ul className="sc-breakdown">
                 <Line
-                  label={isForward ? 'מחיר מכירה' : 'מחיר רישום מחושב'}
+                  label={isForward ? 'מחיר' : 'מחיר סגירה מחושב'}
                   value={formatILS(isForward ? (s.amount || 0) : result.listingPrice)}
                   emphasis
                 />
@@ -294,7 +294,7 @@ function DesktopSellerCalculator() {
                 )}
                 <li className="sc-divider" />
                 <Line
-                  label={isForward ? 'הסכום שיישאר לבעלים' : 'הסכום שיישאר לבעלים'}
+                  label="נשאר ביד"
                   value={formatILS(result.net)}
                   emphasis
                 />
@@ -380,11 +380,11 @@ function buildShareUrl({ result, mode }) {
   if (!result || result.error || !result.net) return '#';
   const isFwd = mode === 'forward';
   const lines = [
-    isFwd ? 'סיכום עמלות מהמכירה:' : 'מחיר רישום מומלץ:',
+    isFwd ? 'סיכום עמלות מהמכירה:' : 'מחיר סגירה מומלץ:',
     '',
     isFwd
-      ? `מחיר מכירה: ₪${Math.round(result.listingPrice).toLocaleString('he-IL')}`
-      : `מחיר רישום: ₪${Math.round(result.listingPrice).toLocaleString('he-IL')}`,
+      ? `מחיר: ₪${Math.round(result.listingPrice).toLocaleString('he-IL')}`
+      : `מחיר סגירה: ₪${Math.round(result.listingPrice).toLocaleString('he-IL')}`,
     `עמלת תיווך: ₪${Math.round(result.brokerage).toLocaleString('he-IL')}`,
     `שכ"ט עו"ד: ₪${Math.round(result.lawyer).toLocaleString('he-IL')}`,
   ];
@@ -392,7 +392,7 @@ function buildShareUrl({ result, mode }) {
     lines.push(`עלויות נוספות: ₪${Math.round(result.additional).toLocaleString('he-IL')}`);
   }
   lines.push('—');
-  lines.push(`יישאר לבעלים: ₪${Math.round(result.net).toLocaleString('he-IL')}`);
+  lines.push(`נשאר ביד: ₪${Math.round(result.net).toLocaleString('he-IL')}`);
   const text = lines.join('\n');
   // wa.me works on web (opens web.whatsapp.com) and on the native app
   // when WhatsApp is installed. No phone — the user picks a contact

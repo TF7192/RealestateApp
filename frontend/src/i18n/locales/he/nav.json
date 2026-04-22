@@ -13,7 +13,7 @@
     "deals": "עסקאות",
     "transfers": "העברות",
     "templates": "תבניות הודעה",
-    "calculator": "מחשבון מוכר",
+    "calculator": "מחשבון",
     "yad2Import": "ייבוא מ-Yad2",
     "reports": "דוחות",
     "activity": "פעילות",
@@ -152,7 +152,7 @@
       "sub": "וואטסאפ אוטומטי מפרטי הנכס"
     },
     "calculator": {
-      "title": "מחשבון מוכר",
+      "title": "מחשבון",
       "sub": "חישוב נטו למוכר אחרי עמלות ומע״מ"
     },
     "yad2Import": {

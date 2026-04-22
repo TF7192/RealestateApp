@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Plus,
   Minus,
-  Share2,
   ChevronDown,
   ChevronUp,
   RotateCcw,
@@ -84,7 +83,7 @@ export default function MobileSellerCalculator() {
   }), [debounced]);
 
   const isFwd = s.mode === 'forward';
-  const heroLabel = isFwd ? 'יישאר לבעלים' : 'מחיר לרישום';
+  const heroLabel = isFwd ? 'נשאר ביד' : 'מחיר סגירה';
   const heroValue = isFwd ? result.net : result.listingPrice;
   const heroSub   = fmtShort(heroValue);
 
@@ -100,25 +99,6 @@ export default function MobileSellerCalculator() {
     setAdvancedOpen(false);
   };
 
-  const share = () => {
-    if (!result || result.error || !result.net) return;
-    haptics.tap?.();
-    const lines = [
-      isFwd ? 'סיכום עמלות מהמכירה:' : 'מחיר רישום מומלץ:',
-      '',
-      isFwd
-        ? `מחיר מכירה: ${fmtILS(result.listingPrice)}`
-        : `מחיר רישום: ${fmtILS(result.listingPrice)}`,
-      `עמלת תיווך: ${fmtILS(result.brokerage)}`,
-      `שכ"ט עו"ד: ${fmtILS(result.lawyer)}`,
-    ];
-    if (result.additional > 0) lines.push(`עלויות נוספות: ${fmtILS(result.additional)}`);
-    lines.push('—');
-    lines.push(`יישאר לבעלים: ${fmtILS(result.net)}`);
-    const url = `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`;
-    window.location.href = url;
-  };
-
   return (
     <div className="msc" dir="rtl">
       {/* ── Header — iOS-style back chevron + title ───────────────── */}
@@ -126,7 +106,7 @@ export default function MobileSellerCalculator() {
         <Link to="/" className="msc-back" aria-label="חזור">
           <ArrowRight size={20} />
         </Link>
-        <h1 className="msc-title">מחשבון מוכר</h1>
+        <h1 className="msc-title">מחשבון</h1>
         <button
           type="button"
           className="msc-reset"
@@ -153,7 +133,7 @@ export default function MobileSellerCalculator() {
           className={`msc-mode-pill ${!isFwd ? 'sel' : ''}`}
           onClick={() => flipMode('reverse')}
         >
-          <span>נטו → מחיר רישום</span>
+          <span>נטו → מחיר סגירה</span>
         </button>
       </div>
 
@@ -193,7 +173,7 @@ export default function MobileSellerCalculator() {
 
       {/* ── Sale / net amount — the single big input ─────────────── */}
       <MoneyCard
-        label={isFwd ? 'מחיר מכירה' : 'סכום רצוי נטו'}
+        label={isFwd ? 'מחיר' : 'סכום רצוי נטו'}
         hint={isFwd ? 'המחיר שמבקשים ללקוח' : 'כמה שהבעלים רוצה לקבל ביד'}
         value={s.amount}
         onChange={(v) => update('amount', v)}
@@ -243,17 +223,8 @@ export default function MobileSellerCalculator() {
         />
       )}
 
-      {/* ── Sticky share CTA ─────────────────────────────────────── */}
+      {/* ── Footnote — mas shevach disclaimer ───────────────────── */}
       <div className="msc-dock">
-        <button
-          type="button"
-          className="msc-share"
-          onClick={share}
-          disabled={!result || !!result.error || !result.net}
-        >
-          <Share2 size={16} />
-          שלח לבעלים בוואטסאפ
-        </button>
         <p className="msc-foot">
           <Info size={11} />
           מס שבח לא מחושב אוטומטית — הוסף ידנית ב״עלויות נוספות״ אם רלוונטי.
