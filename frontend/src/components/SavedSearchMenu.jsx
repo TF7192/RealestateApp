@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bookmark, Trash2, ChevronDown } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
+import Portal from './Portal';
 import './SavedSearchMenu.css';
 
 // Sprint 7 / MLS parity — Task B3. Saved-search dropdown for any list
@@ -149,6 +150,7 @@ export default function SavedSearchMenu({ entityType, currentFilters, onLoad }) 
       </button>
 
       {open && (
+        <Portal>
         <div
           className="ss-menu-pop"
           role="menu"
@@ -205,6 +207,7 @@ export default function SavedSearchMenu({ entityType, currentFilters, onLoad }) 
             ))}
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

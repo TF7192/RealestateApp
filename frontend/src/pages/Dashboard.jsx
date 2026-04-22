@@ -632,18 +632,24 @@ function PipelineHealthCard({ leads = [] }) {
       </div>
       <div className="dash-pipeline-bar" role="img" aria-label={`${buckets.hot} חמים, ${buckets.warm} פושרים, ${buckets.cold} קרים`}>
         {total === 0 && <div className="dash-pipeline-empty">—</div>}
+        {/* Segments sized via `flex` (grow-basis) instead of raw `width`
+            so the percentages always sum to exactly the container
+            width. With plain `width: X%` inside a flex row the browser
+            was leaving a cream sliver on one edge whenever a single
+            bucket was non-zero — the child's flex-basis defaulted to
+            `auto` (content width) and the width % became advisory. */}
         {buckets.hot > 0 && (
-          <Link to="/customers?filter=hot" className="dpb-seg dpb-hot" style={{ width: `${pct(buckets.hot)}%` }} title={`${buckets.hot} לידים חמים`}>
+          <Link to="/customers?filter=hot" className="dpb-seg dpb-hot" style={{ flex: `${pct(buckets.hot)} ${pct(buckets.hot)} 0%` }} title={`${buckets.hot} לידים חמים`}>
             <span>{buckets.hot}</span>
           </Link>
         )}
         {buckets.warm > 0 && (
-          <Link to="/customers?filter=warm" className="dpb-seg dpb-warm" style={{ width: `${pct(buckets.warm)}%` }} title={`${buckets.warm} פושרים`}>
+          <Link to="/customers?filter=warm" className="dpb-seg dpb-warm" style={{ flex: `${pct(buckets.warm)} ${pct(buckets.warm)} 0%` }} title={`${buckets.warm} פושרים`}>
             <span>{buckets.warm}</span>
           </Link>
         )}
         {buckets.cold > 0 && (
-          <Link to="/customers?filter=cold" className="dpb-seg dpb-cold" style={{ width: `${pct(buckets.cold)}%` }} title={`${buckets.cold} קרים`}>
+          <Link to="/customers?filter=cold" className="dpb-seg dpb-cold" style={{ flex: `${pct(buckets.cold)} ${pct(buckets.cold)} 0%` }} title={`${buckets.cold} קרים`}>
             <span>{buckets.cold}</span>
           </Link>
         )}

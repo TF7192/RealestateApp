@@ -1706,19 +1706,33 @@
    UX review F-2 · F-7 · F-11 · F-17 — polish pass
    ============================================================ */
 
-/* F-2 — WhatsApp filled primary (green) used on the desktop customer
-   card footer so the daily action is visually obvious + 40% larger
-   pointer target than the old ghost icon. */
+/* WhatsApp button on the desktop customer card footer. Previously a
+   bold green fill that towered over the neighboring phone + overflow
+   chips; reads unprofessionally on cards that are otherwise
+   low-chrome. Switched to a ghost chip (transparent background,
+   standard border radius, the green lives in the icon + text) so it
+   matches the button rhythm of the rest of the lead card and the
+   surrounding asset cards. */
 .btn.btn-wa {
-  background: #25D366;
-  color: white;
-  border: 1px solid #1DA851;
+  background: var(--bg-card);
+  color: #15803d;
+  border: 1px solid var(--border);
   font-weight: 600;
   gap: 6px;
 }
-.btn.btn-wa:hover  { background: #1fc25c; }
-.btn.btn-wa:active { background: #18a84f; }
-.btn.btn-wa svg   { color: white; }
+.btn.btn-wa:hover {
+  background: var(--bg-card-hover);
+  border-color: #25D366;
+  color: #15803d;
+}
+.btn.btn-wa:active { background: rgba(37, 211, 102, 0.08); }
+.btn.btn-wa svg { color: #25D366; }
+/* Dark-mode: same ghost shape, brighter accent so the green icon
+   remains visible on the dark card surface. */
+[data-theme="dark"] .btn.btn-wa {
+  color: #4ade80;
+}
+[data-theme="dark"] .btn.btn-wa svg { color: #4ade80; }
 
 /* F-7 — "extra-large" rail: SMS gone → remaining 3 slots get more
    generous targets (56×56) with a label under WhatsApp so agents can

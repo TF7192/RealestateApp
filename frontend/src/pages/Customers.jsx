@@ -1275,12 +1275,14 @@ export default function Customers() {
               role="link"
               tabIndex={0}
               onClick={(e) => {
-                // L-7 — whole card is clickable EXCEPT over nested
-                // interactive children (name-link, pickers, stars,
-                // buttons, selects). If the click started on one of
-                // those the child's handler already ran; bail so we
-                // don't double-fire a navigation on top of it.
-                if (e.target.closest('button, a, [role="button"], input, select, label')) return;
+                // L-7 — whole card navigates. Previously this bailed
+                // on every button/anchor/input under the card, which
+                // meant only the lead's name would navigate (the rest
+                // of the card is pickers, chips, and inline editors).
+                // Now only the notes block and the footer action row
+                // opt out via `.no-card-nav` — everything else clicks
+                // through to the detail page.
+                if (e.target.closest('.no-card-nav')) return;
                 navigate(`/customers/${lead.id}`);
               }}
               onKeyDown={(e) => {
@@ -1378,7 +1380,7 @@ export default function Customers() {
                   two free-text surfaces side-by-side, so agents only
                   used notes. Description input removed here; the
                   value is still editable in the lead detail page. */}
-              <div className="customer-notes cc-v2-notes">
+              <div className="customer-notes cc-v2-notes no-card-nav" onClick={(e) => e.stopPropagation()}>
                 <InlineText
                   value={lead.notes || ''}
                   onCommit={(v) => patchLead(lead.id, { notes: v || null }, { success: t('list.patchSuccess.notesUpdated') })}
@@ -1389,7 +1391,7 @@ export default function Customers() {
                 />
               </div>
 
-              <div className="customer-card-footer cc-v2-footer">
+              <div className="customer-card-footer cc-v2-footer no-card-nav" onClick={(e) => e.stopPropagation()}>
                 <div className="customer-dates">
                   <button
                     type="button"

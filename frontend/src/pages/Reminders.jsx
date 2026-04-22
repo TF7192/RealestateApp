@@ -38,17 +38,24 @@ export default function Reminders() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
+  // `toast` from useToast() is a fresh object every render. Including
+  // it in useCallback's deps makes `load` unstable → mount effect
+  // re-runs → on any failure the error toast floods the screen. Same
+  // pattern as the TagSettings fix — stash the latest toast in a ref.
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.listReminders({ status: tab });
       setItems(res?.items || []);
     } catch {
-      toast.error('שגיאה בטעינת תזכורות');
+      toastRef.current?.error?.('שגיאה בטעינת תזכורות');
     } finally {
       setLoading(false);
     }
-  }, [tab, toast]);
+  }, [tab]);
 
   useEffect(() => { load(); }, [load]);
 
