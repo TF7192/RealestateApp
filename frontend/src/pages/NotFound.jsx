@@ -16,7 +16,7 @@ export default function NotFound() {
           יכול להיות שהעברתם את הקישור לפני עדכון, או שמישהו מחק את הרשומה.
         </p>
         <div className="nf-actions">
-          <Link className="btn btn-primary" to="/">
+          <Link className="btn btn-primary" to="/dashboard">
             <Home size={14} /> חזור לדשבורד
           </Link>
           <Link className="btn btn-secondary" to="/properties">

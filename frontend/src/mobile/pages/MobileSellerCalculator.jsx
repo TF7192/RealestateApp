@@ -115,7 +115,7 @@ export default function MobileSellerCalculator() {
     <div className="msc" dir="rtl">
       {/* ── Header — iOS-style back chevron + title ───────────────── */}
       <header className="msc-head">
-        <Link to="/" className="msc-back" aria-label="חזור">
+        <Link to="/dashboard" className="msc-back" aria-label="חזור">
           <ArrowRight size={20} />
         </Link>
         <h1 className="msc-title">מחשבון</h1>

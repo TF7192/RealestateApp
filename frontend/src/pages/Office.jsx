@@ -100,7 +100,7 @@ export default function Office() {
   // Non-owner without an office → send them home. Owners without an
   // office still see the create form.
   if (!loading && !office && !isOwner) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const handleCreate = async (e) => {

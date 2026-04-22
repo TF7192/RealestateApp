@@ -164,7 +164,7 @@ function AppRoutes() {
           await api.googleNativeExchange(code);
           await Browser.close().catch(() => {});
           await refresh();
-          navigate('/', { replace: true });
+          navigate('/dashboard', { replace: true });
         } catch (e) {
           // Swallow: this runs during native OAuth resume. A noisy log
           // would surface in PostHog sessions; the user sees a toast

@@ -92,7 +92,7 @@ export function useGlobalShortcuts({ onOpenPalette, onOpenHelp }) {
         if (k === 'p') navigate('/properties');
         else if (k === 'c') navigate('/customers');
         else if (k === 'd') navigate('/deals');
-        else if (k === 'h') navigate('/');
+        else if (k === 'h') navigate('/dashboard');
         else if (k === 't') navigate('/templates');
         return;
       }

@@ -33,7 +33,7 @@ export default function AdminChats() {
   useEffect(() => {
     if (authLoading) return;
     if (!user || !ADMIN_EMAILS.has((user.email || '').toLowerCase())) {
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   }, [user, authLoading, navigate]);
 

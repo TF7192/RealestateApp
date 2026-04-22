@@ -51,7 +51,13 @@ import './Layout.css';
 // where `t()` is available. Keys live in nav.json (menu.*, quick.*,
 // mobileMore.*, etc.).
 const navItems = [
-  { path: '/', icon: LayoutDashboard, labelKey: 'menu.dashboard' },
+  // Route the sidebar "dashboard" entry to the explicit /dashboard
+  // alias, not "/". In Capacitor's WebView (and any setup where the
+  // server serves a static landing.html at /) a full reload after
+  // navigating to "/" drops the SPA and lands the agent on the
+  // marketing page. /dashboard is the SPA-only alias defined in
+  // App.jsx and never collides with the nginx landing fallback.
+  { path: '/dashboard', icon: LayoutDashboard, labelKey: 'menu.dashboard' },
   { path: '/properties', icon: Building2, labelKey: 'menu.properties' },
   { path: '/owners', icon: UserCircle, labelKey: 'menu.owners' },
   { path: '/customers', icon: Users, labelKey: 'menu.customers' },
@@ -92,6 +98,7 @@ const BACK_TARGETS = [
 // the resolver inside the component can call t() per entry.
 const SECTION_TITLE_KEYS = {
   '/': 'menu.dashboard',
+  '/dashboard': 'menu.dashboard',
   '/properties': 'menu.properties',
   '/owners': 'menu.owners',
   '/customers': 'menu.customers',
@@ -248,7 +255,7 @@ export default function Layout({ onLogout }) {
     haptics.tap();
     if (back?.back === -1) navigate(-1);
     else if (back?.back) navigate(back.back);
-    else navigate('/');
+    else navigate('/dashboard');
   };
 
   // Build the header title: dynamic > hint > section > logo
@@ -277,7 +284,7 @@ export default function Layout({ onLogout }) {
             <span className="mh-title">{pageTitle}</span>
           </div>
         ) : (
-          <Link to="/" className="mobile-logo" onClick={() => haptics.tap()}>
+          <Link to="/dashboard" className="mobile-logo" onClick={() => haptics.tap()}>
             <span className="logo-icon">◆</span>
             <span>Estia</span>
           </Link>
@@ -339,7 +346,7 @@ export default function Layout({ onLogout }) {
 
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
-          <Link to="/" className="logo">
+          <Link to="/dashboard" className="logo">
             <div className="logo-mark">
               <span>◆</span>
             </div>

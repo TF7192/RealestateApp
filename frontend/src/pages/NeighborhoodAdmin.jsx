@@ -202,7 +202,7 @@ export default function NeighborhoodAdmin() {
   // OWNER gate — all hooks have run above so this early-return is safe
   // under rules-of-hooks. Plain agents bounce to the dashboard.
   if (user && user.role !== 'OWNER') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (
