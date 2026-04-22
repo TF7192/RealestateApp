@@ -232,6 +232,10 @@ function AppRoutes() {
             <Route path="/assets" element={<Navigate to="/properties" replace />} />
             <Route path="/assets/:id" element={<Navigate to="/properties" replace />} />
             <Route path="/deals" element={<Deals />} />
+            {/* If an already-authenticated user lands on /login (e.g.
+                after OAuth success redirected back there, or from a
+                bookmark), send them to the dashboard instead of 404. */}
+            <Route path="/login" element={<Navigate to="/" replace />} />
           </Route>
           {/* SEO-friendly public routes */}
           <Route path="/agents/:agentSlug" element={<AgentPortal />} />

@@ -61,7 +61,12 @@ export default function Login() {
       });
       return;
     }
-    const redirect = window.location.pathname + window.location.search;
+    // After OAuth success the backend redirects to this `redirect` param.
+    // If the user starts from /login, redirecting them back to /login
+    // lands them on a 404 in the authenticated router — send them to /
+    // (the dashboard) instead.
+    const here = window.location.pathname + window.location.search;
+    const redirect = window.location.pathname === '/login' ? '/' : here;
     window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirect)}`;
   };
 
