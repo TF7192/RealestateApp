@@ -25,11 +25,11 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | X-2 | Phone normalization utility | Main | 🟢 | ✅ | ✅ | ✅ (unit) | pending | `lib/phone.js` (26 cases) |
 | X-3 | Placeholder styling tokens | Main | 🟢 | ✅ | ✅ | ✅ (unit) | pending | `--placeholder-color` + rules |
 | X-4 | Mutation/invalidation audit | Main | 🟢 | ✅ | ✅ | ✅ (unit) | pending | `lib/mutations.js` helper |
-| LP-1 | Pricing cards alignment | Sub-1 | ⚪ | — | — | — | — | |
-| A-1 | Delete account | Sub-1 | ⚪ | — | — | — | — | Soft-delete, scary UX |
-| A-2 | Google on signup | Sub-1 | ⚪ | — | — | — | — | |
-| A-3 | Google button background | Sub-1 | ⚪ | — | — | — | — | |
-| A-4 | First-login onboarding | Sub-1 | ⚪ | — | — | — | — | License 6–8 digits |
+| LP-1 | Pricing cards alignment | Sub-1 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | margin-block-start: auto on `.lp-tier .lp-btn` |
+| A-1 | Delete account | Sub-1 | 🟢 | ✅ | ✅ | ✅ (unit + integration + E2E spec) | pending | Soft-delete, scary UX; Prisma `deletedAt` |
+| A-2 | Google on signup | Sub-1 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | `/login?flow=signup` form gets Google button |
+| A-3 | Google button background | Sub-1 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | `#fafafa` off-white |
+| A-4 | First-login onboarding | Sub-1 | 🟢 | ✅ | ✅ | ✅ (unit + integration) | pending | Prisma `profileCompletedAt`; license 6–8 digits |
 | D-1 | Remove conversion funnel | Sub-2 | ⚪ | — | — | — | — | |
 | D-2 | Meetings list (today + 7d, N=5) | Sub-2 | ⚪ | — | — | — | — | |
 | D-3 | Leads card width | Sub-2 | ⚪ | — | — | — | — | |
@@ -86,3 +86,32 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
   - Full `unit-frontend` suite: 121 tests pass.
   - Lint clean on touched files.
   - Ready to ship alone.
+- **2026-04-22T21:20Z** — Sub-1 lane complete (LP-1 + A-1..A-4):
+  - **LP-1** `frontend/src/pages/landing/Landing.css` — CTA sticks to
+    bottom via `margin-block-start: auto` on `.lp-tier .lp-btn`; the
+    tier card is already a column flex container so both pricing
+    CTAs align across columns regardless of body length. 2 tests.
+  - **A-3** `frontend/src/pages/Login.css` — Google button background
+    `#fff` → `#fafafa` (border darkened to match) so the button has a
+    distinct silhouette on both themes. 2 tests.
+  - **A-2** `frontend/src/pages/Login.jsx` + `auth.json` —
+    `הירשם עם Google` shortcut at the top of the signup form when
+    the user landed via `/login?flow=signup`. Shares the login-side
+    `handleGoogle()` handler. 3 tests.
+  - **A-1** `frontend/src/pages/Profile.jsx` + `Profile.css` +
+    `backend/src/routes/auth.ts` + Prisma migration
+    `20260422220000_user_profile_completion_and_soft_delete`. Scary
+    type-the-phrase dialog (`מחק את החשבון שלי`) → soft-delete
+    (Prisma `deletedAt`). Login + `/me` reject deleted accounts with
+    "Invalid credentials" so the UI maintains the "permanent"
+    fiction. `api.deleteAccount()` in the client. 8 unit + 5
+    integration + 3 E2E spec tests.
+  - **A-4** `frontend/src/pages/Onboarding.jsx` + `Onboarding.css` +
+    App.jsx route guard + backend `POST /api/me/profile` + Prisma
+    `profileCompletedAt`. License validated 6–8 digits both sides
+    (`/^\d{6,8}$/`). Gate only fires for AGENT/OWNER; customers
+    bypass. 8 unit + 6 integration tests.
+  - 23 new vitest cases pass; pre-existing 4 failures unchanged
+    (`api.test.js` and `sec-user-scoped-stores.test.js` — blocked by
+    worktree not having `@capacitor/core` in node_modules; not
+    introduced by this lane).
