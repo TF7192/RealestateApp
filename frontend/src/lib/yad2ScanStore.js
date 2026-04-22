@@ -14,7 +14,14 @@
 //      When the scan finishes while the agent is on another page a
 //      toast fires so they can jump back to review.
 //
-// Not Redux. Not Zustand. Just a 70-line pub-sub — the state model is
+// Y-1/Y-2 — durable across reload:
+//   We also persist the RUNNING jobId under dedicated sessionStorage
+//   keys, one per job type (preview / import). On module init, if we
+//   find a running entry we call /jobs/:id; the backend is the source
+//   of truth. If still running → re-attach poll. If done/error → apply
+//   and dispatch completion. If 404 (job GC'd) → drop the key, idle.
+//
+// Not Redux. Not Zustand. Just a pub-sub — the state model is
 // trivially simple (one object) and we don't need the overhead.
 
 import { api } from './api';
@@ -43,12 +50,17 @@ let state = {
 };
 
 const listeners = new Set();
-const STORAGE_KEY = 'estia-yad2-last-scan';
+const STORAGE_KEY          = 'estia-yad2-last-scan';
+// Y-1: persists { status:'running', jobId, url, startedAt } for an
+// in-flight preview scan so a reload can re-attach its poll loop.
+const RUNNING_SCAN_KEY     = 'estia-yad2-running-scan';
+// Y-2: same shape for an in-flight IMPORT job (no `url` — we key by
+// jobId alone since the agent already picked the listings).
+const RUNNING_IMPORT_KEY   = 'estia-yad2-running-import';
 
-// Rehydrate from sessionStorage on first import — reloading the page
-// during a flight (or returning from a force-close) shows the most
-// recent finished scan instead of nothing. Running scans don't rehydrate
-// because the fetch promise didn't survive the reload.
+// Rehydrate completed scans from sessionStorage on first import —
+// reloading the page during a flight (or returning from a force-close)
+// shows the most recent finished scan instead of nothing.
 try {
   const raw = sessionStorage.getItem(STORAGE_KEY);
   if (raw) {
@@ -124,6 +136,24 @@ let inflight = null;
 // stamps the epoch at start and checks it before mutating state.
 let sessionEpoch = 0;
 
+// Safe sessionStorage helpers — private browsing / disabled storage
+// throws on every call, and we don't want a throw during module init
+// to prevent the scan store from loading at all.
+function writeRunning(key, payload) {
+  try { sessionStorage.setItem(key, JSON.stringify(payload)); }
+  catch { /* ignore */ }
+}
+function clearRunning(key) {
+  try { sessionStorage.removeItem(key); }
+  catch { /* ignore */ }
+}
+function readRunning(key) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 export function startScan(url) {
   if (inflight) return inflight;
   const myEpoch = sessionEpoch;
@@ -138,6 +168,14 @@ export function startScan(url) {
   inflight = (async () => {
     try {
       const { jobId } = await api.yad2AgencyPreviewStart(url);
+      // Y-1: persist the running jobId so a reload mid-flight can
+      // re-attach to the same job instead of losing the notification.
+      writeRunning(RUNNING_SCAN_KEY, {
+        status: 'running',
+        jobId,
+        url,
+        startedAt: state.startedAt || Date.now(),
+      });
       const res = await pollJob(jobId);
       if (myEpoch !== sessionEpoch) return res; // logged-out mid-flight; drop
       setState({
@@ -165,6 +203,9 @@ export function startScan(url) {
       throw e;
     } finally {
       inflight = null;
+      // Terminal — the running key is only meaningful while the poll
+      // loop is live. Cleared here regardless of success/failure.
+      clearRunning(RUNNING_SCAN_KEY);
     }
   })();
   return inflight;
@@ -204,14 +245,35 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // own busy/error state without touching the shared scan snapshot.
 export async function startImport(listings) {
   const myEpoch = sessionEpoch;
-  const { jobId } = await api.yad2AgencyImportStart(listings);
-  const res = await pollJob(jobId);
-  if (myEpoch !== sessionEpoch) {
-    // Session changed mid-import (logout/login). Drop the result so
-    // a toast doesn't fire for a user who isn't the one who started.
-    throw new Error('הפעולה בוטלה');
+  try {
+    const { jobId } = await api.yad2AgencyImportStart(listings);
+    // Y-2: persist the import jobId so a reload during the image-rehost
+    // phase can re-attach and fire the completion toast when it's done.
+    writeRunning(RUNNING_IMPORT_KEY, {
+      status: 'running',
+      jobId,
+      startedAt: Date.now(),
+    });
+    const res = await pollJob(jobId);
+    if (myEpoch !== sessionEpoch) {
+      // Session changed mid-import (logout/login). Drop the result so
+      // a toast doesn't fire for a user who isn't the one who started.
+      throw new Error('הפעולה בוטלה');
+    }
+    window.dispatchEvent(new CustomEvent('yad2-import-complete', {
+      detail: { ok: true, created: res?.created?.length ?? 0, result: res },
+    }));
+    return res;
+  } catch (e) {
+    if (myEpoch === sessionEpoch) {
+      window.dispatchEvent(new CustomEvent('yad2-import-complete', {
+        detail: { ok: false, error: e?.message || 'הייבוא נכשל' },
+      }));
+    }
+    throw e;
+  } finally {
+    clearRunning(RUNNING_IMPORT_KEY);
   }
-  return res;
 }
 
 /** Wipe the cached scan — called when the agent starts fresh. */
@@ -241,8 +303,10 @@ export function setScanQuota(quota) {
  * session on the same browser. This wipes BOTH the in-memory snapshot
  * AND every sessionStorage artifact the store owns:
  *
- *   - `estia-yad2-last-scan`   — rehydrated completed-scan result.
+ *   - `estia-yad2-last-scan`          — rehydrated completed-scan result.
  *   - `estia-yad2-banner-dismissed-at` — banner-dismiss timestamp.
+ *   - `estia-yad2-running-scan`       — Y-1 in-flight preview jobId.
+ *   - `estia-yad2-running-import`     — Y-2 in-flight import jobId.
  *
  * We also null out the inflight promise so a poll still running at the
  * moment of logout resolves into a trashed state that nothing reads.
@@ -262,6 +326,118 @@ export function resetForLogout() {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem('estia-yad2-banner-dismissed-at');
+    sessionStorage.removeItem(RUNNING_SCAN_KEY);
+    sessionStorage.removeItem(RUNNING_IMPORT_KEY);
   } catch { /* ignore private-mode failures */ }
   emit();
 }
+
+// ----------------------------------------------------------------------------
+// Y-1/Y-2 rehydration — on module init, if a previous tab left behind a
+// running jobId, re-attach the poll loop. The backend is the source of
+// truth: if it says done/error → apply + dispatch; still running → resume
+// polling; 404 → drop the key and stay idle.
+//
+// Runs in a microtask so `setState` subscribers attached during module
+// bootstrap (useEffect in the banner) can pick up the 'running' state as
+// they would for any other poll cycle. Also runs AFTER the `state`
+// initialization + completed-scan rehydration above so we don't clobber a
+// valid completed scan with a stale running record.
+// ----------------------------------------------------------------------------
+function resumeScanJob(persisted) {
+  const myEpoch = sessionEpoch;
+  // Advertise running immediately so the banner reattaches during reload.
+  setState({
+    status: 'running',
+    url: persisted.url || null,
+    startedAt: persisted.startedAt || Date.now(),
+    finishedAt: null,
+    result: null,
+    error: null,
+  });
+  inflight = (async () => {
+    try {
+      const res = await pollJob(persisted.jobId);
+      if (myEpoch !== sessionEpoch) return res;
+      setState({
+        status: 'done',
+        finishedAt: Date.now(),
+        result: res,
+        quota: res?.quota ?? state.quota,
+      });
+      window.dispatchEvent(new CustomEvent('yad2-scan-complete', {
+        detail: { url: persisted.url || null, ok: true, listings: res?.listings?.length ?? 0 },
+      }));
+      return res;
+    } catch (e) {
+      if (myEpoch !== sessionEpoch) return null;
+      // 404 → job was garbage-collected server-side. Not an error we
+      // show to the agent; just drop back to idle and let them start
+      // a new scan.
+      if (e?.status === 404) {
+        setState({
+          status: 'idle',
+          url: null,
+          startedAt: null,
+          finishedAt: null,
+          result: null,
+          error: null,
+        });
+        return null;
+      }
+      setState({
+        status: 'error',
+        finishedAt: Date.now(),
+        error: e?.message || 'הטעינה נכשלה',
+      });
+      window.dispatchEvent(new CustomEvent('yad2-scan-complete', {
+        detail: { url: persisted.url || null, ok: false, error: e?.message || 'הטעינה נכשלה' },
+      }));
+      // Don't rethrow — nothing awaits the rehydration promise, so a
+      // rethrow just produces an "unhandled rejection" at the module
+      // boundary. State + event are already dispatched.
+      return null;
+    } finally {
+      inflight = null;
+      clearRunning(RUNNING_SCAN_KEY);
+    }
+  })();
+}
+
+function resumeImportJob(persisted) {
+  const myEpoch = sessionEpoch;
+  (async () => {
+    try {
+      const res = await pollJob(persisted.jobId);
+      if (myEpoch !== sessionEpoch) return;
+      window.dispatchEvent(new CustomEvent('yad2-import-complete', {
+        detail: { ok: true, created: res?.created?.length ?? 0, result: res },
+      }));
+    } catch (e) {
+      if (myEpoch !== sessionEpoch) return;
+      if (e?.status === 404) {
+        // Import job GC'd — nothing to reattach; the agent can re-trigger.
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('yad2-import-complete', {
+        detail: { ok: false, error: e?.message || 'הייבוא נכשל' },
+      }));
+    } finally {
+      clearRunning(RUNNING_IMPORT_KEY);
+    }
+  })();
+}
+
+// Kick the two rehydration paths in a microtask. Don't block module
+// import on them — if the network is slow, the consumer sees 'running'
+// first and the poll updates state asynchronously.
+Promise.resolve().then(() => {
+  const persistedScan = readRunning(RUNNING_SCAN_KEY);
+  if (persistedScan?.jobId && state.status !== 'running') {
+    resumeScanJob(persistedScan);
+  }
+  const persistedImport = readRunning(RUNNING_IMPORT_KEY);
+  if (persistedImport?.jobId) {
+    resumeImportJob(persistedImport);
+  }
+});
