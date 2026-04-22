@@ -184,18 +184,28 @@ jobs:
           REMOTE
 
       - name: Smoke test
-        # Routed through SSH to the EC2 because Cloudflare blocks GitHub
-        # Actions egress IPs as suspicious, producing HTTP 000 from the
-        # runner on every probe. The EC2 has a direct path to the
-        # origin (127.0.0.1 → nginx) and to the public name via CF.
+        # Runs on the EC2 host against the local nginx container directly
+        # (127.0.0.1 via the docker-published port). Going through
+        # Cloudflare here is fragile — CF sometimes serves a Bot Fight
+        # JS challenge to origin-local IPs, which makes the curl return
+        # an HTML blob that grep'ing for '"ok":true' misses and fails
+        # the probe even though the app is healthy. Loopback → nginx →
+        # backend is what we actually want to verify post-rollout, and
+        # has zero CF flakes.
         run: |
           ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" 'bash -s' <<'REMOTE'
           set -u
+          # The frontend nginx container binds to 127.0.0.1:3001 (per the
+          # FRONTEND_BIND_ADDR/FRONTEND_PORT defaults in docker-compose.yml).
+          FRONT_BASE="http://127.0.0.1:3001"
+          # The backend also listens on 127.0.0.1:6002, but every public path
+          # goes through the frontend's nginx which proxies /api/* to it —
+          # so hitting the frontend base exercises the full real chain.
           PASS=0
           for i in 1 2 3 4 5 6; do
-            HEALTH=$(curl -s --max-time 5 https://estia.co.il/api/health || true)
-            ROOT=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" https://estia.co.il/ || true)
-            AUTH=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" https://estia.co.il/api/me || true)
+            HEALTH=$(curl -s --max-time 5 -H "Host: estia.co.il" "$FRONT_BASE/api/health" || true)
+            ROOT=$(curl -s --max-time 5 -H "Host: estia.co.il" -o /dev/null -w "%{http_code}" "$FRONT_BASE/" || true)
+            AUTH=$(curl -s --max-time 5 -H "Host: estia.co.il" -o /dev/null -w "%{http_code}" "$FRONT_BASE/api/me" || true)
             echo "attempt $i: /api/health=$HEALTH  /=$ROOT  /api/me=$AUTH"
             if echo "$HEALTH" | grep -q '"ok":true' && [ "$ROOT" = "200" ] && [ "$AUTH" = "401" ]; then
               PASS=1
