@@ -128,7 +128,7 @@ export default function MobileTabBar() {
               <span className="mtb-add-arrow">›</span>
             </button>
 
-            <button className="mtb-add-row" onClick={go('/')}>
+            <button className="mtb-add-row" onClick={go('/dashboard')}>
               <span className="mtb-add-icon dash"><LayoutDashboard size={18} /></span>
               <span className="mtb-add-text">
                 <strong>{t('mobileAddSheet.dashboard')}</strong>
