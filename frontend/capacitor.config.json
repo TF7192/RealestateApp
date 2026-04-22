@@ -5,7 +5,7 @@
   "bundledWebRuntime": false,
   "loggingBehavior": "debug",
   "ios": {
-    "contentInset": "never",
+    "contentInset": "automatic",
     "preferredContentMode": "mobile",
     "limitsNavigationsToAppBoundDomains": false,
     "scheme": "Estia",
@@ -51,7 +51,7 @@
       "overlaysWebView": false
     },
     "Keyboard": {
-      "resize": "body",
+      "resize": "native",
       "resizeOnFullScreen": true,
       "style": "DEFAULT"
     },
