@@ -10,7 +10,17 @@ const dealInput = z.object({
   city: z.string().min(1).max(80),
   assetClass: z.enum(['RESIDENTIAL', 'COMMERCIAL']),
   category: z.enum(['SALE', 'RENT']),
-  status: z.enum(['NEGOTIATING', 'WAITING_MORTGAGE', 'PENDING_CONTRACT', 'SIGNED', 'FELL_THROUGH']).optional(),
+  // E-1 — CLOSED + CANCELLED added per the Discovery spec; existing
+  // granular stages stay for back-compat.
+  status: z.enum([
+    'NEGOTIATING',
+    'WAITING_MORTGAGE',
+    'PENDING_CONTRACT',
+    'SIGNED',
+    'FELL_THROUGH',
+    'CLOSED',
+    'CANCELLED',
+  ]).optional(),
   marketingPrice: z.number().int().nonnegative(),
   offer: z.number().int().nonnegative().nullable().optional(),
   closedPrice: z.number().int().nonnegative().nullable().optional(),
@@ -19,6 +29,10 @@ const dealInput = z.object({
   sellerAgent: z.string().max(120).nullable().optional(),
   lawyer: z.string().max(120).nullable().optional(),
   signedAt: z.string().nullable().optional(),
+  // E-1 — structured parties + target close date.
+  buyerId: z.string().nullable().optional(),
+  sellerId: z.string().nullable().optional(),
+  closeDate: z.string().nullable().optional(),
 });
 
 export const registerDealRoutes: FastifyPluginAsync = async (app) => {
@@ -28,16 +42,44 @@ export const registerDealRoutes: FastifyPluginAsync = async (app) => {
     if (q.status) where.status = q.status;
     if (q.assetClass) where.assetClass = q.assetClass;
     if (q.category) where.category = q.category;
+    // E-1 — return lightweight buyer/seller slices so the list view can
+    // render counterparties without a second round-trip. Falls back to
+    // the legacy free-text `buyerAgent` / `sellerAgent` columns.
     const items = await prisma.deal.findMany({
       where,
       orderBy: { updateDate: 'desc' },
+      include: {
+        buyer: { select: { id: true, name: true, phone: true } },
+        seller: { select: { id: true, name: true, phone: true } },
+      },
     });
     return { items };
   });
 
-  app.post('/', { onRequest: [app.requireAgent] }, async (req) => {
+  app.post('/', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const body = dealInput.parse(req.body);
     const uid = requireUser(req).id;
+    // E-1 — agent-scoped FK validation: a buyer must be one of my
+    // leads, a seller must be one of my owners, a property must be
+    // one of mine. Prevents cross-agent data binding.
+    if (body.buyerId) {
+      const l = await prisma.lead.findUnique({ where: { id: body.buyerId } });
+      if (!l || l.agentId !== uid) {
+        return reply.code(400).send({ error: { message: 'ליד לא נמצא' } });
+      }
+    }
+    if (body.sellerId) {
+      const o = await prisma.owner.findUnique({ where: { id: body.sellerId } });
+      if (!o || o.agentId !== uid) {
+        return reply.code(400).send({ error: { message: 'בעלים לא נמצא' } });
+      }
+    }
+    if (body.propertyId) {
+      const p = await prisma.property.findUnique({ where: { id: body.propertyId } });
+      if (!p || p.agentId !== uid) {
+        return reply.code(400).send({ error: { message: 'נכס לא נמצא' } });
+      }
+    }
     const deal = await prisma.deal.create({
       data: { agentId: uid, ...normalize(body) },
     });
@@ -84,5 +126,6 @@ export const registerDealRoutes: FastifyPluginAsync = async (app) => {
 function normalize(body: Partial<z.infer<typeof dealInput>>) {
   const data: any = { ...body };
   if (data.signedAt) data.signedAt = new Date(data.signedAt);
+  if (data.closeDate) data.closeDate = new Date(data.closeDate);
   return data;
 }
