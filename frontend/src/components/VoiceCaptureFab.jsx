@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Mic, Square } from 'lucide-react';
-import api from '../lib/api';
 import { useToast } from '../lib/toast';
 import useMediaRecorder from '../hooks/useMediaRecorder';
-import VoiceReviewDialog from './VoiceReviewDialog';
+import ConfirmDialog from './ConfirmDialog';
 import './VoiceCaptureFab.css';
+
+// Voice-to-lead is a premium feature. Until billing wiring lands, we
+// gate the AI-extraction step behind a "contact support" dialog. The
+// recording itself still runs so the agent gets the same affordance —
+// we only intercept the upload, replacing it with the upgrade prompt.
+const SUPPORT_EMAIL = 'support@estia.app';
+const PREMIUM_SUBJECT = 'הפעלת פיצ׳ר הקלטה קולית — Estia';
+const PREMIUM_BODY =
+  'היי, אני רוצה להפעיל את פיצ׳ר הקלטת הליד הקולי בחשבון שלי.';
 
 // H3 — voice-to-lead FAB.
 //
@@ -41,14 +49,10 @@ function formatMMSS(ms) {
 
 export default function VoiceCaptureFab() {
   const location = useLocation();
-  const navigate = useNavigate();
   const toast = useToast();
   const { state, blob, error, durationMs, start, stop, reset } = useMediaRecorder();
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [kind, setKind] = useState('LEAD');
+  const [premiumOpen, setPremiumOpen] = useState(false);
 
   // Surface permission / capture failures as toasts. Errors from the
   // hook come back as { code, message } — we already localise them.
@@ -57,45 +61,15 @@ export default function VoiceCaptureFab() {
     toast.error(error.message || 'שגיאת הקלטה');
   }, [error, toast]);
 
-  // After a successful stop(), blob arrives asynchronously. Kick off
-  // the upload + open the review dialog in one flow. We key the effect
-  // only on `blob` so the async upload body runs exactly once per
-  // recording — including `uploading` in the deps would re-fire the
-  // effect when we flip it, creating a double-upload loop.
+  // Premium gate: when the recording finishes (blob arrives), instead
+  // of uploading to the AI extraction endpoint, surface the
+  // "פיצ׳ר פרימיום" upgrade dialog. Reset the recorder so a future tap
+  // starts cleanly.
   useEffect(() => {
     if (!blob) return;
-    let cancelled = false;
-    (async () => {
-      setUploading(true);
-      setDialogOpen(true);
-      try {
-        const res = await api.voiceLead(blob, kind);
-        if (!cancelled) setResult(res);
-      } catch (e) {
-        if (cancelled) return;
-        // 422 → LLM couldn't produce JSON; dialog still renders so the
-        // agent at least keeps the transcript. Other errors close the
-        // dialog and surface a toast.
-        if (e?.status === 422 && e?.data) {
-          setResult({
-            transcript: e.data?.transcript || '',
-            extracted: {},
-            mode: 'draft',
-            traceId: e.data?.traceId || null,
-          });
-        } else {
-          toast.error(e?.message || 'העלאת ההקלטה נכשלה');
-          setDialogOpen(false);
-        }
-      } finally {
-        if (!cancelled) {
-          setUploading(false);
-          reset();
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-    // `kind` / `toast` / `reset` captured at start; intentional narrow deps.
+    setPremiumOpen(true);
+    reset();
+    // `reset` is a stable callback from the hook — no need to depend on it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blob]);
 
@@ -124,18 +98,16 @@ export default function VoiceCaptureFab() {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClick]);
 
-  const handleCreated = useCallback((entity) => {
-    setDialogOpen(false);
-    setResult(null);
-    if (!entity?.id) return;
-    if (kind === 'LEAD') navigate(`/customers/${entity.id}`);
-    else navigate(`/properties/${entity.id}`);
-  }, [kind, navigate]);
+  const handleContactSupport = useCallback(() => {
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(PREMIUM_SUBJECT)}&body=${encodeURIComponent(PREMIUM_BODY)}`;
+    try { window.location.href = url; } catch { /* ignore */ }
+    setPremiumOpen(false);
+  }, []);
 
   if (shouldHideOn(location.pathname)) return null;
 
   const recording = state === 'recording';
-  const busy = state === 'requesting' || state === 'stopping' || uploading;
+  const busy = state === 'requesting' || state === 'stopping';
   const label = recording ? 'עצור הקלטה' : 'הקלטת ליד';
 
   return (
@@ -159,14 +131,17 @@ export default function VoiceCaptureFab() {
         )}
       </button>
 
-      {dialogOpen && (
-        <VoiceReviewDialog
-          kind={kind}
-          onKindChange={setKind}
-          loading={uploading}
-          result={result}
-          onClose={() => { setDialogOpen(false); setResult(null); }}
-          onCreated={handleCreated}
+      {premiumOpen && (
+        <ConfirmDialog
+          title="פיצ׳ר פרימיום"
+          message={
+            'הקלטת ליד קולית והפקת פרטי הליד באמצעות AI זמינה במסלולי פרימיום בלבד. ' +
+            'נשמח להפעיל את זה עבורך — צור/י קשר עם התמיכה ונחבר אותך מיד.'
+          }
+          confirmLabel="צור קשר עם התמיכה"
+          cancelLabel="סגור"
+          onConfirm={handleContactSupport}
+          onClose={() => setPremiumOpen(false)}
         />
       )}
     </>
