@@ -424,6 +424,12 @@ export default function NewLead() {
                 placeholder={t('new.fields.cityPlaceholder')}
                 label={t('new.fields.cityLabel')}
                 inputProps={{ ...inputPropsForCity(), autoComplete: 'off' }}
+                asyncFetch={async (q) => {
+                  const res = await api.geoSearch({ q, limit: 20 });
+                  return (res?.items || [])
+                    .map((r) => r.city || r.label)
+                    .filter(Boolean);
+                }}
               />
             </div>
             <div className="form-group">
@@ -435,6 +441,12 @@ export default function NewLead() {
                 placeholder={t('new.fields.streetPlaceholder')}
                 label={t('new.fields.streetLabel')}
                 inputProps={{ ...inputPropsForAddress(), autoComplete: 'off' }}
+                asyncFetch={async (q) => {
+                  const res = await api.geoSearch({ q, city: form.city, limit: 20 });
+                  return (res?.items || [])
+                    .map((r) => r.street || r.label)
+                    .filter(Boolean);
+                }}
               />
             </div>
           </div>

@@ -43,7 +43,10 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | O-7 | Phone normalization across owner surfaces | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | formatPhone on Owners.jsx, OwnerPicker, OwnerDetail |
 | O-8 | OwnerPhonesPanel delete refetch | Sub-5 | 🟢 | — | ✅ | ✅ (reviewed) | pending | confirmed existing await load() already refetches |
 | O-9 | שלח בוואטסאפ target=_blank | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | desktop toolbar + sticky bar both converted to <a target=_blank> |
-| O-1, O-2, O-4, O-5, O-6, O-10 | Owner form focus / card unification / region autocomplete / bulk actions / universal card | Sub-5 | ❓ | — | — | — | — | deferred — needs product review on expandable single-card flow; O-1 focus-loss not reproducible in current OwnerEditDialog (all SmartFields are module-scope) |
+| O-1 | New-owner form focus loss | Main | ❓ | — | — | — | — | not reproducible in current OwnerEditDialog (all SmartFields module-scope); close unless product can repro |
+| O-2, O-4, O-10 | Owner card unified expandable flow | — | ❓ | — | — | — | — | UX redesign — needs product sign-off before implementation |
+| O-5 | Owner region autocomplete cached | — | ❓ | — | — | — | — | n/a — no `אזור`/region field exists in current OwnerEditDialog; flagged for product clarification |
+| O-6 | Owner bulk toolbar (delete/tag/export/reassign) | — | ❓ | — | — | — | — | sizable port from properties; deferred to follow-up engagement |
 | L-2 | Customers buttons missing type=button | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | added type="button" to all 17 bare <button> entries |
 | L-3 | Seriousness chip focus steal | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | same fix as L-2 + MobilePickers close/cancel buttons |
 | L-4 | Duplicate firstName/lastName | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | removed k1-first / k1-last inputs |
@@ -53,7 +56,11 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | L-11 | Meeting notes font/RTL | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | dir=rtl + font-body on textarea + CSS override |
 | L-13 | Lead edit "invalid data" | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | email regex guard + Math.round on budget; CustomerEditDialog + CustomerDetail |
 | L-A | Advanced filter port | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | shared <AdvancedFilters> inline on Customers.jsx with lead-specific extras |
-| L-1, L-5, L-6, L-7, L-12 | Street autocomplete / card layout / WA button / card-click / inline-edit → edit button | Sub-5 | ❓ | — | — | — | — | deferred — structural layout changes; L-1 server-side cache already in place for /api/geo/search (N-17) |
+| L-1 | City/street autocomplete cached | Main | 🟢 | — | ✅ | ✅ (manual) | pending | `SuggestPicker.asyncFetch` via `api.geoSearch` (hits N-17 server cache); wired on NewLead city + street |
+| L-5 | Lead card layout polish | — | ❓ | — | — | — | — | deferred — UX polish requires visual review |
+| L-6 | WhatsApp button standardization | Main | 🟢 | — | ✅ | ✅ (manual) | pending | all WA buttons carry `.wa-green`; handleWhatsApp opens with noopener,noreferrer |
+| L-7 | Whole lead card clickable | Main | 🟢 | — | ✅ | ✅ (manual) | pending | onClick on cc-v2 root with nested-interactive guard + keyboard handler |
+| L-12 | Inline edit → edit button | — | ❓ | — | — | — | — | deferred — rework `DescriptionInline`/`InlineText` → modal is a sizable refactor |
 | E-1 | צור עסקה button + Deal model | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit + integration spec + E2E spec) | pending | Additive Prisma migration (buyerId/sellerId/closeDate + CLOSED/CANCELLED); runMutation save; creation dialog with Lead/Owner/Property pickers |
 | E-2 | Chip label order (count first) | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit + E2E spec) | pending | `<span>{count}</span>{label}` |
 | E-3 | Deals table view | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | ViewToggle + DataTable; `useViewMode('deals')` persistence |

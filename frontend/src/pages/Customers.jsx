@@ -386,7 +386,14 @@ export default function Customers() {
   const handleWhatsApp = (lead) => {
     primeContactBump(lead.id);
     haptics.tap();
-    window.open(waUrl(lead.phone, t('list.card.whatsappHello', { name: lead.name })), '_blank');
+    // L-6 — open with noopener+noreferrer set so Capacitor's WebView
+    // keeps the Estia session intact when wa.me opens in a new surface.
+    // `noreferrer` implies `noopener` but set explicitly for clarity.
+    window.open(
+      waUrl(lead.phone, t('list.card.whatsappHello', { name: lead.name })),
+      '_blank',
+      'noopener,noreferrer',
+    );
   };
 
   const handleTel = (lead) => {
@@ -1226,7 +1233,7 @@ export default function Customers() {
                             aria-label={t('list.card.whatsappTo', { name: lead.name })}
                             title={t('list.card.whatsappTo', { name: lead.name })}
                           >
-                            <WhatsAppIcon size={24} />
+                            <WhatsAppIcon size={24} className="wa-green" />
                             <span className="ccm-rail-label">{t('list.card.whatsapp')}</span>
                           </a>
                           <a
@@ -1274,6 +1281,24 @@ export default function Customers() {
               key={lead.id}
               ref={(el) => { if (el) cardRefs.current[lead.id] = el; }}
               className={`customer-card cc-v2 ${highlightId === lead.id ? 'highlight' : ''}`}
+              role="link"
+              tabIndex={0}
+              onClick={(e) => {
+                // L-7 — whole card is clickable EXCEPT over nested
+                // interactive children (name-link, pickers, stars,
+                // buttons, selects). If the click started on one of
+                // those the child's handler already ran; bail so we
+                // don't double-fire a navigation on top of it.
+                if (e.target.closest('button, a, [role="button"], input, select, label')) return;
+                navigate(`/customers/${lead.id}`);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  if (e.target !== e.currentTarget) return;
+                  e.preventDefault();
+                  navigate(`/customers/${lead.id}`);
+                }
+              }}
             >
               <div className="cc-v2-grid">
                 <div className="cc-v2-left">
@@ -1406,7 +1431,7 @@ export default function Customers() {
                     aria-label={t('list.card.whatsappTo', { name: lead.name })}
                     onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
                   >
-                    <WhatsAppIcon size={14} />
+                    <WhatsAppIcon size={14} className="wa-green" />
                     <span>{t('list.card.whatsapp')}</span>
                   </a>
                   <a

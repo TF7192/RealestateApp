@@ -139,9 +139,16 @@ export function SuggestPicker({
   label,
   inputProps = {},
   maxVisible = 60,
+  // L-1 / O-5 — optional async fetcher. When provided, the sheet search
+  // queries the server (backed by the N-17 LRU+TTL cache on
+  // /api/geo/search) instead of filtering the `options` list client-side.
+  // Debounced 200ms so keystrokes don't thrash the backend.
+  asyncFetch,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [remote, setRemote] = useState([]);
+  const [remoteLoading, setRemoteLoading] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -153,10 +160,28 @@ export function SuggestPicker({
     return undefined;
   }, [open]);
 
+  // Debounced server lookup when asyncFetch is wired.
+  useEffect(() => {
+    if (!asyncFetch || !open) return undefined;
+    const q = (query || '').trim();
+    if (!q) { setRemote([]); return undefined; }
+    setRemoteLoading(true);
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await asyncFetch(q);
+        if (!cancelled) setRemote(Array.isArray(res) ? res : []);
+      } catch { if (!cancelled) setRemote([]); }
+      finally { if (!cancelled) setRemoteLoading(false); }
+    }, 200);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [asyncFetch, open, query]);
+
   const q = (query || value || '').trim();
-  const filtered = q
+  const localFiltered = q
     ? options.filter((o) => o.includes(q)).slice(0, maxVisible)
     : options.slice(0, maxVisible);
+  const filtered = asyncFetch ? remote.slice(0, maxVisible) : localFiltered;
 
   return (
     <>
@@ -232,8 +257,11 @@ export function SuggestPicker({
                     {opt === value && <Check size={14} />}
                   </button>
                 ))}
-                {filtered.length === 0 && (
+                {filtered.length === 0 && !remoteLoading && (
                   <div className="mpk-empty">לא נמצאו תוצאות.</div>
+                )}
+                {asyncFetch && remoteLoading && (
+                  <div className="mpk-empty">טוען…</div>
                 )}
               </div>
             </div>
