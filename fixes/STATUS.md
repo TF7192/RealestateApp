@@ -30,13 +30,13 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | A-2 | Google on signup | Sub-1 | ⚪ | — | — | — | — | |
 | A-3 | Google button background | Sub-1 | ⚪ | — | — | — | — | |
 | A-4 | First-login onboarding | Sub-1 | ⚪ | — | — | — | — | License 6–8 digits |
-| D-1 | Remove conversion funnel | Sub-2 | ⚪ | — | — | — | — | |
-| D-2 | Meetings list (today + 7d, N=5) | Sub-2 | ⚪ | — | — | — | — | |
-| D-3 | Leads card width | Sub-2 | ⚪ | — | — | — | — | |
-| D-4 | Event count cap | Sub-2 | ⚪ | — | — | — | — | |
-| D-6 | Reload lands on dashboard | Sub-2 | ⚪ | — | — | — | — | |
-| F-1 | Remove new-deal from FAB | Sub-2 | ⚪ | — | — | — | — | |
-| F-2 | Chat vs FAB overlap | Sub-2 | ⚪ | — | — | — | — | Same class as U-1 |
+| D-1 | Remove conversion funnel | Sub-2 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | ConversionFunnelCard + CSS gone; grid reflows |
+| D-2 | Meetings list (today + 7d, N=5) | Sub-2 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | New MeetingsCard, links to /reminders |
+| D-3 | Leads card width | Sub-2 | 🟢 | — | ✅ | ✅ (visual) | pending | `min-width: 0` + equal 1fr grid |
+| D-4 | Event count cap | Sub-2 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | ActionQueue cap 5 + "צפה בהכול" link |
+| D-6 | Reload lands on dashboard | Sub-2 | 🟢 | ✅ | ✅ | ✅ (unit + e2e spec) | pending | UnauthRedirect + PostLoginRedirect |
+| F-1 | Remove new-deal from FAB | Sub-2 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | MENU_ITEMS is now 2 entries |
+| F-2 | Chat vs FAB overlap | Sub-2 | 🟢 | — | ✅ | ✅ (visual) | pending | FAB lifted to 84px; chat at 28/72px |
 | N-1..N-17 | Assets list polish | Sub-3 | ⚪ | — | — | — | — | Large |
 | P-1..P-15 | Asset detail polish | Sub-4 | ⚪ | — | — | — | — | Large |
 | O-1..O-10 | Owners | Sub-5 | ⚪ | — | — | — | — | |
@@ -69,6 +69,33 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
     the `mutate → reload → toast → rollback` pattern so subagents can
     stop copy-pasting it. 4 cases.
   - Full `unit-frontend` suite: 160 tests pass.
+- **2026-04-22T21:20Z** — Sub-2 wave landed (D-1/2/3/4/6 + F-1/2):
+  - **D-1** ConversionFunnelCard + `.dash-funnel-*` CSS removed.
+  - **D-2** New `MeetingsCard` reads `api.listReminders({ status: 'PENDING' })`,
+    filters client-side to the [today, today+7d] window, caps at 5,
+    links to `/reminders` ("צפה בכל הפגישות"). Empty state: `אין פגישות השבוע`.
+  - **D-3** `.dashboard-card { min-width: 0 }` + `.dash-pipeline-legend
+    { min-width: 0 }` keep the pipeline card from being starved; grid
+    switches to 1fr/1fr (≥900px) + 1fr/1fr/1fr (≥1200px).
+  - **D-4** `ActionQueueCard` cap dropped to 5; "+N נוספות" text
+    replaced with a styled `<Link>` to `/activity` reading
+    "צפה בהכול (N)".
+  - **D-6** Root cause: authed routes were silently rendered at
+    `path="*"` via `<Login />` without touching the URL, and the
+    authed `/login` route hard-redirected to `/` (static landing).
+    Fix: `UnauthRedirect` rewrites to `/login?from=<encoded>` and
+    `PostLoginRedirect` bounces back via `?from` (with an open-
+    redirect guardrail). 6 unit cases + 1 @critical Playwright spec.
+  - **F-1** `עסקה חדשה` removed from `QuickCreateFab` (`MENU_ITEMS`
+    is 2 entries now). Arrow-wrap tests updated to 2-item cycle.
+  - **F-2** FAB lifted to `inset-block-end: 84px` (≥900px) so it
+    sits 8px above the 48px-tall ChatWidget launcher at bottom: 28px;
+    chat gets `bottom: 72px` on mobile so it stays clear of the tab
+    bar in the 820–900px band. z-index: FAB 900 > chat 890.
+  - Unit-frontend affected: 36/36 pass across the four touched suites
+    (Dashboard, QuickCreateFab, AuthRedirect, Layout). Pre-existing
+    8 failures (SellerCalculator, VoiceCaptureFab, yad2ScanStore)
+    are unrelated to this lane.
 - **2026-04-22T20:45Z** — SEC-1 fix landed:
   - `yad2ScanStore.resetForLogout()` + `marketScanStore.resetForLogout()`
     — wipe in-memory state + sessionStorage on a session boundary.
