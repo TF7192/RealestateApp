@@ -92,6 +92,25 @@ describe('<Dashboard>', () => {
     });
   });
 
+  it('D-1 — the משפך המרה (conversion funnel) card is no longer rendered', async () => {
+    server.use(
+      http.get('/api/properties', () =>
+        HttpResponse.json({ items: [{ id: 'p1', street: 'הרצל', city: 'תא', marketingActions: { mkt1: true } }] })
+      ),
+      http.get('/api/leads', () =>
+        HttpResponse.json({ items: [{ id: 'l1', name: 'דן', status: 'HOT' }] })
+      ),
+    );
+    render(<Dashboard />);
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /שלום/ })).toBeInTheDocument()
+    );
+    // Card used to render <h3>משפך המרה</h3> — assert it's gone.
+    expect(screen.queryByRole('heading', { name: 'משפך המרה' })).not.toBeInTheDocument();
+    // Card had a signature "עסקאות חתומות" row — assert that's gone too.
+    expect(screen.queryByText('עסקאות חתומות')).not.toBeInTheDocument();
+  });
+
   it('B2 — a failing sub-call degrades gracefully (KPI total still renders)', async () => {
     server.use(
       http.get('/api/reports/new-properties', () =>

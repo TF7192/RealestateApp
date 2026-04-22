@@ -259,6 +259,11 @@
 .dashboard-card {
   padding: 0;
   overflow: hidden;
+  /* D-3 — default grid items have min-width: auto (= content width),
+     which let long labels inside a card force the column wider and
+     shove neighboring content. Clamping to 0 lets the two-column grid
+     split evenly and the inner content wrap / ellipsis as designed. */
+  min-width: 0;
 }
 
 .dashboard-card:last-child {
@@ -791,7 +796,12 @@
   to   { background-position: -200% 0; }
 }
 
-/* ── Rich dashboard grid (replaces marketing-progress + hot-leads) ── */
+/* ── Rich dashboard grid (replaces marketing-progress + hot-leads) ──
+   D-1: ConversionFunnelCard removed; grid now holds two cards.
+   D-3: the 1200px+ rule used 1.2fr 1fr 1fr which starved
+   the pipeline card (status labels "חמים/פושרים/קרים" wrapped). With
+   two cards we can give each side an equal 1fr 1fr split, and the
+   legend rows get `min-width: 0` so flex kids don't overflow. */
 .dashboard-grid-rich {
   display: grid;
   gap: 16px;
@@ -801,13 +811,6 @@
   .dashboard-grid-rich {
     grid-template-columns: 1fr 1fr;
   }
-  .dashboard-grid-rich .dash-pipeline { grid-column: 1 / -1; }
-}
-@media (min-width: 1200px) {
-  .dashboard-grid-rich {
-    grid-template-columns: 1.2fr 1fr 1fr;
-  }
-  .dashboard-grid-rich .dash-pipeline { grid-column: auto; }
 }
 
 /* Pipeline Health */
@@ -851,6 +854,9 @@
   flex-wrap: wrap;
   gap: 10px 18px;
   margin-bottom: 12px;
+  /* D-3 — let the legend shrink below its intrinsic width so the
+     three color chips wrap cleanly instead of pushing the card sideways. */
+  min-width: 0;
 }
 .dpl-item {
   display: inline-flex;
@@ -859,6 +865,8 @@
   font-size: 13px;
   color: var(--text-secondary, #54503e);
   text-decoration: none;
+  /* D-3 — same min-width guard for each legend chip. */
+  min-width: 0;
 }
 .dpl-item strong {
   color: var(--text-primary, #1e1a14);
@@ -946,63 +954,4 @@
   text-align: center;
 }
 
-/* Conversion Funnel */
-.dash-funnel-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.dash-funnel-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-decoration: none;
-  padding: 4px 2px;
-  border-radius: 6px;
-  transition: background 0.1s ease;
-}
-.dash-funnel-row:hover { background: var(--bg-secondary, rgba(30,26,20,0.04)); }
-.dash-funnel-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-.dash-funnel-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary, #54503e);
-}
-.dash-funnel-count {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.dash-funnel-count strong {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--text-primary, #1e1a14);
-  font-variant-numeric: tabular-nums;
-}
-.dash-funnel-conv {
-  font-size: 11px;
-  font-weight: 700;
-  font-style: normal;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-variant-numeric: tabular-nums;
-}
-.dash-funnel-conv.good { background: rgba(21,128,61,0.12); color: #15803d; }
-.dash-funnel-conv.mid  { background: rgba(180,139,76,0.16); color: #7a5c2c; }
-.dash-funnel-conv.low  { background: rgba(185,28,28,0.10); color: #b91c1c; }
-.dash-funnel-bar {
-  height: 8px;
-  background: var(--bg-secondary, rgba(30,26,20,0.06));
-  border-radius: 999px;
-  overflow: hidden;
-}
-.dash-funnel-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #d3b27a, #8a6932);
-  border-radius: 999px;
-  transition: width 0.4s ease;
-}
+/* D-1 — Conversion Funnel CSS removed alongside its component. */

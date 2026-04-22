@@ -307,11 +307,12 @@ export default function Dashboard() {
             properties={properties}
             staleThresholdDays={staleThresholdDays}
           />
-          <ConversionFunnelCard
-            leads={leads}
-            properties={properties}
-            dealStats={dealStats}
-          />
+          {/* D-1 — משפך המרה card removed. The conversion numbers it
+              showed (leads → hot → active → signed) repeated data
+              already surfaced across the KPI scroller above, and the
+              funnel's "signed deals" row was misleading for agents
+              still closing their first deal. Card + its CSS deleted
+              together so the grid reflows cleanly to two cards. */}
         </div>
       )}
       </div>
@@ -746,45 +747,8 @@ function ActionQueueCard({ leads = [], properties = [], staleThresholdDays = 30 
   );
 }
 
-// ── Conversion Funnel ────────────────────────────────────────────
-// Three-step funnel: Leads → Hot leads → Signed deals. Visualizes
-// drop-off ratios so the agent sees where the pipeline is leaking.
-// Counts come from in-memory data already loaded.
-function ConversionFunnelCard({ leads = [], properties = [], dealStats = {} }) {
-  const steps = [
-    { key: 'leads', label: 'לידים', count: leads.length, to: '/customers' },
-    { key: 'hot',   label: 'חמים',  count: leads.filter((l) => l.status === 'HOT').length, to: '/customers?filter=hot' },
-    { key: 'props', label: 'נכסים פעילים', count: properties.length, to: '/properties' },
-    { key: 'deals', label: 'עסקאות חתומות', count: dealStats.signed || 0, to: '/deals?tab=signed' },
-  ];
-  const max = Math.max(1, ...steps.map((s) => s.count));
-  return (
-    <div className="card dashboard-card dash-funnel animate-in animate-in-delay-5">
-      <div className="card-header">
-        <h3>משפך המרה</h3>
-        <span className="badge">המרה {leads.length ? Math.round(((dealStats.signed || 0) / leads.length) * 100) : 0}%</span>
-      </div>
-      <div className="dash-funnel-list">
-        {steps.map((s, i) => {
-          const pct = (s.count / max) * 100;
-          const prev = i > 0 ? steps[i - 1].count : null;
-          const conv = prev ? Math.round((s.count / prev) * 100) : null;
-          return (
-            <Link key={s.key} to={s.to} className="dash-funnel-row" onClick={() => haptics.tap()}>
-              <div className="dash-funnel-meta">
-                <span className="dash-funnel-label">{s.label}</span>
-                <span className="dash-funnel-count">
-                  <strong>{s.count}</strong>
-                  {conv != null && <em className={`dash-funnel-conv ${conv >= 30 ? 'good' : conv >= 10 ? 'mid' : 'low'}`}>{conv}%</em>}
-                </span>
-              </div>
-              <div className="dash-funnel-bar">
-                <div className="dash-funnel-bar-fill" style={{ width: `${pct}%` }} />
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+// D-1 — ConversionFunnelCard removed. Left this anchor for git-blame
+// readers: the component used to live here and drew a four-step
+// funnel (leads → hot → active → signed). The data duplicated the KPI
+// scroller and the "signed deals" row was demotivating for agents
+// still closing their first deal.
