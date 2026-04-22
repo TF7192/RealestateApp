@@ -54,10 +54,13 @@
 }
 
 /* On the wide layout the sidebar takes the inline-end side in RTL.
-   Push the FAB further in so it clears the sidebar rail. */
+   Push the FAB further in so it clears the sidebar rail.
+   F-2 — float the FAB ABOVE the ChatWidget launcher so the two don't
+   overlap. ChatWidget anchors at bottom: 28px and is 48px tall, so the
+   FAB needs 28 + 48 + 8 (gap) = 84px of clearance. */
 @media (min-width: 900px) {
   .qcfab-trigger {
-    inset-block-end: 28px;
+    inset-block-end: 84px;
     inset-inline-end: 28px;
   }
 }
@@ -94,7 +97,9 @@
 
 @media (min-width: 900px) {
   .qcfab-menu {
-    inset-block-end: calc(28px + 64px);
+    /* F-2 — match the trigger's new higher anchor (84px) plus the 64px
+       lift so the popover still sits just above the button. */
+    inset-block-end: calc(84px + 64px);
     inset-inline-end: 28px;
   }
 }
