@@ -44,6 +44,7 @@ import ViewToggle from '../components/ViewToggle';
 import DataTable from '../components/DataTable';
 import Pagination from '../components/Pagination';
 import { paginate } from '../lib/pagination';
+import useInfiniteScroll from '../lib/useInfiniteScroll';
 import { useViewMode } from '../lib/useViewMode';
 import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
@@ -337,10 +338,13 @@ export default function Customers() {
     });
   }, [leads, lookingForFilter, interestFilter, statusFilter, inactiveFilter, debouncedSearch, onlyFavorites, favoriteIds]);
 
-  // Client-side pagination at 8/page. Reset when filters / search change.
+  // Table view keeps the numbered pager; card/dense view uses infinite
+  // scroll. Both reset when filters change.
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [lookingForFilter, interestFilter, statusFilter, inactiveFilter, debouncedSearch, onlyFavorites]);
   const paged = useMemo(() => paginate(filtered, { page, pageSize: 8 }), [filtered, page]);
+  const infinite = useInfiniteScroll(filtered.length, { pageSize: 8, initial: 8 });
+  const cardVisible = useMemo(() => filtered.slice(0, infinite.visible), [filtered, infinite.visible]);
 
   const handleWhatsApp = (lead) => {
     primeContactBump(lead.id);
@@ -742,6 +746,7 @@ export default function Customers() {
           onBumpLastContact={(lead) => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: t('list.patchSuccess.lastContactUpdated') })}
         />
       ) : (viewMode === 'table' && !isMobile) ? (
+        <>
         <DataTable
           ariaLabel="טבלת לקוחות"
           rows={paged.slice}
@@ -811,9 +816,15 @@ export default function Customers() {
             },
           ]}
         />
+        {/* Table-view pager — card grid below uses an infinite-scroll
+            sentinel instead of numbered pages. */}
+        {paged.needsPager && (
+          <Pagination page={paged.page} pageCount={paged.pageCount} onPage={setPage} />
+        )}
+        </>
       ) : (
       <div className="customers-grid animate-in animate-in-delay-3">
-        {paged.slice.map((lead) => {
+        {cardVisible.map((lead) => {
           const expanded = expandedId === lead.id;
 
           // ── Mobile: collapsed dense row + swipe actions + tap to expand ──
@@ -1313,8 +1324,9 @@ export default function Customers() {
             </Link>
           </div>
         )}
-        {paged.needsPager && (
-          <Pagination page={paged.page} pageCount={paged.pageCount} onPage={setPage} />
+        {/* Infinite-scroll sentinel for the card grid. */}
+        {infinite.hasMore && (
+          <div ref={infinite.sentinelRef} className="infinite-sentinel" aria-hidden="true" />
         )}
       </div>
       )}

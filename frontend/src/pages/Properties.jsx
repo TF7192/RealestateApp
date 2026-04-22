@@ -65,6 +65,7 @@ import SavedSearchMenu from '../components/SavedSearchMenu';
 import AdvancedFilters from '../components/AdvancedFilters';
 import Pagination from '../components/Pagination';
 import { paginate } from '../lib/pagination';
+import useInfiniteScroll from '../lib/useInfiniteScroll';
 import './Properties.css';
 
 function formatPrice(price) {
@@ -524,12 +525,19 @@ export default function Properties() {
       });
   }, [items, filter, assetClassFilter, advFilters, debouncedSearch, locationCenter, locationRadius, unmarketedOnly, onlyFavorites, favoriteIds]);
 
-  // Client-side pagination — slice at 8/page once filters + sort are
-  // applied. Reset to page 1 whenever the filtered set changes so the
-  // agent doesn't end up stuck on page 5 of a now-2-page result.
+  // Split pagination by view mode (product call):
+  //   - Card grid → infinite scroll, 8 cards at a time. The agent's
+  //     eye flows naturally downward and autoload matches the "keep
+  //     browsing" motion.
+  //   - Table view → classic numbered pager, keeps row density under
+  //     control and makes "jump to page 3" easy for bulk ops.
+  // Both reset whenever the filter set changes so the agent isn't
+  // stuck mid-way through a stale result set.
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [filter, assetClassFilter, debouncedSearch, advFilters, locationCenter, locationRadius, unmarketedOnly, onlyFavorites]);
   const paged = useMemo(() => paginate(filtered, { page, pageSize: 8 }), [filtered, page]);
+  const infinite = useInfiniteScroll(filtered.length, { pageSize: 8, initial: 8 });
+  const cardVisible = useMemo(() => filtered.slice(0, infinite.visible), [filtered, infinite.visible]);
 
   const cities = [...new Set(items.map((p) => p.city))];
 
@@ -1101,7 +1109,7 @@ export default function Properties() {
         />
       ) : (
         <div className="properties-grid">
-          {paged.slice.map((prop, i) => {
+          {cardVisible.map((prop, i) => {
             // S-perf: the first card's image is the LCP on /properties.
             // Lighthouse flagged it as lazy + no fetchpriority; eager-load
             // the first one and let the rest stay lazy as before.
@@ -1479,14 +1487,20 @@ export default function Properties() {
               </div>
             );
           })}
+          {/* Infinite-scroll sentinel for the card grid. Attaches only
+              while more rows exist; the hook disconnects its observer
+              on its own when the list is fully revealed. */}
+          {infinite.hasMore && (
+            <div ref={infinite.sentinelRef} className="infinite-sentinel" aria-hidden="true" />
+          )}
         </div>
       )}
 
-      {/* Client-side pager — renders only when the filtered list has
-          more than 8 items (Pagination itself returns null if
-          pageCount <= 1). Sits between the grid/table and the empty-
-          state blocks so it never paints on an empty result. */}
-      {!loading && paged.needsPager && (
+      {/* Table view keeps the classic pager; the card grid above uses
+          the infinite-scroll sentinel instead. `Pagination` itself
+          returns null when pageCount <= 1 so we don't need a second
+          guard here. */}
+      {!loading && viewMode === 'table' && !isMobile && paged.needsPager && (
         <Pagination page={paged.page} pageCount={paged.pageCount} onPage={setPage} />
       )}
 

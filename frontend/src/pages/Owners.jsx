@@ -17,6 +17,7 @@ import { openWhatsApp } from '../native/share';
 import { relativeDate } from '../lib/relativeDate';
 import Pagination from '../components/Pagination';
 import { paginate } from '../lib/pagination';
+import useInfiniteScroll from '../lib/useInfiniteScroll';
 import haptics from '../lib/haptics';
 import ViewToggle from '../components/ViewToggle';
 import DataTable from '../components/DataTable';
@@ -106,10 +107,13 @@ export default function Owners() {
     );
   }, [owners, search]);
 
-  // Client-side pagination at 8/page. Reset when the search narrows.
+  // Table view → numbered pager; card/mobile list → infinite scroll.
+  // Both reset when the search narrows.
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [search]);
   const paged = useMemo(() => paginate(filtered, { page, pageSize: 8 }), [filtered, page]);
+  const infinite = useInfiniteScroll(filtered.length, { pageSize: 8, initial: 8 });
+  const cardVisible = useMemo(() => filtered.slice(0, infinite.visible), [filtered, infinite.visible]);
 
   const onSaved = async (saved) => {
     setEditing(null);
@@ -230,7 +234,7 @@ export default function Owners() {
           </div>
         ) : isMobile ? (
           <div className="owners-list animate-in animate-in-delay-2">
-            {paged.slice.map((o) => {
+            {cardVisible.map((o) => {
               const createdRel = o.createdAt ? relativeDate(o.createdAt) : null;
               const swipeActions = [
                 {
@@ -310,6 +314,9 @@ export default function Owners() {
                 </div>
               );
             })}
+            {infinite.hasMore && (
+              <div ref={infinite.sentinelRef} className="infinite-sentinel" aria-hidden="true" />
+            )}
           </div>
         ) : (viewMode === 'table' && !isMobile) ? (
           <DataTable
@@ -357,7 +364,7 @@ export default function Owners() {
           />
         ) : (
           <div className="owners-grid animate-in animate-in-delay-2">
-            {paged.slice.map((o) => {
+            {cardVisible.map((o) => {
               const previews = (o.properties || []).slice(0, 2);
               const createdRel = o.createdAt ? relativeDate(o.createdAt) : null;
               return (
@@ -412,13 +419,16 @@ export default function Owners() {
                 </Link>
               );
             })}
+            {/* Card/mobile list → infinite-scroll sentinel. Hook
+                disconnects itself once the full list is revealed. */}
+            {infinite.hasMore && (
+              <div ref={infinite.sentinelRef} className="infinite-sentinel" aria-hidden="true" />
+            )}
           </div>
         )}
 
-        {/* Pager — renders only when >8 items match. Sits between the
-            list/table and the mobile FAB so the "next" button is never
-            hidden under the FAB on small screens. */}
-        {paged.needsPager && (
+        {/* Table view keeps the numbered pager. */}
+        {viewMode === 'table' && !isMobile && paged.needsPager && (
           <Pagination page={paged.page} pageCount={paged.pageCount} onPage={setPage} />
         )}
 

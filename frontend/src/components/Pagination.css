@@ -61,3 +61,14 @@
   min-width: 24px;
   color: var(--text-muted);
 }
+
+/* Infinite-scroll sentinel. Owns 1px of height so the browser accepts
+ * it as a real scroll target, but is invisible so the agent sees a
+ * seamless grid. 200px rootMargin on the hook means the next batch
+ * preloads before the gap opens. */
+.infinite-sentinel {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 1px;
+  pointer-events: none;
+}
