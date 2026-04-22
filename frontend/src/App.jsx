@@ -61,6 +61,7 @@ const Landing = lazy(() => import('./pages/landing/Landing'));
 const LegalPage = lazy(() => import('./pages/landing/LegalPage'));
 import ChatWidget from './components/ChatWidget';
 import Yad2ScanBanner from './components/Yad2ScanBanner';
+import MarketScanBanner from './components/MarketScanBanner';
 import { useScrollRestore } from './hooks/mobile';
 import { useDocumentTitle, useGlobalShortcuts } from './hooks/shortcuts';
 import { usePageviewTracking } from './hooks/analytics';
@@ -271,6 +272,7 @@ function AppRoutes() {
       </Suspense>
       <ChatWidget />
       <Yad2ScanBanner />
+      <MarketScanBanner />
     </>
   );
 }

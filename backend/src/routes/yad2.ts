@@ -153,14 +153,94 @@ function quotaExceededReply(reply: any, quota: QuotaSnapshot) {
   });
 }
 
+// ── Async job queue ───────────────────────────────────────────────
+// Cloudflare's edge has a 100s hard cap on HTTP requests; a Yad2
+// agency crawl routinely runs longer. Rather than die at the CF
+// edge with a "Failed to fetch" (which surfaced to agents as
+// "אין חיבור לשרת"), the /agency/* endpoints return a jobId
+// immediately and the client polls /jobs/:id for the result.
+//
+// In-memory is fine for a single-container deploy: a restart loses
+// in-flight crawls but (a) the client will time out and let the user
+// retry, and (b) the cost is just one wasted quota slot. Jobs are
+// GC'd 30min after completion so the map can't grow unbounded.
+type Yad2JobKind = 'agency-preview' | 'agency-import';
+interface Yad2Job {
+  id: string;
+  kind: Yad2JobKind;
+  agentId: string;
+  status: 'running' | 'done' | 'error';
+  startedAt: number;
+  finishedAt?: number;
+  result?: unknown;
+  // Hebrew-friendly error envelope — mirrors what the sync endpoints
+  // used to return so the frontend can render it verbatim.
+  error?: { message: string; code?: string; status?: number; quota?: QuotaSnapshot };
+}
+
+const jobs = new Map<string, Yad2Job>();
+const JOB_TTL_MS = 30 * 60 * 1000;
+
+// Periodic GC — unref'd so it doesn't pin the process open in tests.
+const jobGcTimer = setInterval(() => {
+  const cutoff = Date.now() - JOB_TTL_MS;
+  for (const [id, j] of jobs) {
+    const stamp = j.finishedAt ?? j.startedAt;
+    if (stamp < cutoff) jobs.delete(id);
+  }
+}, 5 * 60 * 1000);
+jobGcTimer.unref?.();
+
+function startJob(kind: Yad2JobKind, agentId: string, run: () => Promise<unknown>): Yad2Job {
+  const job: Yad2Job = {
+    id: randomUUID(),
+    kind,
+    agentId,
+    status: 'running',
+    startedAt: Date.now(),
+  };
+  jobs.set(job.id, job);
+  // Fire-and-forget — the client polls /jobs/:id for the outcome.
+  Promise.resolve().then(async () => {
+    try {
+      const out = await run();
+      job.result = out;
+      job.status = 'done';
+    } catch (err: any) {
+      // Preserve any structured error envelope thrown by the runner so
+      // the client still gets the right Hebrew message + quota chip.
+      if (err && typeof err === 'object' && err.__yad2Envelope) {
+        job.error = err.__yad2Envelope;
+      } else {
+        job.error = { message: err?.message || 'שגיאה לא צפויה', status: 500 };
+      }
+      job.status = 'error';
+    } finally {
+      job.finishedAt = Date.now();
+    }
+  });
+  return job;
+}
+
+// Helper to throw a structured envelope from inside a job runner so
+// startJob() can surface it verbatim via /jobs/:id.
+function throwYad2Envelope(envelope: Yad2Job['error']): never {
+  const err: any = new Error(envelope?.message || 'שגיאה');
+  err.__yad2Envelope = envelope;
+  throw err;
+}
+
 export const registerYad2Routes: FastifyPluginAsync = async (app) => {
   if (!yad2FeatureEnabled()) {
     const stub = async (_req: any, reply: any) =>
       reply.code(404).send({ error: { message: 'Yad2 import not enabled in this environment' } });
-    app.post('/preview',         stub);
-    app.post('/import',          stub);
-    app.post('/agency/preview',  stub);
-    app.post('/agency/import',   stub);
+    app.post('/preview',                stub);
+    app.post('/import',                 stub);
+    app.post('/agency/preview',         stub);
+    app.post('/agency/import',          stub);
+    app.post('/agency/preview/start',   stub);
+    app.post('/agency/import/start',    stub);
+    app.get ('/jobs/:id',               stub);
     // /quota is read-only; still stub when disabled so the frontend gets
     // a consistent 404 instead of a hang.
     app.get('/quota',            stub);
@@ -198,6 +278,33 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
   });
 
   // ── Agency-wide preview ──────────────────────────────────────────
+  // Shared runner used by BOTH the legacy sync endpoint and the new
+  // async /agency/preview/start flow. The sync path still exists for
+  // integration tests; prod traffic goes through the job queue so
+  // Cloudflare's 100s edge timeout can't kill the long crawl.
+  async function runAgencyPreview(agencyId: string, agentId: string, log: any) {
+    const report = await crawlAgency(agencyId);
+    if (report.listings.length === 0) {
+      const blocked = report.sections.find((s) => s.error?.includes('אימות-בוט'));
+      const sectionErr = report.sections.find((s) => s.error)?.error;
+      log.warn({ agencyId, sections: report.sections }, blocked ? 'yad2 WAF blocked' : 'yad2 returned 0 listings');
+      throwYad2Envelope({
+        status: blocked ? 503 : 422,
+        message: sectionErr || 'לא נמצאו נכסים בסוכנות זו — בדוק את הקישור או נסה שוב מאוחר יותר',
+      });
+    }
+    const alreadyImported = await findAlreadyImported(agentId, report.listings.map((l) => l.sourceId));
+    const quotaAfter = await getYad2Quota(agentId);
+    return {
+      listings: report.listings,
+      agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone },
+      sections: report.sections,
+      truncated: report.truncated,
+      alreadyImported,
+      quota: quotaAfter,
+    };
+  }
+
   app.post('/agency/preview', { onRequest: [app.requireAuth] }, async (req, reply) => {
     const parsed = AgencyPreviewQ.safeParse(req.body);
     if (!parsed.success) {
@@ -216,64 +323,63 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     if (quotaBefore.remaining === 0) return quotaExceededReply(reply, quotaBefore);
     await recordYad2Attempt(u.id);
     try {
-      const report = await crawlAgency(agencyId);
-      if (report.listings.length === 0) {
-        // Distinguish "Yad2 blocked us" from "agency genuinely has no
-        // listings". A WAF block leaves an `error` on every section
-        // report; we surface the most informative one.
-        const blocked = report.sections.find((s) => s.error?.includes('אימות-בוט'));
-        const sectionErr = report.sections.find((s) => s.error)?.error;
-        req.log.warn({ agencyId, sections: report.sections }, blocked ? 'yad2 WAF blocked' : 'yad2 returned 0 listings');
-        return reply.code(blocked ? 503 : 422).send({
-          error: {
-            message: sectionErr
-              || 'לא נמצאו נכסים בסוכנות זו — בדוק את הקישור או נסה שוב מאוחר יותר',
-          },
-        });
-      }
-      // Build the alreadyImported map: { sourceId → propertyId } for any
-      // listing in this preview that the agent already has in their
-      // catalog (matched by the [yad2:<token>] marker in notes). The
-      // frontend uses this to mute already-imported rows + link straight
-      // to the existing property page.
-      const alreadyImported = await findAlreadyImported(u.id, report.listings.map((l) => l.sourceId));
-      const quotaAfter = await getYad2Quota(u.id);
-
-      return {
-        listings: report.listings,
-        agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone },
-        sections: report.sections,
-        truncated: report.truncated,
-        alreadyImported,
-        quota: quotaAfter,
-      };
+      return await runAgencyPreview(agencyId, u.id, req.log);
     } catch (err: any) {
+      if (err?.__yad2Envelope) {
+        const env = err.__yad2Envelope;
+        return reply.code(env.status || 500).send({ error: env });
+      }
       req.log.warn({ err, agencyId }, 'yad2 agency crawl threw');
       const quotaAfter = await getYad2Quota(u.id);
       return reply.code(504).send({ error: { message: 'הסוכנות לא הגיבה — נסה שוב', quota: quotaAfter } });
     }
   });
 
-  // ── Agency import — server-side image re-host ────────────────────
-  app.post('/agency/import', { onRequest: [app.requireAuth] }, async (req, reply) => {
-    const parsed = ImportQ.safeParse(req.body);
+  // ── Async agency preview (jobId-based) ────────────────────────────
+  // Responds in <100ms with a jobId — caller polls /jobs/:id. Designed
+  // to dodge the Cloudflare 100s edge timeout on the long crawl.
+  app.post('/agency/preview/start', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const parsed = AgencyPreviewQ.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: { message: 'Invalid import payload' } });
+      return reply.code(400).send({ error: { message: 'נא להדביק כתובת של דף סוכנות (yad2.co.il/realestate/agency/...)' } });
+    }
+    const agencyId = extractAgencyId(parsed.data);
+    if (!agencyId) {
+      return reply.code(400).send({ error: { message: 'לא נמצא מזהה סוכנות בכתובת' } });
     }
     const u = getUser(req);
     if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    const quotaBefore = await getYad2Quota(u.id);
+    if (quotaBefore.remaining === 0) return quotaExceededReply(reply, quotaBefore);
+    await recordYad2Attempt(u.id);
+    const log = req.log;
+    const job = startJob('agency-preview', u.id, async () => {
+      try {
+        return await runAgencyPreview(agencyId, u.id, log);
+      } catch (err: any) {
+        if (err?.__yad2Envelope) throw err;
+        log.warn({ err, agencyId }, 'yad2 agency crawl threw (async)');
+        const quotaAfter = await getYad2Quota(u.id);
+        throwYad2Envelope({ status: 504, message: 'הסוכנות לא הגיבה — נסה שוב', quota: quotaAfter });
+      }
+    });
+    return reply.code(202).send({ jobId: job.id });
+  });
 
-    // Skip listings the agent already has via the [yad2:<token>] marker
-    // in their existing properties' notes. Same helper the preview
-    // endpoint uses so the "already imported" surface stays consistent.
-    const existingMap = await findAlreadyImported(u.id, parsed.data.listings.map((l) => l.sourceId));
+  // ── Agency import — server-side image re-host ────────────────────
+  async function runAgencyImport(
+    listings: z.infer<typeof ImportQ>['listings'],
+    agentId: string,
+    log: any,
+  ) {
+    const existingMap = await findAlreadyImported(agentId, listings.map((l) => l.sourceId));
     const existingSet = new Set<string>(Object.keys(existingMap));
 
     const created: { sourceId: string; id: string }[] = [];
     const skipped: { sourceId: string; reason: string }[] = [];
     const failed:  { sourceId: string; reason: string }[] = [];
 
-    for (const l of parsed.data.listings) {
+    for (const l of listings) {
       if (existingSet.has(l.sourceId)) {
         skipped.push({ sourceId: l.sourceId, reason: 'already_imported' });
         continue;
@@ -291,7 +397,7 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
 
         const property = await prisma.property.create({
           data: {
-            agentId: u.id,
+            agentId,
             assetClass: map.assetClass,
             category: map.category,
             type: l.type || 'דירה',
@@ -307,10 +413,6 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
           },
         });
 
-        // Re-host every image from the detail-page gallery (or just the
-        // cover if the detail fetch didn't enrich). Order is preserved
-        // so the agent's "cover" stays the cover. Per-image failures
-        // fall back to hot-link rather than skipping silently.
         const sourceUrls = uniqueOrdered(
           (l.images && l.images.length ? l.images : []).concat(l.coverImage ? [l.coverImage] : [])
         );
@@ -322,9 +424,7 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
               data: { propertyId: property.id, url, sortOrder: i },
             });
           } catch (imgErr: any) {
-            req.log.warn({ err: imgErr, propertyId: property.id, src }, 'yad2 image rehost failed');
-            // Hot-link fallback so the slot isn't lost — better one ugly
-            // referrer-less link than a missing photo.
+            log.warn({ err: imgErr, propertyId: property.id, src }, 'yad2 image rehost failed');
             await prisma.propertyImage.create({
               data: { propertyId: property.id, url: src, sortOrder: i },
             });
@@ -338,6 +438,49 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     }
 
     return { created, skipped, failed };
+  }
+
+  app.post('/agency/import', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const parsed = ImportQ.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: { message: 'Invalid import payload' } });
+    }
+    const u = getUser(req);
+    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    return await runAgencyImport(parsed.data.listings, u.id, req.log);
+  });
+
+  // ── Async agency import (jobId-based) ─────────────────────────────
+  app.post('/agency/import/start', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const parsed = ImportQ.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: { message: 'Invalid import payload' } });
+    }
+    const u = getUser(req);
+    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    const listings = parsed.data.listings;
+    const log = req.log;
+    const job = startJob('agency-import', u.id, async () => {
+      return await runAgencyImport(listings, u.id, log);
+    });
+    return reply.code(202).send({ jobId: job.id });
+  });
+
+  // ── Job status — shared by /agency/preview/start + /agency/import/start
+  app.get('/jobs/:id', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const u = getUser(req);
+    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    const { id } = req.params as { id: string };
+    const job = jobs.get(id);
+    if (!job) return reply.code(404).send({ error: { message: 'Job not found or expired' } });
+    if (job.agentId !== u.id) return reply.code(403).send({ error: { message: 'Forbidden' } });
+    // The caller sees { status, result?, error? } — same envelope for
+    // both job kinds so the client can reuse one polling helper.
+    const body: any = { status: job.status, kind: job.kind, startedAt: job.startedAt };
+    if (job.finishedAt) body.finishedAt = job.finishedAt;
+    if (job.status === 'done')  body.result = job.result;
+    if (job.status === 'error') body.error  = job.error;
+    return body;
   });
 
   // ── Legacy single-page import (kept for back-compat) ─────────────

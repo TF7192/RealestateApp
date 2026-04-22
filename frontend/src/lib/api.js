@@ -358,16 +358,32 @@ export const api = {
   }),
   // Agency-wide endpoints — preferred. Walks all 3 sections × all
   // pages × server-side image re-host on import.
-  // Agency preview does the full Playwright crawl across forsale +
-  // rent + commercial sections — consistently the slowest endpoint
-  // in the app. 10-minute timeout; no retry (a retry during the WAF
-  // grace window just wastes the agent's hourly quota).
+  //
+  // The sync `yad2AgencyPreview` / `yad2AgencyImport` calls below still
+  // exist for integration tests, but prod UI uses the *Start + *JobStatus
+  // pair: the backend returns a jobId immediately (under CF's 100s edge
+  // cap) and the client polls for completion. Without this, a long
+  // agency crawl was being killed at the Cloudflare edge mid-flight
+  // and surfaced to agents as "אין חיבור לשרת — בדוק חיבור אינטרנט".
   yad2AgencyPreview: (url) => request('/integrations/yad2/agency/preview', {
     method: 'POST', body: { url }, timeoutMs: 600_000, retries: 1,
   }),
   yad2AgencyImport:  (listings) => request('/integrations/yad2/agency/import', {
     method: 'POST', body: { listings }, timeoutMs: 600_000, retries: 1,
   }),
+  // Async start endpoints — return { jobId } in <1s. The body payload
+  // is small for preview (just a URL) and bounded for import (≤100
+  // listings; nginx caps bodies at 120MB which easily fits), so the
+  // start call itself is guaranteed to land well under CF's timeout.
+  yad2AgencyPreviewStart: (url) => request('/integrations/yad2/agency/preview/start', {
+    method: 'POST', body: { url },
+  }),
+  yad2AgencyImportStart:  (listings) => request('/integrations/yad2/agency/import/start', {
+    method: 'POST', body: { listings },
+  }),
+  // Job status — polled by the scan store until status !== 'running'.
+  // Returns { status, kind, result?, error?, startedAt, finishedAt? }.
+  yad2JobStatus: (jobId) => request(`/integrations/yad2/jobs/${encodeURIComponent(jobId)}`),
   // Sliding-window quota — { limit, remaining, used, resetAt, msUntilReset }.
   // The Yad2 import screen calls this on mount + after each preview to
   // render the "X/3 left this hour, resets in Y min" chip.
@@ -545,8 +561,17 @@ export const api = {
   // `kind` is 'buy' | 'rent'.
   marketContextGet:    (propertyId, kind = 'buy') =>
     request(`/market/property/${propertyId}?kind=${kind}`),
+  // Legacy sync refresh — kept for back-compat. Prod traffic uses the
+  // start+poll pair below so the long Playwright crawl dodges
+  // Cloudflare's 100s edge timeout.
   marketContextRefresh: (propertyId, kind = 'buy') =>
     request(`/market/property/${propertyId}/refresh?kind=${kind}`, { method: 'POST', timeoutMs: 60000 }),
+  // Async start — returns { jobId } immediately. Server coalesces
+  // repeat clicks on the same (property, kind) into one in-flight job.
+  marketContextRefreshStart: (propertyId, kind = 'buy') =>
+    request(`/market/property/${propertyId}/refresh/start?kind=${kind}`, { method: 'POST' }),
+  // Poll until status !== 'running'. Used by marketScanStore.
+  marketJobStatus: (jobId) => request(`/market/jobs/${encodeURIComponent(jobId)}`),
 
   // Neighborhoods (G1)
   listNeighborhoods:   (params = {}) => request(`/neighborhoods${qsFrom(params)}`),

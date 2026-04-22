@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { TrendingUp, RefreshCw, Home, Key, AlertCircle, ExternalLink } from 'lucide-react';
+import { TrendingUp, RefreshCw, Home, Key, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
 import { displayPrice } from '../lib/display';
 import { relativeDate } from '../lib/relativeDate';
+import { startRefresh, subscribeMarketScan, getScanFor } from '../lib/marketScanStore';
 import './MarketContextCard.css';
 
 // Market-context card on PropertyDetail.
@@ -57,10 +58,21 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
     return () => { cancelled = true; };
   }, [propertyId, kind, byKind, setKindState]);
 
+  // Subscribe to the global market-scan store so the button state /
+  // spinner reflect an in-flight crawl even if the agent navigated away
+  // and back (or triggered the same scan from elsewhere).
+  const [scanTick, setScanTick] = useState(0);
+  useEffect(() => subscribeMarketScan(() => setScanTick((t) => t + 1)), []);
+  const scanEntry = propertyId ? getScanFor(propertyId, kind) : null;
+  const scanning  = scanEntry?.status === 'running';
+
   const handleRefresh = useCallback(async () => {
-    setKindState(kind, { refreshing: true, error: null });
+    setKindState(kind, { error: null });
     try {
-      const res = await api.marketContextRefresh(propertyId, kind);
+      // Async job — store handles polling + the completion event. The
+      // card just shows "running" while scanning === true and surfaces
+      // the result when the store resolves.
+      const res = await startRefresh(propertyId, kind);
       setKindState(kind, { refreshing: false, data: res });
       toast.success(res?.cached ? 'הנתונים עדיין טריים — מוצגים מהמטמון' : 'הנתונים התעדכנו');
     } catch (e) {
@@ -68,6 +80,9 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
       toast.error(e?.message || 'שליפת נתוני השוק נכשלה');
     }
   }, [propertyId, kind, setKindState, toast]);
+  // Keep scanTick referenced so lint doesn't flag it unused. The tick
+  // is the state handle that forces a re-render when the store changes.
+  void scanTick;
 
   const deals = state.data?.payload?.deals || [];
   const stats = useMemo(() => computeStats(deals), [deals]);
@@ -110,11 +125,13 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
             type="button"
             className="btn btn-secondary btn-sm"
             onClick={handleRefresh}
-            disabled={state.refreshing || state.loading}
+            disabled={scanning || state.loading}
             title="שליפת עסקאות אחרונות מ-nadlan.gov.il"
           >
-            <RefreshCw size={14} className={state.refreshing ? 'spin' : ''} aria-hidden="true" />
-            <span>{state.refreshing ? 'מעדכן…' : (state.data ? 'רענן' : 'משוך נתונים')}</span>
+            {scanning
+              ? <Loader2 size={14} className="spin" aria-hidden="true" />
+              : <RefreshCw size={14} aria-hidden="true" />}
+            <span>{scanning ? 'שולף נתונים…' : (state.data ? 'רענן' : 'משוך נתונים')}</span>
           </button>
         </div>
       </header>
@@ -129,6 +146,16 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
           <> · עודכן <time>{fetchedRel}</time></>
         )}
       </p>
+
+      {scanning && (
+        <div className="market-running" role="status" aria-live="polite">
+          <Loader2 size={14} className="spin" aria-hidden="true" />
+          <span>
+            שולף נתוני עסקאות אחרונות מ-nadlan.gov.il — זה יכול לקחת עד דקה.
+            אפשר להמשיך לעבוד, תישלח התראה בסיום.
+          </span>
+        </div>
+      )}
 
       {state.error && (
         <div className="market-error" role="alert">

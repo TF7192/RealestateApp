@@ -90,6 +90,27 @@
   font-size: 13px;
 }
 
+.market-running {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: rgba(180, 139, 76, 0.10);
+  color: #8a6932;
+  border: 1px solid rgba(180, 139, 76, 0.25);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.market-running .spin {
+  animation: market-spin 1s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes market-spin {
+  to { transform: rotate(360deg); }
+}
+
 .market-empty {
   padding: 20px 14px;
   background: var(--bg-secondary, #f7f3ec);

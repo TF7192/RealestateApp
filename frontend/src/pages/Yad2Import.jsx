@@ -4,7 +4,7 @@ import { Download, ArrowRight, AlertCircle, Check, Loader2, Building2, Store, Ho
 import { api } from '../lib/api';
 import { useToast } from '../lib/toast';
 import { formatFloor } from '../lib/formatFloor';
-import { getScanState, subscribeScan, startScan, clearScan, setScanQuota } from '../lib/yad2ScanStore';
+import { getScanState, subscribeScan, startScan, clearScan, setScanQuota, startImport } from '../lib/yad2ScanStore';
 import './Yad2Import.css';
 
 // Yad2 agency-wide importer. Paste an agency URL like:
@@ -119,7 +119,10 @@ export default function Yad2Import() {
     setBusyImport(true);
     try {
       const toImport = extracted.filter((l) => picked.has(l.sourceId));
-      const res = await api.yad2AgencyImport(toImport);
+      // Async job flow — backend returns { jobId } immediately and
+      // startImport polls for completion. Dodges the Cloudflare 100s
+      // cap for large image-rehost batches.
+      const res = await startImport(toImport);
       setResult(res);
       setStep('done');
       toast.success(`יובאו ${res.created.length} נכסים`);

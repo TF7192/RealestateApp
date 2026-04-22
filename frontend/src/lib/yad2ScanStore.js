@@ -107,6 +107,15 @@ export function subscribeScan(fn) {
  * @param {string} url
  * @returns {Promise<object>}
  */
+// Polling cadence for the jobId → result flow. 2.5s is a sweet spot:
+// fast enough that an ~75s scan finishes within one extra poll, slow
+// enough that a 5-minute crawl only burns ~120 GET /jobs/:id hits.
+const POLL_INTERVAL_MS = 2500;
+// Hard ceiling on polling — if a job hasn't resolved in 15 minutes
+// something's wrong; give up and surface a real error rather than
+// polling forever.
+const POLL_CEILING_MS = 15 * 60 * 1000;
+
 let inflight = null;
 export function startScan(url) {
   if (inflight) return inflight;
@@ -120,7 +129,12 @@ export function startScan(url) {
   });
   inflight = (async () => {
     try {
-      const res = await api.yad2AgencyPreview(url);
+      // Kick off the async job. The start call itself returns in well
+      // under a second (just a quota check + crawler spawn); the long
+      // Playwright walk then runs in the background and we poll
+      // /jobs/:id until it resolves.
+      const { jobId } = await api.yad2AgencyPreviewStart(url);
+      const res = await pollJob(jobId);
       setState({
         status: 'done',
         finishedAt: Date.now(),
@@ -132,7 +146,7 @@ export function startScan(url) {
       }));
       return res;
     } catch (e) {
-      const inlineQuota = e?.data?.error?.quota;
+      const inlineQuota = e?.data?.error?.quota ?? e?.quota;
       setState({
         status: 'error',
         finishedAt: Date.now(),
@@ -148,6 +162,43 @@ export function startScan(url) {
     }
   })();
   return inflight;
+}
+
+// Poll /jobs/:id until status leaves 'running'. On terminal states we
+// either resolve with the result or throw a re-constructed error that
+// preserves the backend's Hebrew message + any inline quota snapshot.
+async function pollJob(jobId) {
+  const deadline = Date.now() + POLL_CEILING_MS;
+  // Small jittered first-poll delay so a lucky fast job can resolve
+  // on the first check instead of idling the full interval.
+  await sleep(400);
+  while (true) {
+    if (Date.now() > deadline) {
+      throw new Error('הסריקה לוקחת זמן חריג — נסה/י שוב מאוחר יותר');
+    }
+    const snap = await api.yad2JobStatus(jobId);
+    if (snap.status === 'done')  return snap.result;
+    if (snap.status === 'error') {
+      const env = snap.error || {};
+      const err = new Error(env.message || 'הטעינה נכשלה');
+      err.status = env.status;
+      err.quota = env.quota;
+      throw err;
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Async import — same job pattern as the scan. Kicks off the server-side
+// image rehost + property create loop, polls for completion, resolves
+// with the { created, skipped, failed } tally the UI shows on the "done"
+// step. Kept separate from startScan() so the import page can drive its
+// own busy/error state without touching the shared scan snapshot.
+export async function startImport(listings) {
+  const { jobId } = await api.yad2AgencyImportStart(listings);
+  return await pollJob(jobId);
 }
 
 /** Wipe the cached scan — called when the agent starts fresh. */
