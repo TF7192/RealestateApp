@@ -709,7 +709,11 @@ function ActionQueueCard({ leads = [], properties = [], staleThresholdDays = 30 
   }
 
   items.sort((a, b) => b.score - a.score);
-  const visible = items.slice(0, 6);
+  // D-4 — cap at 5 rows (was 6) and replace the silent "+N נוספות"
+  // label with an actionable "צפה בהכול" link to the activity page,
+  // so an agent with a long backlog has one tap to see the full list
+  // instead of a dead-end counter.
+  const visible = items.slice(0, 5);
 
   return (
     <div className="card dashboard-card dash-action-queue animate-in animate-in-delay-4">
@@ -741,7 +745,13 @@ function ActionQueueCard({ leads = [], properties = [], staleThresholdDays = 30 
         </div>
       )}
       {items.length > visible.length && (
-        <div className="dash-aq-more">+{items.length - visible.length} נוספות</div>
+        <Link
+          to="/activity"
+          className="dash-aq-more dash-aq-more-link"
+          onClick={() => haptics.tap()}
+        >
+          צפה בהכול ({items.length})
+        </Link>
       )}
     </div>
   );

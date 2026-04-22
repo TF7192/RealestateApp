@@ -92,6 +92,33 @@ describe('<Dashboard>', () => {
     });
   });
 
+  it('D-4 — action queue caps at 5 rows with a "צפה בהכול" link to /activity', async () => {
+    // Seed 7 stale leads — beyond the 5-row cap so the overflow link
+    // has to render.
+    const tenDaysAgoIso = new Date(Date.now() - 40 * 86400000).toISOString();
+    const leads = Array.from({ length: 7 }, (_, i) => ({
+      id: `l${i}`,
+      name: `ליד ${i}`,
+      status: 'WARM',
+      lastContact: tenDaysAgoIso,
+    }));
+    server.use(
+      http.get('/api/leads', () => HttpResponse.json({ items: leads })),
+    );
+    render(<Dashboard />);
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /שלום/ })).toBeInTheDocument()
+    );
+    // At most 5 action-queue rows visible.
+    await waitFor(() => {
+      const rows = document.querySelectorAll('.dash-aq-row');
+      expect(rows.length).toBe(5);
+    });
+    // Overflow link — Hebrew text + /activity href.
+    const overflow = await screen.findByRole('link', { name: /צפה בהכול/ });
+    expect(overflow).toHaveAttribute('href', '/activity');
+  });
+
   it('D-1 — the משפך המרה (conversion funnel) card is no longer rendered', async () => {
     server.use(
       http.get('/api/properties', () =>

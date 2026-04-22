@@ -953,5 +953,20 @@
   color: var(--text-muted, #6b6356);
   text-align: center;
 }
+/* D-4 — the "+N נוספות" text became a link to /activity so agents
+   with a long backlog have a single-tap escape hatch. */
+a.dash-aq-more-link {
+  display: block;
+  padding: 8px 4px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  color: var(--gold, #b48b4c);
+  transition: background 0.1s ease, color 0.1s ease;
+}
+a.dash-aq-more-link:hover {
+  background: var(--gold-glow, rgba(180, 139, 76, 0.08));
+  color: var(--gold, #b48b4c);
+}
 
 /* D-1 — Conversion Funnel CSS removed alongside its component. */
