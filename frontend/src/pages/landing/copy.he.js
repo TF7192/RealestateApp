@@ -225,8 +225,8 @@ export const copy = {
         title: 'חברה',
         links: [
           { label: 'צור קשר',       href: 'mailto:hello@estia.co.il' },
-          { label: 'תנאי שימוש',    href: '#' },
-          { label: 'מדיניות פרטיות', href: '#' },
+          { label: 'תנאי שימוש',    href: '/terms' },
+          { label: 'מדיניות פרטיות', href: '/privacy' },
         ],
       },
     ],

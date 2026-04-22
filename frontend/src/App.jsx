@@ -58,6 +58,7 @@ const OnboardingTour = lazy(() => import('./components/OnboardingTour'));
 // on a share-link route (e.g. /agents/:slug/:property) never pay the
 // landing's CSS + hero weight; same for authed sessions.
 const Landing = lazy(() => import('./pages/landing/Landing'));
+const LegalPage = lazy(() => import('./pages/landing/LegalPage'));
 import ChatWidget from './components/ChatWidget';
 import Yad2ScanBanner from './components/Yad2ScanBanner';
 import { useScrollRestore } from './hooks/mobile';
@@ -156,6 +157,11 @@ function AppRoutes() {
         <Routes>
           {/* Public landing page — mobile-first Hebrew marketing surface */}
           <Route path="/" element={<Landing />} />
+          {/* Legal: terms + privacy. Public, standalone pages with their
+              own slim nav. Reachable from the landing footer + from
+              inside the app. */}
+          <Route path="/terms"   element={<LegalPage which="terms"   />} />
+          <Route path="/privacy" element={<LegalPage which="privacy" />} />
           {/* Explicit login route; the landing CTAs link here.
               `/login?flow=signup` preselects the signup tab inside Login.jsx. */}
           <Route path="/login" element={<Login />} />
