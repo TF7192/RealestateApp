@@ -41,9 +41,11 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | P-1..P-15 | Asset detail polish | Sub-4 | ⚪ | — | — | — | — | Large |
 | O-1..O-10 | Owners | Sub-5 | ⚪ | — | — | — | — | |
 | L-1..L-13 | Leads | Sub-5 | ⚪ | — | — | — | — | |
-| E-1..E-3 | Deals | Sub-6 | ⚪ | — | — | — | — | |
-| C-1 | Calculator layout | Sub-6 | ⚪ | — | — | — | — | |
-| R-1 | Reports rebuild | Sub-6 | ⚪ | — | — | — | — | |
+| E-1 | צור עסקה button + Deal model | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit + integration spec + E2E spec) | pending | Additive Prisma migration (buyerId/sellerId/closeDate + CLOSED/CANCELLED); runMutation save; creation dialog with Lead/Owner/Property pickers |
+| E-2 | Chip label order (count first) | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit + E2E spec) | pending | `<span>{count}</span>{label}` |
+| E-3 | Deals table view | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | ViewToggle + DataTable; `useViewMode('deals')` persistence |
+| C-1 | Calculator layout | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | Reset below עלויות נוספות; hide/show toggles on brokerage/lawyer/agent-total; `includeBrokerage`/`includeLawyer` flags exclude from נשאר ביד |
+| R-1 | Reports rebuild | Sub-6 | 🟢 | ✅ | — | ✅ (unit) | pending | Page already met design-system spec (h1, subtitle, semantic sections, card vars, RTL, aria-busy); verified via unit test |
 | Y-1 | Durable Yad2 notification | Sub-7 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | Rehydrate by jobId; RUNNING_SCAN_KEY |
 | Y-2 | Async download | Sub-7 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | RUNNING_IMPORT_KEY + yad2-import-complete |
 | Y-3 | Yad2 heading layout | Sub-7 | 🟢 | — | ✅ | ✅ (manual) | pending | .y2-head flex-column |
@@ -172,3 +174,43 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
     (`api.test.js` and `sec-user-scoped-stores.test.js` — blocked by
     worktree not having `@capacitor/core` in node_modules; not
     introduced by this lane).
+- **2026-04-22T21:45Z** — Sub-6 lane complete (E-1/E-2/E-3, C-1, R-1):
+  - **E-1** Additive Prisma migration
+    `20260422230000_deal_buyer_seller_close_date` adds `buyerId` (Lead
+    FK), `sellerId` (Owner FK), `closeDate` (DateTime) and two new
+    `DealStatus` values (`CLOSED`, `CANCELLED`). Backend `/api/deals`
+    accepts the new fields; cross-agent FK IDs are rejected with 400.
+    List response now includes `buyer` + `seller` slices.
+    `frontend/src/pages/Deals.jsx` exposes a `צור עסקה` primary button
+    that opens an `role="dialog" aria-modal="true"` creation modal
+    with property / lead / owner `<select>`s, auto-fills the
+    denormalized address + price when a property is chosen, and uses
+    `runMutation` for the save path with Hebrew success/error toasts.
+  - **E-2** Tab chip JSX reordered — `<span>{count}</span>{label}` so
+    the numeral leads ("0 פעילות" instead of "פעילות0").
+  - **E-3** `ViewToggle` + `DataTable` + `useViewMode('deals')` wired
+    into Deals.jsx. Table columns: address, asset/category, status,
+    marketing price, commission, updated-at (sortable). Status
+    renders as a tonal pill (green / warning / red / blue).
+    `is-warning` + `is-red` tones added to `DataTable.css`.
+  - **C-1** `sellerCalc()` gained `includeBrokerage` / `includeLawyer`
+    input flags; when false the cost is still computed (for display)
+    but excluded from `net` and `totalToAgent`. Desktop
+    `SellerCalculator.jsx` adds three toggle buttons (`הסתר` / `הצג`)
+    for the brokerage, lawyer, and agent-total blocks; the `אפס`
+    button now renders on its own row inside `.sc-reset-row` below
+    the "עלויות נוספות" collapsible. `MobileSellerCalculator.jsx`
+    mirrors the hide flags in its state so the pure-calc contract
+    stays identical across viewports.
+  - **R-1** `Reports.jsx` already matched the requested design
+    (semantic `<h1>` + subtitle + card sections + design-system
+    tokens + RTL + aria-busy). A unit test (`reports-rebuild.test.js`)
+    codifies the requirements so any future regression surfaces.
+  - Tests: 25 new vitest cases across `deals-create.test.js`,
+    `calculator-toggles.test.js`, `reports-rebuild.test.js` — all
+    pass. Playwright spec at `tests/e2e/deals/create-deal.spec.ts`
+    covers the create-dialog open + accessibility attributes + the
+    E-2 chip order. Integration spec at
+    `tests/integration/api/deals.test.ts` covers create + cross-agent
+    FK rejection + list-includes-buyer-seller. Full `unit-frontend`
+    suite: 162/166 (4 pre-existing worktree-env failures unchanged).
