@@ -1,14 +1,23 @@
 .pnd-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(20, 18, 14, 0.48);
+  /* Full-screen dim: 60% black beats every piece of app chrome
+     underneath (sidebar 100, mobile header 200, FAB 900, chat 890,
+     scan banners 130). The previous 48% mix with a warm tint left
+     the sidebar's `--bg-secondary` still readable through the veil,
+     so the app looked "half-dimmed" instead of focused. */
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  z-index: 1100;
+  /* Ride above every known app element. OwnerEditDialog lives at
+     1200; we stay one notch higher (1300) since the notes dialog can
+     be opened on top of list views whose own z-index ceilings
+     (bulk-bar at 950, FAB at 900, etc.) already beat 1100. */
+  z-index: 1300;
   animation: pnd-fade 160ms ease;
 }
 
