@@ -137,67 +137,54 @@ if (typeof window !== 'undefined') {
     return false;
   };
 
-  // Measure any `position: fixed` bottom-pinned chrome (mobile tab
-  // bar, StickyActionBar with "שמור והמשך", quick-create FAB, Yad2
-  // banner, etc.) that sits between the keyboard and the content.
-  // Their combined height has to come OUT of the "visible area" so
-  // the nudge lifts the focused input above THEM, not just above the
-  // raw keyboard rectangle.
+  // State-of-the-art iOS input-focus scroll:
   //
-  // We query by selector rather than walk every element in the DOM
-  // to keep the cost bounded. Each selector covers one known
-  // bottom-fixed piece of chrome; merge their union bounding box.
-  const BOTTOM_CHROME_SELECTORS = [
-    '.mtb',           // MobileTabBar
-    '.sab',           // StickyActionBar (שמור והמשך lives here)
-    '.bulk-bar',      // Properties bulk-action bar
-    '.qcfab-trigger', // QuickCreateFab
-    '.owners-fab',    // Owners page FAB
-    '.y2b',           // Yad2ScanBanner
-    '.sticky-cta',    // landing sticky CTA
-  ];
-  const bottomChromeHeight = (viewportH) => {
-    let topmost = viewportH;
-    for (const sel of BOTTOM_CHROME_SELECTORS) {
-      document.querySelectorAll(sel).forEach((el) => {
-        // Skip hidden / unmounted / offscreen chrome.
-        if (!el.offsetParent && getComputedStyle(el).position !== 'fixed') return;
-        const r = el.getBoundingClientRect();
-        // Only care about chrome anchored at the BOTTOM of the viewport
-        // — skip rows that happen to scroll into view.
-        if (r.bottom > viewportH - 2 && r.top < viewportH) {
-          if (r.top < topmost) topmost = r.top;
-        }
-      });
-    }
-    return Math.max(0, viewportH - topmost);
-  };
-
-  // Only scroll the document when the focused input is ACTUALLY
-  // covered — by the keyboard OR by any bottom-fixed chrome on top of
-  // it. Scroll the minimum amount needed. Top/side chrome never moves.
+  //   1. WebView viewport stays full-height (Capacitor Keyboard.resize
+  //      is "none"). Nothing in the page auto-resizes.
+  //   2. The iOS keyboard slides up as a system-level overlay above
+  //      the WebView. Bottom-fixed chrome (mobile tab bar, sticky
+  //      "שמור והמשך" bar, FABs) is naturally HIDDEN behind the
+  //      keyboard — it's still there, just not visible, which is
+  //      exactly how native iOS apps handle it (Notes / Messages /
+  //      Mail all work this way). We do NOT try to "lift" input
+  //      above those bars, because they're not visible obstacles
+  //      during typing — they're covered by the OS keyboard.
+  //   3. If and only if the focused input itself is under the
+  //      keyboard, we scroll the document just enough to bring its
+  //      bottom edge + a 16px breathing buffer above the keyboard.
+  //      If the input is already visible above the keyboard, we
+  //      scroll zero — screen stays exactly where it was.
+  //
+  // Reading `kbHeight` (Capacitor Keyboard plugin) keeps the math
+  // accurate on native iOS where visualViewport.height doesn't shrink
+  // with resize:"none". On web / Android we fall back to
+  // visualViewport.height via the inline check below.
   const nudgeIfCovered = (el) => {
     if (!el) return;
     const vv = window.visualViewport;
     const viewportH = vv?.height ?? window.innerHeight;
-    // On native iOS the WebView stays full-height (Keyboard.resize
-    // "none"), so visualViewport.height == window.innerHeight. We have
-    // to subtract BOTH the real keyboard height AND any bottom-fixed
-    // chrome height to find the true visible area.
-    const chromeH = bottomChromeHeight(viewportH);
-    const visibleBottom = viewportH - kbHeight - chromeH;
+    // Effective keyboard height: prefer the plugin's measurement
+    // (accurate, available before any layout change on resize:none);
+    // fall back to (innerHeight - visualViewport.height) on web
+    // browsers that shrink visualViewport when a software keyboard
+    // opens.
+    const kb = kbHeight > 0
+      ? kbHeight
+      : Math.max(0, (window.innerHeight || viewportH) - viewportH);
+    const visibleBottom = viewportH - kb;
     const rect = el.getBoundingClientRect();
     const buffer = 16;
     if (rect.bottom > visibleBottom - buffer) {
-      const delta = Math.ceil(rect.bottom - (visibleBottom - buffer));
-      // Instant scroll — smooth-scroll inside WKWebView is a software
-      // animation that reads as input lag. One layout pass.
-      window.scrollBy(0, delta);
-    } else if (rect.top < buffer) {
-      window.scrollBy(0, rect.top - buffer);
+      window.scrollBy(0, Math.ceil(rect.bottom - (visibleBottom - buffer)));
+    } else if (rect.top < 0) {
+      // Input scrolled above the top of the viewport — pull it back
+      // to the top edge. Happens rarely but keeps the behaviour
+      // symmetrical.
+      window.scrollBy(0, rect.top - 4);
     }
-    // Already visible above the keyboard + bottom chrome → zero scroll,
-    // screen stays put.
+    // If the input is already visible above the keyboard, we scroll
+    // by zero. Screen stays put. Bottom-fixed chrome is covered by
+    // the keyboard, which is the native iOS pattern.
   };
 
   document.addEventListener('focusin', (e) => {
