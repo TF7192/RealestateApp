@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowRight,
   Phone,
@@ -59,8 +60,15 @@ function statusBadgeClass(status) {
   }[status] || 'badge-gold';
 }
 
-function statusLabel(status) {
-  return { HOT: 'חם', WARM: 'חמים', COLD: 'קר' }[status] || status;
+// Translate a status code into its Hebrew label. `t` comes from the
+// customers namespace so callers outside the default component scope
+// (ActivityTimeline) can still resolve copy.
+function statusLabel(t, status) {
+  return {
+    HOT: t('detail.options.status.hot'),
+    WARM: t('detail.options.status.warm'),
+    COLD: t('detail.options.status.cold'),
+  }[status] || status;
 }
 
 function statusIcon(status) {
@@ -78,6 +86,7 @@ function statusIcon(status) {
 // Mobile (<900 px): stacks form on top, timeline below.
 // ──────────────────────────────────────────────────────────────────
 export default function CustomerDetail() {
+  const { t } = useTranslation('customers');
   const { id } = useParams();
   const toast = useToast();
   const [lead, setLead] = useState(null);
@@ -105,14 +114,14 @@ export default function CustomerDetail() {
         const list = await api.listLeads();
         fetched = (list?.items || []).find((l) => String(l.id) === String(id)) || null;
       }
-      if (!fetched) throw new Error('הלקוח לא נמצא');
+      if (!fetched) throw new Error(t('detail.notFound'));
       setLead(fetched);
     } catch (e) {
-      setError(e.message || 'שגיאה בטעינה');
+      setError(e.message || t('detail.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => { loadLead(); }, [loadLead]);
 
@@ -134,7 +143,7 @@ export default function CustomerDetail() {
   if (loading) {
     return (
       <div className="customer-detail-page">
-        <div className="cd-skel">טוען…</div>
+        <div className="cd-skel">{t('detail.loading')}</div>
       </div>
     );
   }
@@ -144,8 +153,8 @@ export default function CustomerDetail() {
       <div className="customer-detail-page">
         <div className="cd-error">
           <AlertCircle size={20} />
-          <span>{error || 'הלקוח לא נמצא'}</span>
-          <Link to="/customers" className="btn btn-secondary btn-sm">חזור ללקוחות</Link>
+          <span>{error || t('detail.notFound')}</span>
+          <Link to="/customers" className="btn btn-secondary btn-sm">{t('detail.backToCustomers')}</Link>
         </div>
       </div>
     );
@@ -158,59 +167,59 @@ export default function CustomerDetail() {
         <div className="cd-crumb">
           <Link to="/customers" className="cd-crumb-link">
             <ArrowRight size={16} />
-            לקוחות
+            {t('detail.crumbCustomers')}
           </Link>
           <span className="cd-crumb-sep">/</span>
           <strong className="cd-crumb-name">{lead.name}</strong>
           <span className={`badge ${statusBadgeClass(lead.status)} cd-status-pill`}>
             {statusIcon(lead.status)}
-            {statusLabel(lead.status)}
+            {statusLabel(t, lead.status)}
           </span>
           {matchCount > 0 && (
             <Link
               to={`/properties${lead.city ? `?city=${encodeURIComponent(lead.city)}` : ''}`}
               className="cd-match-pill"
-              title="נכסים תואמים בקריטריונים שלך"
+              title={t('detail.matchingTitle')}
             >
               <Sparkles size={12} />
               <strong>{matchCount}</strong>
-              <span>נכסים תואמים</span>
+              <span>{t('detail.matchLabel')}</span>
             </Link>
           )}
         </div>
         <div className="cd-toolbar-actions">
-          <Link to="/templates" className="btn btn-secondary btn-sm cd-tpl-btn" title="ערוך תבניות הודעה">
+          <Link to="/templates" className="btn btn-secondary btn-sm cd-tpl-btn" title={t('detail.toolbar.templatesTitle')}>
             <FileText size={14} />
-            ערוך תבניות הודעה
+            {t('detail.toolbar.templates')}
           </Link>
           <a
             href={telUrl(lead.phone)}
             className="btn btn-secondary btn-sm"
             onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
-            title={lead.phone || 'התקשר'}
+            title={lead.phone || t('detail.toolbar.callFallback')}
           >
             <Phone size={14} />
-            התקשר
+            {t('detail.toolbar.call')}
           </a>
           <a
-            href={waUrl(lead.phone, `שלום ${lead.name}`)}
+            href={waUrl(lead.phone, t('detail.toolbar.whatsappHello', { name: lead.name }))}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-secondary btn-sm cd-wa-btn"
             onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
-            title="וואטסאפ"
+            title={t('detail.toolbar.whatsappTitle')}
           >
             <WhatsAppIcon size={14} className="wa-green" />
-            וואטסאפ
+            {t('detail.toolbar.whatsapp')}
           </a>
           <a
             href={`sms:${lead.phone}`}
             className="btn btn-secondary btn-sm"
             onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
-            title="הודעת SMS"
+            title={t('detail.toolbar.smsTitle')}
           >
             <MessageSquare size={14} />
-            SMS
+            {t('detail.toolbar.sms')}
           </a>
           {/* 7.2 — Schedule meeting. Opens LeadMeetingDialog which
               checks Google Calendar connection; if not connected, the
@@ -219,18 +228,18 @@ export default function CustomerDetail() {
           <button
             className="btn btn-primary btn-sm"
             onClick={() => { haptics.tap(); setMeetingOpen(true); }}
-            title="קבע פגישה"
+            title={t('detail.toolbar.scheduleMeetingTitle')}
           >
             <Calendar size={14} />
-            קבע פגישה
+            {t('detail.toolbar.scheduleMeeting')}
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title="הדפס">
+          <button className="btn btn-ghost btn-sm" onClick={() => window.print()} title={t('detail.toolbar.printTitle')}>
             <Printer size={14} />
-            הדפס
+            {t('detail.toolbar.print')}
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => popoutCurrentRoute()} title="פתח בחלון חדש">
+          <button className="btn btn-ghost btn-sm" onClick={() => popoutCurrentRoute()} title={t('detail.toolbar.popoutTitle')}>
             <Maximize2 size={14} />
-            פתח בחלון חדש
+            {t('detail.toolbar.popout')}
           </button>
         </div>
       </div>
@@ -248,15 +257,15 @@ export default function CustomerDetail() {
           left; the new MLS-parity panels stack in the right column. */}
       <div className="cd-grid">
         <div className="cd-form-col">
-          <section className="cd-section cd-tags-section" aria-label="תגי לקוח">
-            <h3 className="cd-section-title">תגים</h3>
+          <section className="cd-section cd-tags-section" aria-label={t('detail.sections.tagsAria')}>
+            <h3 className="cd-section-title">{t('detail.sections.tags')}</h3>
             <TagPicker entityType="LEAD" entityId={lead.id} />
           </section>
           <CustomerEditForm
             lead={lead}
             onSaved={async (next) => {
               setLead((cur) => ({ ...cur, ...next }));
-              toast.success('הפרטים נשמרו');
+              toast.success(t('detail.saved'));
               // Re-fetch to pick up any server-derived fields
               try { await loadLead(); } catch { /* ignore */ }
             }}
@@ -288,6 +297,7 @@ export default function CustomerDetail() {
 // without the modal chrome; saves via api.updateLead).
 // ──────────────────────────────────────────────────────────────────
 function CustomerEditForm({ lead, onSaved, toast }) {
+  const { t } = useTranslation('customers');
   const [form, setForm] = useState({
     name: lead.name || '',
     phone: lead.phone || '',
@@ -394,7 +404,7 @@ function CustomerEditForm({ lead, onSaved, toast }) {
       await api.updateLead(lead.id, body);
       onSaved(body);
     } catch (e) {
-      const msg = e.message || 'שמירה נכשלה';
+      const msg = e.message || t('detail.saveError');
       setErr(msg);
       toast?.error?.(msg);
     } finally {
@@ -405,108 +415,108 @@ function CustomerEditForm({ lead, onSaved, toast }) {
   return (
     <div className="cd-form-col">
       <div className="cd-section">
-        <h3 className="cd-section-title">פרטי הלקוח</h3>
+        <h3 className="cd-section-title">{t('detail.sections.customerDetails')}</h3>
         {err && <div className="cd-form-error"><AlertCircle size={14} />{err}</div>}
 
         <div className="deal-form-grid">
           <div className="form-group">
-            <label className="form-label">שם</label>
+            <label className="form-label">{t('detail.fields.name')}</label>
             <input {...inputPropsForName()} className="form-input" value={form.name} onChange={(e) => update('name', e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">טלפון</label>
+            <label className="form-label">{t('detail.fields.phone')}</label>
             <PhoneField value={form.phone} onChange={(v) => update('phone', v)} />
           </div>
           <div className="form-group">
-            <label className="form-label">אימייל</label>
+            <label className="form-label">{t('detail.fields.email')}</label>
             <input {...inputPropsForEmail()} className="form-input" value={form.email} onChange={(e) => update('email', e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">סטטוס</label>
+            <label className="form-label">{t('detail.fields.status')}</label>
             <Segmented
               value={form.status}
               onChange={(v) => update('status', v)}
               options={[
-                { value: 'HOT', label: 'חם' },
-                { value: 'WARM', label: 'חמים' },
-                { value: 'COLD', label: 'קר' },
+                { value: 'HOT', label: t('detail.options.status.hot') },
+                { value: 'WARM', label: t('detail.options.status.warm') },
+                { value: 'COLD', label: t('detail.options.status.cold') },
               ]}
-              ariaLabel="סטטוס"
+              ariaLabel={t('detail.fields.statusAria')}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">סוג התעניינות</label>
+            <label className="form-label">{t('detail.fields.interestType')}</label>
             <Segmented
               value={form.interestType}
               onChange={(v) => update('interestType', v)}
               options={[
-                { value: 'PRIVATE', label: 'פרטי' },
-                { value: 'COMMERCIAL', label: 'מסחרי' },
+                { value: 'PRIVATE', label: t('detail.options.interestType.private') },
+                { value: 'COMMERCIAL', label: t('detail.options.interestType.commercial') },
               ]}
-              ariaLabel="סוג התעניינות"
+              ariaLabel={t('detail.fields.interestTypeAria')}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">קנייה / שכירות</label>
+            <label className="form-label">{t('detail.fields.lookingFor')}</label>
             <Segmented
               value={form.lookingFor}
               onChange={(v) => update('lookingFor', v)}
               options={[
-                { value: 'BUY', label: 'קנייה' },
-                { value: 'RENT', label: 'שכירות' },
+                { value: 'BUY', label: t('detail.options.lookingFor.buy') },
+                { value: 'RENT', label: t('detail.options.lookingFor.rent') },
               ]}
-              ariaLabel="קנייה או שכירות"
+              ariaLabel={t('detail.fields.lookingForAria')}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">עיר</label>
+            <label className="form-label">{t('detail.fields.city')}</label>
             <input {...inputPropsForCity()} className="form-input" value={form.city} onChange={(e) => update('city', e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">רחוב</label>
+            <label className="form-label">{t('detail.fields.street')}</label>
             <input {...inputPropsForAddress()} className="form-input" value={form.street} onChange={(e) => update('street', e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">חדרים</label>
+            <label className="form-label">{t('detail.fields.rooms')}</label>
             <input {...inputPropsForRooms()} className="form-input" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">טווח מחיר (טקסט)</label>
+            <label className="form-label">{t('detail.fields.priceText')}</label>
             <input dir="auto" autoCapitalize="off" autoCorrect="off" enterKeyHint="next" className="form-input" value={form.priceRangeLabel} onChange={(e) => update('priceRangeLabel', e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">תקציב</label>
+            <label className="form-label">{t('detail.fields.budget')}</label>
             <NumberField
               unit="₪"
-              placeholder="2,500,000"
+              placeholder={t('detail.fields.budgetPlaceholder')}
               showShort
               value={form.budget}
               onChange={(v) => update('budget', v)}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">מגזר</label>
+            <label className="form-label">{t('detail.fields.sector')}</label>
             <SelectField
               value={form.sector}
               onChange={(v) => update('sector', v)}
-              options={['כללי', 'דתי', 'חרדי', 'ערבי']}
+              options={[t('detail.options.sectors.general'), t('detail.options.sectors.religious'), t('detail.options.sectors.haredi'), t('detail.options.sectors.arab')]}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">קירבה לבית ספר</label>
+            <label className="form-label">{t('detail.fields.schoolProximity')}</label>
             <SelectField
               value={form.schoolProximity}
               onChange={(v) => update('schoolProximity', v)}
-              placeholder="לא חשוב"
-              options={['עד 200 מטר', 'עד 500 מטר', 'הליכה', 'עד ק״מ']}
+              placeholder={t('detail.fields.schoolProximityNotImportant')}
+              options={[t('detail.options.school.m200'), t('detail.options.school.m500'), t('detail.options.school.walk'), t('detail.options.school.km')]}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">מקור</label>
+            <label className="form-label">{t('detail.fields.source')}</label>
             <input dir="auto" autoCapitalize="words" enterKeyHint="next" autoCorrect="off" className="form-input" value={form.source} onChange={(e) => update('source', e.target.value)} />
           </div>
           <div className="form-group form-group-wide">
-            <label className="form-label">הערות</label>
+            <label className="form-label">{t('detail.fields.notes')}</label>
             <textarea
               {...inputPropsForNotes()}
               className="form-textarea"
@@ -519,62 +529,62 @@ function CustomerEditForm({ lead, onSaved, toast }) {
 
         {/* K1 — contact identity block (additive). */}
         <div className="cd-subsection">
-          <h4 className="cd-subsection-title">פרטים מורחבים</h4>
+          <h4 className="cd-subsection-title">{t('detail.sections.extended')}</h4>
           <div className="deal-form-grid">
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k1-first">שם פרטי</label>
+              <label className="form-label" htmlFor="cd-k1-first">{t('detail.fields.firstName')}</label>
               <input id="cd-k1-first" className="form-input" dir="auto" value={form.firstName}
                 onChange={(e) => update('firstName', e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k1-last">שם משפחה</label>
+              <label className="form-label" htmlFor="cd-k1-last">{t('detail.fields.lastName')}</label>
               <input id="cd-k1-last" className="form-input" dir="auto" value={form.lastName}
                 onChange={(e) => update('lastName', e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k1-company">שם חברה</label>
+              <label className="form-label" htmlFor="cd-k1-company">{t('detail.fields.companyName')}</label>
               <input id="cd-k1-company" className="form-input" dir="auto" value={form.companyName}
                 onChange={(e) => update('companyName', e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k1-pid">ת.ז / ח.פ</label>
+              <label className="form-label" htmlFor="cd-k1-pid">{t('detail.fields.personalId')}</label>
               <input id="cd-k1-pid" className="form-input" dir="ltr" inputMode="numeric" value={form.personalId}
                 onChange={(e) => update('personalId', e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k1-address">כתובת</label>
+              <label className="form-label" htmlFor="cd-k1-address">{t('detail.fields.address')}</label>
               <input id="cd-k1-address" className="form-input" dir="auto" value={form.address}
                 onChange={(e) => update('address', e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k1-citytext">עיר (חופשי)</label>
+              <label className="form-label" htmlFor="cd-k1-citytext">{t('detail.fields.cityFree')}</label>
               <input id="cd-k1-citytext" className="form-input" dir="auto" value={form.cityText}
                 onChange={(e) => update('cityText', e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k1-zip">מיקוד</label>
+              <label className="form-label" htmlFor="cd-k1-zip">{t('detail.fields.zip')}</label>
               <input id="cd-k1-zip" className="form-input" dir="ltr" inputMode="numeric" value={form.zip}
                 onChange={(e) => update('zip', e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label">טלפון עיקרי</label>
+              <label className="form-label">{t('detail.fields.primaryPhone')}</label>
               <PhoneField value={form.primaryPhone} onChange={(v) => update('primaryPhone', v)} />
             </div>
             <div className="form-group">
-              <label className="form-label">טלפון נוסף 1</label>
+              <label className="form-label">{t('detail.fields.phone1')}</label>
               <PhoneField value={form.phone1} onChange={(v) => update('phone1', v)} />
             </div>
             <div className="form-group">
-              <label className="form-label">טלפון נוסף 2</label>
+              <label className="form-label">{t('detail.fields.phone2')}</label>
               <PhoneField value={form.phone2} onChange={(v) => update('phone2', v)} />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k1-fax">פקס</label>
+              <label className="form-label" htmlFor="cd-k1-fax">{t('detail.fields.fax')}</label>
               <input id="cd-k1-fax" className="form-input" dir="ltr" inputMode="tel" value={form.fax}
                 onChange={(e) => update('fax', e.target.value)} />
             </div>
             <div className="form-group form-group-wide">
-              <label className="form-label" htmlFor="cd-k1-desc">תיאור</label>
+              <label className="form-label" htmlFor="cd-k1-desc">{t('detail.fields.description')}</label>
               <input id="cd-k1-desc" className="form-input" dir="auto" value={form.description}
                 onChange={(e) => update('description', e.target.value)} />
             </div>
@@ -583,52 +593,52 @@ function CustomerEditForm({ lead, onSaved, toast }) {
 
         {/* K2 + L1 — admin block. */}
         <div className="cd-subsection">
-          <h4 className="cd-subsection-title">ניהול ולקוח</h4>
+          <h4 className="cd-subsection-title">{t('detail.sections.admin')}</h4>
           <div className="deal-form-grid">
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k2-cs">סטטוס לקוח</label>
+              <label className="form-label" htmlFor="cd-k2-cs">{t('detail.fields.customerStatus')}</label>
               <SelectField
                 id="cd-k2-cs"
                 value={form.customerStatus}
                 onChange={(v) => update('customerStatus', v)}
                 options={labelsToOptions(CUSTOMER_STATUS_LABELS)}
-                aria-label="סטטוס לקוח"
+                aria-label={t('detail.fields.customerStatus')}
               />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="cd-k2-ls">סטטוס ליד</label>
+              <label className="form-label" htmlFor="cd-k2-ls">{t('detail.fields.leadStatus')}</label>
               <SelectField
                 id="cd-k2-ls"
                 value={form.leadStatus}
                 onChange={(v) => update('leadStatus', v)}
                 options={labelsToOptions(QUICK_LEAD_STATUS_LABELS)}
-                aria-label="סטטוס ליד"
+                aria-label={t('detail.fields.leadStatus')}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">אחוז עמלה</label>
+              <label className="form-label">{t('detail.fields.commissionPct')}</label>
               <NumberField
                 value={form.commissionPct}
                 onChange={(n) => update('commissionPct', n)}
                 unit="%"
                 min={0}
                 max={100}
-                placeholder="2"
-                aria-label="אחוז עמלה"
+                placeholder={t('detail.fields.commissionPctPlaceholder')}
+                aria-label={t('detail.fields.commissionPct')}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">רצינות</label>
+              <label className="form-label">{t('detail.fields.seriousness')}</label>
               <Segmented
                 value={form.seriousnessOverride}
                 onChange={(v) => update('seriousnessOverride', v)}
                 options={labelsToOptions(SERIOUSNESS_LABELS)}
-                ariaLabel="רצינות"
+                ariaLabel={t('detail.fields.seriousness')}
               />
             </div>
             <div className="form-group form-group-wide">
-              <span className="form-label">מטרת הרכישה</span>
-              <div className="checkbox-grid" role="group" aria-label="מטרת הרכישה">
+              <span className="form-label">{t('detail.fields.purposes')}</span>
+              <div className="checkbox-grid" role="group" aria-label={t('detail.fields.purposes')}>
                 {Object.keys(CUSTOMER_PURPOSE_LABELS).map((val) => {
                   const checked = form.purposes?.includes(val);
                   return (
@@ -658,7 +668,7 @@ function CustomerEditForm({ lead, onSaved, toast }) {
                   onChange={(e) => update('isPrivate', e.target.checked)}
                 />
                 <span className="checkbox-custom" />
-                לקוח פרטי (לא חשוף לשותפי משרד)
+                {t('detail.fields.privateCustomer')}
               </label>
             </div>
           </div>
@@ -666,13 +676,13 @@ function CustomerEditForm({ lead, onSaved, toast }) {
 
         <div className="checkbox-grid">
           {[
-            { key: 'preApproval', label: 'אישור עקרוני' },
-            { key: 'balconyRequired', label: 'מרפסת' },
-            { key: 'parkingRequired', label: 'חניה' },
-            { key: 'elevatorRequired', label: 'מעלית' },
-            { key: 'safeRoomRequired', label: 'ממ״ד' },
-            { key: 'acRequired', label: 'מזגנים' },
-            { key: 'storageRequired', label: 'מחסן' },
+            { key: 'preApproval', label: t('detail.amenities.preApproval') },
+            { key: 'balconyRequired', label: t('detail.amenities.balcony') },
+            { key: 'parkingRequired', label: t('detail.amenities.parking') },
+            { key: 'elevatorRequired', label: t('detail.amenities.elevator') },
+            { key: 'safeRoomRequired', label: t('detail.amenities.safeRoom') },
+            { key: 'acRequired', label: t('detail.amenities.ac') },
+            { key: 'storageRequired', label: t('detail.amenities.storage') },
           ].map(({ key, label }) => (
             <label key={key} className="checkbox-item">
               <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />
@@ -685,7 +695,7 @@ function CustomerEditForm({ lead, onSaved, toast }) {
         <div className="cd-form-actions">
           <button className="btn btn-primary" onClick={save} disabled={busy}>
             <Save size={16} />
-            {busy ? 'שומר…' : 'שמור שינויים'}
+            {busy ? t('detail.actions.saving') : t('detail.actions.save')}
           </button>
         </div>
       </div>
@@ -697,17 +707,20 @@ function CustomerEditForm({ lead, onSaved, toast }) {
 // ActivityTimeline — derived events from the lead's existing fields.
 // ──────────────────────────────────────────────────────────────────
 function ActivityTimeline({ lead }) {
+  const { t } = useTranslation('customers');
   const events = useMemo(() => {
     const items = [];
     if (lead.lastContact) {
       const rel = relativeDate(lead.lastContact);
       const days = Math.round((Date.now() - new Date(lead.lastContact).getTime()) / 86400000);
-      const daysSuffix = days >= 0 ? `קשר אחרון לפני ${days} ימים` : 'קשר אחרון מתוכנן';
+      const title = days >= 0
+        ? t('detail.timeline.lastContactDaysAgo', { days })
+        : t('detail.timeline.lastContactPlanned');
       items.push({
         kind: 'contact',
         ts: new Date(lead.lastContact).getTime(),
         icon: Phone,
-        title: daysSuffix,
+        title,
         sub: rel.label,
         absolute: absoluteTime(lead.lastContact),
       });
@@ -717,7 +730,7 @@ function ActivityTimeline({ lead }) {
         kind: 'status',
         ts: new Date(lead.statusUpdatedAt).getTime(),
         icon: Sparkles,
-        title: `סטטוס עודכן ל${statusLabel(lead.status)}`,
+        title: t('detail.timeline.statusUpdatedTo', { status: statusLabel(t, lead.status) }),
         sub: relativeTime(lead.statusUpdatedAt),
         absolute: absoluteTime(lead.statusUpdatedAt),
       });
@@ -727,7 +740,7 @@ function ActivityTimeline({ lead }) {
         kind: 'created',
         ts: new Date(lead.createdAt).getTime(),
         icon: Building2,
-        title: 'הליד נוצר',
+        title: t('detail.timeline.created'),
         sub: relativeTime(lead.createdAt),
         absolute: absoluteTime(lead.createdAt),
       });
@@ -735,18 +748,18 @@ function ActivityTimeline({ lead }) {
     // Sort by timestamp descending — most recent first
     items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
     return items;
-  }, [lead]);
+  }, [lead, t]);
 
   return (
     <div className="cd-timeline-col">
       <div className="cd-section cd-timeline-section">
         <h3 className="cd-section-title">
           <History size={16} />
-          ציר פעילות
+          {t('detail.timeline.title')}
         </h3>
         {events.length === 0 ? (
           <div className="cd-timeline-empty">
-            <p>עדיין אין פעילות לתצוגה. עדכן קשר או חתום הסכם כדי להתחיל לעקוב.</p>
+            <p>{t('detail.timeline.empty')}</p>
           </div>
         ) : (
           <ul className="cd-timeline">
