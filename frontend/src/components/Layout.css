@@ -130,6 +130,43 @@
 .sidebar-header {
   padding: 24px 20px;
   border-bottom: 1px solid var(--border);
+  /* Flex so the logo + new search button + close button stack on one
+     row. Logo takes the natural width; the action buttons shrink to
+     circular chips on the inline-end edge. */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sidebar-header .logo {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-search {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+}
+.sidebar-search:hover {
+  color: var(--gold);
+  border-color: var(--gold-border);
+  background: var(--bg-card-hover);
+}
+
+/* Hide the search chip when the sidebar is collapsed — the logo is
+ * already shrunk to just the mark, no room for a second chip, and the
+ * mobile header exposes its own search icon already. */
+.sidebar.collapsed .sidebar-search {
+  display: none;
 }
 
 .sidebar-close {

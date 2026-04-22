@@ -162,8 +162,11 @@
 }
 
 .customer-card:hover {
-  border-color: var(--border-light);
-  box-shadow: var(--shadow-md);
+  /* Match .property-card's lift so the two card types read as the
+     same design family — gold border, dropped shadow, 4px rise. */
+  transform: translateY(-4px);
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-lg);
 }
 
 .customer-card.active-client {

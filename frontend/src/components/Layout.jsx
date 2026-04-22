@@ -349,6 +349,19 @@ export default function Layout({ onLogout }) {
               <p>{t('sidebar.subtitle')}</p>
             </div>
           </Link>
+          {/* Search affordance pinned next to the logo — inline-end of
+              the Estia wordmark in RTL. Dispatches the same event the
+              mobile header uses, so the already-mounted CommandPalette
+              opens without Layout needing a direct reference. */}
+          <button
+            type="button"
+            className="sidebar-search btn-ghost"
+            onClick={() => window.dispatchEvent(new CustomEvent('estia:open-palette'))}
+            aria-label={t('aria.search')}
+            title={t('aria.search')}
+          >
+            <Search size={18} />
+          </button>
           <button
             className="sidebar-close btn-ghost"
             onClick={() => setSidebarOpen(false)}

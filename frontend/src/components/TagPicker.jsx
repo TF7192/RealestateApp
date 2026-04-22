@@ -49,12 +49,12 @@ export default function TagPicker({ entityType, entityId, readonly = false, onCh
         api.listTags(),
         api.listAssignedTags(entityType, entityId),
       ]);
-      setAllTags(catalog?.items || []);
-      // Backend GET /tags/for returns `{ tags: [...] }`, not `{ items }`.
-      // Mis-keyed reads left `assigned` permanently empty, which is why
-      // a freshly-attached tag appeared momentarily via the optimistic
-      // update but vanished the next time the picker mounted / refreshed.
-      setAssigned(assignedRes?.tags || assignedRes?.items || []);
+      // Both endpoints return `{ tags }`, not `{ items }`. The
+      // `.items` reads were always coming back as [] which hid the
+      // catalog (no tags to pick) AND wiped the assigned list on
+      // every mount (so the optimistic add disappeared on refresh).
+      setAllTags(catalog?.tags ?? catalog?.items ?? []);
+      setAssigned(assignedRes?.tags ?? assignedRes?.items ?? []);
     } catch (e) {
       toast.error(e?.message || 'טעינת תגים נכשלה');
     } finally {

@@ -56,7 +56,7 @@ export default function CustomerFiltersPanel({
     if (!open) return undefined;
     let cancelled = false;
     api.listTags()
-      .then((r) => { if (!cancelled) setTags(r?.items || []); })
+      .then((r) => { if (!cancelled) setTags(r?.tags ?? r?.items ?? []); })
       .catch(() => { /* soft-fail: the tag group renders empty */ });
     return () => { cancelled = true; };
   }, [open]);

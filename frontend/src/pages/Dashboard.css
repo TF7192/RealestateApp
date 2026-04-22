@@ -824,6 +824,19 @@
   min-width: 0;
   overflow: hidden;
 }
+
+/* The card body has no wrapping padded container, so the bar / legend /
+ * budget rows go edge-to-edge. Give each one the same horizontal padding
+ * as the card header so the bar doesn't kiss the card rim and the
+ * "0 ₪" value has visual breathing room from the inline-start edge. */
+.dash-pipeline > .dash-pipeline-bar,
+.dash-pipeline > .dash-pipeline-legend,
+.dash-pipeline > .dash-pipeline-budget {
+  padding-inline: 20px;
+}
+.dash-pipeline > .dash-pipeline-budget {
+  padding-bottom: 18px;
+}
 .dash-pipeline-bar {
   display: flex;
   height: 28px;

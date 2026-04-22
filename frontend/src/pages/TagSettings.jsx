@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Tag, Plus, Trash2, Pencil, Check, X as XIcon } from 'lucide-react';
 import api from '../lib/api';
 import { useToast, optimisticUpdate } from '../lib/toast';
@@ -33,17 +33,31 @@ export default function TagSettings() {
   const [editing, setEditing] = useState(null); // {id, name, color, scope}
   const [pendingDelete, setPendingDelete] = useState(null);
 
+  // `toast` from useToast() is a fresh object per render — including
+  // it in useCallback's deps made `load` unstable, which made the
+  // mount useEffect fire every render (load → setState → re-render →
+  // new load → …). The agent saw `שגיאה בטעינת התגיות` flashing in
+  // a loop whenever the initial fetch hiccupped. Swap to a ref so the
+  // latest `toast` is always available inside `load` without being in
+  // the dep list.
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.listTags();
-      setItems(res?.items || []);
+      // Backend returns `{ tags }`, not `{ items }` — the catalog was
+      // always empty here, which is why "Adding tags don't work" showed
+      // up on every surface (the tags page, the TagPicker dropdown,
+      // etc.).
+      setItems(res?.tags ?? res?.items ?? []);
     } catch {
-      toast.error('שגיאה בטעינת התגיות');
+      toastRef.current?.error?.('שגיאה בטעינת התגיות');
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 

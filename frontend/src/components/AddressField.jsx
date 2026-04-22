@@ -55,6 +55,20 @@ export default function AddressField({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [err, setErr] = useState(null);
 
+  const inputRef = useRef(null);
+  const debounceRef = useRef(null);
+  const reqIdRef = useRef(0);
+  // Snapshot of the street label the agent picked, so we can tell later
+  // whether they're EXTENDING it (e.g., "הרצל" → "הרצל 15", which is still
+  // the same validated address with a manually-typed house number) or
+  // DIVERGING (e.g., "הרצל" → "ז'בוטינסקי", a different street that
+  // invalidates the previous lat/lng).
+  //
+  // This ref MUST be declared BEFORE the render-phase diff below — the
+  // diff reads `pickedLabelRef.current` when `value` flips to empty,
+  // and a TDZ reference there was crashing `/properties/new` on delete.
+  const pickedLabelRef = useRef('');
+
   // Track the last `value` we've reconciled with `local`, so we can
   // reset when the parent swaps it out externally (e.g., loading an
   // existing record into an edit form). Render-phase diff keeps the
@@ -70,16 +84,6 @@ export default function AddressField({
       pickedLabelRef.current = '';
     }
   }
-
-  const inputRef = useRef(null);
-  const debounceRef = useRef(null);
-  const reqIdRef = useRef(0);
-  // Snapshot of the street label the agent picked, so we can tell later
-  // whether they're EXTENDING it (e.g., "הרצל" → "הרצל 15", which is still
-  // the same validated address with a manually-typed house number) or
-  // DIVERGING (e.g., "הרצל" → "ז'בוטינסקי", a different street that
-  // invalidates the previous lat/lng).
-  const pickedLabelRef = useRef('');
 
   // Debounced Photon query. Aborts stale responses by bumping reqId.
   // The two setState calls in the early-return clear the fetch-derived
