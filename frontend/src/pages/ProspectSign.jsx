@@ -1,16 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Check, Pen, AlertCircle, Trash2, ArrowRight, FileSignature, Home } from 'lucide-react';
+import {
+  Check, Pen, AlertCircle, Trash2, ArrowRight, FileSignature, Home,
+  BadgeCheck, Percent, CalendarDays, ShieldCheck,
+} from 'lucide-react';
 import './ProspectSign.css';
 
-// Public prospect-sign kiosk. Two-step flow that mirrors the formal
-// Israeli "הזמנת שירותי תיווך" layout:
-//   Step 1: landing — agent header + property context + big CTA.
-//   Step 2: formal order — agent + client + property details, the
-//           agent's own brokerage terms (pulled from their profile),
-//           signature canvas.
+// Public brokerage-order kiosk ("הסכם תיווך" sign flow).
 //
-// Gated by an unguessable 24h token. No login.
+// Two-step flow:
+//   Step 1 — FULL order summary: agent identification, property,
+//            transaction type, commission %, validity, exclusivity,
+//            brokerage terms. The prospect reads the whole agreement
+//            here and taps the CTA to confirm.
+//   Step 2 — identity + signature.
+//
+// Gated by an unguessable 24h token. No login. Light-only theme —
+// the public form should look the same for every signer regardless
+// of their OS theme setting.
+
+// ──────────────────────────────────────────────────────────────
+// Helpers + presentational subcomponents (MUST be defined at
+// MODULE scope, not inside the default export — re-creating them
+// on every render would remount the child <input>s and drop focus
+// on every keystroke, which is the bug users hit when typing.)
+// ──────────────────────────────────────────────────────────────
 
 function formatPrice(n) {
   if (n == null) return '';
@@ -18,10 +32,34 @@ function formatPrice(n) {
   catch { return String(n); }
 }
 
-// Very conservative allow-list for rendering the agent-supplied
+function formatDateIL(d) {
+  if (!d) return '';
+  try {
+    return new Intl.DateTimeFormat('he-IL', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    }).format(d);
+  } catch { return ''; }
+}
+
+function todayDate() { return new Date(); }
+function monthsFromNow(n) {
+  const d = new Date();
+  d.setMonth(d.getMonth() + n);
+  return d;
+}
+
+// Derive the industry-standard Hebrew transaction label from the
+// property's assetClass + category enums.
+function transactionLabel(property) {
+  if (!property) return '';
+  const isRent = property.category === 'RENT';
+  const isCommercial = property.assetClass === 'COMMERCIAL';
+  if (isCommercial) return isRent ? 'השכרת נכס מסחרי' : 'מכירת נכס מסחרי';
+  return isRent ? 'שכירות למגורים' : 'רכישת נכס למגורים';
+}
+
+// Conservative allow-list for rendering the agent-supplied
 // brokerageTermsHtml. No <script>, no event handlers, no <iframe>.
-// Bold + italic + paragraphs + line breaks + lists + headings are
-// enough for a broker form.
 const ALLOWED_TAGS = new Set([
   'P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI',
   'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'SPAN', 'DIV',
@@ -37,8 +75,6 @@ function sanitizeHtml(raw) {
           child.replaceWith(...Array.from(child.childNodes));
           continue;
         }
-        // Strip every attribute — keeps inline handlers, javascript: URLs,
-        // and style-based exfil impossible.
         for (const attr of Array.from(child.attributes)) child.removeAttribute(attr.name);
         walk(child);
       }
@@ -48,6 +84,47 @@ function sanitizeHtml(raw) {
   return tpl.innerHTML;
 }
 
+function Shell({ children }) {
+  return (
+    <div className="psn-page psn-light" dir="rtl">
+      <header className="psn-brand-bar">
+        <div className="psn-brand-mark" aria-hidden="true">◆</div>
+        <div className="psn-brand-text">
+          <strong>Estia</strong>
+          <span>הסכם תיווך</span>
+        </div>
+      </header>
+      <main className="psn-main">{children}</main>
+      <footer className="psn-foot">מאובטח · החתימה נשמרת מוצפנת אצל המתווך/ת</footer>
+    </div>
+  );
+}
+
+function AgentHeader({ agent }) {
+  if (!agent) return null;
+  return (
+    <div className="psn-agent-head">
+      <div className="psn-agent-name">
+        {agent.displayName || 'המתווך/ת'}
+        {agent.agency && <span className="psn-agent-agency"> · {agent.agency}</span>}
+      </div>
+      {agent.businessAddress && <div className="psn-agent-line">{agent.businessAddress}</div>}
+      {agent.phone && <div className="psn-agent-line" dir="ltr">{agent.phone}</div>}
+      {(agent.license || agent.personalId) && (
+        <div className="psn-agent-line psn-agent-meta">
+          {agent.license && <span>מ.ר. {agent.license}</span>}
+          {agent.license && agent.personalId && <span aria-hidden="true"> · </span>}
+          {agent.personalId && <span>ת.ז. {agent.personalId}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Main component
+// ──────────────────────────────────────────────────────────────
+
 export default function ProspectSign() {
   const { token } = useParams();
   const [loading, setLoading] = useState(true);
@@ -55,7 +132,7 @@ export default function ProspectSign() {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
-  const [step, setStep] = useState('intro'); // 'intro' | 'form'
+  const [step, setStep] = useState('summary'); // 'summary' | 'form'
   const [form, setForm] = useState({
     fullName: '',
     idType: 'ID',
@@ -116,8 +193,8 @@ export default function ProspectSign() {
     const t = e.touches?.[0] || e;
     return { x: t.clientX - rect.left, y: t.clientY - rect.top };
   };
-  const start = (e) => { e.preventDefault(); drawing.current = true; last.current = pt(e); };
-  const move = (e) => {
+  const startStroke = (e) => { e.preventDefault(); drawing.current = true; last.current = pt(e); };
+  const moveStroke = (e) => {
     if (!drawing.current) return;
     e.preventDefault();
     const ctx = canvasRef.current.getContext('2d');
@@ -129,8 +206,8 @@ export default function ProspectSign() {
     last.current = p;
     hasStroke.current = true;
   };
-  const end = () => { drawing.current = false; last.current = null; };
-  const clear = () => {
+  const endStroke = () => { drawing.current = false; last.current = null; };
+  const clearCanvas = () => {
     const canvas = canvasRef.current;
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     hasStroke.current = false;
@@ -181,20 +258,6 @@ export default function ProspectSign() {
     [state?.agent?.brokerageTermsHtml],
   );
 
-  const Shell = ({ children }) => (
-    <div className="psn-page" dir="rtl">
-      <header className="psn-brand-bar">
-        <div className="psn-brand-mark" aria-hidden="true">◆</div>
-        <div className="psn-brand-text">
-          <strong>Estia</strong>
-          <span>הזמנת שירותי תיווך</span>
-        </div>
-      </header>
-      <main className="psn-main">{children}</main>
-      <footer className="psn-foot">מאובטח · החתימה נשמרת מוצפנת אצל המתווך/ת</footer>
-    </div>
-  );
-
   if (loading) {
     return (
       <Shell>
@@ -236,58 +299,101 @@ export default function ProspectSign() {
   }
 
   const { prospect, property, agent } = state;
+  const txLabel = transactionLabel(property);
+  const commissionPct = property?.agentCommissionPct ?? null; // read-only; agent-set
+  const validFrom = todayDate();
+  const validUntil = monthsFromNow(6); // industry-standard default validity
 
-  // ── Agent header block (used on both steps) ────────────────────
-  const AgentHeader = () => (
-    <div className="psn-agent-head">
-      <div className="psn-agent-name">
-        {agent?.displayName || 'המתווך/ת'}
-        {agent?.agency && <span className="psn-agent-agency"> · {agent.agency}</span>}
-      </div>
-      {agent?.businessAddress && <div className="psn-agent-line">{agent.businessAddress}</div>}
-      {agent?.phone && <div className="psn-agent-line" dir="ltr">{agent.phone}</div>}
-      {(agent?.license || agent?.personalId) && (
-        <div className="psn-agent-line psn-agent-meta">
-          {agent.license  && <span>מ.ר. {agent.license}</span>}
-          {agent.license && agent.personalId && <span aria-hidden="true"> · </span>}
-          {agent.personalId && <span>ת.ז. {agent.personalId}</span>}
-        </div>
-      )}
-    </div>
-  );
-
-  // ── Step 1: intro landing ──────────────────────────────────────
-  if (step === 'intro') {
+  // ── Step 1: full order summary (read-only review) ────────────
+  if (step === 'summary') {
     return (
       <Shell>
         <div className="psn-card psn-intro">
-          <AgentHeader />
+          <AgentHeader agent={agent} />
           <div className="psn-rule" />
-          <div className="psn-intro-icon"><FileSignature size={24} /></div>
-          <h1>הזמנת שירותי תיווך</h1>
-          <p className="psn-law-cite">
-            נדרשת עפ"י חוק המתווכים במקרקעין, התשנ"ו-1996
-          </p>
 
-          {property && (
-            <div className="psn-prop">
-              <Home size={16} aria-hidden="true" />
-              <div>
-                <div className="psn-prop-title">
-                  {property.type ? `${property.type} ` : ''}ב{property.street}, {property.city}
-                </div>
-                {property.neighborhood && <div className="psn-prop-sub">{property.neighborhood}</div>}
-                {property.marketingPrice != null && (
-                  <div className="psn-prop-price">₪ {formatPrice(property.marketingPrice)}</div>
-                )}
-              </div>
-            </div>
-          )}
+          <div className="psn-intro-icon"><FileSignature size={24} /></div>
+          <h1>הסכם תיווך</h1>
+          <p className="psn-law-cite">
+            נדרש עפ"י חוק המתווכים במקרקעין, התשנ"ו-1996
+          </p>
 
           <p className="psn-intro-copy">
-            שלום {prospect.name}, הטופס כולל פרטי זיהוי, התחייבויות עפ"י חוק המתווכים
-            וחתימה דיגיטלית. המילוי אורך כדקה.
+            שלום {prospect.name}, להלן פרטי ההזמנה שלך למתווך.
+            נא לעיין במלואם ולהמשיך לחתימה בתחתית העמוד.
           </p>
+
+          {/* ── Property ───────────────────────────────────── */}
+          {property && (
+            <>
+              <h3 className="psn-section-h">פרטי הנכס</h3>
+              <div className="psn-prop">
+                <Home size={16} aria-hidden="true" />
+                <div>
+                  <div className="psn-prop-title">
+                    {property.type ? `${property.type} ` : ''}ב{property.street}, {property.city}
+                  </div>
+                  {property.neighborhood && (
+                    <div className="psn-prop-sub">{property.neighborhood}</div>
+                  )}
+                  {property.marketingPrice != null && (
+                    <div className="psn-prop-price">
+                      מחיר מבוקש: ₪ {formatPrice(property.marketingPrice)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── Transaction + commission block ─────────────── */}
+          <h3 className="psn-section-h">תנאי העסקה</h3>
+          <dl className="psn-terms-grid">
+            <dt><BadgeCheck size={14} /> סוג עסקה</dt>
+            <dd>{txLabel || '—'}</dd>
+
+            <dt><Percent size={14} /> דמי תיווך</dt>
+            <dd>
+              {commissionPct != null
+                ? `${commissionPct}% ממחיר העסקה + מע"מ`
+                : 'כמוסכם ביני לבין המתווך/ת'}
+            </dd>
+
+            <dt><CalendarDays size={14} /> תוקף הזמנה</dt>
+            <dd>{formatDateIL(validFrom)} — {formatDateIL(validUntil)}</dd>
+
+            <dt><ShieldCheck size={14} /> בלעדיות</dt>
+            <dd>לא</dd>
+          </dl>
+
+          {/* ── Agent brokerage terms (full legal text) ────── */}
+          <h3 className="psn-section-h">נוסח הסכם התיווך</h3>
+          {agentTermsHtml ? (
+            <div
+              className="psn-terms psn-terms-html"
+              dangerouslySetInnerHTML={{ __html: agentTermsHtml }}
+            />
+          ) : (
+            <div className="psn-terms">
+              <p>
+                הלקוח/ה מזמין/ה בזאת מהמתווך שירותי תיווך בקשר לנכס המפורט לעיל,
+                בהתאם להוראות חוק המתווכים במקרקעין, התשנ"ו-1996 ותקנותיו.
+              </p>
+              <p>
+                הלקוח/ה מתחייב/ת להודיע למתווך באופן מיידי על כל משא ומתן או חתימה
+                על הסכם מחייב ביחס לנכס, ולשלם למתווך את דמי התיווך כמוסכם לעיל
+                מיד עם ביצוע העסקה.
+              </p>
+              <p>
+                הלקוח/ה מצהיר/ה כי הנכס הוצג בפניו/ה באמצעות המתווך, וכי ההתקשרות
+                הזו חלה גם על רוכשים/שוכרים מטעמו/ה (בני משפחה, חברה בשליטתו/ה וכו').
+              </p>
+              <p className="psn-terms-note">
+                * זהו נוסח כללי. המתווך/ת יכולים להחליף אותו בנוסח מלא שלהם
+                בהגדרות חשבון הסוכן.
+              </p>
+            </div>
+          )}
 
           <button
             type="button"
@@ -295,7 +401,7 @@ export default function ProspectSign() {
             onClick={() => setStep('form')}
           >
             <Pen size={18} />
-            <span>לחץ לחתימה</span>
+            <span>קראתי ואני מסכים/ה — המשך לחתימה</span>
           </button>
 
           <ul className="psn-checks">
@@ -308,7 +414,7 @@ export default function ProspectSign() {
     );
   }
 
-  // ── Step 2: formal order form ─────────────────────────────────
+  // ── Step 2: identity + signature ─────────────────────────────
   const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   return (
@@ -318,19 +424,13 @@ export default function ProspectSign() {
           <button
             type="button"
             className="btn btn-ghost psn-back"
-            onClick={() => { setErr(null); setStep('intro'); }}
+            onClick={() => { setErr(null); setStep('summary'); }}
             aria-label="חזור"
           >
             <ArrowRight size={16} /> חזור
           </button>
-          <h2>הזמנת שירותי תיווך</h2>
+          <h2>פרטי חותם/ת</h2>
         </div>
-
-        <AgentHeader />
-        <div className="psn-rule" />
-
-        {/* ── Client details ────────────────────────────────── */}
-        <h3 className="psn-section-h">פרטי הלקוח/ה</h3>
 
         <label className="psn-label" htmlFor="psn-fullname">שם מלא *</label>
         <input
@@ -405,53 +505,6 @@ export default function ProspectSign() {
           placeholder="name@example.com"
         />
 
-        {/* ── Property list ─────────────────────────────────── */}
-        {property && (
-          <>
-            <h3 className="psn-section-h">הנכס</h3>
-            <div className="psn-prop-table" role="table">
-              <div className="psn-prop-row psn-prop-row-head" role="row">
-                <span role="columnheader">סוג</span>
-                <span role="columnheader">כתובת</span>
-                <span role="columnheader">מחיר מבוקש</span>
-              </div>
-              <div className="psn-prop-row" role="row">
-                <span role="cell">{property.type || '—'}</span>
-                <span role="cell">{property.street}, {property.city}</span>
-                <span role="cell">
-                  {property.marketingPrice != null
-                    ? `₪ ${formatPrice(property.marketingPrice)}`
-                    : '—'}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── Brokerage terms (agent-supplied or fallback) ─── */}
-        <h3 className="psn-section-h">תנאי הזמנת שירותי תיווך</h3>
-        {agentTermsHtml ? (
-          <div
-            className="psn-terms psn-terms-html"
-            dangerouslySetInnerHTML={{ __html: agentTermsHtml }}
-          />
-        ) : (
-          <div className="psn-terms">
-            <p>
-              הלקוח/ה מזמין/ה בזאת מהמתווך שירותי תיווך בקשר לנכס המפורט לעיל,
-              בהתאם להוראות חוק המתווכים במקרקעין, התשנ"ו-1996.
-            </p>
-            <p>
-              הלקוח/ה מתחייב/ת להודיע למתווך באופן מיידי על כל משא ומתן או חתימה
-              על הסכם מחייב ביחס לנכס, ועל תשלום דמי תיווך כמוסכם בינו לבין
-              המתווך מיד עם ביצוע העסקה.
-            </p>
-            <p className="psn-terms-note">
-              * זהו נוסח כללי. ניתן להחליפו בנוסח ברוקרז' מלא שלך בהגדרות חשבון המתווך.
-            </p>
-          </div>
-        )}
-
         <label className="psn-label" htmlFor="psn-notes">הערות (אופציונלי)</label>
         <textarea
           id="psn-notes"
@@ -464,10 +517,9 @@ export default function ProspectSign() {
           placeholder="פרטים נוספים שחשוב שהמתווך/ת ידעו"
         />
 
-        {/* ── Signature ─────────────────────────────────────── */}
         <div className="psn-sign-head">
           <label className="psn-label">חתימה *</label>
-          <button type="button" className="psn-clear" onClick={clear}>
+          <button type="button" className="psn-clear" onClick={clearCanvas}>
             <Trash2 size={12} /> נקה
           </button>
         </div>
@@ -475,8 +527,8 @@ export default function ProspectSign() {
           <canvas
             ref={canvasRef}
             className="psn-canvas"
-            onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
-            onTouchStart={start} onTouchMove={move} onTouchEnd={end}
+            onMouseDown={startStroke} onMouseMove={moveStroke} onMouseUp={endStroke} onMouseLeave={endStroke}
+            onTouchStart={startStroke} onTouchMove={moveStroke} onTouchEnd={endStroke}
           />
           <div className="psn-canvas-hint"><Pen size={18} /> חתום/י כאן</div>
         </div>

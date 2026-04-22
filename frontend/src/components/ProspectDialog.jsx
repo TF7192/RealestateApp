@@ -192,7 +192,7 @@ export default function ProspectDialog({ property, onClose, onCreated }) {
         >
           <header className="pdg-head">
             <div className="pdg-head-text">
-              <strong>הוסף מתעניין</strong>
+              <strong>צור הסכם תיווך</strong>
               <span>{property.street}, {property.city}</span>
             </div>
             <button className="pdg-close" onClick={onClose} aria-label="סגור"><X size={18} /></button>
@@ -222,7 +222,7 @@ export default function ProspectDialog({ property, onClose, onCreated }) {
 
           <div className="pdg-body">
             {digital ? (
-              <DigitalLinkPanel digital={digital} onCopy={copyLink} onShareWA={shareViaWA} />
+              <DigitalLinkPanel digital={digital} onCopy={copyLink} />
             ) : (
               <>
                 <div className="pdg-field">
@@ -367,7 +367,11 @@ export default function ProspectDialog({ property, onClose, onCreated }) {
   );
 }
 
-function DigitalLinkPanel({ digital, onCopy, onShareWA }) {
+// The WhatsApp share button lives in the outer dialog footer; this
+// panel only shows the link + QR + copy button. Keeping a single
+// WhatsApp entry point removed the duplicate "send" CTA the design
+// review flagged.
+function DigitalLinkPanel({ digital, onCopy }) {
   // Very small QR implementation — Google Charts (legacy, public) or
   // an inline <img> that fetches from api.qrserver.com. Using qrserver
   // avoids adding a dep; it's been up for 10+ years.
@@ -384,9 +388,6 @@ function DigitalLinkPanel({ digital, onCopy, onShareWA }) {
         <div className="pdg-digital-actions">
           <button className="btn btn-secondary btn-sm" onClick={onCopy}>
             <Link2 size={13} /> העתק קישור
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={onShareWA}>
-            <Send size={13} /> שלח בוואטסאפ
           </button>
         </div>
       </div>

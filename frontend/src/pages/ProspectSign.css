@@ -471,48 +471,36 @@
   .psn-prop-row > span:first-child { font-weight: 700; color: #8a6932; }
 }
 
-/* ── Dark mode ──────────────────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
-  .psn-page {
-    background:
-      radial-gradient(ellipse at top left,  rgba(180, 139, 76, 0.18), transparent 55%),
-      radial-gradient(ellipse at top right, rgba(201, 163, 108, 0.12), transparent 55%),
-      #14110b;
-    color: #f3ecd8;
-  }
-  .psn-brand-text strong { color: #f3ecd8; }
-  .psn-brand-text span,
-  .psn-foot { color: #c9a36c; }
-  .psn-card {
-    background: #1f1a10;
-    border-color: rgba(201, 163, 108, 0.22);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 40px -12px rgba(180, 139, 76, 0.3);
-  }
-  .psn-agent-name,
-  .psn-intro h1,
-  .psn-prop-title,
-  .psn-form-head h2,
-  .psn-done h2, .psn-err h2,
-  .psn-label,
-  .psn-seg-btn.is-on,
-  .psn-input, .psn-textarea { color: #f3ecd8; }
-  .psn-agent-line, .psn-agent-meta,
-  .psn-law-cite,
-  .psn-intro-copy,
-  .psn-done p, .psn-err p,
-  .psn-terms { color: #c9a36c; }
-  .psn-prop,
-  .psn-prop-table,
-  .psn-terms,
-  .psn-segmented,
-  .psn-checks li { background: #2a2113; border-color: rgba(201, 163, 108, 0.22); }
-  .psn-prop-row-head { background: #332716; }
-  .psn-prop-sub { color: #8c7c5a; }
-  .psn-seg-btn { color: #c9a36c; }
-  .psn-seg-btn.is-on { background: #332716; }
-  .psn-input, .psn-textarea {
-    background: #2a2113;
-    border-color: rgba(201, 163, 108, 0.22);
-  }
-  .psn-canvas-wrap { background: #f3ecd8; border-color: rgba(201, 163, 108, 0.35); }
+/* Light-only surface. The prospect-sign kiosk is a legal document
+   screen — the theme must look the same for every signer regardless
+   of OS theme setting. Dark-mode media block removed intentionally;
+   `.psn-light` on the root also forces `color-scheme: light` so any
+   theme-aware UA (form autofill, scroll-bar) stays light as well. */
+.psn-page.psn-light { color-scheme: light; }
+
+/* Transaction-terms grid (summary step 1). Two-column layout in a
+   definition-list; collapses to stacked on narrow phones. */
+.psn-terms-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 14px;
+  margin: 10px 0 16px;
+  font-size: 13px;
+}
+.psn-terms-grid dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8a6932;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.psn-terms-grid dd {
+  margin: 0;
+  color: #2b2721;
+  font-weight: 500;
+}
+@media (max-width: 420px) {
+  .psn-terms-grid { grid-template-columns: 1fr; gap: 4px 0; }
+  .psn-terms-grid dd { margin-block-end: 8px; }
 }

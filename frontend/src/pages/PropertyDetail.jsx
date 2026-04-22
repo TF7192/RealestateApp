@@ -602,7 +602,7 @@ export default function PropertyDetail() {
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => setProspectOpen(true)}>
             <UserPlus size={14} />
-            <span>הוסף מתעניין</span>
+            <span>צור הסכם תיווך</span>
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => setTransferOpen(true)} title="העברה לסוכן אחר">
             <ArrowLeftRight size={14} />
