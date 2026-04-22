@@ -23,6 +23,7 @@ import { registerAdminRoutes } from './routes/admin.js';
 import { registerYad2Routes } from './routes/yad2.js';
 import { registerMarketRoutes } from './routes/market.js';
 import { registerProspectRoutes } from './routes/prospects.js';
+import { registerProspectPdfRoutes } from './routes/prospect-pdf.js';
 import { registerCalendarRoutes } from './routes/calendar.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { registerAgentRoutes } from './routes/agents.js';
@@ -231,6 +232,9 @@ export async function build() {
   await app.register(registerYad2Routes,  { prefix: '/api/integrations/yad2' });
   await app.register(registerMarketRoutes, { prefix: '/api/market' });
   await app.register(registerProspectRoutes, { prefix: '/api' });
+  // P-3 — prospect agreement PDF + lead-link endpoints. Same /api prefix
+  // so the routes sit next to /api/prospects/* from registerProspectRoutes.
+  await app.register(registerProspectPdfRoutes, { prefix: '/api' });
   await app.register(registerCalendarRoutes, { prefix: '/api/integrations/calendar' });
   await app.register(registerOfficeRoutes, { prefix: '/api/office' });
   await app.register(registerTagRoutes, { prefix: '/api/tags' });

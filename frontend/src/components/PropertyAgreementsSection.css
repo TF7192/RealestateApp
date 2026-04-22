@@ -1,0 +1,232 @@
+/* P-3 — "הסכמי תיווך" section on PropertyDetail. RTL-first with logical
+   properties so the card inherits the page's dir="rtl" cleanly. */
+
+.pd-agreements {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-block: 16px 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.pd-agr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: 12px;
+}
+
+.pd-agr-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.pd-agr-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--gold-glow);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  margin-inline-start: 4px;
+}
+
+.pd-agr-loading,
+.pd-agr-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.pd-agr-loading {
+  color: var(--text-muted);
+}
+
+.pd-agr-error {
+  background: var(--danger-bg, rgba(220, 38, 38, 0.08));
+  color: var(--danger, #b91c1c);
+}
+
+.pd-agr-error .btn {
+  margin-inline-start: auto;
+}
+
+.pd-agr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pd-agr-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.pd-agr-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pd-agr-name {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.pd-agr-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pd-agr-date {
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-agr-lead {
+  position: relative;
+}
+
+.pd-agr-linked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--gold-glow);
+  color: var(--gold);
+  font-size: 12px;
+  border: 1px solid var(--gold-border);
+}
+
+.pd-agr-linked-label {
+  color: var(--text-muted);
+}
+
+.pd-agr-linked-name {
+  color: var(--gold);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.pd-agr-linked-name:hover {
+  text-decoration: underline;
+}
+
+.pd-agr-unlink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-inline-start: 2px;
+}
+
+.pd-agr-unlink:hover { background: rgba(0, 0, 0, 0.08); }
+.pd-agr-unlink:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.pd-agr-picker-wrap {
+  position: relative;
+}
+
+.pd-agr-picker {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: calc(100% + 4px);
+  z-index: 30;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.14));
+  padding: 4px;
+  list-style: none;
+  margin: 0;
+}
+
+.pd-agr-picker-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pd-agr-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: start;
+  gap: 2px;
+}
+
+.pd-agr-picker-item:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+}
+
+.pd-agr-picker-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pd-agr-picker-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.pd-agr-picker-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.pd-agr-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .pd-agr-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .pd-agr-actions { justify-content: flex-end; }
+}

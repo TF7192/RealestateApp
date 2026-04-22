@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Check, Pen, Link2, QrCode, Trash2, Send, AlertCircle, UserPlus } from 'lucide-react';
+import { X, Check, Pen, Link2, QrCode, Trash2, Send, AlertCircle, UserPlus, Printer } from 'lucide-react';
 import api from '../lib/api';
 import Portal from './Portal';
 import haptics from '../lib/haptics';
 import useFocusTrap from '../hooks/useFocusTrap';
+import { printPage } from '../lib/print';
 import './ProspectDialog.css';
 
 // 1.5 — Prospect intake form.
@@ -163,6 +164,22 @@ export default function ProspectDialog({ property, onClose, onCreated }) {
     window.open(url, 'estia-whatsapp', 'noreferrer');
   };
 
+  // P-2 — Open the signed-agreement PDF in a new tab and trigger its
+  // print dialog. The backend renders the A4 single-page form with the
+  // captured signature; printing from the PDF is higher-fidelity than
+  // window.print() of the dialog (which hides app chrome but can't
+  // render the signature cleanly).
+  const printSignedForm = () => {
+    const id = success?.prospect?.id;
+    if (!id) return;
+    const url = api.prospectAgreementUrl(id);
+    const w = window.open(url, '_blank');
+    if (!w) {
+      // Popup blocked — fall back to an in-place print of the dialog.
+      printPage();
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────
   if (success) {
     return (
@@ -172,7 +189,13 @@ export default function ProspectDialog({ property, onClose, onCreated }) {
             <div className="pdg-done-icon"><Check size={36} /></div>
             <h3>נרשם בהצלחה</h3>
             <p>{success.prospect.name} נוסף לרשימת המתעניינים בנכס.</p>
-            <button className="btn btn-primary" onClick={onClose}>סגור</button>
+            <div className="pdg-done-actions">
+              <button className="btn btn-secondary" onClick={printSignedForm}>
+                <Printer size={14} />
+                <span>הדפס טופס חתום</span>
+              </button>
+              <button className="btn btn-primary" onClick={onClose}>סגור</button>
+            </div>
           </div>
         </div>
       </Portal>
