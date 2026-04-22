@@ -55,178 +55,23 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// iOS keyboard handling + zoom guards.
+// Keyboard handling: NONE.
 //
-// Design goal: the page MUST NOT jump when the user focuses / blurs an
-// input. Previously we called `scrollIntoView({ block: 'center' })` on
-// focus which repositioned the whole page, and iOS WKWebView's built-in
-// scroll-assist doubled-down on it — blurring often landed at a
-// different scroll than where the user tapped. Now:
-//   1. Subscribe to Capacitor's Keyboard plugin (native app only) to get
-//      the exact keyboard height and expose it as a CSS var (--kb-h) so
-//      pages can add bottom padding while the keyboard is up.
-//   2. Disable WKWebView's built-in scroll-assist (Keyboard.setScroll).
-//      We handle scroll manually below.
-//   3. On focusin, capture window.scrollY. After the keyboard is up, if
-//      and only if the focused field is hidden behind the keyboard, we
-//      scroll by the minimum delta needed (scrollBy, not scrollIntoView
-//      block:center — that would drag the whole page).
-//   4. On focusout, restore the captured scrollY UNLESS focus is moving
-//      to another input — in which case we leave the page where it is so
-//      the next input doesn't provoke a second hop.
+// User feedback, repeated: "when I click on to write, can you not do
+// anything? I mean, keep it like iPhone and Apple intended?"
+//
+// So we deliberately ship ZERO focus/keyboard scroll behaviour. iOS is
+// responsible for the whole keyboard experience. The previous passes
+// (`nudgeIntoView`, visualViewport.resize handlers, scroll restore on
+// blur, Keyboard.addListener hooks) all removed.
+//
+// Relevant Capacitor config already in place:
+//   - Keyboard.resize: "none" — WebView doesn't resize on keyboard open
+//   - StatusBar.overlaysWebView: false — no top-bar chrome shift
+//
+// The only remaining document-level listeners below are zoom guards
+// (pinch / double-tap) which are a11y-neutral and don't touch scroll.
 if (typeof window !== 'undefined') {
-  // Scroll restoration target: when the keyboard closes (or focus
-  // leaves all inputs), we snap the document back here so the user
-  // isn't left mid-form-scroll.
-  let preFocusScrollY = null;
-
-  // Actual iOS keyboard height, from the Capacitor Keyboard plugin.
-  // Stays at 0 until the keyboard opens; updated on willShow/didShow
-  // and cleared on hide. We DON'T expose this as --kb-h anymore —
-  // nothing in CSS pushes elements up on keyboard-open (user feedback:
-  // "I don't want anything to go up"). We only use the height below,
-  // in the focusin handler, to decide whether the focused input is
-  // actually covered and needs a minimum-possible document scroll.
-  let kbHeight = 0;
-  document.documentElement.style.setProperty('--kb-h', '0px');
-
-  // Hook the Capacitor keyboard plugin when available (iPhone app).
-  import('@capacitor/core').then(({ Capacitor }) => {
-    if (!Capacitor?.isNativePlatform?.()) return;
-    import('@capacitor/keyboard').then(({ Keyboard }) => {
-      const nudgeActive = () => {
-        // Re-run the cover check when the keyboard size actually
-        // changes (e.g. suggestion bar expands, split-keyboard). If
-        // the currently-focused input has just been covered, scroll.
-        const el = document.activeElement;
-        if (isTextInput(el)) nudgeIfCovered(el);
-      };
-      Keyboard.addListener('keyboardWillShow', (info) => {
-        kbHeight = info?.keyboardHeight || 0;
-      });
-      Keyboard.addListener('keyboardDidShow', (info) => {
-        kbHeight = info?.keyboardHeight || 0;
-        nudgeActive();
-      });
-      Keyboard.addListener('keyboardWillHide', () => { kbHeight = 0; });
-      Keyboard.addListener('keyboardDidHide', () => {
-        kbHeight = 0;
-        // Restore pre-focus scroll when the keyboard closes, so the
-        // agent isn't left halfway down a form that re-expanded.
-        if (preFocusScrollY != null) {
-          window.scrollTo(0, preFocusScrollY);
-          preFocusScrollY = null;
-        }
-      });
-      // Hide the iOS "Previous / Next / Done" accessory bar; it takes
-      // extra vertical space and causes cascading re-layouts on inputs.
-      Keyboard.setAccessoryBarVisible?.({ isVisible: false }).catch(() => {});
-    }).catch(() => {});
-  }).catch(() => {});
-
-  const isTextInput = (el) => {
-    if (!el || el === document.body) return false;
-    const tag = (el.tagName || '').toLowerCase();
-    if (tag === 'select') return true;
-    if (tag === 'input') {
-      const t = (el.getAttribute('type') || 'text').toLowerCase();
-      return ['text', 'search', 'email', 'tel', 'url', 'password', 'number', 'date', 'datetime-local', 'time', 'month', 'week'].includes(t);
-    }
-    if (tag === 'textarea') return true;
-    if (el.isContentEditable) return true;
-    return false;
-  };
-
-  // State-of-the-art iOS input-focus scroll:
-  //
-  //   1. WebView viewport stays full-height (Capacitor Keyboard.resize
-  //      is "none"). Nothing in the page auto-resizes.
-  //   2. The iOS keyboard slides up as a system-level overlay above
-  //      the WebView. Bottom-fixed chrome (mobile tab bar, sticky
-  //      "שמור והמשך" bar, FABs) is naturally HIDDEN behind the
-  //      keyboard — it's still there, just not visible, which is
-  //      exactly how native iOS apps handle it (Notes / Messages /
-  //      Mail all work this way). We do NOT try to "lift" input
-  //      above those bars, because they're not visible obstacles
-  //      during typing — they're covered by the OS keyboard.
-  //   3. If and only if the focused input itself is under the
-  //      keyboard, we scroll the document just enough to bring its
-  //      bottom edge + a 16px breathing buffer above the keyboard.
-  //      If the input is already visible above the keyboard, we
-  //      scroll zero — screen stays exactly where it was.
-  //
-  // Reading `kbHeight` (Capacitor Keyboard plugin) keeps the math
-  // accurate on native iOS where visualViewport.height doesn't shrink
-  // with resize:"none". On web / Android we fall back to
-  // visualViewport.height via the inline check below.
-  const nudgeIfCovered = (el) => {
-    if (!el) return;
-    const vv = window.visualViewport;
-    const viewportH = vv?.height ?? window.innerHeight;
-    // Effective keyboard height: prefer the plugin's measurement
-    // (accurate, available before any layout change on resize:none);
-    // fall back to (innerHeight - visualViewport.height) on web
-    // browsers that shrink visualViewport when a software keyboard
-    // opens.
-    const kb = kbHeight > 0
-      ? kbHeight
-      : Math.max(0, (window.innerHeight || viewportH) - viewportH);
-    const visibleBottom = viewportH - kb;
-    const rect = el.getBoundingClientRect();
-    const buffer = 16;
-    if (rect.bottom > visibleBottom - buffer) {
-      window.scrollBy(0, Math.ceil(rect.bottom - (visibleBottom - buffer)));
-    } else if (rect.top < 0) {
-      // Input scrolled above the top of the viewport — pull it back
-      // to the top edge. Happens rarely but keeps the behaviour
-      // symmetrical.
-      window.scrollBy(0, rect.top - 4);
-    }
-    // If the input is already visible above the keyboard, we scroll
-    // by zero. Screen stays put. Bottom-fixed chrome is covered by
-    // the keyboard, which is the native iOS pattern.
-  };
-
-  document.addEventListener('focusin', (e) => {
-    const t = e.target;
-    if (!isTextInput(t)) return;
-    if (preFocusScrollY == null) preFocusScrollY = window.scrollY;
-    // Run on the next frame so the browser has a chance to register
-    // the focus (layout may shift) before we measure.
-    requestAnimationFrame(() => nudgeIfCovered(t));
-  });
-
-  document.addEventListener('focusout', (e) => {
-    if (!isTextInput(e.target)) return;
-    // If focus is moving to another input (tab / next-field), skip —
-    // the new focusin will handle positioning. Only restore when focus
-    // really left all inputs.
-    setTimeout(() => {
-      const active = document.activeElement;
-      if (isTextInput(active)) return;
-      if (preFocusScrollY != null && kbHeight === 0) {
-        // Only restore once the keyboard has actually closed; otherwise
-        // we'd fight the cover-check above.
-        window.scrollTo(0, preFocusScrollY);
-        preFocusScrollY = null;
-      }
-    }, 50);
-  });
-
-  // Desktop Safari / mobile web: visualViewport shrinks when a virtual
-  // keyboard opens. Coalesce via rAF so typing doesn't re-trigger the
-  // nudge on every keystroke.
-  let vvPending = false;
-  window.visualViewport?.addEventListener('resize', () => {
-    if (vvPending) return;
-    vvPending = true;
-    requestAnimationFrame(() => {
-      vvPending = false;
-      const el = document.activeElement;
-      if (isTextInput(el)) nudgeIfCovered(el);
-    });
-  });
-
   // Belt-and-suspenders: block multi-touch pinch-zoom + double-tap zoom.
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('gesturechange', (e) => e.preventDefault());
