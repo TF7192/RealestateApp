@@ -51,6 +51,7 @@ import StickyActionBar from '../components/StickyActionBar';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import PageTour from '../components/PageTour';
 import PropertyHero from '../components/PropertyHero';
+import MarketContextCard from '../components/MarketContextCard';
 import PropertyKpiTile from '../components/PropertyKpiTile';
 import PropertyPanelSheet from '../components/PropertyPanelSheet';
 import PropertyPipelineBlock from '../components/PropertyPipelineBlock';
@@ -660,6 +661,19 @@ export default function PropertyDetail() {
         onDragLeave={handleGalleryDragLeave}
         onDrop={handleGalleryDrop}
       />
+
+      {/* Market context — recent nadlan.gov.il transactions for this
+          street (purchases + rentals). On-demand: agent clicks the
+          refresh button to fire a Playwright crawl. Hidden if the
+          property is missing street/city. */}
+      {property.street && property.city && (
+        <MarketContextCard
+          propertyId={property.id}
+          propertyCategory={property.category}
+          propertyStreet={property.street}
+          propertyCity={property.city}
+        />
+      )}
 
       {/* KPI strip */}
       {/* UX review F-1.1 — Matched-leads quick dispatch.

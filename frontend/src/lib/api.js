@@ -540,6 +540,14 @@ export const api = {
   // <a href>. `kind` is one of 'properties' | 'leads' | 'deals'.
   exportUrl:           (kind) => `${BASE}/reports/export/${kind}.csv`,
 
+  // Market context (nadlan.gov.il via Playwright). On-demand refresh —
+  // GET returns cached or 204; POST refresh fires the live crawl.
+  // `kind` is 'buy' | 'rent'.
+  marketContextGet:    (propertyId, kind = 'buy') =>
+    request(`/market/property/${propertyId}?kind=${kind}`),
+  marketContextRefresh: (propertyId, kind = 'buy') =>
+    request(`/market/property/${propertyId}/refresh?kind=${kind}`, { method: 'POST', timeoutMs: 60000 }),
+
   // Neighborhoods (G1)
   listNeighborhoods:   (params = {}) => request(`/neighborhoods${qsFrom(params)}`),
   createNeighborhood:  (body) => request('/neighborhoods', { method: 'POST', body }),

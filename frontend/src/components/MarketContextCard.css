@@ -1,0 +1,194 @@
+.market-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border, rgba(30, 26, 20, 0.08));
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-block: 24px;
+  direction: rtl;
+}
+.market-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.market-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.market-card-title h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary, #1e1a14);
+}
+.market-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.market-tabs {
+  display: inline-flex;
+  background: var(--bg-secondary, #f7f3ec);
+  border: 1px solid var(--border, rgba(30, 26, 20, 0.08));
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.market-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary, #54503e);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.market-tab.is-active {
+  background: var(--bg-card, #ffffff);
+  color: var(--text-primary, #1e1a14);
+  box-shadow: 0 1px 3px rgba(30, 26, 20, 0.08);
+}
+.market-tab:focus-visible {
+  outline: 2px solid var(--gold, #b48b4c);
+  outline-offset: 1px;
+}
+
+.market-source {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: var(--text-muted, #6b6356);
+  line-height: 1.6;
+}
+.market-source a {
+  color: var(--gold-readable, #7a5c2c);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.market-source a:hover { text-decoration: underline; }
+
+.market-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: rgba(185, 28, 28, 0.08);
+  color: #b91c1c;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.market-empty {
+  padding: 20px 14px;
+  background: var(--bg-secondary, #f7f3ec);
+  border: 1px dashed var(--border-light, rgba(30, 26, 20, 0.14));
+  border-radius: 10px;
+  color: var(--text-muted, #6b6356);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+}
+.market-empty-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.market-kpis {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 14px;
+}
+@media (min-width: 700px) {
+  .market-kpis { grid-template-columns: repeat(4, 1fr); }
+}
+.market-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--bg-secondary, #f7f3ec);
+  border: 1px solid var(--border, rgba(30, 26, 20, 0.08));
+  border-radius: 10px;
+}
+.market-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted, #6b6356);
+  letter-spacing: 0.02em;
+}
+.market-kpi-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary, #1e1a14);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-spark {
+  margin: 6px 0 18px;
+}
+.market-spark-svg {
+  width: 100%;
+  height: 90px;
+  display: block;
+}
+.market-spark-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted, #6b6356);
+  margin-top: 4px;
+}
+
+.market-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border, rgba(30, 26, 20, 0.08));
+  border-radius: 10px;
+}
+.market-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  direction: rtl;
+}
+.market-table thead {
+  background: var(--bg-secondary, #f7f3ec);
+}
+.market-table th {
+  text-align: start;
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--text-secondary, #54503e);
+  border-bottom: 1px solid var(--border, rgba(30, 26, 20, 0.08));
+}
+.market-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border, rgba(30, 26, 20, 0.06));
+}
+.market-table tbody tr:last-child td { border-bottom: 0; }
+.market-table .cell-num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.spin {
+  animation: market-spin 1s linear infinite;
+}
+@keyframes market-spin {
+  to { transform: rotate(-360deg); }
+}

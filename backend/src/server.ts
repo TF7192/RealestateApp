@@ -21,6 +21,7 @@ import { registerMeRoutes } from './routes/me.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerYad2Routes } from './routes/yad2.js';
+import { registerMarketRoutes } from './routes/market.js';
 import { registerProspectRoutes } from './routes/prospects.js';
 import { registerCalendarRoutes } from './routes/calendar.js';
 import fastifyWebsocket from '@fastify/websocket';
@@ -228,6 +229,7 @@ export async function build() {
   await app.register(registerChatRoutes, { prefix: '/api/chat' });
   await app.register(registerAdminRoutes, { prefix: '/api/admin' });
   await app.register(registerYad2Routes,  { prefix: '/api/integrations/yad2' });
+  await app.register(registerMarketRoutes, { prefix: '/api/market' });
   await app.register(registerProspectRoutes, { prefix: '/api' });
   await app.register(registerCalendarRoutes, { prefix: '/api/integrations/calendar' });
   await app.register(registerOfficeRoutes, { prefix: '/api/office' });

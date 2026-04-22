@@ -1273,3 +1273,21 @@ model LeadSearchProfile {
 
   @@index([leadId])
 }
+
+// Market-context snapshot fetched from nadlan.gov.il (purchase or
+// rent). Keyed by (cityKey, streetKey, kind) so multiple properties on
+// the same street share one cache row. 24h TTL is enforced in the
+// service layer, not the DB.
+model MarketContext {
+  id         String   @id @default(cuid())
+  cityKey    String
+  streetKey  String
+  kind       String   // 'buy' | 'rent'
+  fetchedAt  DateTime @default(now())
+  dealCount  Int      @default(0)
+  payload    Json
+  error      String?
+
+  @@unique([cityKey, streetKey, kind])
+  @@index([fetchedAt])
+}
