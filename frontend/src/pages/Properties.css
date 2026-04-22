@@ -515,8 +515,12 @@
 
 .property-quick-btn:disabled { opacity: 0.5; cursor: default; }
 
-/* N-3 — share icon pinned to the BOTTOM-LEFT (logical end, bottom) of
- * the desktop card so it sits in the corner opposite the favorite star. */
+/* Share chip pinned to the bottom-LEFT of the PHOTO (inside
+ * `.property-image`, which is position: relative). Anchoring to the
+ * image wrapper keeps the chip hovering over the photo regardless of
+ * card body height. Always visible on touch (where hover doesn't
+ * exist); still fades in on pointer devices so the photo stays clean
+ * at rest. */
 .property-share-btn {
   position: absolute;
   bottom: 10px;
@@ -533,11 +537,16 @@
   cursor: pointer;
   padding: 0;
   z-index: 3;
-  opacity: 0;
+  opacity: 1;
   transition: background 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s, transform 0.12s;
 }
-
-.property-card:hover .property-share-btn { opacity: 1; }
+@media (hover: hover) {
+  /* Touchless pointer: keep the photo clean and fade the chip in on
+   * hover. Touch devices (hover: none) show it permanently so agents
+   * never have to tap-and-hold just to reveal share. */
+  .property-share-btn { opacity: 0.85; }
+  .property-card:hover .property-share-btn { opacity: 1; }
+}
 
 .property-share-btn:hover {
   background: var(--gold);

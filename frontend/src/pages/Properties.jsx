@@ -1350,6 +1350,24 @@ export default function Properties() {
                     <div className="property-price-overlay">
                       {formatPrice(prop.marketingPrice)}
                     </div>
+                    {/* Share chip pinned to the bottom-left of the
+                        image (inside .property-image so it anchors to
+                        the photo, not the full card). preventDefault
+                        + stopPropagation keeps the wrapping <Link>
+                        from following through to /properties/:id. */}
+                    <button
+                      type="button"
+                      className="property-share-btn"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleShareProp(prop);
+                      }}
+                      title="שתף נכס"
+                      aria-label={`שתף ${prop.street}`}
+                    >
+                      <Share2 size={14} aria-hidden="true" />
+                    </button>
                   </div>
                   <div className="property-card-body">
                     <div className="property-address">
@@ -1449,20 +1467,6 @@ export default function Properties() {
                     <Copy size={14} aria-hidden="true" />
                   </button>
                 </div>
-                {/* N-3 — share icon pinned to the bottom-left of the card. */}
-                <button
-                  type="button"
-                  className="property-share-btn"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleShareProp(prop);
-                  }}
-                  title="שתף נכס"
-                  aria-label={`שתף ${prop.street}`}
-                >
-                  <Share2 size={14} aria-hidden="true" />
-                </button>
                 <button
                   className="property-overflow-btn"
                   onClick={(e) => openOverflow(e, prop)}

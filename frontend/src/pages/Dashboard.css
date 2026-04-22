@@ -809,17 +809,12 @@
   grid-template-columns: 1fr;
 }
 @media (min-width: 900px) {
-  .dashboard-grid-rich {
-    grid-template-columns: 1fr 1fr;
-  }
-  /* Pipeline card needs width for the 3-chip legend + stacked bar. */
-  .dashboard-grid-rich .dash-pipeline { grid-column: 1 / -1; }
-}
-@media (min-width: 1200px) {
+  /* Three cards sit side-by-side from 900px onward so תור פעולות /
+     מצב הלידים / פגישות השבוע share the same row without any of
+     them going taller-than-necessary with padding. */
   .dashboard-grid-rich {
     grid-template-columns: 1fr 1fr 1fr;
   }
-  .dashboard-grid-rich .dash-pipeline { grid-column: auto; }
 }
 
 /* Pipeline Health */

@@ -715,11 +715,11 @@ function ActionQueueCard({ leads = [], properties = [], staleThresholdDays = 30 
   }
 
   items.sort((a, b) => b.score - a.score);
-  // D-4 — cap at 5 rows (was 6) and replace the silent "+N נוספות"
-  // label with an actionable "צפה בהכול" link to the activity page,
-  // so an agent with a long backlog has one tap to see the full list
-  // instead of a dead-end counter.
-  const visible = items.slice(0, 5);
+  // Cap at 2 rows so the card stays short enough to sit on the same
+  // row as מצב הלידים + פגישות השבוע at 3-col breakpoint without
+  // towering over the others. The "צפה בהכול" link below still
+  // surfaces the full backlog in one tap.
+  const visible = items.slice(0, 2);
 
   return (
     <div className="card dashboard-card dash-action-queue animate-in animate-in-delay-4">

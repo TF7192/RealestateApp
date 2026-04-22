@@ -83,12 +83,13 @@
   letter-spacing: 0.02em;
 }
 
-/* Push further from the edge on wide layouts to clear the sidebar.
-   On desktop there's no MobileTabBar, so the stack can sit closer to
-   the bottom — still above the QuickCreateFab which lives at 28px. */
+/* Desktop: F-2 lifted the QuickCreateFab to inset-block-end: 84px so
+   it clears the ChatWidget launcher at bottom: 28px. The voice FAB
+   must stack above the QC trigger with the same 18px breathing room:
+   84 (FAB bottom) + 56 (FAB height) + 18 (gap) = 158px. */
 @media (min-width: 900px) {
   .vc-fab {
-    inset-block-end: calc(28px + 56px + 18px); /* 102px: above QC trigger */
+    inset-block-end: calc(84px + 56px + 18px); /* 158px: above QC trigger */
     inset-inline-end: 28px;
   }
 }
