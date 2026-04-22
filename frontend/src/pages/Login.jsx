@@ -74,7 +74,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       if (flow === 'email-signup') {
-        if (form.password.length < 8) throw new Error('הסיסמה חייבת להיות באורך 8 תווים לפחות');
+        if (form.password.length < 8) throw new Error('הסיסמה צריכה להיות באורך 8 תווים לפחות');
         await signup({
           email: form.email,
           password: form.password,
@@ -193,7 +193,7 @@ export default function Login() {
                 onClick={() => { setFlow(null); setError(''); }}
               >
                 <ArrowLeft size={16} />
-                חזרה
+                חזור
               </button>
 
               {flow === 'email-signup' && (
@@ -277,7 +277,7 @@ export default function Login() {
               >
                 {flow === 'email-signup' ? <UserPlus size={18} /> : <LogIn size={18} />}
                 {submitting
-                  ? 'שולח…'
+                  ? 'רק רגע…'
                   : flow === 'email-signup'
                   ? 'יצירת חשבון'
                   : 'כניסה'}
