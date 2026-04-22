@@ -1,174 +1,398 @@
-/* Public signing page — no app chrome, clean kiosk-style form */
+/* Prospect-sign kiosk — branded, mobile-first, two-step.
+   Opened by the prospect on their own phone via a 24h token link.
+   Touch targets >=44px; visual voice quiet so the signature is the hero. */
 
 .psn-page {
-  min-height: 100vh;
-  padding: 24px 18px calc(24px + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, #f8f4ea 0%, #f0ebe0 100%);
+  min-height: 100dvh;
+  background:
+    radial-gradient(ellipse at top left,  rgba(134, 59, 255, 0.08), transparent 55%),
+    radial-gradient(ellipse at top right, rgba(71, 191, 255, 0.08), transparent 55%),
+    #faf9fc;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-body, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial);
   color: #1e1a14;
-  font-family: var(--font-body, 'Heebo', system-ui);
+  padding-block-start: max(12px, env(safe-area-inset-top));
+  padding-block-end:   max(12px, env(safe-area-inset-bottom));
+  padding-inline:      max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
 }
 
-.psn-loading {
-  min-height: 100vh;
+/* ── Brand bar ──────────────────────────────────────────────── */
+.psn-brand-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #6b6356;
-  font-family: var(--font-body, 'Heebo', system-ui);
+  gap: 10px;
+  padding: 8px 4px 16px;
 }
-
-.psn-card {
-  max-width: 520px;
-  margin: 0 auto;
-  background: #fff;
-  border-radius: 18px;
-  padding: 24px 22px 22px;
-  box-shadow: 0 24px 64px rgba(30, 26, 20, 0.12);
+.psn-brand-mark {
+  width: 34px;
+  height: 34px;
+  filter: drop-shadow(0 2px 8px rgba(126, 20, 255, 0.18));
+}
+.psn-brand-text {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  line-height: 1.1;
 }
-.psn-card header h1 {
-  font-family: var(--font-display, serif);
-  font-size: 22px;
-  margin: 0 0 2px;
-  letter-spacing: -0.2px;
-}
-.psn-card header p {
-  font-size: 13px;
-  color: #6b6356;
-  margin: 0;
-}
-
-.psn-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
+.psn-brand-text strong {
+  font-size: 17px;
+  font-weight: 700;
   color: #1e1a14;
-  padding: 10px 12px;
-  background: #faf6ec;
-  border: 1px solid rgba(202, 166, 98, 0.25);
-  border-radius: 10px;
+  letter-spacing: 0.2px;
 }
-.psn-summary strong { color: #6b6356; font-weight: 600; margin-inline-end: 4px; }
+.psn-brand-text span {
+  font-size: 12px;
+  color: #6b6680;
+}
+
+.psn-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-block-start: 4px;
+}
+
+.psn-foot {
+  text-align: center;
+  font-size: 11px;
+  color: #8c879c;
+  padding: 18px 8px 0;
+}
+
+/* ── Card ──────────────────────────────────────────────────── */
+.psn-card {
+  width: 100%;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow:
+    0 1px 2px rgba(25, 20, 60, 0.05),
+    0 12px 40px -12px rgba(126, 20, 255, 0.18);
+  padding: 28px 22px;
+  animation: psn-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes psn-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Intro (step 1) ───────────────────────────────────────────── */
+.psn-intro { text-align: center; }
+.psn-intro-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #863bff, #47bfff);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 14px;
+  box-shadow: 0 10px 30px -10px rgba(126, 20, 255, 0.5);
+}
+.psn-intro h1 {
+  font-size: 22px;
+  margin: 0 0 14px;
+  line-height: 1.25;
+  color: #1e1a14;
+}
+.psn-prop {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f5f2fa;
+  border: 1px solid #ece6f6;
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: start;
+  margin: 6px 0 14px;
+}
+.psn-prop svg { flex: 0 0 auto; margin-block-start: 2px; color: #863bff; }
+.psn-prop-title { font-weight: 600; font-size: 15px; color: #1e1a14; }
+.psn-prop-sub   { font-size: 12px; color: #6b6680; margin-block-start: 2px; }
+.psn-prop-price { font-size: 13px; color: #47bfff; margin-block-start: 4px; font-weight: 600; }
+
+.psn-agent {
+  font-size: 13px;
+  color: #4a465a;
+  margin: 10px 0 16px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  align-items: baseline;
+}
+.psn-agent strong { color: #1e1a14; font-weight: 600; }
+.psn-agent-agency { color: #8c879c; font-size: 12px; }
+
+.psn-intro-copy {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4a465a;
+  margin: 10px 4px 18px;
+}
+
+.psn-cta {
+  width: 100%;
+  min-height: 52px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 14px;
+  gap: 8px;
+}
+.psn-cta-hero {
+  background: linear-gradient(135deg, #863bff, #5a1fdb);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 14px 28px -12px rgba(126, 20, 255, 0.55);
+}
+.psn-cta-hero:hover,
+.psn-cta-hero:focus-visible {
+  filter: brightness(1.05);
+  box-shadow: 0 16px 32px -10px rgba(126, 20, 255, 0.7);
+}
+
+.psn-checks {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  font-size: 12px;
+  color: #6b6680;
+}
+.psn-checks li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f5f2fa;
+  padding: 4px 10px;
+  border-radius: 100px;
+}
+.psn-checks svg { color: #863bff; }
+
+/* Form (step 2) ────────────────────────────────────────────── */
+.psn-form-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block-end: 4px;
+}
+.psn-form-head h2 {
+  font-size: 18px;
+  margin: 0;
+  flex: 1;
+  color: #1e1a14;
+}
+.psn-back {
+  min-height: 40px;
+  padding: 6px 12px;
+  color: #4a465a;
+  gap: 6px;
+}
+
+.psn-prop-compact {
+  padding: 8px 12px;
+  margin: 8px 0 14px;
+  font-size: 13px;
+  color: #4a465a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 .psn-label {
-  font-size: 12px;
+  display: block;
+  font-size: 13px;
   font-weight: 600;
-  color: #4a443b;
-  margin: 4px 0 0;
+  color: #2b273a;
+  margin: 16px 0 6px;
 }
 
-.psn-input, .psn-textarea {
+.psn-input,
+.psn-textarea {
   width: 100%;
-  padding: 11px 13px;
-  border: 1px solid #ded8c9;
-  border-radius: 10px;
+  min-height: 48px;
+  font-size: 16px; /* iOS: >=16px prevents auto-zoom on focus */
+  line-height: 1.4;
+  padding: 12px 14px;
+  border: 1px solid #e0dae9;
+  border-radius: 12px;
   background: #fff;
-  font-family: var(--font-body, 'Heebo', system-ui);
-  font-size: 15px;
   color: #1e1a14;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+}
+.psn-textarea { min-height: 92px; resize: vertical; }
+
+.psn-input:focus,
+.psn-textarea:focus {
   outline: none;
-  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+  border-color: #863bff;
+  box-shadow: 0 0 0 4px rgba(134, 59, 255, 0.15);
 }
-.psn-input:focus, .psn-textarea:focus {
-  border-color: #c9a96e;
-  box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.18);
+
+.psn-segmented {
+  display: inline-flex;
+  padding: 4px;
+  background: #f5f2fa;
+  border-radius: 12px;
+  gap: 4px;
 }
-.psn-textarea { resize: vertical; min-height: 80px; }
+.psn-seg-btn {
+  min-width: 88px;
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #4a465a;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.psn-seg-btn.is-on {
+  background: #fff;
+  color: #1e1a14;
+  box-shadow: 0 1px 3px rgba(25, 20, 60, 0.1);
+}
 
 .psn-sign-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-block-end: 6px;
 }
 .psn-clear {
+  font-size: 12px;
+  color: #a44;
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid #ded8c9;
-  background: transparent;
-  color: #6b6356;
-  font-size: 11.5px;
-  cursor: pointer;
+  border-radius: 8px;
 }
+.psn-clear:hover { background: #fef2f2; }
 
 .psn-canvas-wrap {
   position: relative;
-  height: 180px;
-  border: 1px dashed #ded8c9;
-  border-radius: 12px;
-  background: #fdfbf5;
+  aspect-ratio: 2 / 1;
+  max-height: 220px;
+  background: #fff;
+  border: 2px dashed #d8d1e8;
+  border-radius: 14px;
   overflow: hidden;
   touch-action: none;
+  transition: border-color 0.15s, background 0.15s;
 }
-.psn-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-  cursor: crosshair;
-}
+.psn-canvas-wrap:focus-within { border-color: #863bff; background: #fcfbff; }
+.psn-canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 .psn-canvas-hint {
   position: absolute;
   inset: 0;
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  color: #b5ac9b;
-  font-size: 14px;
+  gap: 4px;
+  color: #b5aecf;
   pointer-events: none;
-  font-family: var(--font-display, serif);
+  font-size: 13px;
 }
+
+.psn-form-actions { margin-block-start: 18px; }
 
 .psn-err-inline {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
+  font-size: 13px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
   border-radius: 8px;
-  background: #fdecea;
-  color: #b83f2a;
-  font-size: 12.5px;
+  padding: 8px 12px;
+  margin-block-start: 12px;
+  width: 100%;
 }
 
-.psn-cta {
-  margin-top: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 52px;
-  border-radius: 14px;
-  border: none;
-  background: linear-gradient(135deg, #e5c07a 0%, #c9a96e 55%, #a4844c 100%);
-  color: #15100a;
-  font-family: var(--font-display, serif);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.1px;
-  cursor: pointer;
-  box-shadow: 0 10px 24px rgba(201, 169, 110, 0.32);
+/* Done ─────────────────────────────────────────────────────── */
+.psn-done, .psn-err { text-align: center; }
+.psn-done-ring {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  margin: 4px auto 16px;
+  box-shadow: 0 12px 30px -10px rgba(34, 197, 94, 0.55);
+  animation: psn-pop 360ms cubic-bezier(0.22, 1.6, 0.36, 1) both;
 }
-.psn-cta:disabled { opacity: 0.55; cursor: default; box-shadow: none; }
+@keyframes psn-pop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+.psn-done h2, .psn-err h2 { font-size: 22px; margin: 4px 0 8px; }
+.psn-done p, .psn-err p { font-size: 15px; color: #4a465a; line-height: 1.5; margin: 0 4px; }
+.psn-err svg { color: #b91c1c; margin-block-end: 8px; }
 
-.psn-err, .psn-done {
-  align-items: center;
-  text-align: center;
-  padding: 32px 24px;
-  gap: 10px;
+/* Loading ──────────────────────────────────────────────────── */
+.psn-loading-card { text-align: center; padding: 40px 20px; color: #6b6680; }
+.psn-spinner {
+  width: 32px; height: 32px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  border: 3px solid #ece6f6;
+  border-block-start-color: #863bff;
+  animation: psn-spin 700ms linear infinite;
 }
-.psn-err svg { color: #b83f2a; }
-.psn-done svg { color: #2c8a5c; }
-.psn-err h2, .psn-done h2 {
-  font-family: var(--font-display, serif);
-  margin: 0;
-  font-size: 22px;
+@keyframes psn-spin { to { transform: rotate(360deg); } }
+
+/* ── Tight phone viewports ──────────────────────────────────── */
+@media (max-width: 420px) {
+  .psn-card { padding: 22px 18px; border-radius: 18px; }
+  .psn-intro h1 { font-size: 20px; }
+  .psn-cta-hero { min-height: 56px; font-size: 17px; }
+  .psn-seg-btn { min-width: 76px; min-height: 44px; }
+  .psn-canvas-wrap { max-height: 180px; }
 }
-.psn-err p, .psn-done p {
-  color: #6b6356;
-  margin: 0;
+
+/* ── Dark mode ──────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .psn-page {
+    background:
+      radial-gradient(ellipse at top left,  rgba(134, 59, 255, 0.18), transparent 55%),
+      radial-gradient(ellipse at top right, rgba(71, 191, 255, 0.14), transparent 55%),
+      #0e0b16;
+    color: #f1eef7;
+  }
+  .psn-brand-text strong { color: #f1eef7; }
+  .psn-brand-text span, .psn-foot { color: #8c879c; }
+  .psn-card {
+    background: #191324;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 40px -12px rgba(126, 20, 255, 0.35);
+  }
+  .psn-intro h1,
+  .psn-prop-title,
+  .psn-form-head h2,
+  .psn-done h2, .psn-err h2,
+  .psn-label,
+  .psn-seg-btn.is-on,
+  .psn-input, .psn-textarea { color: #f1eef7; }
+  .psn-prop { background: #20192e; border-color: #2c2440; }
+  .psn-prop-sub, .psn-agent, .psn-intro-copy { color: #b5aecf; }
+  .psn-segmented { background: #20192e; }
+  .psn-seg-btn { color: #b5aecf; }
+  .psn-seg-btn.is-on { background: #2c2440; }
+  .psn-input, .psn-textarea { background: #20192e; border-color: #2c2440; }
+  .psn-canvas-wrap { background: #fcfbff; border-color: #3a3152; }
+  .psn-checks li { background: #20192e; color: #b5aecf; }
 }

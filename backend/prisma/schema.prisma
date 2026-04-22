@@ -922,6 +922,11 @@ model Prospect {
   // for the digital flow where the prospect signs later.
   signatureDataUrl String?
   signedAt         DateTime?
+  // Identity fields captured on the public sign form (industry-standard
+  // interested-party intake). Nullable because legacy rows pre-date these.
+  idType           String?   // 'ID' (Israeli ת.ז.) | 'PASSPORT'
+  idNumber         String?
+  address          String?
   // Public sign-from-phone flow tokens.
   publicToken      String?   @unique
   tokenExpiresAt   DateTime?

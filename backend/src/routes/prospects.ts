@@ -31,6 +31,11 @@ const ProspectInput = z.object({
   // after base64 overhead (~375kB raw PNG). Bigger signatures are signs
   // of an accidentally-giant canvas, not a genuine need.
   signatureDataUrl: z.string().max(500_000).optional(),
+  // Industry-standard interested-party intake captures identity + address
+  // alongside the signature.
+  idType:   z.enum(['ID', 'PASSPORT']).optional(),
+  idNumber: z.string().max(40).optional(),
+  address:  z.string().max(200).optional(),
 });
 
 const PUBLIC_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -131,7 +136,11 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
     }
     const property = await prisma.property.findUnique({
       where: { id: prospect.propertyId },
-      select: { street: true, city: true, type: true, marketingPrice: true },
+      select: { street: true, city: true, type: true, marketingPrice: true, neighborhood: true },
+    });
+    const agent = await prisma.user.findUnique({
+      where: { id: prospect.agentId },
+      select: { displayName: true, phone: true, agentProfile: { select: { agency: true } } },
     });
     return {
       prospect: {
@@ -142,6 +151,13 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
         signed: !!prospect.signedAt,
       },
       property,
+      agent: agent
+        ? {
+            displayName: agent.displayName,
+            phone: agent.phone,
+            agency: agent.agentProfile?.agency || null,
+          }
+        : null,
     };
   });
 
