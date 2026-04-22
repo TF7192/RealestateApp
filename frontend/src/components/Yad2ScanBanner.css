@@ -30,8 +30,14 @@
 
 @media (min-width: 1025px) {
   .y2b {
-    left: auto;
-    right: 20px;
+    /* Pin to viewport-left on desktop. The RTL sidebar sits on
+       viewport-right and its 'יציאה' button lives at the bottom of
+       that column — the previous right:20px placement landed the
+       banner directly on top of logout, blocking the click. The
+       viewport-left corner is empty space and sits opposite the
+       sidebar, so the banner no longer collides with anything. */
+    left: 20px;
+    right: auto;
     bottom: 20px;
     min-width: 320px;
     max-width: 420px;

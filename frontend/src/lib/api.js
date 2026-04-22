@@ -343,12 +343,31 @@ export const api = {
   // appends it to the query so Photon ranks local matches first.
   // Task 4 — Yad2 import. Both endpoints 404 when FEATURE_YAD2_IMPORT
   // is off in the deployment environment.
-  yad2Preview: (url) => request('/integrations/yad2/preview', { method: 'POST', body: { url } }),
-  yad2Import:  (listings) => request('/integrations/yad2/import',  { method: 'POST', body: { listings } }),
+  // Yad2 scraping runs Playwright server-side and occasionally takes
+  // 5+ minutes end-to-end (page load + WAF challenge + pagination +
+  // image re-host). The default 60s write timeout aborted the fetch
+  // mid-crawl, leaving the agent staring at "הבקשה חרגה מזמן המענה"
+  // even though the backend was still working. 10-minute cap is a
+  // deliberately generous ceiling; the backend caps the crawl itself,
+  // so this just prevents the frontend from bailing early.
+  yad2Preview: (url) => request('/integrations/yad2/preview', {
+    method: 'POST', body: { url }, timeoutMs: 600_000, retries: 1,
+  }),
+  yad2Import:  (listings) => request('/integrations/yad2/import',  {
+    method: 'POST', body: { listings }, timeoutMs: 600_000, retries: 1,
+  }),
   // Agency-wide endpoints — preferred. Walks all 3 sections × all
   // pages × server-side image re-host on import.
-  yad2AgencyPreview: (url) => request('/integrations/yad2/agency/preview', { method: 'POST', body: { url } }),
-  yad2AgencyImport:  (listings) => request('/integrations/yad2/agency/import',  { method: 'POST', body: { listings } }),
+  // Agency preview does the full Playwright crawl across forsale +
+  // rent + commercial sections — consistently the slowest endpoint
+  // in the app. 10-minute timeout; no retry (a retry during the WAF
+  // grace window just wastes the agent's hourly quota).
+  yad2AgencyPreview: (url) => request('/integrations/yad2/agency/preview', {
+    method: 'POST', body: { url }, timeoutMs: 600_000, retries: 1,
+  }),
+  yad2AgencyImport:  (listings) => request('/integrations/yad2/agency/import', {
+    method: 'POST', body: { listings }, timeoutMs: 600_000, retries: 1,
+  }),
   // Sliding-window quota — { limit, remaining, used, resetAt, msUntilReset }.
   // The Yad2 import screen calls this on mount + after each preview to
   // render the "X/3 left this hour, resets in Y min" chip.

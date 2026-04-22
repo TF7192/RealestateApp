@@ -19,12 +19,33 @@ import './Yad2ScanBanner.css';
 //     off-page, so even if they're on a page where the banner is
 //     hidden (e.g. full-screen modals) they still get notified.
 
+// Dismissal is keyed to the SPECIFIC completion (scan.finishedAt) so
+// clicking X on one result sticks across route changes / remounts,
+// and a brand-new completion re-arms the banner. Persisted to
+// sessionStorage so a tab reload doesn't forget the dismissal either.
+const DISMISS_KEY = 'estia-yad2-banner-dismissed-at';
+function readDismissedAt() {
+  try { return Number(sessionStorage.getItem(DISMISS_KEY)) || 0; }
+  catch { return 0; }
+}
+function writeDismissedAt(ts) {
+  try { sessionStorage.setItem(DISMISS_KEY, String(ts || 0)); }
+  catch { /* private mode */ }
+}
+
+// Guard the toast effect against double-fires. The effect re-subscribes
+// when `toast` identity changes (ToastProvider recreates its api object
+// on every render), so if we keyed off subscription alone we'd attach a
+// fresh handler repeatedly. The handler itself checks lastToastedAt so
+// the same `yad2-scan-complete` event never raises two toasts.
+let lastToastedAt = 0;
+
 export default function Yad2ScanBanner() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
   const [scan, setScan] = useState(getScanState());
-  const [dismissedDone, setDismissedDone] = useState(false);
+  const [dismissedAt, setDismissedAt] = useState(readDismissedAt);
 
   useEffect(() => subscribeScan(setScan), []);
 
@@ -34,6 +55,9 @@ export default function Yad2ScanBanner() {
     const handler = (e) => {
       const { ok, listings, error } = e.detail || {};
       if (location.pathname.startsWith('/integrations/yad2')) return;
+      const finishedAt = getScanState()?.finishedAt || Date.now();
+      if (lastToastedAt === finishedAt) return; // dedupe across remounts
+      lastToastedAt = finishedAt;
       try { haptics.success?.(); } catch { /* ignore */ }
       if (ok) {
         toast.success?.(`הסריקה הסתיימה — ${listings ?? 0} נכסים מוכנים`);
@@ -45,18 +69,21 @@ export default function Yad2ScanBanner() {
     return () => window.removeEventListener('yad2-scan-complete', handler);
   }, [location.pathname, toast]);
 
-  // When a fresh scan starts, reset the "dismissed" flag so the
-  // completion banner shows again.
-  useEffect(() => {
-    if (scan.status === 'running') setDismissedDone(false);
-  }, [scan.status]);
-
   // Don't render on the yad2 page itself — would duplicate the inline UI.
   if (location.pathname.startsWith('/integrations/yad2')) return null;
 
+  // Dismissed if user clicked X during this completion's lifetime.
+  // If the scan exposes a finishedAt, compare against that (so a
+  // NEWER completion with later finishedAt re-arms the banner).
+  // If finishedAt is missing (older scan store / test fixture), fall
+  // back to a plain "user dismissed at some point" check.
+  const finishedAt = scan.finishedAt || 0;
+  const isDismissedForThisRun = dismissedAt > 0
+    && (finishedAt === 0 || dismissedAt >= finishedAt);
+
   const show = scan.status === 'running'
-    || (scan.status === 'done' && scan.result && !dismissedDone)
-    || (scan.status === 'error' && !dismissedDone);
+    || (scan.status === 'done'  && scan.result && !isDismissedForThisRun)
+    || (scan.status === 'error' && !isDismissedForThisRun);
 
   if (!show) return null;
 
@@ -69,7 +96,13 @@ export default function Yad2ScanBanner() {
   };
   const dismiss = (e) => {
     e.stopPropagation();
-    setDismissedDone(true);
+    // Stamp the dismissal with the CURRENT completion timestamp. Any
+    // later completion will have a higher finishedAt and re-show the
+    // banner; same-completion re-renders (remounts, navigation) leave
+    // it hidden.
+    const stampAt = finishedAt || Date.now();
+    writeDismissedAt(stampAt);
+    setDismissedAt(stampAt);
   };
 
   return (
