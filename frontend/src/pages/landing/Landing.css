@@ -759,7 +759,12 @@
   display: inline-flex; align-items: center; justify-content: center;
   margin-top: 2px;
 }
-.lp-tier .lp-btn { width: 100%; }
+/* LP-1 — push the CTA to the bottom of the tier card so both cards line
+   up their "התחלה חינם" buttons at the same baseline regardless of how
+   many bullets or how long the lead copy above them is. The tier is
+   already `display: flex; flex-direction: column`, so `margin-block-start:
+   auto` on the CTA collapses any size mismatch into the space above it. */
+.lp-tier .lp-btn { width: 100%; margin-block-start: auto; }
 .lp-pricing-trust {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 20px;
   margin-top: 28px; font-size: 13px; color: var(--text-muted);

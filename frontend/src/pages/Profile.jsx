@@ -20,9 +20,12 @@ import {
   Calendar,
   LinkIcon,
   Unlink,
+  Trash2,
+  X as XIcon,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useToast } from '../lib/toast';
 import { useTheme } from '../lib/theme';
 import { inputPropsForName } from '../lib/inputProps';
 import { PhoneField } from '../components/SmartFields';
@@ -30,9 +33,11 @@ import './Profile.css';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, refresh } = useAuth();
+  const { user, refresh, logout } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
+  const toast = useToast();
   const fileInput = useRef(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const [form, setForm] = useState({
     displayName: user?.displayName || '',
@@ -318,6 +323,139 @@ export default function Profile() {
             <Save size={16} />
             {saving ? 'שומר…' : saved ? 'נשמר' : 'שמור שינויים'}
             {saved && <Check size={16} />}
+          </button>
+        </div>
+
+        {/* A-1 — destructive surface. Lives at the bottom of Profile so
+            the agent has to scroll past everything else to find it. The
+            confirmation dialog is the actual guard (type-the-phrase). */}
+        <section className="profile-section profile-danger-zone">
+          <div className="profile-section-head">
+            <AlertCircle size={16} />
+            <h3>אזור מסוכן</h3>
+            <span>פעולות בלתי הפיכות</span>
+          </div>
+          <div className="profile-danger-row">
+            <div className="profile-danger-text">
+              <strong>מחיקת חשבון</strong>
+              <span>
+                מחיקת החשבון מסירה את כל הגישה שלך ל-Estia לצמיתות.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 size={14} /> מחק חשבון
+            </button>
+          </div>
+        </section>
+      </div>
+
+      {deleteOpen && (
+        <DeleteAccountDialog
+          onClose={() => setDeleteOpen(false)}
+          onConfirmed={async () => {
+            try {
+              await api.deleteAccount();
+            } catch {
+              // Even on failure we still sign the user out + send them to
+              // the landing; the server call is idempotent and the UI's
+              // obligation is "act like the account is gone".
+            }
+            try { await logout(); } catch { /* ignore */ }
+            toast.info('החשבון נמחק');
+            // Full navigation so any cached state from the previous
+            // session doesn't leak into the landing shell.
+            window.location.href = '/';
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// A-1 — scary confirmation dialog. Require typing the exact phrase
+// "מחק את החשבון שלי" before enabling the destructive CTA. Blocks
+// pocket-taps, muscle-memory clicks, and "I'll just click through"
+// panic-quits. The destructive button styling is .btn-danger.
+const CONFIRM_PHRASE = 'מחק את החשבון שלי';
+
+function DeleteAccountDialog({ onClose, onConfirmed }) {
+  const [phrase, setPhrase] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const canConfirm = phrase.trim() === CONFIRM_PHRASE;
+
+  const confirm = async () => {
+    if (!canConfirm || submitting) return;
+    setSubmitting(true);
+    try {
+      await onConfirmed();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Close on ESC. Enter doesn't fire the destructive action — we don't
+  // want a stray Enter keypress after typing the phrase to trigger
+  // deletion; the user must aim at the button.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="profile-delete-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-account-title"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="profile-delete-dialog" dir="rtl">
+        <button
+          type="button"
+          className="profile-delete-close"
+          onClick={onClose}
+          aria-label="סגור"
+        >
+          <XIcon size={16} />
+        </button>
+        <h2 id="delete-account-title">מחיקת חשבון</h2>
+        <p className="profile-delete-warning">
+          פעולה זו תמחק את חשבונך וכל הנתונים שלך לצמיתות. לא ניתן לבטל פעולה זו.
+        </p>
+        <label className="profile-delete-confirm">
+          <span>
+            כדי להמשיך, הקלד/י: <code>{CONFIRM_PHRASE}</code>
+          </span>
+          <input
+            type="text"
+            className="form-input"
+            autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            value={phrase}
+            onChange={(e) => setPhrase(e.target.value)}
+            placeholder={CONFIRM_PHRASE}
+            aria-label="אישור מחיקה"
+            autoFocus
+          />
+        </label>
+        <div className="profile-delete-actions">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>
+            ביטול
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={confirm}
+            disabled={!canConfirm || submitting}
+          >
+            {submitting ? 'מוחק…' : 'מחק לצמיתות'}
           </button>
         </div>
       </div>

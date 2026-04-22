@@ -8,7 +8,7 @@ import { requireUser } from '../middleware/auth.js';
 import { putUpload } from '../lib/storage.js';
 
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
-  app.get('/', { onRequest: [app.requireAuth] }, async (req) => {
+  app.get('/', { onRequest: [app.requireAuth] }, async (req, reply) => {
     const uid = requireUser(req).id;
 
     // Opportunistically record the platform the agent first logged in on.
@@ -34,6 +34,12 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
       include: { agentProfile: true, customerProfile: true },
     });
     if (!user) return { user: null };
+    // A-1 — soft-deleted accounts must be treated as "no session" so
+    // the SPA's 401 bounce clears the cookie and redirects to the
+    // landing. Don't leak the deletion state — just 401.
+    if (user.deletedAt) {
+      return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    }
     return { user: toPublic(user) };
   });
 
@@ -84,6 +90,65 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
     return { user: user && toPublic(user) };
   });
 
+  // A-4 — first-login onboarding submit. License is required + validated
+  // as 6–8 digits (see Discovery §15 — the Nadlan regulator issues
+  // license numbers in this range). Title / agency / phone are
+  // optional; phone passes through as typed so the frontend's
+  // `toE164` / `formatPhone` stays the source of truth for normalization.
+  // Stamps `profileCompletedAt = NOW()` so the SPA route guard stops
+  // redirecting to /onboarding.
+  const onboardingSchema = z.object({
+    license: z.string().regex(/^\d{6,8}$/, 'מספר רישיון חייב להיות 6 עד 8 ספרות'),
+    title: z.string().max(120).nullable().optional(),
+    agency: z.string().max(120).nullable().optional(),
+    phone: z.string().max(40).nullable().optional(),
+  });
+
+  app.post('/profile', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const parse = onboardingSchema.safeParse(req.body);
+    if (!parse.success) {
+      const msg = parse.error.errors[0]?.message || 'שדות לא תקינים';
+      return reply.code(400).send({ error: { message: msg } });
+    }
+    const body = parse.data;
+    const uid = requireUser(req).id;
+    const u = await prisma.user.findUnique({ where: { id: uid } });
+    if (!u) return reply.code(404).send({ error: { message: 'Not found' } });
+
+    const nowIso = new Date();
+    await prisma.user.update({
+      where: { id: uid },
+      data: {
+        phone: body.phone ?? undefined,
+        profileCompletedAt: nowIso,
+      },
+    });
+    // Only agents have an agentProfile row; customers hitting this
+    // endpoint still get `profileCompletedAt` stamped but we skip the
+    // profile write.
+    if (requireUser(req).role === 'AGENT') {
+      await prisma.agentProfile.upsert({
+        where: { userId: uid },
+        update: {
+          license: body.license,
+          title: body.title ?? undefined,
+          agency: body.agency ?? undefined,
+        },
+        create: {
+          userId: uid,
+          license: body.license,
+          title: body.title ?? undefined,
+          agency: body.agency ?? undefined,
+        },
+      });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: uid },
+      include: { agentProfile: true, customerProfile: true },
+    });
+    return { user: user && toPublic(user) };
+  });
+
   // Avatar upload — stores image under /uploads/avatars/{userId}/{uuid}.{ext}
   // and updates the user.avatarUrl. Public read path is /uploads/avatars/...
   app.post('/avatar', { onRequest: [app.requireAuth] }, async (req, reply) => {
@@ -118,5 +183,9 @@ function toPublic(user: any) {
     customerProfile: user.customerProfile,
     hasCompletedTutorial: !!user.hasCompletedTutorial,
     firstLoginPlatform: user.firstLoginPlatform || null,
+    // A-4 — SPA route guard reads this. Null ⇒ bounce to /onboarding
+    // until the first-login form is submitted and the server stamps
+    // this column via POST /api/me/profile.
+    profileCompletedAt: user.profileCompletedAt || null,
   };
 }

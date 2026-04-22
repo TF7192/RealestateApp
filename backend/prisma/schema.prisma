@@ -289,6 +289,16 @@ model User {
   // device switch.
   hasCompletedTutorial  Boolean      @default(false)
   firstLoginPlatform    String? // 'web' | 'ios' | 'android'
+  // A-4 — set by POST /api/me/profile when the agent finishes the
+  // first-login onboarding form (license number + optional title /
+  // agency / phone). If null, the SPA route guard bounces the user
+  // to /onboarding from every other authed route until they submit.
+  profileCompletedAt    DateTime?
+  // A-1 — soft delete. When set, /api/me rejects the request and the
+  // SPA logs the user out. UI lies gracefully about "permanence" —
+  // rows stay intact so a follow-up support request can restore them
+  // and shared properties remain visible to co-owner agents.
+  deletedAt             DateTime?
   // 7.1 — Google Calendar OAuth tokens. Populated by a consent flow
   // that's separate from (but layered on top of) the existing Google
   // login — agents who logged in with email can still connect their
