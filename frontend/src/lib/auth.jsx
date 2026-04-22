@@ -1,6 +1,19 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api } from './api';
 import { clearPageCache } from './pageCache';
+import { resetForLogout as resetYad2ScanStore } from './yad2ScanStore';
+import { resetForLogout as resetMarketScanStore } from './marketScanStore';
+
+// SEC-1 — one place to wipe every piece of cross-user client state when
+// a session ends. Module-level stores + sessionStorage rehydration
+// previously left one user's scan banner visible to the next user on
+// the same browser. Any new cross-session store that gets added later
+// should be cleared from here too.
+function purgeClientSessionState() {
+  clearPageCache();
+  try { resetYad2ScanStore(); } catch { /* ignore */ }
+  try { resetMarketScanStore(); } catch { /* ignore */ }
+}
 
 const AuthContext = createContext(null);
 
@@ -27,7 +40,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const handler = (e) => {
       setUser(null);
-      clearPageCache();
+      purgeClientSessionState();
       try {
         const from = e?.detail?.pathname || '/';
         if (!from.startsWith('/login')) {
@@ -43,26 +56,35 @@ export function AuthProvider({ children }) {
 
   const signup = async (data) => {
     const res = await api.signup(data);
-    setUser(res.user);
-    return res.user;
+    return finalizeLogin(res.user);
   };
 
   const login = async (data) => {
     const res = await api.login(data);
-    setUser(res.user);
-    return res.user;
+    return finalizeLogin(res.user);
   };
 
   const loginWithGoogle = async (role) => {
     const res = await api.googleMock({ role });
-    setUser(res.user);
-    return res.user;
+    return finalizeLogin(res.user);
   };
 
   const logout = async () => {
     try { await api.logout(); } catch { /* ignore */ }
     setUser(null);
-    clearPageCache();
+    purgeClientSessionState();
+  };
+
+  // SEC-1 — also purge on a successful fresh login so a different user
+  // signing in on the same browser never inherits residual state from
+  // whoever used this browser before (e.g. agent swap in an office, or
+  // the previous user didn't cleanly log out). We run the purge BEFORE
+  // setting the new user so any race in the scan stores doesn't see
+  // the new identity mid-wipe.
+  const finalizeLogin = (nextUser) => {
+    purgeClientSessionState();
+    setUser(nextUser);
+    return nextUser;
   };
 
   return (

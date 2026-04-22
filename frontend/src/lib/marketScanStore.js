@@ -77,6 +77,10 @@ export function subscribeMarketScan(fn) {
 // fine — the backend's own coalescing catches the "same page, two
 // fetches" race.
 const inflight = new Map();
+// SEC-1 — bumped by resetForLogout so late poll results from the
+// previous session can't apply state or fire the completion event
+// under a new user's session.
+let sessionEpoch = 0;
 
 const POLL_INTERVAL_MS = 2500;
 const POLL_CEILING_MS = 10 * 60 * 1000;
@@ -95,6 +99,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function startRefresh(propertyId, kind = 'buy') {
   const key = keyFor(propertyId, kind);
   if (inflight.has(key)) return inflight.get(key);
+  const myEpoch = sessionEpoch;
 
   setScan(key, {
     status: 'running',
@@ -112,12 +117,14 @@ export function startRefresh(propertyId, kind = 'buy') {
     try {
       const { jobId } = await api.marketContextRefreshStart(propertyId, kind);
       const result = await pollJob(jobId);
+      if (myEpoch !== sessionEpoch) return result; // session changed
       setScan(key, { status: 'done', finishedAt: Date.now(), result });
       window.dispatchEvent(new CustomEvent('market-scan-complete', {
         detail: { propertyId, kind, ok: true, result },
       }));
       return result;
     } catch (e) {
+      if (myEpoch !== sessionEpoch) throw e;
       const msg = e?.message || 'שליפת נתוני השוק נכשלה';
       setScan(key, { status: 'error', finishedAt: Date.now(), error: msg });
       window.dispatchEvent(new CustomEvent('market-scan-complete', {
@@ -157,5 +164,20 @@ export function clearScanFor(propertyId, kind) {
   const next = { ...state };
   delete next[key];
   state = next;
+  emit();
+}
+
+/**
+ * SEC-1 — reset all market-scan state for the current browser.
+ *
+ * Called from `AuthProvider.logout()` and from the 401 bounce handler.
+ * The store itself holds no sessionStorage (scans don't rehydrate), but
+ * the in-memory `state` map + any inflight polling promises still leak
+ * across users on the same browser unless we wipe them here.
+ */
+export function resetForLogout() {
+  inflight.clear();
+  sessionEpoch += 1;
+  state = {};
   emit();
 }

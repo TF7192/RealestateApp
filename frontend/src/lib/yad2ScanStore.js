@@ -117,8 +117,16 @@ const POLL_INTERVAL_MS = 2500;
 const POLL_CEILING_MS = 15 * 60 * 1000;
 
 let inflight = null;
+// SEC-1 — monotonic epoch bumped by `resetForLogout()`. A scan started
+// under epoch N that finishes after a logout+login (epoch N+1) MUST NOT
+// apply its result or fire the completion event — that would leak
+// User A's scan-done banner into User B's session. Every async path
+// stamps the epoch at start and checks it before mutating state.
+let sessionEpoch = 0;
+
 export function startScan(url) {
   if (inflight) return inflight;
+  const myEpoch = sessionEpoch;
   setState({
     status: 'running',
     url,
@@ -129,12 +137,9 @@ export function startScan(url) {
   });
   inflight = (async () => {
     try {
-      // Kick off the async job. The start call itself returns in well
-      // under a second (just a quota check + crawler spawn); the long
-      // Playwright walk then runs in the background and we poll
-      // /jobs/:id until it resolves.
       const { jobId } = await api.yad2AgencyPreviewStart(url);
       const res = await pollJob(jobId);
+      if (myEpoch !== sessionEpoch) return res; // logged-out mid-flight; drop
       setState({
         status: 'done',
         finishedAt: Date.now(),
@@ -146,6 +151,7 @@ export function startScan(url) {
       }));
       return res;
     } catch (e) {
+      if (myEpoch !== sessionEpoch) throw e;
       const inlineQuota = e?.data?.error?.quota ?? e?.quota;
       setState({
         status: 'error',
@@ -197,8 +203,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // step. Kept separate from startScan() so the import page can drive its
 // own busy/error state without touching the shared scan snapshot.
 export async function startImport(listings) {
+  const myEpoch = sessionEpoch;
   const { jobId } = await api.yad2AgencyImportStart(listings);
-  return await pollJob(jobId);
+  const res = await pollJob(jobId);
+  if (myEpoch !== sessionEpoch) {
+    // Session changed mid-import (logout/login). Drop the result so
+    // a toast doesn't fire for a user who isn't the one who started.
+    throw new Error('הפעולה בוטלה');
+  }
+  return res;
 }
 
 /** Wipe the cached scan — called when the agent starts fresh. */
@@ -218,4 +231,37 @@ export function clearScan() {
 /** Update only the quota (e.g. after /quota GET). */
 export function setScanQuota(quota) {
   setState({ quota });
+}
+
+/**
+ * SEC-1 — reset all scan state for the current browser.
+ *
+ * Called from `AuthProvider.logout()` and from the 401 bounce handler
+ * so residual scan data from User A can never leak into User B's
+ * session on the same browser. This wipes BOTH the in-memory snapshot
+ * AND every sessionStorage artifact the store owns:
+ *
+ *   - `estia-yad2-last-scan`   — rehydrated completed-scan result.
+ *   - `estia-yad2-banner-dismissed-at` — banner-dismiss timestamp.
+ *
+ * We also null out the inflight promise so a poll still running at the
+ * moment of logout resolves into a trashed state that nothing reads.
+ */
+export function resetForLogout() {
+  inflight = null;
+  sessionEpoch += 1;
+  state = {
+    status: 'idle',
+    url: null,
+    startedAt: null,
+    finishedAt: null,
+    result: null,
+    error: null,
+    quota: null,
+  };
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem('estia-yad2-banner-dismissed-at');
+  } catch { /* ignore private-mode failures */ }
+  emit();
 }
