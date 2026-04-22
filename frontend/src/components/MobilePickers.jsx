@@ -160,10 +160,14 @@ export function SuggestPicker({
     return undefined;
   }, [open]);
 
-  // Debounced server lookup when asyncFetch is wired.
+  // Debounced server lookup — on touch the sheet opens and drives
+  // `query`; on desktop the user types into the inline input and
+  // `value` is what changes. Either source kicks the fetch so L-1
+  // autocomplete works in both surfaces.
+  const probe = (open ? query : value) || '';
   useEffect(() => {
-    if (!asyncFetch || !open) return undefined;
-    const q = (query || '').trim();
+    if (!asyncFetch) return undefined;
+    const q = probe.trim();
     if (!q) { setRemote([]); return undefined; }
     setRemoteLoading(true);
     let cancelled = false;
@@ -175,7 +179,7 @@ export function SuggestPicker({
       finally { if (!cancelled) setRemoteLoading(false); }
     }, 200);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [asyncFetch, open, query]);
+  }, [asyncFetch, probe]);
 
   const q = (query || value || '').trim();
   const localFiltered = q
@@ -192,8 +196,13 @@ export function SuggestPicker({
           value={value || ''}
           onChange={(e) => onChange?.(e.target.value)}
           onFocus={(e) => {
-            // On touch, open the sheet; on desktop, allow inline editing
-            if (window.matchMedia('(pointer: coarse)').matches) {
+            // Touch: always open the sheet (keyboard gets out of the
+            // way). Desktop: only open the sheet when we're server-
+            // driven (asyncFetch), since that's where the dropdown
+            // rendering lives. Static-options desktop keeps inline
+            // editing.
+            const isTouch = window.matchMedia('(pointer: coarse)').matches;
+            if (isTouch || asyncFetch) {
               e.target.blur();
               setQuery(value || '');
               setOpen(true);

@@ -1307,15 +1307,6 @@ export default function Properties() {
                     {isPicked ? <CheckSquare size={22} /> : <Square size={22} />}
                   </span>
                 )}
-                {/* Sprint 7 B4 — favorite toggle pinned to the visual
-                    top-left of the card. Lives outside the Link so taps
-                    never navigate; FavoriteStar stops its own propagation. */}
-                <FavoriteStar
-                  className="property-fav-star"
-                  active={favoriteIds.has(prop.id)}
-                  onToggle={(next) => handleToggleFavorite(prop.id, next)}
-                />
-
                 <Link to={`/properties/${prop.id}`} className="property-card-link" onClick={handleCardTap}>
                   <div className="property-image">
                     <img
@@ -1447,6 +1438,15 @@ export default function Properties() {
                  * (visual top-left). The overflow menu stays for the long
                  * tail (transfer, similar, delete). */}
                 <div className="property-quick-actions" aria-label={`פעולות מהירות ${prop.street}`}>
+                  {/* Favorite star sits inline with the other quick
+                      actions so all three controls read as one group at
+                      the card's corner — previously the star floated
+                      on top of the tag/category badges on the image. */}
+                  <FavoriteStar
+                    className="property-fav-star property-fav-star-inline"
+                    active={favoriteIds.has(prop.id)}
+                    onToggle={(next) => handleToggleFavorite(prop.id, next)}
+                  />
                   <button
                     type="button"
                     className="property-quick-btn"

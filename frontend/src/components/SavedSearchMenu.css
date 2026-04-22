@@ -41,11 +41,13 @@
   animation: ss-menu-in 140ms ease;
 }
 
-/* Containing element must form its own stacking context so the popover
- * escapes the `.page-header-actions` row without a different header
- * element painting over the menu. */
+/* Containing element forms its own stacking context so the popover
+ * escapes the `.page-header-actions` row without sibling elements
+ * painting over the menu. Must be HIGHER than the sticky search bar
+ * underneath (`.sticky-search` sits at z-index 40) or the dropdown
+ * lives inside a context pinned below the search input. */
 .ss-menu {
-  z-index: 1;
+  z-index: 60;
 }
 
 @keyframes ss-menu-in {

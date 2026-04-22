@@ -401,7 +401,11 @@ export default function NewLead() {
                 label={t('new.fields.cityLabel')}
                 inputProps={{ ...inputPropsForCity(), autoComplete: 'off' }}
                 asyncFetch={async (q) => {
-                  const res = await api.geoSearch({ q, limit: 20 });
+                  // Backend caps `limit` at 15 (zod rejects anything
+                  // higher). The picker's maxVisible already clamps
+                  // what we render; 12 leaves headroom for duplicates
+                  // the filter step strips.
+                  const res = await api.geoSearch({ q, limit: 12 });
                   return (res?.items || [])
                     .map((r) => r.city || r.label)
                     .filter(Boolean);
@@ -418,7 +422,7 @@ export default function NewLead() {
                 label={t('new.fields.streetLabel')}
                 inputProps={{ ...inputPropsForAddress(), autoComplete: 'off' }}
                 asyncFetch={async (q) => {
-                  const res = await api.geoSearch({ q, city: form.city, limit: 20 });
+                  const res = await api.geoSearch({ q, city: form.city, limit: 12 });
                   return (res?.items || [])
                     .map((r) => r.street || r.label)
                     .filter(Boolean);

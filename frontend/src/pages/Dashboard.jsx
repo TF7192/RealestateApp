@@ -615,7 +615,10 @@ function PipelineHealthCard({ leads = [] }) {
   const total = buckets.hot + buckets.warm + buckets.cold;
   const pct = (n) => (total ? (n / total) * 100 : 0);
   const fmtBudget = (n) => {
-    if (!n) return '—';
+    // Zero is a real, informative value for a brand-new agent with no
+    // budget data yet. Print "0 ₪" instead of the em-dash so the card
+    // reads like a number, not a placeholder.
+    if (!n) return '0 ₪';
     if (n >= 1_000_000) return `₪${(n / 1_000_000).toFixed(1)}M`;
     if (n >= 1_000) return `₪${Math.round(n / 1_000)}K`;
     return `₪${n.toLocaleString('he-IL')}`;

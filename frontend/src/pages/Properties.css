@@ -1282,6 +1282,19 @@
   background: rgba(30, 26, 20, 0.75);
 }
 
+/* Inline variant — used when the star sits inside
+ * `.property-quick-actions` alongside edit + duplicate icons, so the
+ * three controls read as one group at the card corner. Drop the
+ * absolute positioning (parent flex row handles layout) and match the
+ * neighboring quick-btn sizing. */
+.property-fav-star-inline {
+  position: static;
+  top: auto;
+  inset-inline-start: auto;
+  width: 28px;
+  height: 28px;
+}
+
 .property-fav-star-compact {
   top: 6px;
   inset-inline-start: 6px;

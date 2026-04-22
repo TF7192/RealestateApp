@@ -50,7 +50,11 @@ export default function TagPicker({ entityType, entityId, readonly = false, onCh
         api.listAssignedTags(entityType, entityId),
       ]);
       setAllTags(catalog?.items || []);
-      setAssigned(assignedRes?.items || []);
+      // Backend GET /tags/for returns `{ tags: [...] }`, not `{ items }`.
+      // Mis-keyed reads left `assigned` permanently empty, which is why
+      // a freshly-attached tag appeared momentarily via the optimistic
+      // update but vanished the next time the picker mounted / refreshed.
+      setAssigned(assignedRes?.tags || assignedRes?.items || []);
     } catch (e) {
       toast.error(e?.message || 'טעינת תגים נכשלה');
     } finally {

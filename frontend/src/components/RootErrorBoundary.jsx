@@ -45,7 +45,11 @@ export default class RootErrorBoundary extends Component {
   };
 
   handleHome = () => {
-    try { window.location.href = '/'; } catch { /* ignore */ }
+    // Full-nav to `/` is served by nginx's static landing.html, so the
+    // error-boundary "back to dashboard" ended up on the marketing page.
+    // Use the SPA `/dashboard` alias so the WebView always lands on the
+    // authed app shell.
+    try { window.location.href = '/dashboard'; } catch { /* ignore */ }
   };
 
   render() {
