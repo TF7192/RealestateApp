@@ -1,1 +1,464 @@
-{}
+{
+  "new": {
+    "back": "חזרה ללידים",
+    "title": "ליד חדש",
+    "subtitle": "הזן פרטי לקוח מתעניין",
+    "unsavedWarning": "יש שינויים שלא נשמרו בליד — לעזוב?",
+    "nameRequired": "שם הלקוח הוא שדה חובה",
+    "errors": {
+      "saveFailed": "שמירת הליד נכשלה"
+    },
+    "toasts": {
+      "draftRestored": "הטיוטה שוחזרה",
+      "draftDiscarded": "הטיוטה נמחקה",
+      "phonePasted": "טלפון הודבק",
+      "saved": "הליד נשמר",
+      "voiceFilled": "השדות מולאו מההקלטה"
+    },
+    "draft": {
+      "found": "נמצאה טיוטה שנשמרה",
+      "restore": "שחזר",
+      "discard": "מחק"
+    },
+    "clipboard": {
+      "suggestion": "{{phone}} מהלוח — הוסף",
+      "srDetected": "מספר טלפון זוהה בלוח העתקה",
+      "close": "סגור"
+    },
+    "sections": {
+      "personal": "פרטים אישיים",
+      "searchPreferences": "העדפות חיפוש",
+      "extended": "פרטים מורחבים",
+      "admin": "ניהול ולקוח",
+      "notes": "הערות"
+    },
+    "fields": {
+      "customerName": "שם הלקוח",
+      "customerNamePlaceholder": "שם מלא",
+      "phone": "טלפון",
+      "source": "מקור הליד",
+      "sourcePlaceholder": "בחר מקור...",
+      "interestType": "סוג התעניינות",
+      "interestTypeAria": "סוג התעניינות",
+      "lookingFor": "קנייה / שכירות",
+      "lookingForAria": "קנייה או שכירות",
+      "sector": "מגזר",
+      "city": "עיר מבוקשת",
+      "cityLabel": "עיר",
+      "cityPlaceholder": "תל אביב, ירושלים, חיפה…",
+      "street": "רחוב (אופציונלי)",
+      "streetLabel": "רחוב",
+      "streetPlaceholder": "רוטשילד, אלנבי…",
+      "roomsRange": "טווח חדרים",
+      "roomsFrom": "מ",
+      "roomsTo": "עד",
+      "priceRange": "טווח מחיר",
+      "schoolProximity": "קירבה לבית ספר",
+      "schoolProximityNotImportant": "לא חשוב",
+      "firstName": "שם פרטי",
+      "lastName": "שם משפחה",
+      "companyName": "שם חברה",
+      "personalId": "ת.ז / ח.פ",
+      "address": "כתובת",
+      "cityFree": "עיר (חופשי)",
+      "zip": "מיקוד",
+      "primaryPhone": "טלפון עיקרי",
+      "phone1": "טלפון נוסף 1",
+      "phone2": "טלפון נוסף 2",
+      "fax": "פקס",
+      "description": "תיאור",
+      "customerStatus": "סטטוס לקוח",
+      "leadStatus": "סטטוס ליד",
+      "commissionPct": "אחוז עמלה",
+      "seriousness": "רצינות",
+      "purposes": "מטרת הרכישה",
+      "privateCustomer": "לקוח פרטי (לא חשוף לשותפי משרד)",
+      "notesPlaceholder": "הערות נוספות על הלקוח..."
+    },
+    "options": {
+      "lookingFor": {
+        "buy": "קנייה",
+        "rent": "שכירות"
+      },
+      "interestType": {
+        "private": "פרטי",
+        "commercial": "מסחרי"
+      },
+      "sectors": {
+        "general": "כללי",
+        "religious": "דתי",
+        "haredi": "חרדי",
+        "arab": "ערבי"
+      },
+      "school": {
+        "m200": "עד 200 מטר",
+        "m500": "עד 500 מטר",
+        "walk": "הליכה",
+        "km": "עד ק״מ"
+      },
+      "sourceGroups": {
+        "online": "אונליין",
+        "referrals": "מכרים",
+        "physical": "פיזי",
+        "other": "אחר"
+      },
+      "sources": {
+        "facebook": "פייסבוק",
+        "yad2": "יד 2",
+        "website": "אתר",
+        "referral": "הפניה",
+        "customerReferral": "הפניה מלקוח",
+        "openHouse": "בית פתוח",
+        "sign": "שלט",
+        "agentTour": "סיור סוכנים",
+        "other": "אחר"
+      }
+    },
+    "amenities": {
+      "preApproval": "אישור עקרוני למשכנתא",
+      "balcony": "מרפסת",
+      "parking": "חניה",
+      "elevator": "מעלית",
+      "safeRoom": "ממ״ד",
+      "ac": "מזגנים",
+      "storage": "מחסן"
+    },
+    "autosave": {
+      "saving": "שומר טיוטה…",
+      "savedAt": "טיוטה נשמרה {{time}}",
+      "saved": "טיוטה נשמרה"
+    },
+    "actions": {
+      "save": "שמור ליד",
+      "saving": "שומר…",
+      "cancel": "ביטול"
+    }
+  },
+  "list": {
+    "title": "לקוחות",
+    "loading": "טוען...",
+    "countFormat": "{{filtered}} מתוך {{total}} לקוחות",
+    "newLead": "ליד חדש",
+    "searchPlaceholder": "חיפוש לפי שם, עיר, טלפון...",
+    "filters": {
+      "advanced": "סינון מתקדם",
+      "advancedTitle": "סינון מתקדם",
+      "advancedAria": "סינון מתקדם",
+      "advancedAriaWithCount": "סינון מתקדם ({{count}})",
+      "openSort": "פתח סינון",
+      "filter": "סנן",
+      "filterWithCount": "סנן ({{count}})",
+      "clear": "נקה סינון",
+      "onlyFavorites": "רק מועדפים",
+      "onlyFavoritesTitle": "הצג רק מועדפים",
+      "incoming": {
+        "hot": "לידים חמים",
+        "warm": "לידים חמימים",
+        "cold": "לידים קרים",
+        "inactive": "לידים ללא קשר {{days}}+ ימים",
+        "showing": "מוצג: {{label}}",
+        "clear": "נקה סינון"
+      },
+      "lookingFor": {
+        "all": "הכל",
+        "buy": "קונים",
+        "rent": "שוכרים"
+      },
+      "interest": {
+        "all": "כל הסוגים",
+        "private": "פרטי",
+        "commercial": "מסחרי"
+      },
+      "status": {
+        "all": "הכל",
+        "hot": "חם",
+        "warm": "חמים",
+        "cold": "קר"
+      }
+    },
+    "view": {
+      "ariaLabel": "תצוגה",
+      "cards": "כרטיסים",
+      "cardsTitle": "תצוגת כרטיסים",
+      "list": "רשימה",
+      "listTitle": "תצוגת רשימה"
+    },
+    "filterSheet": {
+      "title": "סינון לקוחות",
+      "groupSearch": "חיפוש",
+      "groupPropertyType": "סוג נכס",
+      "groupStatus": "סטטוס",
+      "clear": "נקה סינון",
+      "showResults": "הצג {{count}} תוצאות",
+      "close": "סגור"
+    },
+    "statusSheet": {
+      "title": "שנה סטטוס",
+      "reasonFallback": "לא זוהתה פעילות אחרונה. עדכן קשר או שלח וואטסאפ כדי לקדם את הליד.",
+      "autoSuggestion": "הצעה אוטומטית",
+      "cancel": "ביטול",
+      "close": "סגור"
+    },
+    "status": {
+      "hot": "חם",
+      "warm": "חמים",
+      "cold": "קר",
+      "change": "שנה סטטוס",
+      "autoSuggestionLabel": "הצעה אוטומטית",
+      "autoSuggestionDiffers": "הצעה אוטומטית שונה מהסטטוס הנוכחי",
+      "hint": "בחר סטטוס לליד",
+      "updatedTo": "סטטוס עודכן ל-{{status}}"
+    },
+    "statusReason": {
+      "hot": "חם",
+      "warm": "חמים",
+      "cold": "קר",
+      "new": "חדש",
+      "noContact": "ללא קשר",
+      "daysNoContact": "{{days}} ימים ללא קשר"
+    },
+    "empty": {
+      "noneTitle": "אין עדיין לקוחות במערכת",
+      "noneBody": "הוסף את הליד הראשון שלך כדי להתחיל לעקוב אחר הלקוחות הפוטנציאליים.",
+      "filteredTitle": "אין לקוחות בסינון הנוכחי",
+      "filteredBody": "נסה לשנות את הסינון או לחפש לקוח בשם אחר.",
+      "filteredShort": "אין לקוחות בסינון הנוכחי"
+    },
+    "tour": {
+      "title": "הלקוחות שלך",
+      "content": "לקוחות מתעניינים לפי חום הליד (חם/פושר/קר). כשיש התאמה בין לקוח לנכס היא מופיעה אוטומטית בכרטיס הנכס."
+    },
+    "card": {
+      "roomsShort": "{{count}} חד׳",
+      "roomsUnknown": "— חד׳",
+      "cityUnknown": "עיר ?",
+      "budgetUnknown": "תקציב ?",
+      "lookingForBuy": "לקנות",
+      "lookingForRent": "לשכור",
+      "interestPrivate": "פרטי",
+      "interestCommercial": "מסחרי",
+      "preApprovalTitle": "אישור עקרוני",
+      "preApprovalLabel": "אישור עקרוני",
+      "preApprovalHas": "יש",
+      "preApprovalNone": "אין",
+      "preApprovalMortgageTitle": "אישור עקרוני למשכנתא",
+      "matchPillTitle": "{{count}} נכסים תואמים",
+      "matchPillDescTitle": "{{count}} נכסים שלך עונים לקריטריונים של {{name}}",
+      "matchPillLabel": "נכסים תואמים",
+      "matchingTitle": "נכסים תואמים בקריטריונים שלך",
+      "stalePillTitle": "לחץ לעדכון קשר אחרון לעכשיו",
+      "stalePill": "{{days}} ימים ללא קשר",
+      "lookingForLabel": "מחפש",
+      "cityLabel": "עיר",
+      "addCityPlaceholder": "הוסף עיר",
+      "roomsLabel": "חדרים",
+      "budgetLabel": "תקציב",
+      "addBudgetPlaceholder": "הוסף תקציב",
+      "sectorLabel": "מגזר",
+      "schoolLabel": "קירבה לבית ספר",
+      "notesPlaceholder": "הוסף הערות...",
+      "lastContactTitle": "לחץ לעדכון קשר אחרון לעכשיו",
+      "noContact": "ללא קשר",
+      "whatsapp": "וואטסאפ",
+      "whatsappTo": "וואטסאפ ל{{name}}",
+      "whatsappHello": "שלום {{name}}",
+      "callTo": "התקשר ל{{name}}",
+      "call": "התקשר",
+      "sms": "SMS",
+      "moreActions": "פעולות נוספות",
+      "moreActionsTo": "פעולות נוספות ל{{name}}",
+      "tagsChange": "שנה סטטוס"
+    },
+    "table": {
+      "headerName": "שם",
+      "headerCity": "עיר",
+      "headerRooms": "חדרים",
+      "headerBudget": "תקציב",
+      "headerStatus": "סטטוס",
+      "headerLastContact": "קשר אחרון",
+      "headerActions": "פעולות",
+      "openCardTitle": "פתח כרטיס לקוח של {{name}}",
+      "stalePillTitle": "לחץ לעדכון קשר אחרון לעכשיו",
+      "stalePill": "{{days}} ימים ללא קשר",
+      "waTitle": "וואטסאפ",
+      "editTitle": "עריכה",
+      "deleteTitle": "מחיקה"
+    },
+    "overflow": {
+      "openCard": "פתח כרטיס לקוח",
+      "openCardDesc": "היסטוריה, התאמות, עריכה מלאה",
+      "call": "התקשר",
+      "sms": "SMS",
+      "edit": "עריכה",
+      "delete": "מחיקה"
+    },
+    "swipe": {
+      "call": "התקשר",
+      "whatsapp": "וואטסאפ",
+      "sms": "SMS"
+    },
+    "delete": {
+      "title": "מחיקת לקוח",
+      "message": "למחוק את \"{{name}}\"? הפעולה אינה הפיכה.",
+      "confirm": "מחק",
+      "toastRemoved": "נמחק \"{{name}}\"",
+      "undo": "בטל",
+      "restored": "הליד שוחזר",
+      "restoreFailed": "שחזור נכשל"
+    },
+    "patchSuccess": {
+      "saving": "שומר…",
+      "saved": "נשמר",
+      "seriousnessUpdated": "רצינות עודכנה ל-{{label}}",
+      "cityUpdated": "עיר עודכנה",
+      "roomsUpdated": "חדרים עודכנו",
+      "descriptionUpdated": "תיאור עודכן",
+      "notesUpdated": "הערות עודכנו",
+      "lastContactUpdated": "קשר אחרון עודכן"
+    },
+    "favorite": {
+      "failed": "שינוי המועדפים נכשל"
+    },
+    "placeholders": {
+      "dash": "—",
+      "addDescription": "הוסף תיאור קצר",
+      "descriptionAria": "תיאור",
+      "descriptionEditTitle": "לחץ לעריכת תיאור"
+    },
+    "rooms": {
+      "clear": "נקה",
+      "valueFormat": "{{count}} חד׳"
+    },
+    "seriousness": {
+      "title": "רצינות",
+      "label": "רצינות: {{label}}",
+      "changeTitle": "שנה רצינות",
+      "chooseAria": "בחר רצינות"
+    }
+  },
+  "detail": {
+    "loading": "טוען…",
+    "notFound": "הלקוח לא נמצא",
+    "loadError": "שגיאה בטעינה",
+    "backToCustomers": "חזור ללקוחות",
+    "crumbCustomers": "לקוחות",
+    "matchingTitle": "נכסים תואמים בקריטריונים שלך",
+    "matchCount": "{{count}} נכסים תואמים",
+    "matchLabel": "נכסים תואמים",
+    "toolbar": {
+      "templates": "ערוך תבניות הודעה",
+      "templatesTitle": "ערוך תבניות הודעה",
+      "call": "התקשר",
+      "callFallback": "התקשר",
+      "whatsapp": "וואטסאפ",
+      "whatsappTitle": "וואטסאפ",
+      "whatsappHello": "שלום {{name}}",
+      "sms": "SMS",
+      "smsTitle": "הודעת SMS",
+      "scheduleMeeting": "קבע פגישה",
+      "scheduleMeetingTitle": "קבע פגישה",
+      "print": "הדפס",
+      "printTitle": "הדפס",
+      "popout": "פתח בחלון חדש",
+      "popoutTitle": "פתח בחלון חדש"
+    },
+    "sections": {
+      "tags": "תגים",
+      "tagsAria": "תגי לקוח",
+      "customerDetails": "פרטי הלקוח",
+      "extended": "פרטים מורחבים",
+      "admin": "ניהול ולקוח"
+    },
+    "fields": {
+      "name": "שם",
+      "phone": "טלפון",
+      "email": "אימייל",
+      "status": "סטטוס",
+      "statusAria": "סטטוס",
+      "interestType": "סוג התעניינות",
+      "interestTypeAria": "סוג התעניינות",
+      "lookingFor": "קנייה / שכירות",
+      "lookingForAria": "קנייה או שכירות",
+      "city": "עיר",
+      "street": "רחוב",
+      "rooms": "חדרים",
+      "priceText": "טווח מחיר (טקסט)",
+      "budget": "תקציב",
+      "budgetPlaceholder": "2,500,000",
+      "sector": "מגזר",
+      "schoolProximity": "קירבה לבית ספר",
+      "schoolProximityNotImportant": "לא חשוב",
+      "source": "מקור",
+      "notes": "הערות",
+      "firstName": "שם פרטי",
+      "lastName": "שם משפחה",
+      "companyName": "שם חברה",
+      "personalId": "ת.ז / ח.פ",
+      "address": "כתובת",
+      "cityFree": "עיר (חופשי)",
+      "zip": "מיקוד",
+      "primaryPhone": "טלפון עיקרי",
+      "phone1": "טלפון נוסף 1",
+      "phone2": "טלפון נוסף 2",
+      "fax": "פקס",
+      "description": "תיאור",
+      "customerStatus": "סטטוס לקוח",
+      "leadStatus": "סטטוס ליד",
+      "commissionPct": "אחוז עמלה",
+      "commissionPctPlaceholder": "2",
+      "seriousness": "רצינות",
+      "purposes": "מטרת הרכישה",
+      "privateCustomer": "לקוח פרטי (לא חשוף לשותפי משרד)"
+    },
+    "options": {
+      "lookingFor": {
+        "buy": "קנייה",
+        "rent": "שכירות"
+      },
+      "interestType": {
+        "private": "פרטי",
+        "commercial": "מסחרי"
+      },
+      "status": {
+        "hot": "חם",
+        "warm": "חמים",
+        "cold": "קר"
+      },
+      "sectors": {
+        "general": "כללי",
+        "religious": "דתי",
+        "haredi": "חרדי",
+        "arab": "ערבי"
+      },
+      "school": {
+        "m200": "עד 200 מטר",
+        "m500": "עד 500 מטר",
+        "walk": "הליכה",
+        "km": "עד ק״מ"
+      }
+    },
+    "amenities": {
+      "preApproval": "אישור עקרוני",
+      "balcony": "מרפסת",
+      "parking": "חניה",
+      "elevator": "מעלית",
+      "safeRoom": "ממ״ד",
+      "ac": "מזגנים",
+      "storage": "מחסן"
+    },
+    "actions": {
+      "save": "שמור שינויים",
+      "saving": "שומר…"
+    },
+    "saveError": "שמירה נכשלה",
+    "saved": "הפרטים נשמרו",
+    "timeline": {
+      "title": "ציר פעילות",
+      "empty": "עדיין אין פעילות לתצוגה. עדכן קשר או חתום הסכם כדי להתחיל לעקוב.",
+      "lastContactDaysAgo": "קשר אחרון לפני {{days}} ימים",
+      "lastContactPlanned": "קשר אחרון מתוכנן",
+      "statusUpdatedTo": "סטטוס עודכן ל{{status}}",
+      "created": "הליד נוצר"
+    }
+  }
+}

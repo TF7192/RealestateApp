@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowRight, Save, Clipboard, X, Check, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { cityNames, streetNames } from '../data/mockData';
@@ -80,6 +81,7 @@ const INITIAL_FORM = {
 };
 
 export default function NewLead() {
+  const { t } = useTranslation('customers');
   const navigate = useNavigate();
   const toast = useToast();
   const [form, setForm] = useState(INITIAL_FORM);
@@ -91,7 +93,7 @@ export default function NewLead() {
 
   const hasContent = !!(form.name || form.phone || form.email || form.city || form.notes);
   const isDirty = hasContent && !savedRef.current;
-  useBeforeUnload(isDirty, 'יש שינויים שלא נשמרו בליד — לעזוב?');
+  useBeforeUnload(isDirty, t('new.unsavedWarning'));
   const [clipboardSuggestion, setClipboardSuggestion] = useState(null);
   const [clipboardDismissed, setClipboardDismissed] = useState(false);
   const peekedRef = useRef(false);
@@ -116,13 +118,13 @@ export default function NewLead() {
       const { __savedAt, ...formData } = draftBanner;
       setForm({ ...INITIAL_FORM, ...formData });
       setDraftBanner(null);
-      toast.info('הטיוטה שוחזרה');
+      toast.info(t('new.toasts.draftRestored'));
     }
   };
   const discardDraft = () => {
     clearDraft();
     setDraftBanner(null);
-    toast.info('הטיוטה נמחקה');
+    toast.info(t('new.toasts.draftDiscarded'));
   };
 
   // ── Clipboard phone auto-paste ─────────────────────────────────────
@@ -153,7 +155,7 @@ export default function NewLead() {
     if (clipboardSuggestion) {
       update('phone', clipboardSuggestion);
       setClipboardSuggestion(null);
-      toast.success('טלפון הודבק');
+      toast.success(t('new.toasts.phonePasted'));
     }
   };
   const dismissClipboard = () => {
@@ -188,7 +190,7 @@ export default function NewLead() {
       if (extracted.source) next.source = extracted.source;
       return next;
     });
-    toast.success('השדות מולאו מההקלטה');
+    toast.success(t('new.toasts.voiceFilled'));
   };
 
   // F-1 (P0) — the previous handler navigated without persisting the
@@ -197,7 +199,7 @@ export default function NewLead() {
     e.preventDefault();
     if (submitting) return;
     if (!form.name?.trim()) {
-      toast.error('שם הלקוח הוא שדה חובה');
+      toast.error(t('new.nameRequired'));
       return;
     }
     setSubmitting(true);
@@ -256,12 +258,12 @@ export default function NewLead() {
       const res = await api.createLead(body);
       savedRef.current = true;
       clearDraft();
-      toast.success('הליד נשמר');
+      toast.success(t('new.toasts.saved'));
       const newId = res?.id || res?.lead?.id;
       if (newId) navigate(`/customers/${newId}`);
       else navigate('/customers');
     } catch (err) {
-      toast.error(err?.message || 'שמירת הליד נכשלה');
+      toast.error(err?.message || t('new.errors.saveFailed'));
       setSubmitting(false);
     }
   };
@@ -276,13 +278,13 @@ export default function NewLead() {
     <div className="form-page has-sticky-bar" onFocusCapture={tryPeekClipboard} onTouchStartCapture={tryPeekClipboard}>
       <Link to="/customers" className="back-link animate-in">
         <ArrowRight size={16} />
-        חזרה ללידים
+        {t('new.back')}
       </Link>
 
       <div className="page-header animate-in">
         <div className="page-header-info">
-          <h2>ליד חדש</h2>
-          <p>הזן פרטי לקוח מתעניין</p>
+          <h2>{t('new.title')}</h2>
+          <p>{t('new.subtitle')}</p>
         </div>
         {/* H3 — one-line voice shortcut. Agent can dictate details
             instead of typing; extracted fields hydrate into this
@@ -293,14 +295,14 @@ export default function NewLead() {
       {draftBanner && (
         <div className="draft-banner animate-in" role="status">
           <span>
-            נמצאה טיוטה שנשמרה
+            {t('new.draft.found')}
             {draftBanner.__savedAt && (
               <span className="draft-banner-age"> · {relLabel(draftBanner.__savedAt)}</span>
             )}
           </span>
           <div className="draft-banner-actions">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>שחזר</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft}>מחק</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>{t('new.draft.restore')}</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft}>{t('new.draft.discard')}</button>
           </div>
         </div>
       )}
@@ -317,15 +319,15 @@ export default function NewLead() {
             onClick={acceptClipboard}
           >
             <Clipboard size={14} />
-            <span>{clipboardSuggestion} מהלוח — הוסף</span>
+            <span>{t('new.clipboard.suggestion', { phone: clipboardSuggestion })}</span>
           </button>
           <span id="clip-chip-desc" className="sr-only">
-            מספר טלפון זוהה בלוח העתקה
+            {t('new.clipboard.srDetected')}
           </span>
           <button
             type="button"
             className="clipboard-chip-dismiss clipboard-chip-dismiss-sm"
-            aria-label="סגור"
+            aria-label={t('new.clipboard.close')}
             onClick={dismissClipboard}
           >
             <X size={14} />
@@ -335,20 +337,20 @@ export default function NewLead() {
 
       <form id="lead-form" onSubmit={handleSubmit} className="intake-form animate-in animate-in-delay-1">
         <div className="form-section">
-          <h3 className="form-section-title">פרטים אישיים</h3>
+          <h3 className="form-section-title">{t('new.sections.personal')}</h3>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">שם הלקוח</label>
+              <label className="form-label">{t('new.fields.customerName')}</label>
               <input
                 {...inputPropsForName()}
                 className="form-input"
-                placeholder="שם מלא"
+                placeholder={t('new.fields.customerNamePlaceholder')}
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">טלפון</label>
+              <label className="form-label">{t('new.fields.phone')}</label>
               <PhoneField
                 value={form.phone}
                 onChange={(v) => update('phone', v)}
@@ -357,81 +359,81 @@ export default function NewLead() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">מקור הליד</label>
+              <label className="form-label">{t('new.fields.source')}</label>
               {/* F-5 — grouped sources. Flat 9-option dropdown hurt
                   scanning; "הפניה" vs "הפניה מלקוח" adjacency cost real
                   agent seconds and polluted the funnel report. */}
               <SelectField
                 value={form.source}
                 onChange={(v) => update('source', v)}
-                placeholder="בחר מקור..."
+                placeholder={t('new.fields.sourcePlaceholder')}
                 groups={[
-                  { label: 'אונליין', options: ['פייסבוק', 'יד 2', 'אתר'] },
-                  { label: 'מכרים',   options: ['הפניה', 'הפניה מלקוח'] },
-                  { label: 'פיזי',    options: ['בית פתוח', 'שלט', 'סיור סוכנים'] },
-                  { label: 'אחר',     options: ['אחר'] },
+                  { label: t('new.options.sourceGroups.online'), options: [t('new.options.sources.facebook'), t('new.options.sources.yad2'), t('new.options.sources.website')] },
+                  { label: t('new.options.sourceGroups.referrals'),   options: [t('new.options.sources.referral'), t('new.options.sources.customerReferral')] },
+                  { label: t('new.options.sourceGroups.physical'),    options: [t('new.options.sources.openHouse'), t('new.options.sources.sign'), t('new.options.sources.agentTour')] },
+                  { label: t('new.options.sourceGroups.other'),     options: [t('new.options.sources.other')] },
                 ]}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">סוג התעניינות</label>
+              <label className="form-label">{t('new.fields.interestType')}</label>
               <Segmented
                 value={form.interestType}
                 onChange={(v) => update('interestType', v)}
                 options={[
-                  { value: 'פרטי', label: 'פרטי' },
-                  { value: 'מסחרי', label: 'מסחרי' },
+                  { value: 'פרטי', label: t('new.options.interestType.private') },
+                  { value: 'מסחרי', label: t('new.options.interestType.commercial') },
                 ]}
-                ariaLabel="סוג התעניינות"
+                ariaLabel={t('new.fields.interestTypeAria')}
               />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">קנייה / שכירות</label>
+              <label className="form-label">{t('new.fields.lookingFor')}</label>
               <Segmented
                 value={form.lookingFor}
                 onChange={(v) => update('lookingFor', v)}
                 options={[
-                  { value: 'buy', label: 'קנייה' },
-                  { value: 'rent', label: 'שכירות' },
+                  { value: 'buy', label: t('new.options.lookingFor.buy') },
+                  { value: 'rent', label: t('new.options.lookingFor.rent') },
                 ]}
-                ariaLabel="קנייה או שכירות"
+                ariaLabel={t('new.fields.lookingForAria')}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">מגזר</label>
+              <label className="form-label">{t('new.fields.sector')}</label>
               <SelectField
                 value={form.sector}
                 onChange={(v) => update('sector', v)}
-                options={['כללי', 'דתי', 'חרדי', 'ערבי']}
+                options={[t('new.options.sectors.general'), t('new.options.sectors.religious'), t('new.options.sectors.haredi'), t('new.options.sectors.arab')]}
               />
             </div>
           </div>
         </div>
 
         <div className="form-section">
-          <h3 className="form-section-title">העדפות חיפוש</h3>
+          <h3 className="form-section-title">{t('new.sections.searchPreferences')}</h3>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">עיר מבוקשת</label>
+              <label className="form-label">{t('new.fields.city')}</label>
               <SuggestPicker
                 options={cityNames}
                 value={form.city}
                 onChange={(v) => update('city', v)}
-                placeholder="תל אביב, ירושלים, חיפה…"
-                label="עיר"
+                placeholder={t('new.fields.cityPlaceholder')}
+                label={t('new.fields.cityLabel')}
                 inputProps={{ ...inputPropsForCity(), autoComplete: 'off' }}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">רחוב (אופציונלי)</label>
+              <label className="form-label">{t('new.fields.street')}</label>
               <SuggestPicker
                 options={streetOptions}
                 value={form.street}
                 onChange={(v) => update('street', v)}
-                placeholder="רוטשילד, אלנבי…"
-                label="רחוב"
+                placeholder={t('new.fields.streetPlaceholder')}
+                label={t('new.fields.streetLabel')}
                 inputProps={{ ...inputPropsForAddress(), autoComplete: 'off' }}
               />
             </div>
@@ -441,26 +443,26 @@ export default function NewLead() {
               ("חדרים: מ" / "חדרים: עד"). Mirrors the PriceRange pattern
               right below this. */}
           <div className="form-group" style={{ marginBottom: 16 }}>
-            <label className="form-label">טווח חדרים</label>
+            <label className="form-label">{t('new.fields.roomsRange')}</label>
             <div className="form-row">
               <div className="form-group">
                 <RoomsChips
                   value={form.roomsMin}
                   onChange={(v) => update('roomsMin', v)}
-                  label="מ"
+                  label={t('new.fields.roomsFrom')}
                 />
               </div>
               <div className="form-group">
                 <RoomsChips
                   value={form.roomsMax}
                   onChange={(v) => update('roomsMax', v)}
-                  label="עד"
+                  label={t('new.fields.roomsTo')}
                 />
               </div>
             </div>
           </div>
           <div className="form-group" style={{ marginBottom: 16 }}>
-            <label className="form-label">טווח מחיר</label>
+            <label className="form-label">{t('new.fields.priceRange')}</label>
             <PriceRange
               minVal={form.priceMin}
               maxVal={form.priceMax}
@@ -471,12 +473,12 @@ export default function NewLead() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">קירבה לבית ספר</label>
+              <label className="form-label">{t('new.fields.schoolProximity')}</label>
               <SelectField
                 value={form.schoolProximity}
                 onChange={(v) => update('schoolProximity', v)}
-                placeholder="לא חשוב"
-                options={['עד 200 מטר', 'עד 500 מטר', 'הליכה', 'עד ק״מ']}
+                placeholder={t('new.fields.schoolProximityNotImportant')}
+                options={[t('new.options.school.m200'), t('new.options.school.m500'), t('new.options.school.walk'), t('new.options.school.km')]}
               />
             </div>
           </div>
@@ -488,7 +490,7 @@ export default function NewLead() {
                 onChange={(e) => update('preApproval', e.target.checked)}
               />
               <span className="checkbox-custom" />
-              אישור עקרוני למשכנתא
+              {t('new.amenities.preApproval')}
             </label>
             <label className="checkbox-item">
               <input
@@ -497,7 +499,7 @@ export default function NewLead() {
                 onChange={(e) => update('balconyRequired', e.target.checked)}
               />
               <span className="checkbox-custom" />
-              מרפסת
+              {t('new.amenities.balcony')}
             </label>
             <label className="checkbox-item">
               <input
@@ -506,7 +508,7 @@ export default function NewLead() {
                 onChange={(e) => update('parkingRequired', e.target.checked)}
               />
               <span className="checkbox-custom" />
-              חניה
+              {t('new.amenities.parking')}
             </label>
             <label className="checkbox-item">
               <input
@@ -515,7 +517,7 @@ export default function NewLead() {
                 onChange={(e) => update('elevatorRequired', e.target.checked)}
               />
               <span className="checkbox-custom" />
-              מעלית
+              {t('new.amenities.elevator')}
             </label>
             <label className="checkbox-item">
               <input
@@ -524,7 +526,7 @@ export default function NewLead() {
                 onChange={(e) => update('safeRoomRequired', e.target.checked)}
               />
               <span className="checkbox-custom" />
-              ממ״ד
+              {t('new.amenities.safeRoom')}
             </label>
             <label className="checkbox-item">
               <input
@@ -533,7 +535,7 @@ export default function NewLead() {
                 onChange={(e) => update('acRequired', e.target.checked)}
               />
               <span className="checkbox-custom" />
-              מזגנים
+              {t('new.amenities.ac')}
             </label>
             <label className="checkbox-item">
               <input
@@ -542,7 +544,7 @@ export default function NewLead() {
                 onChange={(e) => update('storageRequired', e.target.checked)}
               />
               <span className="checkbox-custom" />
-              מחסן
+              {t('new.amenities.storage')}
             </label>
           </div>
         </div>
@@ -550,10 +552,10 @@ export default function NewLead() {
         <div className="form-section">
           {/* K1 — contact / identity block. Optional: agents who only
               have a phone number can leave the whole section blank. */}
-          <h3 className="form-section-title">פרטים מורחבים</h3>
+          <h3 className="form-section-title">{t('new.sections.extended')}</h3>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label" htmlFor="k1-first">שם פרטי</label>
+              <label className="form-label" htmlFor="k1-first">{t('new.fields.firstName')}</label>
               <input
                 id="k1-first"
                 className="form-input"
@@ -565,7 +567,7 @@ export default function NewLead() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="k1-last">שם משפחה</label>
+              <label className="form-label" htmlFor="k1-last">{t('new.fields.lastName')}</label>
               <input
                 id="k1-last"
                 className="form-input"
@@ -579,7 +581,7 @@ export default function NewLead() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label" htmlFor="k1-company">שם חברה</label>
+              <label className="form-label" htmlFor="k1-company">{t('new.fields.companyName')}</label>
               <input
                 id="k1-company"
                 className="form-input"
@@ -590,7 +592,7 @@ export default function NewLead() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="k1-pid">ת.ז / ח.פ</label>
+              <label className="form-label" htmlFor="k1-pid">{t('new.fields.personalId')}</label>
               <input
                 id="k1-pid"
                 className="form-input"
@@ -603,7 +605,7 @@ export default function NewLead() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label" htmlFor="k1-address">כתובת</label>
+              <label className="form-label" htmlFor="k1-address">{t('new.fields.address')}</label>
               <input
                 id="k1-address"
                 className="form-input"
@@ -614,7 +616,7 @@ export default function NewLead() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="k1-city">עיר (חופשי)</label>
+              <label className="form-label" htmlFor="k1-city">{t('new.fields.cityFree')}</label>
               <input
                 id="k1-city"
                 className="form-input"
@@ -627,7 +629,7 @@ export default function NewLead() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label" htmlFor="k1-zip">מיקוד</label>
+              <label className="form-label" htmlFor="k1-zip">{t('new.fields.zip')}</label>
               <input
                 id="k1-zip"
                 className="form-input"
@@ -638,7 +640,7 @@ export default function NewLead() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">טלפון עיקרי</label>
+              <label className="form-label">{t('new.fields.primaryPhone')}</label>
               <PhoneField
                 value={form.primaryPhone}
                 onChange={(v) => update('primaryPhone', v)}
@@ -647,17 +649,17 @@ export default function NewLead() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">טלפון נוסף 1</label>
+              <label className="form-label">{t('new.fields.phone1')}</label>
               <PhoneField value={form.phone1} onChange={(v) => update('phone1', v)} />
             </div>
             <div className="form-group">
-              <label className="form-label">טלפון נוסף 2</label>
+              <label className="form-label">{t('new.fields.phone2')}</label>
               <PhoneField value={form.phone2} onChange={(v) => update('phone2', v)} />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label" htmlFor="k1-fax">פקס</label>
+              <label className="form-label" htmlFor="k1-fax">{t('new.fields.fax')}</label>
               <input
                 id="k1-fax"
                 className="form-input"
@@ -668,7 +670,7 @@ export default function NewLead() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="k1-desc">תיאור</label>
+              <label className="form-label" htmlFor="k1-desc">{t('new.fields.description')}</label>
               <input
                 id="k1-desc"
                 className="form-input"
@@ -684,32 +686,32 @@ export default function NewLead() {
         <div className="form-section">
           {/* K2 + L1 — admin block. Lives in its own section so agents
               can skip it entirely on quick-capture. */}
-          <h3 className="form-section-title">ניהול ולקוח</h3>
+          <h3 className="form-section-title">{t('new.sections.admin')}</h3>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label" htmlFor="k2-cs">סטטוס לקוח</label>
+              <label className="form-label" htmlFor="k2-cs">{t('new.fields.customerStatus')}</label>
               <SelectField
                 value={form.customerStatus}
                 onChange={(v) => update('customerStatus', v)}
                 options={labelsToOptions(CUSTOMER_STATUS_LABELS)}
-                aria-label="סטטוס לקוח"
+                aria-label={t('new.fields.customerStatus')}
                 id="k2-cs"
               />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="k2-ls">סטטוס ליד</label>
+              <label className="form-label" htmlFor="k2-ls">{t('new.fields.leadStatus')}</label>
               <SelectField
                 value={form.leadStatus}
                 onChange={(v) => update('leadStatus', v)}
                 options={labelsToOptions(QUICK_LEAD_STATUS_LABELS)}
-                aria-label="סטטוס ליד"
+                aria-label={t('new.fields.leadStatus')}
                 id="k2-ls"
               />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">אחוז עמלה</label>
+              <label className="form-label">{t('new.fields.commissionPct')}</label>
               <NumberField
                 value={form.commissionPct}
                 onChange={(n) => update('commissionPct', n)}
@@ -717,22 +719,22 @@ export default function NewLead() {
                 min={0}
                 max={100}
                 placeholder="2"
-                aria-label="אחוז עמלה"
+                aria-label={t('new.fields.commissionPct')}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">רצינות</label>
+              <label className="form-label">{t('new.fields.seriousness')}</label>
               <Segmented
                 value={form.seriousnessOverride}
                 onChange={(v) => update('seriousnessOverride', v)}
                 options={labelsToOptions(SERIOUSNESS_LABELS)}
-                ariaLabel="רצינות"
+                ariaLabel={t('new.fields.seriousness')}
               />
             </div>
           </div>
           <div className="form-group" style={{ marginBottom: 12 }}>
-            <span className="form-label">מטרת הרכישה</span>
-            <div className="checkbox-grid" role="group" aria-label="מטרת הרכישה">
+            <span className="form-label">{t('new.fields.purposes')}</span>
+            <div className="checkbox-grid" role="group" aria-label={t('new.fields.purposes')}>
               {PURPOSE_OPTIONS.map((val) => {
                 const checked = form.purposes?.includes(val);
                 return (
@@ -761,16 +763,16 @@ export default function NewLead() {
               onChange={(e) => update('isPrivate', e.target.checked)}
             />
             <span className="checkbox-custom" />
-            לקוח פרטי (לא חשוף לשותפי משרד)
+            {t('new.fields.privateCustomer')}
           </label>
         </div>
 
         <div className="form-section">
-          <h3 className="form-section-title">הערות</h3>
+          <h3 className="form-section-title">{t('new.sections.notes')}</h3>
           <div className="form-group">
             <textarea
               className="form-textarea"
-              placeholder="הערות נוספות על הלקוח..."
+              placeholder={t('new.fields.notesPlaceholder')}
               rows={4}
               dir="auto"
               autoCapitalize="sentences"
@@ -784,10 +786,10 @@ export default function NewLead() {
         <div className="form-actions form-actions-desktop">
           <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
             {submitting ? <Loader2 size={18} className="y2-spin" /> : <Save size={18} />}
-            {submitting ? 'שומר…' : 'שמור ליד'}
+            {submitting ? t('new.actions.saving') : t('new.actions.save')}
           </button>
           <Link to="/customers" className="btn btn-secondary btn-lg">
-            ביטול
+            {t('new.actions.cancel')}
           </Link>
           {/* F-15 — honest autosave chip. During the debounce window
               (draftPending) we say "pending"; after the flush we show the
@@ -799,8 +801,8 @@ export default function NewLead() {
               aria-live="polite"
             >
               {draftPending
-                ? (<><Loader2 size={12} className="y2-spin" /> שומר טיוטה…</>)
-                : (<><Check size={12} /> {draftSavedAt ? `טיוטה נשמרה ${relLabel(draftSavedAt)}` : 'טיוטה נשמרה'}</>)
+                ? (<><Loader2 size={12} className="y2-spin" /> {t('new.autosave.saving')}</>)
+                : (<><Check size={12} /> {draftSavedAt ? t('new.autosave.savedAt', { time: relLabel(draftSavedAt) }) : t('new.autosave.saved')}</>)
               }
             </span>
           )}
@@ -810,9 +812,9 @@ export default function NewLead() {
       <StickyActionBar visible>
         <button type="submit" form="lead-form" className="btn btn-primary btn-lg" disabled={submitting}>
           {submitting ? <Loader2 size={18} className="y2-spin" /> : <Save size={18} />}
-          {submitting ? 'שומר…' : 'שמור ליד'}
+          {submitting ? t('new.actions.saving') : t('new.actions.save')}
         </button>
-        <Link to="/customers" className="btn btn-secondary btn-lg">ביטול</Link>
+        <Link to="/customers" className="btn btn-secondary btn-lg">{t('new.actions.cancel')}</Link>
       </StickyActionBar>
     </div>
   );
