@@ -173,51 +173,176 @@
   .lp-h1 { font-size: 64px; }
 }
 
-/* ──── device frame (SVG, zero network) ──── */
+/* ──── device frame (in-browser phone mockup, zero network) ──── */
 .lp-device {
   position: relative;
-  max-width: 320px; aspect-ratio: 9 / 19;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 9 / 19;
   margin-inline: auto;
-  filter: drop-shadow(0 24px 48px rgba(30,26,20,0.18));
+  filter: drop-shadow(0 24px 48px rgba(30,26,20,0.22));
 }
-.lp-device-bg {
-  position: absolute; inset: 0; border-radius: 42px;
-  background: linear-gradient(165deg, #1e1a14 0%, #0d0f14 100%);
-  padding: 12px;
+.lp-device-frame {
+  position: absolute; inset: 0;
+  background: linear-gradient(165deg, #2a261f 0%, #0d0f14 100%);
+  border-radius: 42px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.05);
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,0.4), inset 0 2px 10px rgba(255,255,255,0.06);
 }
 .lp-device-screen {
   width: 100%; height: 100%;
   border-radius: 32px;
-  background: linear-gradient(180deg, var(--gold-glow) 0%, var(--bg-primary) 38%);
-  padding: 18px 14px;
+  background: #f7f3ec;
   overflow: hidden;
   position: relative;
+  direction: rtl;
 }
 .lp-device-notch {
-  position: absolute; top: 12px; inset-inline: 32%;
-  height: 18px; border-radius: 999px;
+  position: absolute; top: 12px; inset-inline: 34%;
+  height: 22px; border-radius: 999px;
   background: #0d0f14;
+  z-index: 2;
 }
-.lp-mock-header { display: flex; align-items: center; justify-content: space-between; margin-top: 26px; margin-bottom: 18px; }
-.lp-mock-avatar { width: 32px; height: 32px; border-radius: 999px; background: var(--gold); }
-.lp-mock-title { height: 10px; width: 120px; border-radius: 4px; background: var(--text-primary); opacity: 0.82; }
-.lp-mock-bell  { width: 22px; height: 22px; border-radius: 6px; background: var(--border); }
-.lp-mock-kpis  { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 14px; }
-.lp-mock-kpi   { background: var(--bg-card); border-radius: 10px; padding: 10px 8px; border: 1px solid var(--border); }
-.lp-mock-kpi-n { height: 12px; width: 40%; border-radius: 3px; background: var(--gold); margin-bottom: 6px; }
-.lp-mock-kpi-l { height: 7px; width: 80%; border-radius: 3px; background: var(--text-muted); opacity: 0.4; }
-.lp-mock-list-item {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+
+/* ─── mock — shared pieces ─── */
+.lp-mock {
+  position: absolute; inset: 0;
+  padding: 42px 14px 14px;
+  display: flex; flex-direction: column;
+  font-family: var(--font-body);
+  color: #1e1a14;
+  font-size: 11px;
 }
-.lp-mock-list-dot  { width: 10px; height: 10px; border-radius: 999px; }
-.lp-mock-list-dot.hot  { background: var(--danger); box-shadow: 0 0 0 4px var(--danger-bg); }
-.lp-mock-list-dot.warm { background: var(--warning); box-shadow: 0 0 0 4px var(--warning-bg); }
-.lp-mock-list-dot.cold { background: var(--info); box-shadow: 0 0 0 4px var(--info-bg); }
-.lp-mock-list-body     { flex: 1; }
-.lp-mock-list-name     { height: 8px; width: 60%; border-radius: 3px; background: var(--text-primary); opacity: 0.85; margin-bottom: 5px; }
-.lp-mock-list-meta     { height: 6px; width: 40%; border-radius: 3px; background: var(--text-muted); opacity: 0.5; }
+.lp-mock-status {
+  position: absolute; top: 14px; inset-inline: 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 10px; font-weight: 700; color: #1e1a14;
+  z-index: 3;
+}
+.lp-mock-status-icons { display: flex; gap: 3px; }
+.lp-mock-status .lp-mock-dot { width: 4px; height: 4px; border-radius: 999px; background: #1e1a14; display: inline-block; }
+
+.lp-mock-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-top: 6px; margin-bottom: 14px;
+}
+.lp-mock-header-compact { margin-top: 4px; margin-bottom: 10px; }
+.lp-mock-greet { display: flex; flex-direction: column; gap: 2px; }
+.lp-mock-hi { font-weight: 700; font-size: 14px; color: #1e1a14; }
+.lp-mock-title-lg { font-family: var(--font-display); font-weight: 800; font-size: 17px; color: #1e1a14; letter-spacing: -0.01em; }
+.lp-mock-date { font-size: 10px; color: #6b6356; }
+.lp-mock-bell {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: #ffffff; border: 1px solid rgba(30,26,20,0.08);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #54503e;
+  flex: none;
+}
+
+.lp-mock-kpis {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 14px;
+}
+.lp-mock-kpi {
+  background: #ffffff;
+  border-radius: 10px; padding: 8px;
+  border: 1px solid rgba(30,26,20,0.08);
+  display: flex; align-items: center; gap: 6px;
+}
+.lp-mock-kpi > div { display: flex; flex-direction: column; line-height: 1; }
+.lp-mock-kpi-icon {
+  width: 22px; height: 22px; border-radius: 6px;
+  background: var(--gold-glow); color: var(--gold-readable);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.lp-mock-kpi-n {
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 15px; color: #1e1a14;
+  margin-bottom: 1px;
+}
+.lp-mock-kpi-l { font-size: 9px; color: #6b6356; font-weight: 600; }
+.lp-mock-kpi-accent .lp-mock-kpi-icon { background: var(--gold); color: #1e1a14; }
+.lp-mock-kpi-accent .lp-mock-kpi-n { color: var(--gold-readable); }
+
+.lp-mock-section-title {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; font-weight: 700; color: #1e1a14;
+  margin: 4px 2px 8px;
+}
+.lp-mock-badge {
+  background: var(--gold); color: #1e1a14;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.02em;
+}
+
+.lp-mock-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; flex: 1; overflow: hidden; }
+.lp-mock-row {
+  display: flex; align-items: center; gap: 8px;
+  background: #ffffff; border: 1px solid rgba(30,26,20,0.06);
+  border-radius: 10px; padding: 8px 10px;
+}
+.lp-mock-row-roomy { padding: 10px 12px; }
+.lp-mock-row-dot {
+  width: 22px; height: 22px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+  color: #fff;
+}
+.lp-mock-row-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.lp-mock-row-name {
+  font-size: 11px; font-weight: 700; color: #1e1a14;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lp-mock-row-sub {
+  font-size: 9.5px; color: #6b6356;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* tones */
+.lp-mock-hot.lp-mock-row-dot,
+.lp-mock-hot.lp-mock-avatar { background: var(--danger); color: #fff; }
+.lp-mock-warm.lp-mock-row-dot,
+.lp-mock-warm.lp-mock-avatar { background: var(--warning); color: #fff; }
+.lp-mock-cold.lp-mock-row-dot,
+.lp-mock-cold.lp-mock-avatar { background: var(--info); color: #fff; }
+
+.lp-mock-avatar {
+  width: 30px; height: 30px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800; font-size: 13px;
+  flex: none;
+}
+
+.lp-mock-row-pulse {
+  width: 8px; height: 8px; border-radius: 999px; flex: none;
+  box-shadow: 0 0 0 4px rgba(0,0,0,0.04);
+}
+.lp-mock-hot.lp-mock-row-pulse  { background: var(--danger); }
+.lp-mock-warm.lp-mock-row-pulse { background: var(--warning); }
+.lp-mock-cold.lp-mock-row-pulse { background: var(--info); }
+
+.lp-mock-cta {
+  margin-top: auto;
+  display: flex; align-items: center; gap: 8px;
+  background: #ffffff; border: 1px solid rgba(30,26,20,0.08);
+  border-radius: 999px; padding: 8px 14px;
+  color: #6b6356; font-size: 11px; font-weight: 600;
+}
+
+.lp-mock-chip-row {
+  display: flex; gap: 6px; overflow: hidden;
+  margin-bottom: 10px;
+}
+.lp-mock-chip {
+  padding: 4px 10px; border-radius: 999px;
+  background: #ffffff; border: 1px solid rgba(30,26,20,0.08);
+  font-size: 10px; font-weight: 600; color: #54503e;
+  white-space: nowrap;
+}
+.lp-mock-chip-active {
+  background: #1e1a14; color: #f7f3ec; border-color: #1e1a14;
+}
 
 /* ──── app store badges (disabled placeholders) ──── */
 .lp-store-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
