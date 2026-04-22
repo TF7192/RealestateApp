@@ -103,12 +103,16 @@ describe('<Layout>', () => {
     });
   });
 
-  it('hides the favorites strip entirely when the list is empty', async () => {
-    // The default MSW handler returns an empty items list — no "המועדפים"
-    // label should appear. We wait a tick so the fetch has had its turn.
+  it('N-15 — shows the favorites strip with an empty-state hint when the list is empty', async () => {
+    // Updated for N-15: the strip stays visible so the affordance is
+    // always discoverable. A muted Hebrew hint fills the slot that
+    // would otherwise list starred entities.
     render(<Layout onLogout={() => {}} />);
     await waitFor(() => {
-      expect(screen.queryByText('המועדפים')).toBeNull();
+      // The empty-state hint is present in the DOM.
+      expect(screen.getByTestId('nav-favorites-empty')).toBeInTheDocument();
     });
+    // Copy matches the product spec.
+    expect(screen.getByTestId('nav-favorites-empty')).toHaveTextContent('הוסף מועדפים לגישה מהירה');
   });
 });
