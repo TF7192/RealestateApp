@@ -1,11 +1,16 @@
 # Estia — real-estate CRM + customer-facing catalog pages.
-# Authenticated agent routes live under non-crawlable paths behind auth;
-# the public catalog pages (/agents/<slug>, /agents/<slug>/<property>) are
-# the only surfaces we want indexed.
+# Authenticated agent routes live behind auth; the landing page (/) and
+# public catalog pages (/agents/<slug>, /agents/<slug>/<property>) are
+# the surfaces we want discovered by search + AI crawlers.
+
+# Default policy — open landing + public pages, block app surfaces.
 User-agent: *
+Allow: /$
 Allow: /agents/
 Allow: /a/
 Allow: /p/
+Allow: /terms
+Allow: /privacy
 Disallow: /api/
 Disallow: /admin/
 Disallow: /customers
@@ -15,5 +20,49 @@ Disallow: /properties/new
 Disallow: /transfers
 Disallow: /profile
 Disallow: /templates
+
+# AI crawlers — explicitly welcomed so ChatGPT, Claude, Perplexity,
+# Gemini, and Common Crawl can surface Estia in answers.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
 
 Sitemap: https://estia.co.il/sitemap.xml
