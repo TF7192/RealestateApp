@@ -22,7 +22,7 @@ describe('<MobileTabBar>', () => {
     expect(screen.getByRole('button', { name: /נכס חדש/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /ליד חדש/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /עסקאות/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /דשבורד/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /לוח בקרה/ })).toBeInTheDocument();
   });
 
   it('clicking the backdrop or "ביטול" closes the sheet', async () => {

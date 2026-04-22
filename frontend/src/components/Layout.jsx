@@ -519,7 +519,7 @@ export default function Layout({ onLogout }) {
             <div className="agent-info">
               <span className="agent-name">{user?.displayName || 'סוכן'}</span>
               <span className="agent-agency">
-                {user?.agentProfile?.agency || 'ערוך את הפרופיל שלך'}
+                {user?.agentProfile?.agency || 'הוסף פרטי משרד'}
               </span>
             </div>
           </NavLink>
@@ -531,7 +531,7 @@ export default function Layout({ onLogout }) {
           <a
             className="sidebar-help"
             href="mailto:support@estia.app?subject=עזרה%20ב-Estia"
-            title="צור קשר עם התמיכה"
+            title="פנייה לתמיכה"
           >
             <HelpCircle size={16} />
             <span>עזרה</span>

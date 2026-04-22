@@ -285,7 +285,7 @@ export default function Dashboard() {
             <FileText size={18} />
             <div>
               <strong>תבניות הודעה</strong>
-              <small>התאם את ההודעות שיישלחו מהנכסים</small>
+              <small>התאמת ההודעות שיישלחו מהנכסים</small>
             </div>
           </Link>
         </div>
@@ -294,8 +294,8 @@ export default function Dashboard() {
       {!hasAnyContent ? (
         <div className="dashboard-empty animate-in animate-in-delay-2">
           <div className="de-illustration">🏡</div>
-          <h3>ברוך הבא ל-Estia</h3>
-          <p>עוד אין לך נתונים. התחל בקליטת הנכס הראשון שלך או הוסף ליד חדש.</p>
+          <h3>ברוכים הבאים ל-Estia</h3>
+          <p>עדיין אין נתונים. אפשר להתחיל בקליטת נכס ראשון או להוסיף ליד חדש.</p>
           <div className="de-actions">
             <Link to="/properties/new" className="btn btn-primary btn-lg">
               <Plus size={16} /> קליטת נכס
@@ -360,7 +360,7 @@ export default function Dashboard() {
                 );
               })}
               {properties.length === 0 && (
-                <div className="de-inline">אין עדיין נכסים. <Link to="/properties/new">הוסף ראשון</Link></div>
+                <div className="de-inline">עדיין אין נכסים. <Link to="/properties/new">הוסף ראשון</Link></div>
               )}
             </div>
           </div>
@@ -574,7 +574,7 @@ function TodayStrip({ leads = [], properties = [] }) {
             <span className="today-tile-icon"><Sparkles size={16} /></span>
             <span className="today-tile-meta">
               <strong>הכל מסודר להיום</strong>
-              <small>אין לידים חמים ממתינים · אין נכסים ללא שיווק</small>
+              <small>אין לידים חמים ממתינים · כל הנכסים בשיווק</small>
             </span>
           </div>
         </div>

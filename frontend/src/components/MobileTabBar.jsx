@@ -129,7 +129,7 @@ export default function MobileTabBar() {
             <button className="mtb-add-row" onClick={go('/')}>
               <span className="mtb-add-icon dash"><LayoutDashboard size={18} /></span>
               <span className="mtb-add-text">
-                <strong>דשבורד</strong>
+                <strong>לוח בקרה</strong>
                 <small>מבט-על על היום והשבוע</small>
               </span>
               <span className="mtb-add-arrow">›</span>

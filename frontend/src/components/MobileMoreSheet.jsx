@@ -215,7 +215,7 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
               <span className="mms-row-icon"><Calculator size={18} /></span>
               <span className="mms-row-text">
                 <strong>מחשבון מוכר</strong>
-                <small>חישוב נטו לבעלים אחרי עמלות ומע״מ</small>
+                <small>חישוב נטו למוכר אחרי עמלות ומע״מ</small>
               </span>
               <span className="mms-arrow">›</span>
             </button>
@@ -223,7 +223,7 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
               <span className="mms-row-icon"><DownloadIcon size={18} /></span>
               <span className="mms-row-text">
                 <strong>ייבוא נכסים מ-Yad2</strong>
-                <small>סריקת הסוכנות + תמונות בלחיצה</small>
+                <small>סריקת מודעות הסוכנות + תמונות בלחיצה</small>
               </span>
               <span className="mms-arrow">›</span>
             </button>
