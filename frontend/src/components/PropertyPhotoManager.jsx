@@ -198,13 +198,28 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
               </div>
             )}
 
-            {/* Dropzone */}
-            <div
+            {/* Dropzone. P-5 — the whole card is a <label htmlFor="ppm-file">
+                so a native click on any inner element (icon, text, or the
+                card itself) opens the file picker without JS. Falling back
+                to ref.click() only on keyboard activation. The input stays
+                visually hidden but clickable: `display:none` was the root
+                cause of the "click doesn't open the picker" regression on
+                some browsers — `sr-only`-style offscreen positioning keeps
+                the label→input linkage alive and clickable. */}
+            <label
+              htmlFor="ppm-file-input"
               className={`ppm-dropzone ${dragOver ? 'is-over' : ''}`}
-              onClick={() => fileInput.current?.click()}
               onDragOver={onZoneDragOver}
               onDragLeave={onZoneDragLeave}
               onDrop={onZoneDrop}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  fileInput.current?.click();
+                }
+              }}
+              role="button"
+              tabIndex={0}
             >
               <div className="ppm-dropzone-inner">
                 <div className="ppm-dropzone-icon">
@@ -214,11 +229,12 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
                 <span>JPG או PNG · ניתן לבחור מספר קבצים יחד</span>
               </div>
               <input
+                id="ppm-file-input"
                 ref={fileInput}
                 type="file"
                 accept="image/*,.heic,.heif"
                 multiple
-                style={{ display: 'none' }}
+                className="ppm-file-input"
                 onChange={(e) => {
                   // Task 4 · defensively restore focus to the tab after
                   // the OS file picker closes. On macOS + Chrome there's
@@ -237,7 +253,7 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
                   handleFiles(files);
                 }}
               />
-            </div>
+            </label>
 
             {/* Task 4 · optimistic previews. Painted the moment the picker
                 closes, replaced by the real server-backed thumbs once the
@@ -247,7 +263,15 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
               <ul className="ppm-grid ppm-grid-pending">
                 {pending.map((p) => (
                   <li key={p.id} className="ppm-thumb ppm-thumb-pending">
-                    <img src={p.url} alt={p.name} draggable={false} />
+                    <img
+                      src={p.url}
+                      alt={p.name}
+                      width="400"
+                      height="300"
+                      draggable={false}
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <div className="ppm-thumb-pending-overlay">
                       <Loader2 size={18} className="ppm-spin" />
                       <span>מעלה…</span>
@@ -276,7 +300,15 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
                     onDrop={onDropItem(i)}
                     onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
                   >
-                    <img src={img.url} alt={`תמונה ${i + 1}`} draggable={false} />
+                    <img
+                      src={img.url}
+                      alt={`תמונה ${i + 1}`}
+                      width="400"
+                      height="300"
+                      draggable={false}
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <div className="ppm-thumb-overlay">
                       {i === 0 ? (
                         <span className="ppm-cover-badge">
