@@ -20,10 +20,27 @@ const ENABLED = (import.meta.env.VITE_POSTHOG_ENABLED === 'true') ||
                 (import.meta.env.PROD && !!KEY);
 
 // `posthog` is populated by the dynamic import once initAnalytics runs.
-// Null-guarded access in every helper below so a pre-init call is a clean
-// no-op rather than a throw.
+// Callers must never depend on ready state — helpers queue everything
+// until init finishes so nothing is silently dropped.
 let posthog = null;
 let ready = false;
+
+// Pre-init call queue. Anything our wrappers receive before
+// initAnalytics() finishes (identify, track, page, resetIdentity) is
+// parked here and replayed against the real posthog instance once init
+// resolves. Before: the wrappers bailed early with `if (!ready) return`
+// and every event fired between page load and the idle-callback init
+// was silently dropped — including the post-login identify, which left
+// all frontend events attached to anonymous Persons with no way to
+// correlate them to agents. After: the queue is replayed in order on
+// init success, so an identify that happens during init is applied
+// BEFORE later captures, and every subsequent event carries the
+// identity super-properties.
+const preInitQueue = [];
+const PRE_INIT_MAX = 200;   // safety cap so a broken init can't OOM
+const enqueue = (fn) => {
+  if (preInitQueue.length < PRE_INIT_MAX) preInitQueue.push(fn);
+};
 
 export async function initAnalytics() {
   if (ready || !ENABLED || !KEY) return;
@@ -67,6 +84,13 @@ export async function initAnalytics() {
       },
     });
     ready = true;
+    // Replay anything that was queued while we were booting. Identify
+    // calls in the queue get applied first (by virtue of being older),
+    // so subsequent captures carry the identity super-properties.
+    while (preInitQueue.length) {
+      const fn = preInitQueue.shift();
+      try { fn(); } catch { /* no-op */ }
+    }
   } catch (e) {
     // Never crash the app if PostHog fails to init
     // eslint-disable-next-line no-console
@@ -75,7 +99,11 @@ export async function initAnalytics() {
 }
 
 export function identify(user) {
-  if (!ready || !posthog || !user?.id) return;
+  if (!user?.id) return;
+  if (!ready || !posthog) {
+    enqueue(() => identify(user));
+    return;
+  }
   try {
     posthog.identify(user.id, {
       email: user.email,
@@ -96,7 +124,7 @@ export function identify(user) {
 }
 
 export function resetIdentity() {
-  if (!ready || !posthog) return;
+  if (!ready || !posthog) { enqueue(() => resetIdentity()); return; }
   try {
     // Drop super-properties BEFORE reset so a lingering user_id from the
     // previous session can't ride along on the next anonymous session's
@@ -109,7 +137,7 @@ export function resetIdentity() {
 }
 
 export function track(event, props = {}) {
-  if (!ready || !posthog) return;
+  if (!ready || !posthog) { enqueue(() => track(event, props)); return; }
   try { posthog.capture(event, props); } catch { /* no-op */ }
 }
 
@@ -122,7 +150,10 @@ export function getDistinctId() {
 }
 
 export function page(path, extra = {}) {
-  if (!ready || !posthog) return;
+  if (!ready || !posthog) {
+    enqueue(() => page(path, extra));
+    return;
+  }
   try {
     posthog.capture('$pageview', {
       $current_url: window.location.href,
