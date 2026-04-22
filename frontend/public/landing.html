@@ -628,20 +628,128 @@ a { color: inherit; text-decoration: none; }
 .outcome-visual {
   position: relative; aspect-ratio: 4/3;
   border: 1px solid var(--border); border-radius: var(--radius-lg);
-  display: flex; align-items: center; justify-content: center; text-align: center;
-  color: var(--text-muted); font-size: 13px;
   background:
     radial-gradient(600px 300px at 70% 30%, var(--gold-glow), transparent 60%),
     var(--bg-secondary);
   overflow: hidden;
+  padding: 22px;
+  direction: rtl;
 }
-.outcome-visual .vis-inner { padding: 18px; max-width: 80%; }
-.outcome-visual .vis-icon {
-  width: 56px; height: 56px; border-radius: 16px;
-  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
-  color: #1e1a14; display: flex; align-items: center; justify-content: center;
-  font-size: 26px; font-weight: 800; margin: 0 auto 12px;
+
+/* Outcome visual 1 — Lead rows */
+.ov-leads { display: flex; flex-direction: column; gap: 10px; justify-content: center; height: 100%; }
+.ov-lead {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 12px; box-shadow: 0 1px 2px rgba(30,26,20,0.04);
 }
+.ov-lead .avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; font-size: 14px;
+}
+.ov-lead .meta { flex: 1; min-width: 0; }
+.ov-lead .meta b { display: block; font-size: 13px; color: var(--text-primary); font-weight: 700; }
+.ov-lead .meta span { display: block; font-size: 11px; color: var(--text-muted); }
+.ov-lead .pill {
+  font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 10px; flex: none;
+}
+.ov-lead .pill.hot  { background: #fee2e2; color: #b91c1c; }
+.ov-lead .pill.warm { background: #fef3c7; color: #92400e; }
+.ov-lead .pill.meet { background: rgba(180,139,76,0.18); color: #7a5c2c; }
+
+/* Outcome visual 2 — Property card */
+.ov-prop {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+  overflow: hidden; box-shadow: 0 4px 14px rgba(30,26,20,0.06);
+  max-width: 340px; margin: 0 auto;
+}
+.ov-prop-photo {
+  height: 110px; position: relative;
+  background: linear-gradient(145deg, #d3b27a 0%, #8a6932 55%, #2a261f 100%);
+  overflow: hidden;
+}
+.ov-prop-photo::before, .ov-prop-photo::after {
+  content: ''; position: absolute; bottom: 0; background: rgba(30,26,20,0.32);
+}
+.ov-prop-photo::before { inset-inline-start: 18%; width: 22%; height: 62%; }
+.ov-prop-photo::after  { inset-inline-start: 46%; width: 28%; height: 78%; }
+.ov-prop-badge {
+  position: absolute; top: 10px; inset-inline-end: 10px;
+  background: rgba(30,26,20,0.85); color: #d3b27a;
+  font-size: 10px; font-weight: 800; padding: 4px 9px; border-radius: 10px;
+}
+.ov-prop-body { padding: 12px 14px 14px; display: grid; gap: 8px; }
+.ov-prop-body h4 { margin: 0; font-size: 15px; font-weight: 800; color: var(--text-primary); }
+.ov-prop-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ov-prop-row small { font-size: 11px; color: var(--text-muted); }
+.ov-prop-row strong { font-size: 15px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.ov-prop-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.ov-prop-chip { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 9px; background: rgba(30,26,20,0.06); color: var(--text-primary); }
+.ov-prop-chip.is-gold { background: var(--gold-glow); color: var(--gold-readable); border: 1px solid var(--gold-border); }
+
+/* Outcome visual 3 — mini phone */
+.ov-phone {
+  display: flex; align-items: center; justify-content: center; height: 100%;
+}
+.ov-phone-frame {
+  position: relative; width: 160px; aspect-ratio: 9/19;
+  background: linear-gradient(155deg, #2a261f 0%, #0d0f14 100%);
+  border-radius: 26px; padding: 6px;
+  filter: drop-shadow(0 16px 36px rgba(30,26,20,0.28));
+}
+.ov-phone-screen {
+  width: 100%; height: 100%; background: var(--bg-primary);
+  border-radius: 22px; padding: 14px 10px; display: flex; flex-direction: column; gap: 8px;
+}
+.ov-phone-greet { font-size: 11px; font-weight: 800; color: var(--text-primary); }
+.ov-phone-greet small { display: block; font-size: 9px; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
+.ov-phone-ai {
+  display: flex; align-items: center; gap: 6px;
+  background: linear-gradient(90deg, #fdf3de, #f8e1b8);
+  border: 1px solid #d6b787; border-radius: 8px;
+  padding: 6px 8px;
+}
+.ov-phone-ai .dot { width: 16px; height: 16px; border-radius: 50%; background: linear-gradient(135deg, #d3b27a, #8a6932); color: #1e1a14; font-size: 10px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.ov-phone-ai span { font-size: 10px; font-weight: 700; color: #3b2e13; line-height: 1.2; }
+.ov-phone-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.ov-phone-kpi {
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  padding: 5px 6px; text-align: start;
+}
+.ov-phone-kpi small { display: block; font-size: 8px; color: var(--text-muted); }
+.ov-phone-kpi b { display: block; font-size: 12px; color: var(--text-primary); font-weight: 800; }
+.ov-phone-action {
+  margin-top: auto; padding: 8px; background: #1a7f47; color: #fff;
+  text-align: center; border-radius: 8px;
+  font-size: 10px; font-weight: 800;
+}
+
+/* Outcome visual 4 — AI chat-like */
+.ov-ai { display: flex; flex-direction: column; gap: 10px; justify-content: center; height: 100%; }
+.ov-ai-row {
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.ov-ai-row.is-assistant { flex-direction: row; }
+.ov-ai-row.is-user { flex-direction: row-reverse; }
+.ov-ai-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 14px;
+}
+.ov-ai-row.is-assistant .ov-ai-avatar { background: linear-gradient(135deg, var(--gold), var(--gold-dim)); color: #1e1a14; }
+.ov-ai-row.is-user .ov-ai-avatar { background: #1e1a14; color: var(--gold-light); }
+.ov-ai-bubble {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 9px 12px;
+  font-size: 12px; line-height: 1.5; color: var(--text-primary);
+  max-width: 78%;
+  box-shadow: 0 1px 2px rgba(30,26,20,0.04);
+}
+.ov-ai-row.is-assistant .ov-ai-bubble { border-start-start-radius: 4px; }
+.ov-ai-row.is-user .ov-ai-bubble { border-start-end-radius: 4px; background: #1e1a14; color: #f7f3ec; border-color: #1e1a14; }
+.ov-ai-bubble strong { color: var(--gold-readable); }
+.ov-ai-row.is-user .ov-ai-bubble strong { color: var(--gold-light); }
 </style>
 </head>
 <body>
@@ -670,7 +778,7 @@ a { color: inherit; text-decoration: none; }
       <span class="hero-eyebrow">נבנה לסוכני נדל״ן בישראל</span>
       <h1 class="h1">
         <span>ליד אחד שפספסת</span>
-        <span class="h1-accent">שווה יותר מ-Estia לשנה.</span>
+        <span class="h1-accent">עולה יותר מ-Estia לשנה.</span>
       </h1>
       <p class="hero-sub">סוף לבלאגן בין WhatsApp, אקסל ויומן. כל ליד, כל נכס וכל פגישה במקום אחד — גם במשרד, גם בשטח.</p>
       <div class="hero-cta-row">
@@ -767,8 +875,8 @@ a { color: inherit; text-decoration: none; }
   <div class="container">
     <div class="section-head">
       <span class="eyebrow">למה סוכנים עוברים ל-Estia</span>
-      <h2 class="h2">כי ליד שמתאבד בצ׳אט — הוא עמלה שנעלמה.</h2>
-      <p class="sub">רוב הסוכנים בארץ עובדים בין חמש אפליקציות שונות. Estia מחליפה אותן באחת.</p>
+      <h2 class="h2">כי ליד שנאבד בצ׳אט - הוא עמלה שנעלמת.</h2>
+      <p class="sub">רוב הסוכנים עובדים עם חמש אפליקציות שונות. Estia מחליפה את כולן.</p>
     </div>
     <div class="switch-grid">
       <article class="switch-card is-before">
@@ -787,12 +895,12 @@ a { color: inherit; text-decoration: none; }
         <span class="switch-tag">איך זה עם Estia</span>
         <h3>מערכת אחת. שקט בראש.</h3>
         <ul class="switch-list">
-          <li>כל ליד — עם סטטוס, היסטוריה ותזכורת הבאה.</li>
+          <li>כל ליד - עם סטטוס, היסטוריה, תזכורות ופעולות אוטומטיות.</li>
           <li>תיק נכס מלא: תמונות, בעלים, בלעדיות, מסלול שיווק.</li>
-          <li>פגישה קופצת עם הלקוח, הנכס והכתובת מצמידים אוטומטית.</li>
-          <li>מחזירים את הלידים מ-Excel בקובץ אחד.</li>
-          <li>AI כותב תיאור נכס שיווקי מהנתונים — בלחיצה.</li>
-          <li>תמיד יודעים מה הצעד הבא, בלי לחשוב.</li>
+          <li>פגישה קופצת עם הלקוח? הכל מתעדכן אוטומטית.</li>
+          <li>ייבוא קל של כל הנכסים והלידים שלכם.</li>
+          <li>אינטגרציה מלאה עם AI לפעולות אקטיביות ואוטמטיות שיחסכו לכם שעות.</li>
+          <li>הכל גם בטלפון, בתמיכה מלאה באפליקציה.</li>
         </ul>
       </article>
     </div>
@@ -826,10 +934,27 @@ a { color: inherit; text-decoration: none; }
           </ul>
         </div>
         <div class="outcome-visual" role="img" aria-label="דוגמה של ניהול לידים">
-          <div class="vis-inner">
-            <div class="vis-icon" aria-hidden="true">👥</div>
-            <strong>תצוגת לידים חמים</strong><br>
-            <span>סטטוס · תזכורת · תקציב · התאמה אוטומטית</span>
+          <div class="ov-leads">
+            <div class="ov-lead">
+              <span class="avatar" style="background:#b91c1c">ד</span>
+              <div class="meta"><b>דוד לוי</b><span>4 חד׳ · רמת גן · עד ₪2.8M</span></div>
+              <span class="pill hot">חם</span>
+            </div>
+            <div class="ov-lead">
+              <span class="avatar" style="background:#b45309">מ</span>
+              <div class="meta"><b>מיכל בן-עמי</b><span>פגישה היום · 14:30</span></div>
+              <span class="pill meet">פגישה</span>
+            </div>
+            <div class="ov-lead">
+              <span class="avatar" style="background:#b91c1c">י</span>
+              <div class="meta"><b>יונתן כהן</b><span>מרפסת · ראשון לציון · ₪3.4M</span></div>
+              <span class="pill hot">חם</span>
+            </div>
+            <div class="ov-lead">
+              <span class="avatar" style="background:#64748b">ש</span>
+              <div class="meta"><b>שירה פרידמן</b><span>4.5 חד׳ · הרצליה · עד ₪4.2M</span></div>
+              <span class="pill warm">פושר</span>
+            </div>
           </div>
         </div>
       </article>
@@ -837,10 +962,23 @@ a { color: inherit; text-decoration: none; }
       <!-- 2. Properties & owners -->
       <article class="outcome reverse">
         <div class="outcome-visual" role="img" aria-label="דוגמה של תיק נכס">
-          <div class="vis-inner">
-            <div class="vis-icon" aria-hidden="true">🏢</div>
-            <strong>תיק נכס מלא</strong><br>
-            <span>תמונות · בעלים · בלעדיות · מסלול שיווק</span>
+          <div class="ov-prop">
+            <div class="ov-prop-photo">
+              <span class="ov-prop-badge">★ בלעדי</span>
+            </div>
+            <div class="ov-prop-body">
+              <h4>הרצל 42, רמת גן</h4>
+              <div class="ov-prop-row">
+                <strong>₪2,850,000</strong>
+                <small>₪29,689 למ״ר</small>
+              </div>
+              <div class="ov-prop-chips">
+                <span class="ov-prop-chip">4 חד׳</span>
+                <span class="ov-prop-chip">96 מ״ר</span>
+                <span class="ov-prop-chip">קומה 3/5</span>
+                <span class="ov-prop-chip is-gold">מרפסת שמש</span>
+              </div>
+            </div>
           </div>
         </div>
         <div>
@@ -870,21 +1008,42 @@ a { color: inherit; text-decoration: none; }
           </ul>
         </div>
         <div class="outcome-visual" role="img" aria-label="דוגמה של עבודה בנייד">
-          <div class="vis-inner">
-            <div class="vis-icon" aria-hidden="true">📱</div>
-            <strong>דף נכס בנייד</strong><br>
-            <span>שיתוף בוואטסאפ · ניווט · תיאור AI</span>
+          <div class="ov-phone">
+            <div class="ov-phone-frame">
+              <div class="ov-phone-screen">
+                <div class="ov-phone-greet">שלום, יוסי<small>יום שלישי · 22 באפריל</small></div>
+                <div class="ov-phone-ai">
+                  <span class="dot">✦</span>
+                  <span>AI מציע 3 לידים<br>מתאימים לנכס החדש</span>
+                </div>
+                <div class="ov-phone-kpis">
+                  <div class="ov-phone-kpi"><small>לידים</small><b>24</b></div>
+                  <div class="ov-phone-kpi"><small>נכסים</small><b>12</b></div>
+                  <div class="ov-phone-kpi"><small>צנרת</small><b>₪8.4M</b></div>
+                </div>
+                <div class="ov-phone-action">שיחה · WhatsApp · ניווט</div>
+              </div>
+            </div>
           </div>
         </div>
       </article>
 
       <!-- 4. Office efficiency + AI -->
       <article class="outcome reverse">
-        <div class="outcome-visual" role="img" aria-label="דוגמה של יעילות משרדית">
-          <div class="vis-inner">
-            <div class="vis-icon" aria-hidden="true">✦</div>
-            <strong>AI שמבין נדל״ן</strong><br>
-            <span>תיאורים · התאמות · תבניות WhatsApp</span>
+        <div class="outcome-visual" role="img" aria-label="דוגמה של שיחה עם ה-AI">
+          <div class="ov-ai">
+            <div class="ov-ai-row is-user">
+              <span class="ov-ai-avatar">י</span>
+              <div class="ov-ai-bubble">כתוב תיאור שיווקי לנכס ברמת גן, 4 חד׳, מרפסת שמש, קומה 3/5.</div>
+            </div>
+            <div class="ov-ai-row is-assistant">
+              <span class="ov-ai-avatar">✦</span>
+              <div class="ov-ai-bubble"><strong>דירת 4 חדרים מוארת</strong> בלב רמת גן — מרפסת שמש פתוחה, קומה נוחה 3/5, מיקום מנצח לצעירים ולמשפחות. מוכנה לכניסה מיידית.</div>
+            </div>
+            <div class="ov-ai-row is-user">
+              <span class="ov-ai-avatar">י</span>
+              <div class="ov-ai-bubble">מי מהלידים שלי מתאים לנכס?</div>
+            </div>
           </div>
         </div>
         <div>
@@ -1008,8 +1167,8 @@ a { color: inherit; text-decoration: none; }
 <section id="pricing" class="section">
   <div class="container">
     <div class="pricing-head">
-      <span class="eyebrow">מחירים</span>
       <div class="pricing-banner">30 יום חינם. בלי כרטיס אשראי. ביטול בכל רגע.</div>
+      <span class="eyebrow">מחירים</span>
       <h2 class="h2">מחיר ברור. הכול כלול.</h2>
     </div>
     <div class="pricing-grid">
