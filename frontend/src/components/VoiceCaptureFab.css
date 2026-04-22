@@ -1,22 +1,27 @@
 /* H3 — VoiceCaptureFab.
  *
- * Twin of QuickCreateFab but larger (48×48 rounded), opposite corner
- * (bottom-inline-start) so both are reachable on mobile. Gradient fill
- * is intentionally loud — this is the marquee feature for the release
- * and the agents need to notice the mic.
+ * Twin of QuickCreateFab but larger (56×56 rounded). Stacked ABOVE the
+ * QuickCreate FAB on the same inline-end column so neither one lands
+ * on top of the MobileTabBar. Previous layout placed the mic on the
+ * opposite corner (inline-start) which in RTL = viewport right — that
+ * sits directly over the rightmost tab of the bottom taskbar on phones
+ * and clipped the icon's touch target.
+ *
+ * Vertical stack from bottom-up on the inline-end side (= left in RTL):
+ *     · QuickCreateFab  → 72px above bottom
+ *     · VoiceCaptureFab → 72 + 56 + 18 = 146px above bottom (+ safe-area)
+ * The 18px gap sits outside the QuickCreate options popover (which
+ * opens at +64px above the QC trigger, i.e. ~136px), so the popover
+ * slides in cleanly between the two buttons when active.
  *
  * Logical CSS properties throughout; dir="rtl" at app root flips the
- * inline-end/inline-start axis for free.
+ * inline-end axis for free.
  */
 
 .vc-fab {
   position: fixed;
-  inset-block-end: calc(72px + env(safe-area-inset-bottom, 0px));
-  /* Opposite side from QuickCreateFab. In RTL, inline-start === right
-     edge (wait — no: inline-start in RTL is the right side; so to sit
-     opposite QCFab which is inline-end (=left in RTL), we use
-     inline-start. Both FABs end up on opposing sides and never collide). */
-  inset-inline-start: 20px;
+  inset-block-end: calc(146px + env(safe-area-inset-bottom, 0px));
+  inset-inline-end:  20px;
   z-index: 900;
 
   width: 56px;
@@ -78,11 +83,13 @@
   letter-spacing: 0.02em;
 }
 
-/* Push further from the edge on wide layouts to clear the sidebar. */
+/* Push further from the edge on wide layouts to clear the sidebar.
+   On desktop there's no MobileTabBar, so the stack can sit closer to
+   the bottom — still above the QuickCreateFab which lives at 28px. */
 @media (min-width: 900px) {
   .vc-fab {
-    inset-block-end: 28px;
-    inset-inline-start: 28px;
+    inset-block-end: calc(28px + 56px + 18px); /* 102px: above QC trigger */
+    inset-inline-end: 28px;
   }
 }
 
