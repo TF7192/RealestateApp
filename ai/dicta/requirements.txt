@@ -1,0 +1,22 @@
+# Web server
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+
+# Model runtime
+# torch is pinned to the CPU wheel by default; override via --extra-index-url
+# https://download.pytorch.org/whl/cu121 for GPU builds (see Dockerfile.gpu note).
+torch==2.4.1
+transformers==4.44.2
+accelerate==0.34.2
+sentencepiece==0.2.0
+safetensors==0.4.5
+
+# HTTP client used by the healthcheck and tests
+httpx==0.27.2
+
+# Test deps (kept here so `pip install -r requirements.txt` in the image is
+# enough to run the test suite inside the container for CI). Not strictly
+# needed at runtime — split into requirements-dev.txt if image size bites.
+pytest==8.3.3
+pytest-asyncio==0.24.0
