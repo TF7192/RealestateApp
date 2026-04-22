@@ -48,7 +48,11 @@ const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import { AuthProvider, useAuth } from './lib/auth';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
 import OfflineBanner from './components/OfflineBanner';
-import OnboardingTour from './components/OnboardingTour';
+// OnboardingTour bundles react-joyride (~60 KB). Lazy so it lands in its
+// own chunk — most authed sessions either already finished the tour
+// (hasCompletedTutorial=true) or are on mobile (where the tour is
+// silenced), so the main bundle doesn't need to pay for it up-front.
+const OnboardingTour = lazy(() => import('./components/OnboardingTour'));
 import ChatWidget from './components/ChatWidget';
 import Yad2ScanBanner from './components/Yad2ScanBanner';
 import { useScrollRestore } from './hooks/mobile';
@@ -232,7 +236,9 @@ function AppRoutes() {
         </Suspense>
       )}
       <ShortcutsOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
-      <OnboardingTour />
+      <Suspense fallback={null}>
+        <OnboardingTour />
+      </Suspense>
       <ChatWidget />
       <Yad2ScanBanner />
     </>

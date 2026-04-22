@@ -7,19 +7,32 @@
 //   VITE_POSTHOG_KEY       — phc_... project token
 //   VITE_POSTHOG_HOST      — https://us.i.posthog.com  (or https://eu.i.posthog.com)
 //   VITE_POSTHOG_ENABLED   — 'true' to enable outside of production
-
-import posthog from 'posthog-js';
+//
+// Perf (2026-04-22): posthog-js is dynamically imported inside
+// initAnalytics() so the ~80 KB bundle stays out of the initial page
+// load. main.jsx already wraps initAnalytics in requestIdleCallback;
+// combined with the dynamic import, PostHog now lands on the wire AFTER
+// the first meaningful paint + the agent's /me + /dashboard calls.
 
 const KEY     = import.meta.env.VITE_POSTHOG_KEY || '';
 const HOST    = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com';
 const ENABLED = (import.meta.env.VITE_POSTHOG_ENABLED === 'true') ||
                 (import.meta.env.PROD && !!KEY);
 
+// `posthog` is populated by the dynamic import once initAnalytics runs.
+// Null-guarded access in every helper below so a pre-init call is a clean
+// no-op rather than a throw.
+let posthog = null;
 let ready = false;
 
-export function initAnalytics() {
+export async function initAnalytics() {
   if (ready || !ENABLED || !KEY) return;
   try {
+    // Dynamic import keeps posthog-js out of the critical-path bundle.
+    // Vite hoists this into its own chunk (posthog-js-<hash>.js) and
+    // the browser fetches it only when the idle callback fires.
+    const mod = await import('posthog-js');
+    posthog = mod.default || mod;
     posthog.init(KEY, {
       api_host: HOST,
       // Route tracking is manual (we fire page_view on React Router changes
@@ -62,7 +75,7 @@ export function initAnalytics() {
 }
 
 export function identify(user) {
-  if (!ready || !user?.id) return;
+  if (!ready || !posthog || !user?.id) return;
   try {
     posthog.identify(user.id, {
       email: user.email,
@@ -83,7 +96,7 @@ export function identify(user) {
 }
 
 export function resetIdentity() {
-  if (!ready) return;
+  if (!ready || !posthog) return;
   try {
     // Drop super-properties BEFORE reset so a lingering user_id from the
     // previous session can't ride along on the next anonymous session's
@@ -96,12 +109,12 @@ export function resetIdentity() {
 }
 
 export function track(event, props = {}) {
-  if (!ready) return;
+  if (!ready || !posthog) return;
   try { posthog.capture(event, props); } catch { /* no-op */ }
 }
 
 export function getDistinctId() {
-  if (!ready) return null;
+  if (!ready || !posthog) return null;
   try {
     const id = posthog.get_distinct_id?.();
     return typeof id === 'string' ? id : null;
@@ -109,7 +122,7 @@ export function getDistinctId() {
 }
 
 export function page(path, extra = {}) {
-  if (!ready) return;
+  if (!ready || !posthog) return;
   try {
     posthog.capture('$pageview', {
       $current_url: window.location.href,

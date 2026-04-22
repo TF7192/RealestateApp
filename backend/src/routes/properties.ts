@@ -185,12 +185,24 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         { type: { contains: q.search, mode: 'insensitive' } },
       ];
     }
+    // Perf (2026-04-22): this endpoint was pulling *every* image, every
+    // video, and every marketing-action row for every property in the
+    // agent's catalog. The list views (Properties, Customers, Dashboard)
+    // only consume `images[0]` (the cover) + the marketing-action bool
+    // map — not videos, not the full image gallery. For an agent with
+    // 50 properties × ~10 images each that was 500+ image rows pulled
+    // and serialized per request, blowing p95 to ~500 ms on a single
+    // round-trip regardless of concurrency. See perf/SUMMARY.md F-1.
+    //
+    // Cover-only is safe: `serialize()` still emits `images: string[]`
+    // and `imageList: {id,url,sortOrder}[]` — just of length 1 — so
+    // callers that do `prop.images?.[0]` continue to work unchanged.
+    // The detail endpoint (`GET /:id` below) still returns the full set.
     const items = await prisma.property.findMany({
       where,
       include: {
-        images: { orderBy: { sortOrder: 'asc' } },
+        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
         marketingActions: true,
-        videos: { orderBy: { sortOrder: 'asc' } },
         propertyOwner: true,
       },
       orderBy: { createdAt: 'desc' },

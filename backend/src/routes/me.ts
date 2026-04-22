@@ -9,18 +9,26 @@ import { putUpload } from '../lib/storage.js';
 
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAuth] }, async (req) => {
+    const uid = requireUser(req).id;
+
     // Opportunistically record the platform the agent first logged in on.
     // We only write when firstLoginPlatform is null so it stays stable
-    // after the first call — the tour only fires on that same platform.
-    const uid = requireUser(req).id;
+    // after the first call. Previously this `await`ed the updateMany
+    // before the findUnique, adding ~30-50 ms to every /api/me call
+    // (this endpoint fires on every authed page load). Fire-and-forget
+    // instead — the write either succeeds or doesn't; the response
+    // doesn't need to wait.
     const xPlatform = (req.headers['x-estia-platform'] as string | undefined)?.slice(0, 20);
     const platform = xPlatform && ['web', 'ios', 'android'].includes(xPlatform) ? xPlatform : null;
     if (platform) {
-      await prisma.user.updateMany({
-        where: { id: uid, firstLoginPlatform: null },
-        data: { firstLoginPlatform: platform },
-      });
+      prisma.user
+        .updateMany({
+          where: { id: uid, firstLoginPlatform: null },
+          data: { firstLoginPlatform: platform },
+        })
+        .catch((err) => req.log.warn({ err }, 'me: firstLoginPlatform update failed'));
     }
+
     const user = await prisma.user.findUnique({
       where: { id: uid },
       include: { agentProfile: true, customerProfile: true },
