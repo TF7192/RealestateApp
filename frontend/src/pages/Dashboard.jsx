@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Building2,
   Store,
@@ -33,22 +34,19 @@ import { pageCache } from '../lib/pageCache';
 import haptics from '../lib/haptics';
 import './Dashboard.css';
 
-// Maps a period value to the Hebrew label shown inside DeltaBadge
-// ("+3 השבוע"). Kept outside the component so it's a stable reference.
-const PERIOD_LABEL = { week: 'השבוע', month: 'החודש', quarter: 'הרבעון' };
-const PERIOD_OPTIONS = [
-  { value: 'week', label: 'שבוע' },
-  { value: 'month', label: 'חודש' },
-  { value: 'quarter', label: 'רבעון' },
-];
+// Period keys for DeltaBadge labels + the Segmented options. The actual
+// Hebrew / English strings live in dashboard.json (period.*, periodLong.*)
+// and are resolved inside the component where t() is available.
+const PERIOD_KEYS = ['week', 'month', 'quarter'];
 
-function formatPrice(price) {
+function formatPrice(price, rentPerSuffix) {
   if (!price) return '₪0';
-  if (price < 10000) return `₪${price.toLocaleString('he-IL')}/חודש`;
+  if (price < 10000) return `₪${price.toLocaleString('he-IL')}${rentPerSuffix}`;
   return `₪${price.toLocaleString('he-IL')}`;
 }
 
 export default function Dashboard() {
+  const { t } = useTranslation('dashboard');
   // Seed from cache so a return trip paints stats instantly. If no
   // cache exists (first visit) we fall back to loading = true.
   const _cached = pageCache.get('dashboard');
@@ -156,9 +154,9 @@ export default function Dashboard() {
   const stats = [
     {
       icon: Building2,
-      label: 'נכסי מגורים פעילים',
+      label: t('stats.residentialActive'),
       value: res.total,
-      sub: `${res.sale} מכירה · ${res.rent} השכרה`,
+      sub: t('stats.saleRentFormat', { sale: res.sale, rent: res.rent }),
       color: 'var(--gold)',
       bg: 'var(--gold-glow)',
       to: '/properties?assetClass=residential',
@@ -166,9 +164,9 @@ export default function Dashboard() {
     },
     {
       icon: Store,
-      label: 'נכסים מסחריים פעילים',
+      label: t('stats.commercialActive'),
       value: com.total,
-      sub: `${com.sale} מכירה · ${com.rent} השכרה`,
+      sub: t('stats.saleRentFormat', { sale: com.sale, rent: com.rent }),
       color: 'var(--warning)',
       bg: 'var(--warning-bg)',
       to: '/properties?assetClass=commercial',
@@ -176,9 +174,9 @@ export default function Dashboard() {
     },
     {
       icon: Target,
-      label: 'לידים חמים',
+      label: t('stats.hotLeads'),
       value: leadStats.hot,
-      sub: `מתוך ${leadStats.total} לקוחות`,
+      sub: t('stats.leadsTotalFormat', { count: leadStats.total }),
       color: 'var(--danger)',
       bg: 'var(--danger-bg)',
       to: '/customers?filter=hot',
@@ -186,9 +184,9 @@ export default function Dashboard() {
     },
     {
       icon: Handshake,
-      label: 'עסקאות פעילות',
+      label: t('stats.dealsActive'),
       value: dealStats.active,
-      sub: `${dealStats.signed} נסגרו`,
+      sub: t('stats.dealsClosedFormat', { count: dealStats.signed }),
       color: 'var(--success)',
       bg: 'var(--success-bg)',
       to: '/deals',
@@ -196,9 +194,9 @@ export default function Dashboard() {
     },
     {
       icon: TrendingUp,
-      label: 'עמלות',
-      value: formatPrice(dealStats.totalCommission),
-      sub: 'סה״כ עמלות שנגבו',
+      label: t('stats.commissions'),
+      value: formatPrice(dealStats.totalCommission, t('rentPer')),
+      sub: t('stats.commissionsSub'),
       color: 'var(--info)',
       bg: 'var(--info-bg)',
       to: '/deals?tab=signed',
@@ -208,9 +206,9 @@ export default function Dashboard() {
     },
     {
       icon: UserCircle,
-      label: 'בעלי נכסים',
+      label: t('stats.owners'),
       value: ownersTotal,
-      sub: `${ownersActive} עם נכסים פעילים`,
+      sub: t('stats.ownersActiveFormat', { count: ownersActive }),
       color: 'var(--gold)',
       bg: 'var(--gold-glow)',
       to: '/owners',
@@ -230,6 +228,8 @@ export default function Dashboard() {
     return diffDays >= staleThresholdDays && l.status !== 'COLD';
   });
 
+  const periodOptions = PERIOD_KEYS.map((key) => ({ value: key, label: t(`period.${key}`) }));
+
   return (
     <PullRefresh onRefresh={load}>
       <div className="dashboard">
@@ -238,12 +238,12 @@ export default function Dashboard() {
         <TodayStrip leads={leads} properties={properties} />
 
         <div className="kpi-period-row">
-          <span className="kpi-period-label">שנה תקופה</span>
+          <span className="kpi-period-label">{t('periodLabel')}</span>
           <Segmented
             value={period}
             onChange={setPeriod}
-            options={PERIOD_OPTIONS}
-            ariaLabel="בחר תקופה להשוואה"
+            options={periodOptions}
+            ariaLabel={t('periodAria')}
           />
         </div>
 
@@ -251,7 +251,7 @@ export default function Dashboard() {
           stats={stats}
           refreshing={isRefreshing}
           deltaBucket={deltas[period]}
-          periodLabel={PERIOD_LABEL[period]}
+          periodLabel={t(`periodLong.${period}`)}
         />
 
         {staleLeads.length > 0 && (
@@ -269,9 +269,9 @@ export default function Dashboard() {
               >
                 <Clock3 size={18} />
                 <div>
-                  <strong>{staleLeads.length} לידים ללא קשר {staleThresholdDays} ימים</strong>
+                  <strong>{t('staleLeads.title', { count: staleLeads.length, days: staleThresholdDays })}</strong>
                   <small>
-                    הוותיק: <span className={`rel-${rel.severity}`}>{rel.label}</span>
+                    {t('staleLeads.oldest')}<span className={`rel-${rel.severity}`}>{rel.label}</span>
                   </small>
                 </div>
               </Link>
@@ -284,8 +284,8 @@ export default function Dashboard() {
           >
             <FileText size={18} />
             <div>
-              <strong>תבניות הודעה</strong>
-              <small>התאמת ההודעות שיישלחו מהנכסים</small>
+              <strong>{t('templates.title')}</strong>
+              <small>{t('templates.description')}</small>
             </div>
           </Link>
         </div>
@@ -294,14 +294,14 @@ export default function Dashboard() {
       {!hasAnyContent ? (
         <div className="dashboard-empty animate-in animate-in-delay-2">
           <div className="de-illustration">🏡</div>
-          <h3>ברוכים הבאים ל-Estia</h3>
-          <p>עדיין אין נתונים. אפשר להתחיל בקליטת נכס ראשון או להוסיף ליד חדש.</p>
+          <h3>{t('empty.welcomeTitle')}</h3>
+          <p>{t('empty.welcomeBody')}</p>
           <div className="de-actions">
             <Link to="/properties/new" className="btn btn-primary btn-lg">
-              <Plus size={16} /> קליטת נכס
+              <Plus size={16} /> {t('ctas.newProperty')}
             </Link>
             <Link to="/customers/new" className="btn btn-secondary btn-lg">
-              <UserPlus size={16} /> ליד חדש
+              <UserPlus size={16} /> {t('ctas.newLead')}
             </Link>
           </div>
         </div>
@@ -310,7 +310,7 @@ export default function Dashboard() {
           {/* Marketing progress — agent's own properties */}
           <div className="card dashboard-card animate-in animate-in-delay-3">
             <div className="card-header">
-              <h3>התקדמות שיווק</h3>
+              <h3>{t('marketingProgress')}</h3>
               <span className="badge badge-gold">
                 {progressPct}%
               </span>
@@ -323,7 +323,7 @@ export default function Dashboard() {
                 />
               </div>
               <span className="progress-text">
-                {completedActions} מתוך {totalActions} פעולות הושלמו
+                {t('marketingProgressFormat', { done: completedActions, total: totalActions })}
               </span>
             </div>
 
@@ -353,14 +353,14 @@ export default function Dashboard() {
                     </div>
                     {rel && (
                       <span className={`ppi-updated rel-${rel.severity}`}>
-                        עודכן {rel.label}
+                        {t('marketingUpdated', { label: rel.label })}
                       </span>
                     )}
                   </Link>
                 );
               })}
               {properties.length === 0 && (
-                <div className="de-inline">עדיין אין נכסים. <Link to="/properties/new">הוסף ראשון</Link></div>
+                <div className="de-inline">{t('propertiesEmpty')}<Link to="/properties/new">{t('propertiesEmptyCta')}</Link></div>
               )}
             </div>
           </div>
@@ -368,9 +368,9 @@ export default function Dashboard() {
           {/* Hot leads — pulled from the agent's own leads */}
           <div className="card dashboard-card animate-in animate-in-delay-5">
             <div className="card-header">
-              <h3>לידים חמים</h3>
+              <h3>{t('hotLeadsTitle')}</h3>
               <Link to="/customers" className="btn btn-ghost btn-sm">
-                הכל
+                {t('hotLeadsAll')}
                 <ArrowUpLeft size={14} />
               </Link>
             </div>
@@ -391,12 +391,12 @@ export default function Dashboard() {
                     <div className="lead-info">
                       <span className="lead-name">{lead.name}</span>
                       <span className="lead-details">
-                        {[lead.city, lead.rooms ? `${lead.rooms} חד׳` : null, lead.priceRangeLabel]
+                        {[lead.city, lead.rooms ? t('roomsFormat', { count: lead.rooms }) : null, lead.priceRangeLabel]
                           .filter(Boolean).join(' · ')}
                       </span>
                       {rel && (
                         <span className={`lead-last rel-${rel.severity}`}>
-                          קשר אחרון: {rel.label}
+                          {t('hotLeadsLastContact', { label: rel.label })}
                         </span>
                       )}
                     </div>
@@ -406,8 +406,8 @@ export default function Dashboard() {
               })}
               {hotLeads.length === 0 && (
                 <div className="de-inline">
-                  אין לידים חמים כרגע.{' '}
-                  <Link to="/customers/new">הוסף ליד</Link>
+                  {t('hotLeadsEmpty')}
+                  <Link to="/customers/new">{t('hotLeadsEmptyCta')}</Link>
                 </div>
               )}
             </div>
@@ -419,7 +419,7 @@ export default function Dashboard() {
   );
 }
 
-function KpiScroller({ stats, refreshing = false, deltaBucket = null, periodLabel = 'השבוע' }) {
+function KpiScroller({ stats, refreshing = false, deltaBucket = null, periodLabel = '' }) {
   const trackRef = useRef(null);
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -500,6 +500,7 @@ function KpiScroller({ stats, refreshing = false, deltaBucket = null, periodLabe
 // Only renders tiles that have content — the strip disappears entirely
 // on a quiet day rather than showing "0 things to do!" cheerleader copy.
 function TodayStrip({ leads = [], properties = [] }) {
+  const { t } = useTranslation('dashboard');
   const now = Date.now();
   const DAY = 86400000;
 
@@ -533,8 +534,8 @@ function TodayStrip({ leads = [], properties = [] }) {
       key: 'hot',
       to: '/customers?filter=hot',
       icon: PhoneCall,
-      title: `${hotSilent.length} לידים חמים ממתינים`,
-      sub: 'עוד לא נוצר קשר היום',
+      title: t('today.hotSilent.title', { count: hotSilent.length }),
+      sub: t('today.hotSilent.sub'),
       tone: 'danger',
     });
   }
@@ -543,8 +544,8 @@ function TodayStrip({ leads = [], properties = [] }) {
       key: 'stale',
       to: '/customers?filter=inactive10',
       icon: Clock3,
-      title: `${staleLeads.length} לידים ללא קשר 10+ ימים`,
-      sub: 'שווה לחזור אליהם',
+      title: t('today.stale.title', { count: staleLeads.length }),
+      sub: t('today.stale.sub'),
       tone: 'warn',
     });
   }
@@ -553,8 +554,8 @@ function TodayStrip({ leads = [], properties = [] }) {
       key: 'promo',
       to: '/properties?filter=unmarketed',
       icon: Sparkles,
-      title: `${unmarketed.length} נכסים ללא שיווק`,
-      sub: 'התחל עם פעולה אחת',
+      title: t('today.unmarketed.title', { count: unmarketed.length }),
+      sub: t('today.unmarketed.sub'),
       tone: 'gold',
     });
   }
@@ -564,17 +565,17 @@ function TodayStrip({ leads = [], properties = [] }) {
   // morning scan rhythm — they think the widget broke.
   if (tiles.length === 0) {
     return (
-      <section className="today-strip animate-in animate-in-delay-1" aria-label="סדר היום">
+      <section className="today-strip animate-in animate-in-delay-1" aria-label={t('today.aria')}>
         <header className="today-strip-head">
           <Sun size={14} aria-hidden="true" />
-          <h3>היום</h3>
+          <h3>{t('today.heading')}</h3>
         </header>
         <div className="today-strip-rail">
           <div className="today-tile today-tile-ok" aria-live="polite">
             <span className="today-tile-icon"><Sparkles size={16} /></span>
             <span className="today-tile-meta">
-              <strong>הכל מסודר להיום</strong>
-              <small>אין לידים חמים ממתינים · כל הנכסים בשיווק</small>
+              <strong>{t('today.allClearTitle')}</strong>
+              <small>{t('today.allClearSub')}</small>
             </span>
           </div>
         </div>
@@ -583,10 +584,10 @@ function TodayStrip({ leads = [], properties = [] }) {
   }
 
   return (
-    <section className="today-strip animate-in animate-in-delay-1" aria-label="סדר היום">
+    <section className="today-strip animate-in animate-in-delay-1" aria-label={t('today.aria')}>
       <header className="today-strip-head">
         <Sun size={14} aria-hidden="true" />
-        <h3>היום</h3>
+        <h3>{t('today.heading')}</h3>
       </header>
       <div className="today-strip-rail">
         {tiles.map((t) => {
@@ -612,11 +613,13 @@ function TodayStrip({ leads = [], properties = [] }) {
 }
 
 function WelcomeSection() {
+  const { t } = useTranslation('dashboard');
   const { user } = useAuth();
   const [shareOpen, setShareOpen] = useState(false);
   const isMobile = useViewportMobile();
 
-  const displayName = user?.displayName || 'סוכן';
+  const displayName = user?.displayName || t('fallbacks.agent');
+  const firstName = displayName.split(' ')[0];
   const catalogUrl = user?.slug
     ? `${window.location.origin}/agents/${encodeURI(user.slug)}`
     : (user?.id ? `${window.location.origin}/a/${user.id}` : null);
@@ -626,11 +629,11 @@ function WelcomeSection() {
     if (!catalogUrl) return;
     if (isMobile) {
       const text = [
-        `שלום, זה ${displayName || 'הסוכן שלך'}.`,
-        'ריכזתי עבורך את כל הנכסים שלי במקום אחד:',
+        t('share.greetingLine', { name: displayName || t('fallbacks.yourAgent') }),
+        t('share.introLine'),
       ].join('\n');
       const ok = await shareSheet({
-        title: 'הקטלוג שלי',
+        title: t('share.title'),
         text,
         url: catalogUrl,
       });
@@ -645,26 +648,26 @@ function WelcomeSection() {
     <>
       <div className="welcome-section animate-in">
         <div className="welcome-content">
-          <h2>שלום, {displayName.split(' ')[0]}</h2>
-          <p>סיכום פעילות יומי</p>
+          <h2>{t('greeting', { firstName })}</h2>
+          <p>{t('subtitle')}</p>
         </div>
         <div className="welcome-actions">
           <button
             className="btn btn-secondary btn-lg"
             onClick={handleShare}
             disabled={!catalogUrl}
-            title="תצוגה מקדימה ושיתוף"
+            title={t('sharePreview')}
           >
             <MessageCircle size={18} />
-            שתף את הנכסים שלי
+            {t('ctas.share')}
           </button>
           <Link to="/properties/new" className="btn btn-ghost btn-lg">
             <Plus size={18} />
-            קליטת נכס
+            {t('ctas.newProperty')}
           </Link>
           <Link to="/customers/new" className="btn btn-ghost btn-lg">
             <UserPlus size={18} />
-            ליד חדש
+            {t('ctas.newLead')}
           </Link>
           {/* Used constantly during pricing conversations — surface
               right next to the create-shortcuts so it's a one-tap
@@ -672,7 +675,7 @@ function WelcomeSection() {
               setup tool, not on this row; reachable via more-sheet. */}
           <Link to="/calculator" className="btn btn-ghost btn-lg">
             <CalcIcon size={18} />
-            מחשבון
+            {t('ctas.calculator')}
           </Link>
         </div>
       </div>

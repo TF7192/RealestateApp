@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { User, UserCircle, Sun, Moon, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield, Calculator, Download as DownloadIcon, BarChart2, Activity as ActivityIcon, Bell, Tag, Building2 } from 'lucide-react';
 
 const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
@@ -10,6 +11,7 @@ import Portal from './Portal';
 import './MobileMoreSheet.css';
 
 export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
+  const { t } = useTranslation('nav');
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
@@ -102,8 +104,8 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
                 <div className="mms-avatar placeholder">{(user?.displayName || 'E').charAt(0)}</div>
               )}
               <div className="mms-me-text">
-                <strong>{user?.displayName || 'סוכן'}</strong>
-                <small>{user?.agentProfile?.agency || user?.email || 'עריכת פרופיל'}</small>
+                <strong>{user?.displayName || t('fallbacks.agent')}</strong>
+                <small>{user?.agentProfile?.agency || user?.email || t('mobileMore.profileFallback')}</small>
               </div>
               <span className="mms-chevron">›</span>
             </div>
@@ -116,28 +118,28 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
           <section className="mms-section">
             <button className="mms-row" onClick={() => go('/reports')}>
               <span className="mms-row-icon"><BarChart2 size={18} /></span>
-              <span className="mms-row-text"><strong>דוחות</strong><small>ביצועים, עסקאות, נכסים</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.reports.title')}</strong><small>{t('mobileMore.reports.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/activity')}>
               <span className="mms-row-icon"><ActivityIcon size={18} /></span>
-              <span className="mms-row-text"><strong>פעילות</strong><small>פיד כל השינויים במערכת</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.activity.title')}</strong><small>{t('mobileMore.activity.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/reminders')}>
               <span className="mms-row-icon"><Bell size={18} /></span>
-              <span className="mms-row-text"><strong>תזכורות</strong><small>מטלות ותזכורות עם מועד</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.reminders.title')}</strong><small>{t('mobileMore.reminders.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/settings/tags')}>
               <span className="mms-row-icon"><Tag size={18} /></span>
-              <span className="mms-row-text"><strong>ניהול תגיות</strong><small>תיוג לקוחות, נכסים, עסקאות</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.tagSettings.title')}</strong><small>{t('mobileMore.tagSettings.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             {user?.role === 'OWNER' && (
               <button className="mms-row" onClick={() => go('/office')}>
                 <span className="mms-row-icon"><Building2 size={18} /></span>
-                <span className="mms-row-text"><strong>המשרד שלי</strong><small>חברי משרד ותפקידים</small></span>
+                <span className="mms-row-text"><strong>{t('mobileMore.office.title')}</strong><small>{t('mobileMore.office.sub')}</small></span>
                 <span className="mms-arrow">›</span>
               </button>
             )}
@@ -147,8 +149,8 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
             <button className="mms-row primary" onClick={copyCatalog}>
               <span className="mms-row-icon"><Share2 size={18} /></span>
               <span className="mms-row-text">
-                <strong>שיתוף הקטלוג שלי</strong>
-                <small>{copied ? 'הקישור הועתק' : 'העתק לשיתוף בוואטסאפ'}</small>
+                <strong>{t('mobileMore.share.title')}</strong>
+                <small>{copied ? t('mobileMore.share.copied') : t('mobileMore.share.sub')}</small>
               </span>
               <span className="mms-row-trail">
                 {copied ? <Check size={16} color="var(--success)" /> : <span className="mms-arrow">›</span>}
@@ -159,16 +161,16 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
                 <button className="mms-row" onClick={() => go('/admin/chats')}>
                   <span className="mms-row-icon"><Shield size={18} /></span>
                   <span className="mms-row-text">
-                    <strong>מרכז שיחות</strong>
-                    <small>פאנל אדמין — כל שיחות המשתמשים</small>
+                    <strong>{t('mobileMore.adminChats.title')}</strong>
+                    <small>{t('mobileMore.adminChats.sub')}</small>
                   </span>
                   <span className="mms-arrow">›</span>
                 </button>
                 <button className="mms-row" onClick={() => go('/admin/users')}>
                   <span className="mms-row-icon"><Shield size={18} /></span>
                   <span className="mms-row-text">
-                    <strong>משתמשים</strong>
-                    <small>פאנל אדמין — כל המשתמשים, נכסים, לידים</small>
+                    <strong>{t('mobileMore.adminUsers.title')}</strong>
+                    <small>{t('mobileMore.adminUsers.sub')}</small>
                   </span>
                   <span className="mms-arrow">›</span>
                 </button>
@@ -179,32 +181,32 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
           <section className="mms-section">
             <button className="mms-row" onClick={openPalette}>
               <span className="mms-row-icon"><Search size={18} /></span>
-              <span className="mms-row-text"><strong>חיפוש מהיר</strong><small>לקוחות, נכסים, מסכים</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.search.title')}</strong><small>{t('mobileMore.search.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/customers/new')}>
               <span className="mms-row-icon"><UserPlus size={18} /></span>
-              <span className="mms-row-text"><strong>ליד חדש</strong><small>הוספת לקוח פוטנציאלי</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.newLead.title')}</strong><small>{t('mobileMore.newLead.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/properties/new')}>
               <span className="mms-row-icon"><Plus size={18} /></span>
-              <span className="mms-row-text"><strong>קליטת נכס</strong><small>הוספת נכס למערכת</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.newProperty.title')}</strong><small>{t('mobileMore.newProperty.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/owners')}>
               <span className="mms-row-icon"><UserCircle size={18} /></span>
-              <span className="mms-row-text"><strong>בעלי נכסים</strong><small>ניהול בעלי הנכסים שלך</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.owners.title')}</strong><small>{t('mobileMore.owners.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/transfers')}>
               <span className="mms-row-icon"><ArrowLeftRight size={18} /></span>
-              <span className="mms-row-text"><strong>העברות נכסים</strong><small>בקשות נכנסות ויוצאות</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.transfers.title')}</strong><small>{t('mobileMore.transfers.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/templates')}>
               <span className="mms-row-icon"><FileText size={18} /></span>
-              <span className="mms-row-text"><strong>תבניות הודעה</strong><small>וואטסאפ אוטומטי מפרטי הנכס</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.templates.title')}</strong><small>{t('mobileMore.templates.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
             {/* Mobile entry to the seller calculator + Yad2 importer.
@@ -214,16 +216,16 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
             <button className="mms-row" onClick={() => go('/calculator')}>
               <span className="mms-row-icon"><Calculator size={18} /></span>
               <span className="mms-row-text">
-                <strong>מחשבון מוכר</strong>
-                <small>חישוב נטו למוכר אחרי עמלות ומע״מ</small>
+                <strong>{t('mobileMore.calculator.title')}</strong>
+                <small>{t('mobileMore.calculator.sub')}</small>
               </span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/integrations/yad2')}>
               <span className="mms-row-icon"><DownloadIcon size={18} /></span>
               <span className="mms-row-text">
-                <strong>ייבוא נכסים מ-Yad2</strong>
-                <small>סריקת מודעות הסוכנות + תמונות בלחיצה</small>
+                <strong>{t('mobileMore.yad2Import.title')}</strong>
+                <small>{t('mobileMore.yad2Import.sub')}</small>
               </span>
               <span className="mms-arrow">›</span>
             </button>
@@ -235,8 +237,8 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
                 {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
               </span>
               <span className="mms-row-text">
-                <strong>{theme === 'light' ? 'מצב כהה' : 'מצב בהיר'}</strong>
-                <small>מעבר בין ערכות הצבעים</small>
+                <strong>{theme === 'light' ? t('theme.dark') : t('theme.light')}</strong>
+                <small>{t('mobileMore.themeSub')}</small>
               </span>
               <span className={`mms-switch ${theme === 'dark' ? 'on' : ''}`}>
                 <span />
@@ -244,7 +246,7 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
             </button>
             <button className="mms-row" onClick={() => go('/profile')}>
               <span className="mms-row-icon"><User size={18} /></span>
-              <span className="mms-row-text"><strong>הפרופיל שלי</strong><small>פרטים, תמונה, ביוגרפיה</small></span>
+              <span className="mms-row-text"><strong>{t('mobileMore.profile.title')}</strong><small>{t('mobileMore.profile.sub')}</small></span>
               <span className="mms-arrow">›</span>
             </button>
           </section>
@@ -252,11 +254,11 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
           <section className="mms-section danger">
             <button className="mms-row" onClick={doLogout}>
               <span className="mms-row-icon"><LogOut size={18} /></span>
-              <span className="mms-row-text"><strong>יציאה</strong></span>
+              <span className="mms-row-text"><strong>{t('menu.logout')}</strong></span>
             </button>
           </section>
 
-          <div className="mms-hint">Estia · גרסה לאייפון</div>
+          <div className="mms-hint">{t('mobileMore.versionHint')}</div>
         </div>
       </div>
     </Portal>

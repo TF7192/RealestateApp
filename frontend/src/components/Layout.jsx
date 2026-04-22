@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   Building2,
@@ -46,62 +47,67 @@ const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
 import haptics from '../lib/haptics';
 import './Layout.css';
 
+// Nav items reference labels by i18n key — resolved inside the component
+// where `t()` is available. Keys live in nav.json (menu.*, quick.*,
+// mobileMore.*, etc.).
 const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'לוח בקרה' },
-  { path: '/properties', icon: Building2, label: 'נכסים' },
-  { path: '/owners', icon: UserCircle, label: 'בעלי נכסים' },
-  { path: '/customers', icon: Users, label: 'לקוחות' },
-  { path: '/deals', icon: Handshake, label: 'עסקאות' },
-  { path: '/transfers', icon: ArrowLeftRight, label: 'העברות' },
-  { path: '/templates', icon: FileText, label: 'תבניות הודעה' },
-  { path: '/calculator', icon: Calculator, label: 'מחשבון מוכר' },
-  { path: '/integrations/yad2', icon: DownloadIcon, label: 'ייבוא מ-Yad2' },
+  { path: '/', icon: LayoutDashboard, labelKey: 'menu.dashboard' },
+  { path: '/properties', icon: Building2, labelKey: 'menu.properties' },
+  { path: '/owners', icon: UserCircle, labelKey: 'menu.owners' },
+  { path: '/customers', icon: Users, labelKey: 'menu.customers' },
+  { path: '/deals', icon: Handshake, labelKey: 'menu.deals' },
+  { path: '/transfers', icon: ArrowLeftRight, labelKey: 'menu.transfers' },
+  { path: '/templates', icon: FileText, labelKey: 'menu.templates' },
+  { path: '/calculator', icon: Calculator, labelKey: 'menu.calculator' },
+  { path: '/integrations/yad2', icon: DownloadIcon, labelKey: 'menu.yad2Import' },
 ];
 
 const quickActions = [
-  { path: '/properties/new', icon: Plus, label: 'נכס חדש' },
-  { path: '/customers/new', icon: UserPlus, label: 'ליד חדש' },
+  { path: '/properties/new', icon: Plus, labelKey: 'quick.newProperty' },
+  { path: '/customers/new', icon: UserPlus, labelKey: 'quick.newLead' },
 ];
 
 // Sprint 4 reporting surfaces + Sprint 1 A2 tag-settings entry point.
 // Collected in a "כלי ניהול" group so the main nav isn't cluttered; Office
 // (Sprint 7 A1) is gated to role === 'OWNER' — rendered conditionally below.
 const MANAGEMENT_ITEMS = [
-  { path: '/reports',       icon: BarChart2,   label: 'דוחות' },
-  { path: '/activity',      icon: ActivityIcon, label: 'פעילות' },
-  { path: '/reminders',     icon: Bell,         label: 'תזכורות' },
-  { path: '/settings/tags', icon: Tag,          label: 'ניהול תגיות' },
+  { path: '/reports',       icon: BarChart2,    labelKey: 'menu.reports' },
+  { path: '/activity',      icon: ActivityIcon, labelKey: 'menu.activity' },
+  { path: '/reminders',     icon: Bell,         labelKey: 'menu.reminders' },
+  { path: '/settings/tags', icon: Tag,          labelKey: 'menu.tagSettings' },
 ];
 
 // Pages that should show a back arrow + contextual title instead of the logo.
-// `titleHint` is a fallback title; dynamic titles come via the `estia:title`
-// custom event (set per-page: window.dispatchEvent(new CustomEvent('estia:title', { detail: '...' }))).
+// `titleHintKey` is a fallback title (i18n key in nav.pageHints / menu);
+// dynamic titles come via the `estia:title` custom event.
 const BACK_TARGETS = [
-  { match: /^\/properties\/new$/,  titleHint: 'נכס חדש',   back: '/properties' },
-  { match: /^\/properties\/[^/]+$/, titleHint: 'פרטי נכס', back: '/properties' },
-  { match: /^\/customers\/new$/,    titleHint: 'ליד חדש',  back: '/customers' },
-  { match: /^\/owners\/[^/]+$/,     titleHint: 'בעל נכס',  back: '/owners' },
-  { match: /^\/profile$/,           titleHint: 'הפרופיל שלי', back: -1 },
+  { match: /^\/properties\/new$/,   titleHintKey: 'pageHints.newProperty',  back: '/properties' },
+  { match: /^\/properties\/[^/]+$/, titleHintKey: 'pageHints.propertyDetail', back: '/properties' },
+  { match: /^\/customers\/new$/,    titleHintKey: 'pageHints.newLead',      back: '/customers' },
+  { match: /^\/owners\/[^/]+$/,     titleHintKey: 'pageHints.ownerDetail',  back: '/owners' },
+  { match: /^\/profile$/,           titleHintKey: 'menu.profileMine',       back: -1 },
 ];
 
-// Top-level section titles for the breadcrumb (P1-M1)
-const SECTION_TITLES = {
-  '/': 'לוח בקרה',
-  '/properties': 'נכסים',
-  '/owners': 'בעלי נכסים',
-  '/customers': 'לקוחות',
-  '/deals': 'עסקאות',
-  '/transfers': 'העברות',
-  '/templates': 'תבניות הודעה',
-  '/profile': 'הפרופיל',
+// Top-level section titles for the breadcrumb (P1-M1). Keyed by path so
+// the resolver inside the component can call t() per entry.
+const SECTION_TITLE_KEYS = {
+  '/': 'menu.dashboard',
+  '/properties': 'menu.properties',
+  '/owners': 'menu.owners',
+  '/customers': 'menu.customers',
+  '/deals': 'menu.deals',
+  '/transfers': 'menu.transfers',
+  '/templates': 'menu.templates',
+  '/profile': 'menu.profile',
 };
 
 function pickBack(pathname) {
-  for (const t of BACK_TARGETS) if (t.match.test(pathname)) return t;
+  for (const target of BACK_TARGETS) if (target.match.test(pathname)) return target;
   return null;
 }
 
 export default function Layout({ onLogout }) {
+  const { t } = useTranslation('nav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
@@ -146,14 +152,14 @@ export default function Layout({ onLogout }) {
           if (!entity) return null;
           if (fav.entityType === 'PROPERTY') {
             const street = [entity.street, entity.number].filter(Boolean).join(' ').trim();
-            const label = [street || entity.address || 'נכס', entity.city].filter(Boolean).join(', ');
+            const label = [street || entity.address || t('fallbacks.property'), entity.city].filter(Boolean).join(', ');
             return { key: `P-${fav.entityId}`, label, to: `/properties/${fav.entityId}` };
           }
           if (fav.entityType === 'LEAD') {
-            return { key: `L-${fav.entityId}`, label: entity.name || 'ליד', to: `/customers?selected=${fav.entityId}` };
+            return { key: `L-${fav.entityId}`, label: entity.name || t('fallbacks.lead'), to: `/customers?selected=${fav.entityId}` };
           }
           if (fav.entityType === 'OWNER') {
-            return { key: `O-${fav.entityId}`, label: entity.name || 'בעל נכס', to: `/owners/${fav.entityId}` };
+            return { key: `O-${fav.entityId}`, label: entity.name || t('fallbacks.owner'), to: `/owners/${fav.entityId}` };
           }
           return null;
         })
@@ -163,7 +169,7 @@ export default function Layout({ onLogout }) {
       // Fail silently — favorites are a nice-to-have; 401 will bounce
       // via the api client already.
     }
-  }, [user?.id]);
+  }, [user?.id, t]);
 
   useEffect(() => { loadFavorites(); }, [loadFavorites]);
   useEffect(() => {
@@ -246,10 +252,11 @@ export default function Layout({ onLogout }) {
   };
 
   // Build the header title: dynamic > hint > section > logo
+  const sectionKey = SECTION_TITLE_KEYS[location.pathname];
   const pageTitle =
     dynamicTitle ||
-    (back && back.titleHint) ||
-    SECTION_TITLES[location.pathname] ||
+    (back && back.titleHintKey ? t(back.titleHintKey) : '') ||
+    (sectionKey ? t(sectionKey) : '') ||
     '';
 
   return (
@@ -260,7 +267,7 @@ export default function Layout({ onLogout }) {
       <header className={`mobile-header ${headerHidden ? 'mh-hidden' : ''}`}>
         <div className="mh-side mh-leading">
           {back && (
-            <button className="btn-ghost mh-back-btn" onClick={goBack} aria-label="חזרה">
+            <button className="btn-ghost mh-back-btn" onClick={goBack} aria-label={t('aria.back')}>
               <ArrowRight size={22} />
             </button>
           )}
@@ -287,7 +294,7 @@ export default function Layout({ onLogout }) {
               haptics.tap();
               window.dispatchEvent(new Event('estia:open-palette'));
             }}
-            aria-label="חיפוש"
+            aria-label={t('aria.search')}
             type="button"
           >
             <Search size={20} />
@@ -306,7 +313,7 @@ export default function Layout({ onLogout }) {
                 haptics.tap();
                 window.dispatchEvent(new Event('estia:open-chat'));
               }}
-              aria-label="צ׳אט עם המפתחים"
+              aria-label={t('aria.chat')}
               type="button"
             >
               <MessageCircle size={20} />
@@ -315,7 +322,7 @@ export default function Layout({ onLogout }) {
           <button
             className="btn-ghost mh-profile-btn"
             onClick={() => { haptics.tap(); setMoreOpen(true); }}
-            aria-label="חשבון"
+            aria-label={t('aria.account')}
           >
             {user?.avatarUrl ? (
               <img src={user.avatarUrl} alt="" className="mh-avatar" />
@@ -338,7 +345,7 @@ export default function Layout({ onLogout }) {
             </div>
             <div className="logo-text">
               <h1>Estia</h1>
-              <p>ניהול נכסים ולידים</p>
+              <p>{t('sidebar.subtitle')}</p>
             </div>
           </Link>
           <button
@@ -352,71 +359,77 @@ export default function Layout({ onLogout }) {
         <button
           className="sidebar-collapse-rail"
           onClick={() => setCollapsed((c) => !c)}
-          title={collapsed ? 'הרחב סרגל' : 'כווץ סרגל'}
-          aria-label={collapsed ? 'הרחב סרגל' : 'כווץ סרגל'}
+          title={collapsed ? t('aria.expandSidebar') : t('aria.collapseSidebar')}
+          aria-label={collapsed ? t('aria.expandSidebar') : t('aria.collapseSidebar')}
         >
           {collapsed ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
         </button>
 
         <nav className="sidebar-nav">
           <div className="nav-section">
-            <span className="nav-section-label">ניווט ראשי</span>
-            {navItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                data-label={item.label}
-                // data-tour targets used by the OnboardingTour (T10).
-                data-tour={
-                  item.path === '/properties' ? 'sidebar-properties' :
-                  item.path === '/owners'     ? 'sidebar-owners' :
-                  item.path === '/customers'  ? 'sidebar-customers' :
-                  item.path === '/templates'  ? 'sidebar-templates' :
-                  item.path === '/transfers'  ? 'sidebar-transfers' :
-                  undefined
-                }
-                className={({ isActive }) =>
-                  `nav-item ${isActive ? 'active' : ''}`
-                }
-                onClick={() => setSidebarOpen(false)}
-              >
-                <item.icon size={20} />
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
+            <span className="nav-section-label">{t('sections.main')}</span>
+            {navItems.map((item) => {
+              const label = t(item.labelKey);
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/'}
+                  data-label={label}
+                  // data-tour targets used by the OnboardingTour (T10).
+                  data-tour={
+                    item.path === '/properties' ? 'sidebar-properties' :
+                    item.path === '/owners'     ? 'sidebar-owners' :
+                    item.path === '/customers'  ? 'sidebar-customers' :
+                    item.path === '/templates'  ? 'sidebar-templates' :
+                    item.path === '/transfers'  ? 'sidebar-transfers' :
+                    undefined
+                  }
+                  className={({ isActive }) =>
+                    `nav-item ${isActive ? 'active' : ''}`
+                  }
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <item.icon size={20} />
+                  <span>{label}</span>
+                </NavLink>
+              );
+            })}
           </div>
 
           {/* Sprint 4 (reports, activity, reminders) + Sprint 1 A2 (tags)
               + Sprint 7 A1 (office — OWNER only). Grouped so the main
               nav isn't swamped with admin-ish surfaces. */}
           <div className="nav-section">
-            <span className="nav-section-label">כלי ניהול</span>
-            {MANAGEMENT_ITEMS.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                data-label={item.label}
-                className={({ isActive }) =>
-                  `nav-item ${isActive ? 'active' : ''}`
-                }
-                onClick={() => setSidebarOpen(false)}
-              >
-                <item.icon size={20} />
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
+            <span className="nav-section-label">{t('sections.management')}</span>
+            {MANAGEMENT_ITEMS.map((item) => {
+              const label = t(item.labelKey);
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  data-label={label}
+                  className={({ isActive }) =>
+                    `nav-item ${isActive ? 'active' : ''}`
+                  }
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <item.icon size={20} />
+                  <span>{label}</span>
+                </NavLink>
+              );
+            })}
             {isOwner && (
               <NavLink
                 to="/office"
-                data-label="משרד"
+                data-label={t('menu.office')}
                 className={({ isActive }) =>
                   `nav-item ${isActive ? 'active' : ''}`
                 }
                 onClick={() => setSidebarOpen(false)}
               >
                 <Building2 size={20} />
-                <span>משרד</span>
+                <span>{t('menu.office')}</span>
               </NavLink>
             )}
           </div>
@@ -428,7 +441,7 @@ export default function Layout({ onLogout }) {
             <div className="nav-section nav-favorites">
               <span className="nav-section-label">
                 <Heart size={12} style={{ marginInlineEnd: 4, verticalAlign: -1 }} />
-                המועדפים
+                {t('sections.favorites')}
               </span>
               {favorites.map((f) => (
                 <NavLink
@@ -448,7 +461,7 @@ export default function Layout({ onLogout }) {
           )}
 
           <div className="nav-section">
-            <span className="nav-section-label">פעולות מהירות</span>
+            <span className="nav-section-label">{t('sections.quickActions')}</span>
             {quickActions.map((item) => (
               <NavLink
                 key={item.path}
@@ -459,16 +472,16 @@ export default function Layout({ onLogout }) {
                 onClick={() => setSidebarOpen(false)}
               >
                 <item.icon size={18} />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </NavLink>
             ))}
             <button
               className="nav-item nav-action share-link-btn"
               onClick={handleShareCatalog}
-              title="העתק קישור שיתוף לקטלוג האישי"
+              title={t('aria.shareCatalog')}
             >
               {copiedShare ? <Check size={18} /> : <Share2 size={18} />}
-              <span>{copiedShare ? 'הקישור הועתק' : 'שיתוף הקטלוג שלי'}</span>
+              <span>{copiedShare ? t('share.copied') : t('share.action')}</span>
             </button>
             {ADMIN_EMAILS.has((user?.email || '').toLowerCase()) && (
               <>
@@ -478,10 +491,10 @@ export default function Layout({ onLogout }) {
                     `nav-item nav-action nav-item-admin ${isActive ? 'active' : ''}`
                   }
                   onClick={() => setSidebarOpen(false)}
-                  title="מרכז שיחות אדמין"
+                  title={t('aria.adminChats')}
                 >
                   <Shield size={18} />
-                  <span>מרכז שיחות</span>
+                  <span>{t('sidebar.adminChats')}</span>
                 </NavLink>
                 <NavLink
                   to="/admin/users"
@@ -489,10 +502,10 @@ export default function Layout({ onLogout }) {
                     `nav-item nav-action nav-item-admin ${isActive ? 'active' : ''}`
                   }
                   onClick={() => setSidebarOpen(false)}
-                  title="משתמשים — לוח אדמין"
+                  title={t('aria.adminUsers')}
                 >
                   <Shield size={18} />
-                  <span>משתמשים</span>
+                  <span>{t('sidebar.adminUsers')}</span>
                 </NavLink>
               </>
             )}
@@ -503,23 +516,23 @@ export default function Layout({ onLogout }) {
           <button
             className="sidebar-theme-toggle"
             onClick={toggleTheme}
-            title={theme === 'light' ? 'מעבר למצב כהה' : 'מעבר למצב בהיר'}
+            title={theme === 'light' ? t('theme.toDark') : t('theme.toLight')}
           >
             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-            <span>{theme === 'light' ? 'מצב כהה' : 'מצב בהיר'}</span>
+            <span>{theme === 'light' ? t('theme.dark') : t('theme.light')}</span>
           </button>
           <NavLink to="/profile" className="agent-card agent-card-link" onClick={() => setSidebarOpen(false)}>
             {user?.avatarUrl ? (
-              <img className="agent-avatar" src={user.avatarUrl} alt={user.displayName || 'סוכן'} />
+              <img className="agent-avatar" src={user.avatarUrl} alt={user.displayName || t('fallbacks.agent')} />
             ) : (
               <div className="agent-avatar">
                 {(user?.displayName || 'E').charAt(0)}
               </div>
             )}
             <div className="agent-info">
-              <span className="agent-name">{user?.displayName || 'סוכן'}</span>
+              <span className="agent-name">{user?.displayName || t('fallbacks.agent')}</span>
               <span className="agent-agency">
-                {user?.agentProfile?.agency || 'הוסף פרטי משרד'}
+                {user?.agentProfile?.agency || t('quick.addAgency')}
               </span>
             </div>
           </NavLink>
@@ -530,15 +543,15 @@ export default function Layout({ onLogout }) {
               + icon stay stable. */}
           <a
             className="sidebar-help"
-            href="mailto:support@estia.app?subject=עזרה%20ב-Estia"
-            title="פנייה לתמיכה"
+            href={`mailto:support@estia.app?subject=${encodeURIComponent(t('help.subject'))}`}
+            title={t('aria.supportContact')}
           >
             <HelpCircle size={16} />
-            <span>עזרה</span>
+            <span>{t('menu.help')}</span>
           </a>
           <button className="sidebar-logout" onClick={onLogout}>
             <LogOut size={16} />
-            יציאה
+            {t('menu.logout')}
           </button>
         </div>
       </aside>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Building2,
   Users,
@@ -27,15 +28,16 @@ import './MobileTabBar.css';
 // who want the dashboard.
 
 const TABS_BEFORE = [
-  { to: '/properties', label: 'נכסים', icon: Building2, tour: 'sidebar-properties' },
-  { to: '/customers',  label: 'לקוחות', icon: Users,    tour: 'sidebar-customers' },
+  { to: '/properties', labelKey: 'mobileTabs.properties', icon: Building2, tour: 'sidebar-properties' },
+  { to: '/customers',  labelKey: 'mobileTabs.customers',  icon: Users,     tour: 'sidebar-customers' },
 ];
 const TABS_AFTER = [
-  { to: '/owners',     label: 'בעלים',  icon: UserCircle },
-  { to: '/calculator', label: 'מחשבון', icon: Calculator },
+  { to: '/owners',     labelKey: 'mobileTabs.owners',     icon: UserCircle },
+  { to: '/calculator', labelKey: 'mobileTabs.calculator', icon: Calculator },
 ];
 
 export default function MobileTabBar() {
+  const { t } = useTranslation('nav');
   const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
 
@@ -54,40 +56,40 @@ export default function MobileTabBar() {
       {/* The bar is navigation, not a tablist — tabs imply tab-panel
           pairs which this doesn't have. role="tablist" without
           role="tab" children fails axe's aria-required-children rule. */}
-      <nav className="mtb" aria-label="ניווט ראשי">
+      <nav className="mtb" aria-label={t('mobileTabs.navAria')}>
         <div className="mtb-inner">
-          {TABS_BEFORE.map((t) => (
+          {TABS_BEFORE.map((tab) => (
             <NavLink
-              key={t.to}
-              to={t.to}
-              data-tour={t.tour}
+              key={tab.to}
+              to={tab.to}
+              data-tour={tab.tour}
               className={({ isActive }) => `mtb-item ${isActive ? 'active' : ''}`}
               onClick={() => haptics.tap()}
             >
-              <span className="mtb-icon"><t.icon /></span>
-              <span className="mtb-label">{t.label}</span>
+              <span className="mtb-icon"><tab.icon /></span>
+              <span className="mtb-label">{t(tab.labelKey)}</span>
             </NavLink>
           ))}
 
           <button
             className="mtb-item mtb-add"
             onClick={openAddSheet}
-            aria-label="תפריט הוספה / קיצורים"
+            aria-label={t('mobileTabs.addMenuAria')}
             type="button"
           >
             <span className="mtb-icon mtb-add-icon-pill"><Plus /></span>
-            <span className="mtb-label">עוד</span>
+            <span className="mtb-label">{t('mobileTabs.more')}</span>
           </button>
 
-          {TABS_AFTER.map((t) => (
+          {TABS_AFTER.map((tab) => (
             <NavLink
-              key={t.to}
-              to={t.to}
+              key={tab.to}
+              to={tab.to}
               className={({ isActive }) => `mtb-item ${isActive ? 'active' : ''}`}
               onClick={() => haptics.tap()}
             >
-              <span className="mtb-icon"><t.icon /></span>
-              <span className="mtb-label">{t.label}</span>
+              <span className="mtb-icon"><tab.icon /></span>
+              <span className="mtb-label">{t(tab.labelKey)}</span>
             </NavLink>
           ))}
         </div>
@@ -97,13 +99,13 @@ export default function MobileTabBar() {
         <div className="mtb-add-backdrop" onClick={() => setAddOpen(false)}>
           <div className="mtb-add-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="mtb-add-grabber" />
-            <h4>מה לעשות?</h4>
+            <h4>{t('mobileAddSheet.title')}</h4>
 
             <button className="mtb-add-row" onClick={go('/properties/new')}>
               <span className="mtb-add-icon prop"><Home size={18} /></span>
               <span className="mtb-add-text">
-                <strong>נכס חדש</strong>
-                <small>קליטת נכס לשיווק</small>
+                <strong>{t('mobileAddSheet.newProperty')}</strong>
+                <small>{t('mobileAddSheet.newPropertySub')}</small>
               </span>
               <span className="mtb-add-arrow">›</span>
             </button>
@@ -111,8 +113,8 @@ export default function MobileTabBar() {
             <button className="mtb-add-row" onClick={go('/customers/new')}>
               <span className="mtb-add-icon lead"><UserPlus size={18} /></span>
               <span className="mtb-add-text">
-                <strong>ליד חדש</strong>
-                <small>הוספת לקוח פוטנציאלי</small>
+                <strong>{t('mobileAddSheet.newLead')}</strong>
+                <small>{t('mobileAddSheet.newLeadSub')}</small>
               </span>
               <span className="mtb-add-arrow">›</span>
             </button>
@@ -120,8 +122,8 @@ export default function MobileTabBar() {
             <button className="mtb-add-row" onClick={go('/deals')}>
               <span className="mtb-add-icon deal"><Handshake size={18} /></span>
               <span className="mtb-add-text">
-                <strong>עסקאות</strong>
-                <small>כל העסקאות הפתוחות והסגורות</small>
+                <strong>{t('mobileAddSheet.deals')}</strong>
+                <small>{t('mobileAddSheet.dealsSub')}</small>
               </span>
               <span className="mtb-add-arrow">›</span>
             </button>
@@ -129,15 +131,15 @@ export default function MobileTabBar() {
             <button className="mtb-add-row" onClick={go('/')}>
               <span className="mtb-add-icon dash"><LayoutDashboard size={18} /></span>
               <span className="mtb-add-text">
-                <strong>לוח בקרה</strong>
-                <small>מבט-על על היום והשבוע</small>
+                <strong>{t('mobileAddSheet.dashboard')}</strong>
+                <small>{t('mobileAddSheet.dashboardSub')}</small>
               </span>
               <span className="mtb-add-arrow">›</span>
             </button>
 
             <button className="mtb-add-cancel" onClick={() => setAddOpen(false)}>
               <X size={14} />
-              ביטול
+              {t('mobileAddSheet.cancel')}
             </button>
           </div>
         </div>

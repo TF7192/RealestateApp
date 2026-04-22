@@ -42,6 +42,14 @@
     "adminUsers": "משתמשים — לוח אדמין",
     "supportContact": "פנייה לתמיכה"
   },
+  "sidebar": {
+    "subtitle": "ניהול נכסים ולידים",
+    "adminChats": "מרכז שיחות",
+    "adminUsers": "משתמשים"
+  },
+  "help": {
+    "subject": "עזרה ב-Estia"
+  },
   "share": {
     "action": "שיתוף הקטלוג שלי",
     "copied": "הקישור הועתק"

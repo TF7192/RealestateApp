@@ -26,7 +26,9 @@
     "leadsTotalFormat":  "מתוך {{count}} לקוחות",
     "dealsClosedFormat": "{{count}} נסגרו",
     "categorySale":      "מכירה",
-    "categoryRent":      "השכרה"
+    "categoryRent":      "השכרה",
+    "saleRentFormat":    "{{sale}} מכירה · {{rent}} השכרה",
+    "ownersActiveFormat": "{{count}} עם נכסים פעילים"
   },
   "templates": {
     "title":       "תבניות הודעה",
@@ -37,11 +39,26 @@
     "welcomeBody":  "עדיין אין נתונים. אפשר להתחיל בקליטת נכס ראשון או להוסיף ליד חדש."
   },
   "marketingProgress": "התקדמות שיווק",
+  "marketingProgressFormat": "{{done}} מתוך {{total}} פעולות הושלמו",
+  "marketingUpdated": "עודכן {{label}}",
   "propertiesEmpty":   "עדיין אין נכסים. ",
   "propertiesEmptyCta": "הוסף ראשון",
   "hotLeadsTitle": "לידים חמים",
+  "hotLeadsAll": "הכל",
+  "hotLeadsLastContact": "קשר אחרון: {{label}}",
+  "roomsFormat": "{{count}} חד׳",
   "hotLeadsEmpty": "אין לידים חמים כרגע. ",
   "hotLeadsEmptyCta": "הוסף ליד",
+  "staleLeads": {
+    "title": "{{count}} לידים ללא קשר {{days}} ימים",
+    "oldest": "הוותיק: "
+  },
+  "ctas": {
+    "share": "שתף את הנכסים שלי",
+    "newProperty": "קליטת נכס",
+    "newLead": "ליד חדש",
+    "calculator": "מחשבון"
+  },
   "today": {
     "aria":   "סדר היום",
     "heading": "היום",
