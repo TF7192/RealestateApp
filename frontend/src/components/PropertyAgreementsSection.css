@@ -6,7 +6,10 @@
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px 18px;
-  margin-block: 16px 0;
+  /* Generous vertical breathing room so the section doesn't read as
+     glued to the KPI rail above it or the next panel below. Matches
+     the 28px rhythm used between most PropertyDetail sibling cards. */
+  margin-block: 28px;
   box-shadow: var(--shadow-sm);
 }
 
