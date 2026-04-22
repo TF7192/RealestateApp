@@ -26,11 +26,14 @@
     "androidScheme": "https",
     "iosScheme": "https",
     "allowNavigation": [
+      "estia.co.il",
+      "www.estia.co.il",
       "accounts.google.com",
       "oauth2.googleapis.com",
       "openidconnect.googleapis.com",
       "www.google.com",
       "ssl.gstatic.com",
+      "appleid.apple.com",
       "*.googleusercontent.com"
     ]
   },

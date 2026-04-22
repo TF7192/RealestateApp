@@ -100,7 +100,12 @@ export default function Login() {
         givenName: r.givenName,
         familyName: r.familyName,
       });
-      window.location.href = '/dashboard';
+      // Replace with an absolute same-origin URL so the Capacitor
+      // WKWebView doesn't treat it as a potentially-external URL and
+      // hand it to iOS's external browser. `location.replace` avoids
+      // leaving /login on the history stack, so the back gesture from
+      // /dashboard doesn't bounce back into the login screen.
+      window.location.replace(`${window.location.origin}/dashboard`);
     } catch (err) {
       // User-cancel codes vary by iOS version — .code / .error / string
       // that includes 'canceled'. Don't show a scary error for those.
