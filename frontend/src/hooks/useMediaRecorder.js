@@ -114,7 +114,9 @@ export function useMediaRecorder({ maxDurationMs = MAX_DURATION_MS } = {}) {
       rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     } catch {
       // Safari sometimes rejects explicit mimeType — retry default.
-      try { rec = new MediaRecorder(stream); } catch (e2) {
+      try {
+        rec = new MediaRecorder(stream);
+      } catch {
         setError({ code: 'CAPTURE_FAILED', message: 'לא הצלחנו לאתחל את ההקלטה' });
         setState('error');
         cleanup();
