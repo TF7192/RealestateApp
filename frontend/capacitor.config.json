@@ -36,10 +36,11 @@
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 1000,
+      "launchShowDuration": 800,
       "launchAutoHide": true,
-      "backgroundColor": "#f7f3ec",
-      "androidScaleType": "CENTER_CROP",
+      "backgroundColor": "#faf7ef",
+      "androidScaleType": "CENTER",
+      "iosSpinnerStyle": "small",
       "showSpinner": false,
       "splashFullScreen": true,
       "splashImmersive": true,

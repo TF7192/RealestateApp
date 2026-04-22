@@ -92,10 +92,14 @@ if (typeof window !== 'undefined') {
       Keyboard.addListener('keyboardDidShow',  (info) => setKb(info.keyboardHeight));
       Keyboard.addListener('keyboardWillHide', () => setKb(0));
       Keyboard.addListener('keyboardDidHide',  () => setKb(0));
-      // Stop WKWebView from trying to scroll on our behalf — our focusin
-      // handler does it more conservatively and, crucially, restores on
-      // blur.
-      Keyboard.setScroll?.({ isDisabled: true }).catch(() => {});
+      // Note: we used to call `Keyboard.setScroll({ isDisabled: true })`
+      // here, intending to suppress the Keyboard plugin's auto-scroll-to-
+      // focused-input assist. But in practice it appears to also gate
+      // user-initiated document scroll in the WKWebView on some iOS
+      // versions — every scroll attempt rubber-banded without actually
+      // moving the page. Removed so iOS handles scroll natively; our
+      // focusin handler already does a more conservative input-into-view
+      // nudge that doesn't need the plugin's help.
       // Hide the iOS "Previous / Next / Done" accessory bar; it takes
       // extra vertical space and causes cascading re-layouts on inputs.
       Keyboard.setAccessoryBarVisible?.({ isVisible: false }).catch(() => {});
