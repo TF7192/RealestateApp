@@ -1,12 +1,26 @@
-/* Floating background-scan banner. Sits just above the mobile tab bar
-   on phones, flush-top on desktop. Lives at App root so it survives
-   navigation. */
+/* Floating background-scan banner. U-1 — sits bottom-CENTER, full-width
+   on mobile, max-width 480px centered on desktop. Previously it was
+   pinned to the left and collided with the gold "+" FAB on the right
+   and the chat button; the bottom-center layout keeps it out of those
+   fixed-corner stacking zones while still staying visible as the agent
+   works elsewhere.
+
+   z-index sits deliberately BELOW the FAB (z=140 in MobileAddFab.css)
+   so a tap that lands on the FAB isn't eaten by the banner. It sits
+   ABOVE the tab bar (z=100) and above most page chrome. Sub-2 owns the
+   chat-vs-FAB stacking separately. */
 
 .y2b {
   position: fixed;
+  /* Bottom-center. On mobile we need to clear:
+       - env(safe-area-inset-bottom)  — iOS home indicator
+       - ~64px tab bar                — MobileTabBar's height
+       - 8px breathing room           — so it doesn't touch the tab bar */
   left: 12px;
   right: 12px;
   bottom: calc(64px + env(safe-area-inset-bottom) + 8px);
+  margin: 0 auto;
+  max-width: 480px;
   z-index: 130;
   display: flex;
   align-items: center;
@@ -30,17 +44,12 @@
 
 @media (min-width: 1025px) {
   .y2b {
-    /* Pin to viewport-left on desktop. The RTL sidebar sits on
-       viewport-right and its 'יציאה' button lives at the bottom of
-       that column — the previous right:20px placement landed the
-       banner directly on top of logout, blocking the click. The
-       viewport-left corner is empty space and sits opposite the
-       sidebar, so the banner no longer collides with anything. */
-    left: 20px;
-    right: auto;
-    bottom: 20px;
+    /* Desktop — bottom-center, tighter bottom offset (no tab bar). */
+    left: 0;
+    right: 0;
+    bottom: 24px;
+    max-width: 480px;
     min-width: 320px;
-    max-width: 420px;
   }
 }
 
@@ -85,6 +94,9 @@
   text-overflow: ellipsis;
 }
 
+/* U-1 — close button. Always rendered (both running + done states) so
+   the agent can dismiss an in-flight banner too, not just completion
+   notices. Dismissal is keyed to finishedAt so a newer scan re-arms. */
 .y2b-x {
   flex-shrink: 0;
   width: 28px;
@@ -96,8 +108,15 @@
   background: var(--bg-elevated);
   color: var(--text-muted);
   transition: background 0.15s ease;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
 }
 .y2b-x:hover { background: var(--border); color: var(--text-primary); }
+.y2b-x:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
 
 .y2b-spin { animation: y2b-spin 0.9s linear infinite; }
 @keyframes y2b-spin { to { transform: rotate(360deg); } }

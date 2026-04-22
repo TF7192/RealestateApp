@@ -69,6 +69,26 @@ export default function Yad2ScanBanner() {
     return () => window.removeEventListener('yad2-scan-complete', handler);
   }, [location.pathname, toast]);
 
+  // Y-2 — separate import-complete toast. Fires when the async import
+  // job finishes in the background (e.g. the agent left the import page
+  // mid-rehost and we want to notify them when properties are ready).
+  useEffect(() => {
+    const handler = (e) => {
+      const { ok, created, error } = e.detail || {};
+      // Suppress on the import page — the inline "done" card there is
+      // the primary confirmation; the toast would be duplicative.
+      if (location.pathname.startsWith('/integrations/yad2')) return;
+      try { haptics.success?.(); } catch { /* ignore */ }
+      if (ok) {
+        toast.success?.(`הייבוא הסתיים — נוספו ${created ?? 0} נכסים`);
+      } else {
+        toast.error?.(`הייבוא נכשל: ${error || 'שגיאה'}`);
+      }
+    };
+    window.addEventListener('yad2-import-complete', handler);
+    return () => window.removeEventListener('yad2-import-complete', handler);
+  }, [location.pathname, toast]);
+
   // Don't render on the yad2 page itself — would duplicate the inline UI.
   if (location.pathname.startsWith('/integrations/yad2')) return null;
 
@@ -105,12 +125,22 @@ export default function Yad2ScanBanner() {
     setDismissedAt(stampAt);
   };
 
+  // U-1 — the outer element used to be a <button>, which made the
+  // inner close "button" an invalid nested-interactive element (and
+  // VoiceOver read the whole row as a single control). Split into a
+  // <div role="button"> for the main tap target + a real nested
+  // <button> for dismiss.
   return (
-    <button
-      type="button"
+    <div
       className={`y2b ${isRunning ? 'y2b-run' : isDone ? 'y2b-ok' : 'y2b-err'}`}
+      role="button"
+      tabIndex={0}
       onClick={click}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(); }
+      }}
       aria-label={isRunning ? 'סריקה פעילה — חזור לייבוא' : 'הסריקה הסתיימה — חזור לייבוא'}
+      data-testid="yad2-scan-banner"
     >
       <span className="y2b-icon">
         {isRunning && <Loader2 size={16} className="y2b-spin" />}
@@ -129,11 +159,18 @@ export default function Yad2ScanBanner() {
           {isError   && (scan.error || 'נסה/י שוב מעמוד הייבוא')}
         </span>
       </span>
-      {!isRunning && (
-        <span className="y2b-x" onClick={dismiss} role="button" aria-label="סגור">
-          <X size={14} />
-        </span>
-      )}
-    </button>
+      {/* U-1 — always allow dismiss, even while running. Clicking X on
+          an in-flight scan just hides the banner; the scan itself keeps
+          running in the background and the completion toast still fires.
+          A NEWER scan will re-arm the banner (see finishedAt check). */}
+      <button
+        type="button"
+        className="y2b-x"
+        onClick={dismiss}
+        aria-label="סגור התראה"
+      >
+        <X size={14} />
+      </button>
+    </div>
   );
 }
