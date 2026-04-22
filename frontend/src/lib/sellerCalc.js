@@ -38,6 +38,9 @@ const DEFAULT_VAT_RATE = 0.18;
  * @property {boolean} lawyerVatIncluded      — true if rate/amount already includes VAT
  * @property {number} additional              — ₪ — additional costs (mas shevach, tabu, etc.)
  * @property {number} [vatRate]               — defaults to DEFAULT_VAT_RATE
+ * @property {boolean} [includeBrokerage]     — C-1: when false, brokerage
+ *   is still computed for display but excluded from `net`. Defaults to true.
+ * @property {boolean} [includeLawyer]        — C-1: same for lawyer fees.
  */
 
 /**
@@ -91,7 +94,14 @@ export function sellerCalc(input) {
 
     const lawyer = lawyerOnPrice(P, input, vat);
     const additional = Math.max(0, input.additional || 0);
-    const net = P - brokerage - lawyer.total - additional;
+    // C-1 — optional exclusions. When the agent hides the brokerage
+    // or lawyer block in the UI, the cost is rendered as "not
+    // counted" and the net-to-seller is computed without it.
+    const includeBrokerage = input.includeBrokerage !== false;
+    const includeLawyer    = input.includeLawyer    !== false;
+    const effectiveBrokerage = includeBrokerage ? brokerage       : 0;
+    const effectiveLawyer    = includeLawyer    ? lawyer.total    : 0;
+    const net = P - effectiveBrokerage - effectiveLawyer - additional;
 
     return {
       listingPrice: P,
@@ -99,7 +109,7 @@ export function sellerCalc(input) {
       lawyer: lawyer.total, lawyerBase: lawyer.base, lawyerVat: lawyer.vat,
       additional,
       net,
-      totalToAgent: brokerage,
+      totalToAgent: includeBrokerage ? brokerage : 0,
       error: net < 0 ? 'fees_exceed_price' : null,
     };
   }

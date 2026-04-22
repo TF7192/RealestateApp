@@ -4,6 +4,18 @@
   gap: 16px;
 }
 
+/* E-1/E-3 — header actions (totals + view-toggle + create button). */
+.deals-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.deals-view-toggle {
+  margin-inline-start: auto;
+}
+
 .deal-chip-row {
   display: flex;
   flex-wrap: wrap;

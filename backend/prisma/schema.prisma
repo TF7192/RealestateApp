@@ -182,6 +182,13 @@ enum DealStatus {
   PENDING_CONTRACT
   SIGNED
   FELL_THROUGH
+  // E-1 — additional lifecycle values for the new "צור עסקה" flow.
+  // `CLOSED` indicates a deal completed past the signing stage (funds
+  // exchanged); `CANCELLED` is an explicit abandonment. Separate from
+  // `FELL_THROUGH` which is a legacy value for deals that collapsed
+  // mid-process.
+  CLOSED
+  CANCELLED
 }
 
 enum ConversationStatus {
@@ -603,6 +610,9 @@ model Owner {
 
   properties Property[]
   phones     OwnerPhone[]
+  // E-1 — reverse of Deal.seller. One owner can be the seller on many
+  // deals (multi-asset portfolios).
+  dealsAsSeller Deal[]    @relation("DealSeller")
 
   @@index([agentId])
   @@index([phone])
@@ -796,6 +806,9 @@ model Lead {
   searchProfiles  LeadSearchProfile[]
   // Reverse of Prospect.lead — signed prospects linked to this lead.
   prospects       Prospect[]
+  // E-1 — reverse of Deal.buyer. A lead can be tied to multiple deals
+  // across their history (repeat buyers / combined transactions).
+  dealsAsBuyer    Deal[]              @relation("DealBuyer")
 
   @@index([agentId])
   @@index([status])
@@ -836,11 +849,25 @@ model Deal {
   lawyer         String?
   updateDate     DateTime         @default(now())
   signedAt       DateTime?
+  // E-1 — structured parties. `buyerId` references a Lead (the
+  // prospective buyer in the CRM), `sellerId` references an Owner
+  // (the canonical seller record). Both nullable — legacy rows and
+  // quickly-captured deals may only have the free-text
+  // buyerAgent/sellerAgent copy. `closeDate` is the target / actual
+  // closing date (distinct from `signedAt` which is the binding-
+  // contract signature date).
+  buyerId        String?
+  buyer          Lead?            @relation("DealBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  sellerId       String?
+  seller         Owner?           @relation("DealSeller", fields: [sellerId], references: [id], onDelete: SetNull)
+  closeDate      DateTime?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   @@index([agentId])
   @@index([status])
+  @@index([buyerId])
+  @@index([sellerId])
 }
 
 model Agreement {

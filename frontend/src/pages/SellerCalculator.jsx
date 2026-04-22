@@ -9,6 +9,8 @@ import {
   ChevronUp,
   RotateCcw,
   Share2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { sellerCalc } from '../lib/sellerCalc';
 import { NumberField, Segmented } from '../components/SmartFields';
@@ -70,6 +72,15 @@ const INITIAL = {
   lawyerVatIncluded: false,
   additional: null,
   advancedOpen: false,
+  // C-1 — visibility toggles for the three cost blocks. When hidden,
+  // the block is collapsed in the UI AND excluded from the net-to-
+  // seller calculation (so "hide brokerage" is the agent saying
+  // "assume I'm not charging the seller commission" for this quote).
+  // "סך לסוכן" is purely a summary chip — toggling it just hides the
+  // chip; the math underneath is unaffected.
+  showBrokerage: true,
+  showLawyer: true,
+  showAgentTotal: true,
 };
 
 export default function SellerCalculator() {
@@ -99,6 +110,8 @@ function DesktopSellerCalculator() {
     lawyerAmount: debounced.lawyerAmount || 0,
     lawyerVatIncluded: debounced.lawyerVatIncluded,
     additional: debounced.additional || 0,
+    includeBrokerage: debounced.showBrokerage,
+    includeLawyer: debounced.showLawyer,
   }), [debounced]);
 
   const isForward = s.mode === 'forward';
@@ -152,58 +165,94 @@ function DesktopSellerCalculator() {
           </div>
 
           <div className="sc-row">
-            <label className="sc-label" htmlFor="sc-commission">
-              עמלת תיווך
-              <Tooltip>אחוז מהסכום שמקבל הסוכן/ת. ברירת המחדל בישראל: 1–2% + מע״מ.</Tooltip>
-            </label>
-            <PercentField
-              id="sc-commission"
-              value={s.commissionPctText}
-              onChange={(v) => update('commissionPctText', v)}
-            />
-            <label className="sc-toggle">
-              <input
-                type="checkbox"
-                checked={s.commissionVatIncluded}
-                onChange={(e) => update('commissionVatIncluded', e.target.checked)}
-              />
-              <span>האחוז כולל מע״מ</span>
-            </label>
+            <div className="sc-row-head">
+              <label className="sc-label" htmlFor="sc-commission">
+                עמלת תיווך
+                <Tooltip>אחוז מהסכום שמקבל הסוכן/ת. ברירת המחדל בישראל: 1–2% + מע״מ.</Tooltip>
+              </label>
+              {/* C-1 — hide/show toggle. Hiding the block excludes it
+                  from the "נשאר ביד" net-to-seller computation. */}
+              <button
+                type="button"
+                className="sc-toggle-btn"
+                aria-pressed={!s.showBrokerage}
+                onClick={() => update('showBrokerage', !s.showBrokerage)}
+                title={s.showBrokerage ? 'הסתר עמלת תיווך מהחישוב' : 'הצג עמלת תיווך בחישוב'}
+              >
+                {s.showBrokerage
+                  ? <><EyeOff size={12} aria-hidden="true" /> הסתר</>
+                  : <><Eye size={12} aria-hidden="true" /> הצג</>}
+              </button>
+            </div>
+            {s.showBrokerage && (
+              <>
+                <PercentField
+                  id="sc-commission"
+                  value={s.commissionPctText}
+                  onChange={(v) => update('commissionPctText', v)}
+                />
+                <label className="sc-toggle">
+                  <input
+                    type="checkbox"
+                    checked={s.commissionVatIncluded}
+                    onChange={(e) => update('commissionVatIncluded', e.target.checked)}
+                  />
+                  <span>האחוז כולל מע״מ</span>
+                </label>
+              </>
+            )}
           </div>
 
           <div className="sc-row">
-            <label className="sc-label">שכר טרחת עו״ד</label>
-            <Segmented
-              value={s.lawyerMode}
-              onChange={(v) => update('lawyerMode', v)}
-              ariaLabel="סוג שכר טרחה"
-              options={[
-                { value: 'percent', label: 'אחוז' },
-                { value: 'fixed', label: 'סכום קבוע' },
-              ]}
-            />
-            {s.lawyerMode === 'percent' ? (
-              <PercentField
-                value={s.lawyerPctText}
-                onChange={(v) => update('lawyerPctText', v)}
-              />
-            ) : (
-              <NumberField
-                value={s.lawyerAmount}
-                onChange={(v) => update('lawyerAmount', v)}
-                unit="₪"
-                placeholder="5,000"
-                aria-label="שכר טרחה (סכום קבוע)"
-              />
+            <div className="sc-row-head">
+              <label className="sc-label">שכר טרחת עו״ד</label>
+              <button
+                type="button"
+                className="sc-toggle-btn"
+                aria-pressed={!s.showLawyer}
+                onClick={() => update('showLawyer', !s.showLawyer)}
+                title={s.showLawyer ? 'הסתר שכר טרחה מהחישוב' : 'הצג שכר טרחה בחישוב'}
+              >
+                {s.showLawyer
+                  ? <><EyeOff size={12} aria-hidden="true" /> הסתר</>
+                  : <><Eye size={12} aria-hidden="true" /> הצג</>}
+              </button>
+            </div>
+            {s.showLawyer && (
+              <>
+                <Segmented
+                  value={s.lawyerMode}
+                  onChange={(v) => update('lawyerMode', v)}
+                  ariaLabel="סוג שכר טרחה"
+                  options={[
+                    { value: 'percent', label: 'אחוז' },
+                    { value: 'fixed', label: 'סכום קבוע' },
+                  ]}
+                />
+                {s.lawyerMode === 'percent' ? (
+                  <PercentField
+                    value={s.lawyerPctText}
+                    onChange={(v) => update('lawyerPctText', v)}
+                  />
+                ) : (
+                  <NumberField
+                    value={s.lawyerAmount}
+                    onChange={(v) => update('lawyerAmount', v)}
+                    unit="₪"
+                    placeholder="5,000"
+                    aria-label="שכר טרחה (סכום קבוע)"
+                  />
+                )}
+                <label className="sc-toggle">
+                  <input
+                    type="checkbox"
+                    checked={s.lawyerVatIncluded}
+                    onChange={(e) => update('lawyerVatIncluded', e.target.checked)}
+                  />
+                  <span>הסכום כולל מע״מ</span>
+                </label>
+              </>
             )}
-            <label className="sc-toggle">
-              <input
-                type="checkbox"
-                checked={s.lawyerVatIncluded}
-                onChange={(e) => update('lawyerVatIncluded', e.target.checked)}
-              />
-              <span>הסכום כולל מע״מ</span>
-            </label>
           </div>
 
           <button
@@ -236,9 +285,13 @@ function DesktopSellerCalculator() {
             </div>
           )}
 
-          <button type="button" className="sc-reset" onClick={reset} title="אפס את כל השדות">
-            <RotateCcw size={14} /> אפס
-          </button>
+          {/* C-1 — Reset button lives on its own row BELOW the advanced
+              "עלויות נוספות" collapsible, not mid-form. */}
+          <div className="sc-reset-row">
+            <button type="button" className="sc-reset" onClick={reset} title="אפס את כל השדות">
+              <RotateCcw size={14} /> אפס
+            </button>
+          </div>
         </section>
 
         {/* Summary */}
@@ -267,27 +320,35 @@ function DesktopSellerCalculator() {
                   value={formatILS(isForward ? (s.amount || 0) : result.listingPrice)}
                   emphasis
                 />
-                <Line
-                  label="עמלת תיווך (לפני מע״מ)"
-                  value={formatILS(result.brokerageBase)}
-                />
-                {result.brokerageVat > 0 && (
-                  <Line
-                    label="מע״מ עמלת תיווך"
-                    value={formatILS(result.brokerageVat)}
-                    sub
-                  />
+                {s.showBrokerage && (
+                  <>
+                    <Line
+                      label="עמלת תיווך (לפני מע״מ)"
+                      value={formatILS(result.brokerageBase)}
+                    />
+                    {result.brokerageVat > 0 && (
+                      <Line
+                        label="מע״מ עמלת תיווך"
+                        value={formatILS(result.brokerageVat)}
+                        sub
+                      />
+                    )}
+                  </>
                 )}
-                <Line
-                  label={s.lawyerMode === 'percent' ? 'שכר טרחת עו״ד (לפני מע״מ)' : 'שכר טרחת עו״ד (סכום קבוע)'}
-                  value={formatILS(result.lawyerBase)}
-                />
-                {result.lawyerVat > 0 && (
-                  <Line
-                    label="מע״מ שכר טרחת עו״ד"
-                    value={formatILS(result.lawyerVat)}
-                    sub
-                  />
+                {s.showLawyer && (
+                  <>
+                    <Line
+                      label={s.lawyerMode === 'percent' ? 'שכר טרחת עו״ד (לפני מע״מ)' : 'שכר טרחת עו״ד (סכום קבוע)'}
+                      value={formatILS(result.lawyerBase)}
+                    />
+                    {result.lawyerVat > 0 && (
+                      <Line
+                        label="מע״מ שכר טרחת עו״ד"
+                        value={formatILS(result.lawyerVat)}
+                        sub
+                      />
+                    )}
+                  </>
                 )}
                 {result.additional > 0 && (
                   <Line label="עלויות נוספות" value={formatILS(result.additional)} />
@@ -298,11 +359,29 @@ function DesktopSellerCalculator() {
                   value={formatILS(result.net)}
                   emphasis
                 />
-                <Line
-                  label="סך לסוכן (כולל מע״מ)"
-                  value={formatILS(result.totalToAgent)}
-                  emphasis
-                />
+                {/* C-1 — "סך לסוכן" chip has its own hide/show toggle.
+                    The number itself reflects the brokerage-include flag
+                    so it stays internally consistent. */}
+                <li className="sc-agent-total-row">
+                  <button
+                    type="button"
+                    className="sc-toggle-btn sc-toggle-btn-inline"
+                    aria-pressed={!s.showAgentTotal}
+                    onClick={() => update('showAgentTotal', !s.showAgentTotal)}
+                    title={s.showAgentTotal ? 'הסתר סך לסוכן' : 'הצג סך לסוכן'}
+                  >
+                    {s.showAgentTotal
+                      ? <><EyeOff size={12} aria-hidden="true" /> הסתר סך לסוכן</>
+                      : <><Eye size={12} aria-hidden="true" /> הצג סך לסוכן</>}
+                  </button>
+                </li>
+                {s.showAgentTotal && (
+                  <Line
+                    label="סך לסוכן (כולל מע״מ)"
+                    value={formatILS(result.totalToAgent)}
+                    emphasis
+                  />
+                )}
               </ul>
 
               {/* Share-to-seller — pre-builds a clean WhatsApp message
