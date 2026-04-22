@@ -16,10 +16,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Estia" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- ?v=gd1 cache-busts Cloudflare's 4h edge cache after the
+         gold-diamond logo swap. Bump the suffix on future logo changes. -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=gd1" />
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <!-- Favicon: SVG first for modern browsers (crisp, themed), PNG
+         fallback for older ones. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=gd1" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=gd1" />
 
     <!-- Fonts — single family across the entire app.
          Lighthouse flagged the stylesheet link as render-blocking (~290ms
