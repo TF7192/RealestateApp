@@ -16,4 +16,4 @@ Disallow: /transfers
 Disallow: /profile
 Disallow: /templates
 
-Sitemap: https://estia.tripzio.xyz/sitemap.xml
+Sitemap: https://estia.co.il/sitemap.xml

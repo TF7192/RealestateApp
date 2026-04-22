@@ -41,7 +41,7 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
       const r = await fetch(url, {
         headers: {
           // Nominatim requires identifying the app per their usage policy.
-          'User-Agent': 'Estia-CRM/1.0 (https://estia.tripzio.xyz)',
+          'User-Agent': 'Estia-CRM/1.0 (https://estia.co.il)',
           'Accept-Language': 'he,en;q=0.7',
         },
       });
@@ -158,7 +158,7 @@ export const registerGeoRoutes: FastifyPluginAsync = async (app) => {
     try {
       const r = await fetch(url, {
         headers: {
-          'User-Agent': 'Estia-CRM/1.0 (https://estia.tripzio.xyz)',
+          'User-Agent': 'Estia-CRM/1.0 (https://estia.co.il)',
           'Accept-Language': `${lang},en;q=0.5`,
         },
       });

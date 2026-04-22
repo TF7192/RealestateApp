@@ -1,6 +1,6 @@
 # Estia — Deployment Runbook
 
-Operator's manual for the deployed system. Live at `https://estia.tripzio.xyz`.
+Operator's manual for the deployed system. Live at `https://estia.co.il`.
 
 ---
 
@@ -100,8 +100,8 @@ In dev (`UPLOADS_BACKEND=local`) files land at `/app/uploads/`.
 
 ## Domain + TLS
 
-- Domain `tripzio.xyz` registered externally; `estia` subdomain points to the EC2 Elastic IP.
-- nginx terminates TLS via Let's Encrypt (Certbot). Auto-renewal: `systemctl status certbot-renew.timer`.
+- Domain `estia.co.il` registered externally; DNS managed in Cloudflare (proxied) → EC2 Elastic IP.
+- Cloudflare terminates TLS at the edge; origin cert on the EC2 nginx is managed via Let's Encrypt (Certbot). Auto-renewal: `systemctl status certbot-renew.timer`.
 - Force renewal: `sudo certbot renew --force-renewal`.
 
 ---
@@ -113,7 +113,7 @@ Production secrets live in `/home/ec2-user/estia-new/.env` on the server (chmod 
 ```
 POSTGRES_PASSWORD=...
 JWT_SECRET=...
-PUBLIC_ORIGIN=https://estia.tripzio.xyz
+PUBLIC_ORIGIN=https://estia.co.il
 UPLOADS_BACKEND=s3
 S3_BUCKET=estia-prod
 S3_REGION=eu-north-1
@@ -142,7 +142,7 @@ Configure at: GitHub → Settings → Secrets and variables → Actions.
 
 ## Monitoring & alerts
 
-- **Health**: `curl https://estia.tripzio.xyz/api/health`
+- **Health**: `curl https://estia.co.il/api/health`
 - **Disk**: log into the box and `df -h /` — alert when >85%
 - **AWS Budget**: $40/mo email alert configured per account (see `scripts/aws-budget.sh`)
 - **Container status**: `sudo docker compose ps` shows all 3 containers

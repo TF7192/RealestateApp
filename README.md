@@ -10,7 +10,7 @@ throughout, ships as a web app + an iPhone app (Capacitor WebView).
 - **Frontend**: React 19 + Vite + React Router 7. Same bundle serves
   web and the Capacitor WKWebView. CSS custom properties for tokens;
   no CSS-in-JS.
-- **Native**: Capacitor 8 (iOS). Live-reload from `https://estia.tripzio.xyz`
+- **Native**: Capacitor 8 (iOS). Live-reload from `https://estia.co.il`
   in production; `http://localhost:5173` in dev.
 - **Infra**: EC2 (eu-north-1) behind nginx + Let's Encrypt, Postgres
   on RDS, S3 for uploads, GitHub Actions for tag-triggered deploys.
@@ -52,7 +52,7 @@ critical ones — the server refuses to start without them:
 - `COOKIE_SECRET` — separate from JWT_SECRET so one leak doesn't
   compromise both. Used to sign the cookie itself.
 - `DATABASE_URL` — Postgres connection string.
-- `PUBLIC_ORIGIN` — `https://estia.tripzio.xyz` in prod; used for
+- `PUBLIC_ORIGIN` — `https://estia.co.il` in prod; used for
   OAuth callbacks, WhatsApp share URLs, OG meta.
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — required for Google
   OAuth (login and Calendar). Set via GitHub Actions secrets.
@@ -86,12 +86,12 @@ GitHub Actions `deploy.yml` then:
 3. patches `.env` with managed secrets
 4. `docker compose build --pull && up -d`
 5. runs migrations
-6. healthchecks `https://estia.tripzio.xyz/api/health`
+6. healthchecks `https://estia.co.il/api/health`
 
 ## Production URLs
 
-- Web: https://estia.tripzio.xyz
-- API: https://estia.tripzio.xyz/api
+- Web: https://estia.co.il
+- API: https://estia.co.il/api
 - Liveness: `/api/health`
 - Readiness: `/api/health/ready` (actually checks the DB)
 

@@ -1,7 +1,7 @@
 // F-11.7 — content-type whitelisting for multipart uploads.
 //
 // Block executable / HTML / SVG-with-script uploads from being served
-// back under estia.tripzio.xyz (same-origin = full session scope).
+// back under estia.co.il (same-origin = full session scope).
 // Individual upload routes wrap their `await req.file()` in
 // `assertAllowedMime(file, 'image' | 'video' | 'pdf')`.
 

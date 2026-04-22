@@ -44,7 +44,7 @@ export function appBaseUrl() {
   if (typeof window === 'undefined') return '';
   const { protocol, host } = window.location;
   if (protocol === 'capacitor:' || protocol === 'http:' && host.includes('localhost')) {
-    return 'https://estia.tripzio.xyz';
+    return 'https://estia.co.il';
   }
   return `${protocol}//${host}`;
 }

@@ -465,7 +465,7 @@ async function rehostImage(srcUrl: string, propertyId: string): Promise<string> 
   const r = await fetch(srcUrl, {
     headers: {
       // Yad2 image CDN doesn't enforce referrer or UA but be consistent.
-      'User-Agent': 'EstiaImporter/1.0 (https://estia.tripzio.xyz)',
+      'User-Agent': 'EstiaImporter/1.0 (https://estia.co.il)',
       'Accept': 'image/jpeg,image/png,image/webp,*/*;q=0.5',
     },
   });

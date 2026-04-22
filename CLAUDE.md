@@ -7,7 +7,7 @@ conventions; don't rediscover them every session.
 
 Estia — a Hebrew-first CRM for Israeli real estate agents. Web app +
 iPhone app (Capacitor WKWebView hitting the same production URL).
-Live at https://estia.tripzio.xyz.
+Live at https://estia.co.il.
 
 ## Tech map
 

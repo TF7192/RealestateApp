@@ -37,7 +37,7 @@ function isConfigured(): boolean {
 }
 
 function redirectUri(): string {
-  const origin = process.env.PUBLIC_ORIGIN || 'https://estia.tripzio.xyz';
+  const origin = process.env.PUBLIC_ORIGIN || 'https://estia.co.il';
   return `${origin}/api/integrations/calendar/callback`;
 }
 

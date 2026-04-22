@@ -7,27 +7,27 @@ import {
 
 describe('buildPopoutUrl', () => {
   it('adds popout=1 to a URL with no query string', () => {
-    expect(buildPopoutUrl('https://estia.tripzio.xyz/properties/abc')).toBe(
-      'https://estia.tripzio.xyz/properties/abc?popout=1',
+    expect(buildPopoutUrl('https://estia.co.il/properties/abc')).toBe(
+      'https://estia.co.il/properties/abc?popout=1',
     );
   });
 
   it('appends popout=1 alongside existing query params', () => {
-    const out = buildPopoutUrl('https://estia.tripzio.xyz/customers/x?tab=notes');
+    const out = buildPopoutUrl('https://estia.co.il/customers/x?tab=notes');
     const u = new URL(out);
     expect(u.searchParams.get('tab')).toBe('notes');
     expect(u.searchParams.get('popout')).toBe('1');
   });
 
   it('leaves other query params untouched when popout is already set', () => {
-    const out = buildPopoutUrl('https://estia.tripzio.xyz/owners/1?popout=1&foo=bar');
+    const out = buildPopoutUrl('https://estia.co.il/owners/1?popout=1&foo=bar');
     const u = new URL(out);
     expect(u.searchParams.get('popout')).toBe('1');
     expect(u.searchParams.get('foo')).toBe('bar');
   });
 
   it('preserves the URL hash', () => {
-    const out = buildPopoutUrl('https://estia.tripzio.xyz/properties/abc#hero');
+    const out = buildPopoutUrl('https://estia.co.il/properties/abc#hero');
     expect(out.endsWith('#hero')).toBe(true);
     expect(new URL(out).searchParams.get('popout')).toBe('1');
   });

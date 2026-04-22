@@ -98,7 +98,7 @@ export async function build() {
         'http://localhost:5173',
         'http://localhost:6001',
         'http://127.0.0.1:6001',
-        'https://estia.tripzio.xyz',
+        'https://estia.co.il',
       ].filter(Boolean);
       if (!origin || allowed.includes(origin)) return cb(null, true);
       cb(null, false);

@@ -94,7 +94,7 @@ Two workflows at `.github/workflows/`:
 - Pre-deploy gate: backend typecheck + frontend build run on the GitHub runner before touching EC2.
 - Managed-secrets patch: selectively rewrites `GOOGLE_CLIENT_ID/SECRET`, `PUBLIC_ORIGIN`, `POSTHOG_*` lines in `/home/ec2-user/estia-new/.env`; leaves `DATABASE_URL`, `JWT_SECRET`, etc. untouched.
 - Concurrency group `estia-prod` with `cancel-in-progress: false` — deploys serialize, no mid-flight kills. Good.
-- Healthcheck polls `https://estia.tripzio.xyz/api/health` 5× with 5s between.
+- Healthcheck polls `https://estia.co.il/api/health` 5× with 5s between.
 
 **What it does well**
 - Pre-deploy typecheck/build gate is the right instinct.
@@ -127,7 +127,7 @@ Cannot read the Actions tab from here. Flag for the first draft: **measure curre
   - `/api/` → `127.0.0.1:6002` (backend container)
   - `/uploads/` → `127.0.0.1:6002/uploads/`
   - `/` → `127.0.0.1:3001` (frontend container, nginx serving Vite dist)
-- Domain `estia.tripzio.xyz` (A record → the EIP).
+- Domain `estia.co.il` (A record → the EIP).
 - Shared host with the sibling `tripzio.xyz` Tripzio API (port 8000) — CI/CD changes should be careful not to disrupt it.
 - **Database**: AWS RDS Postgres 16, `db.t4g.micro`, single-AZ, not publicly accessible; SG lets only the EC2 SG in on 5432. Backups 7d retention.
 - **Uploads / DB backups**: S3 `s3://estia-prod` in eu-north-1. IAM instance profile `estia-prod-app` grants scoped access — no keys on disk.
@@ -135,7 +135,7 @@ Cannot read the Actions tab from here. Flag for the first draft: **measure curre
 - **Budget**: `estia-monthly-40usd` budget, 80% alert to `talfuks1234@gmail.com`.
 
 ### Environments that exist today
-- **prod** — live, `estia.tripzio.xyz`.
+- **prod** — live, `estia.co.il`.
 - **No staging.** No preview environments. No dev environment in AWS (dev is local `npm run dev` + docker-compose.test.yml).
 
 ### Terraform
@@ -149,7 +149,7 @@ Referenced by the existing workflows:
 - `EC2_SSH_KEY` — long-lived private key for `ec2-user` on the EC2.
 - `EC2_USER`, `EC2_HOST` — not really secrets, but stored as such.
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — OAuth creds.
-- `PUBLIC_ORIGIN` — base URL (`https://estia.tripzio.xyz`).
+- `PUBLIC_ORIGIN` — base URL (`https://estia.co.il`).
 - `POSTHOG_PROJECT_API_KEY`, `POSTHOG_HOST` — PostHog frontend telemetry.
 
 **Not in GitHub** (kept on the EC2 `.env`):
@@ -221,7 +221,7 @@ Out of scope for this engagement (flag for follow-up):
 
 1. **Keep npm, or migrate to pnpm?** The `CLAUDE.md` prefers pnpm. Migrating is a separate task with non-trivial blast radius (lockfile, Docker builds, workspace resolution). Default: **stay on npm** unless Adam wants to spend a day on the migration. Pin `.nvmrc` to `20.20.2` and add `"packageManager": "npm@10.x"` to root `package.json` either way.
 2. **ECR vs GHCR** for image registry. ECR is natural given the AWS footprint and pairs with OIDC. Default: **ECR in eu-north-1**.
-3. **Staging on the same EC2 or a second instance?** Default proposal: **same EC2, second compose stack on ports 6003/3002, `staging.estia.tripzio.xyz` subdomain, separate RDS database (or a schema) for test data isolation.** Cheapest; revisit if test data starts contaminating prod patterns.
+3. **Staging on the same EC2 or a second instance?** Default proposal: **same EC2, second compose stack on ports 6003/3002, `staging.estia.co.il` subdomain, separate RDS database (or a schema) for test data isolation.** Cheapest; revisit if test data starts contaminating prod patterns.
 4. **Notifications channel.** Slack? Discord? Plain email to `talfuks1234@gmail.com`? Default: assume Slack if a webhook URL is provided; otherwise email-only until asked.
 5. **Adam's deploy-only-when-asked rule** (memory) — the new pipeline must **NOT auto-deploy to prod on tag push** by default. Staging auto-deploy from `main` is fine. Prod deploy stays gated behind `workflow_dispatch` with an approver. The existing `tags: [v*]` trigger on `deploy.yml` should be removed or changed to push-to-staging-only.
 6. **Branch protection** is currently unknown (can't introspect from here). Assumption: none configured, or only loose. The new pipeline's required checks need to be turned on in GitHub settings after the PR lane lands green once.

@@ -54,10 +54,10 @@ export default function Login() {
     if (isNative()) {
       // Always resolve against the production origin — on native there
       // is no window.location meaningful for this hop; the app bundle
-      // loads from estia.tripzio.xyz and that's where /api lives.
+      // loads from estia.co.il and that's where /api lives.
       const origin = window.location.origin.startsWith('http')
         ? window.location.origin
-        : 'https://estia.tripzio.xyz';
+        : 'https://estia.co.il';
       await Browser.open({
         url: `${origin}/api/auth/google?native=1`,
         presentationStyle: 'popover',

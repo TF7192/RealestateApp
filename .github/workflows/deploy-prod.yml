@@ -187,9 +187,9 @@ jobs:
         run: |
           PASS=0
           for i in 1 2 3 4 5 6; do
-            HEALTH=$(curl -s --max-time 5 https://estia.tripzio.xyz/api/health || true)
-            ROOT=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' https://estia.tripzio.xyz/ || true)
-            AUTH=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' https://estia.tripzio.xyz/api/me || true)
+            HEALTH=$(curl -s --max-time 5 https://estia.co.il/api/health || true)
+            ROOT=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' https://estia.co.il/ || true)
+            AUTH=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' https://estia.co.il/api/me || true)
             echo "attempt $i: /api/health=$HEALTH  /=$ROOT  /api/me=$AUTH"
             if echo "$HEALTH" | grep -q '"ok":true' && [ "$ROOT" = "200" ] && [ "$AUTH" = "401" ]; then
               PASS=1
@@ -235,5 +235,5 @@ jobs:
             ${{ needs.deploy.result == 'success' && 'production deployed & smoke OK' || (needs.deploy.result == 'cancelled' && 'production deploy cancelled' || 'production deploy FAILED') }}
           details: |
             *ref:* `${{ inputs.ref }}` → `${{ needs.resolve.outputs.short }}`
-            *site:* https://estia.tripzio.xyz
+            *site:* https://estia.co.il
             *rollback:* `gh workflow run deploy-prod.yml -f ref=<older-sha> -f skip_build=true`

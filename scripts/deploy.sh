@@ -45,6 +45,6 @@ ssh -i "$KEY" -o StrictHostKeyChecking=no "$USER@$HOST" '
 '
 
 echo "==> healthcheck"
-curl -sf https://estia.tripzio.xyz/api/health && echo "  ✓ API healthy"
+curl -sf https://estia.co.il/api/health && echo "  ✓ API healthy"
 echo "==> frontend bundle:"
-curl -s https://estia.tripzio.xyz/ | grep -oE 'assets/index-[^"]+\.(js|css)' | head -2
+curl -s https://estia.co.il/ | grep -oE 'assets/index-[^"]+\.(js|css)' | head -2

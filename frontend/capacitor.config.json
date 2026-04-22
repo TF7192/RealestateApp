@@ -21,7 +21,7 @@
     "backgroundColor": "#f7f3ec"
   },
   "server": {
-    "url": "https://estia.tripzio.xyz",
+    "url": "https://estia.co.il",
     "cleartext": false,
     "androidScheme": "https",
     "iosScheme": "https",

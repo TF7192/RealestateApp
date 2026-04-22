@@ -130,7 +130,7 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
   // invitee logs in or signs up, auth.ts auto-attaches them to the
   // office and marks the invite accepted.
   function inviteUrl(inviteId: string): string {
-    const origin = process.env.PUBLIC_ORIGIN || 'https://estia.tripzio.xyz';
+    const origin = process.env.PUBLIC_ORIGIN || 'https://estia.co.il';
     return `${origin.replace(/\/$/, '')}/accept-invite?token=${inviteId}`;
   }
 

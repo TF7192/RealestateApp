@@ -51,7 +51,7 @@ cat > /etc/nginx/conf.d/estia.conf <<'NGINX'
 # Filled in by certbot --nginx on first TLS provision
 server {
     listen 80;
-    server_name estia.tripzio.xyz;
+    server_name estia.co.il;
     client_max_body_size 120m;
 
     location /api/ {
@@ -73,7 +73,7 @@ NGINX
 nginx -t && systemctl restart nginx
 
 echo "[6/8] Provisioning Let's Encrypt cert (interactive; needs DNS pointing to this box)"
-echo "      → run manually:  sudo certbot --nginx -d estia.tripzio.xyz --agree-tos -m operator@tripzio.xyz"
+echo "      → run manually:  sudo certbot --nginx -d estia.co.il --agree-tos -m operator@estia.co.il"
 echo "      certbot-renew.timer is enabled by default for auto-renewal."
 
 echo "[7/8] Creating /home/ec2-user/estia-new (target dir for ./scripts/deploy.sh rsync)"
@@ -89,4 +89,4 @@ chmod 644 /etc/cron.d/estia-db-backup
 echo "DONE. Next steps:"
 echo "  1) scp .env to /home/ec2-user/estia-new/.env (chmod 600)"
 echo "  2) cd /home/ec2-user/estia-new && sudo docker compose -f docker-compose.prod.yml up -d"
-echo "  3) sudo certbot --nginx -d estia.tripzio.xyz --agree-tos -m you@example.com"
+echo "  3) sudo certbot --nginx -d estia.co.il --agree-tos -m you@example.com"

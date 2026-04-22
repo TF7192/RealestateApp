@@ -117,7 +117,7 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
         tokenExpiresAt: new Date(Date.now() + PUBLIC_TOKEN_TTL_MS),
       },
     });
-    const origin = process.env.PUBLIC_ORIGIN || 'https://estia.tripzio.xyz';
+    const origin = process.env.PUBLIC_ORIGIN || 'https://estia.co.il';
     return {
       prospect,
       signUrl: `${origin}/public/p/${publicToken}`,

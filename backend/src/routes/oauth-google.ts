@@ -6,10 +6,10 @@
 // Required env:
 //   GOOGLE_CLIENT_ID
 //   GOOGLE_CLIENT_SECRET
-//   PUBLIC_ORIGIN               (e.g. https://estia.tripzio.xyz)
+//   PUBLIC_ORIGIN               (e.g. https://estia.co.il)
 //
 // The authorised redirect URI in the Google Cloud Console must be:
-//   https://estia.tripzio.xyz/api/auth/google/callback
+//   https://estia.co.il/api/auth/google/callback
 //
 // The legacy POST /api/auth/google/mock stays in auth.ts as a dev fallback
 // (see README for how to disable it in production).
@@ -63,7 +63,7 @@ function isConfigured(): boolean {
 }
 
 function redirectUri(): string {
-  const origin = process.env.PUBLIC_ORIGIN || 'https://estia.tripzio.xyz';
+  const origin = process.env.PUBLIC_ORIGIN || 'https://estia.co.il';
   return `${origin}/api/auth/google/callback`;
 }
 

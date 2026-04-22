@@ -1,12 +1,12 @@
 # Estia — AWS Deployment Plan
 
-> Budget-aware, single-VM deployment. Live at `https://estia.tripzio.xyz`.
+> Budget-aware, single-VM deployment. Live at `https://estia.co.il`.
 > Target: ≤ $50/month steady-state. Actual: ~$17/month (Green).
 
 ## Stack
 - **Frontend**: React + Vite, served by nginx in Docker.
 - **Backend**: Fastify + Prisma + PostgreSQL.
-- **Mobile**: Capacitor iOS app loading the same web bundle from `https://estia.tripzio.xyz`.
+- **Mobile**: Capacitor iOS app loading the same web bundle from `https://estia.co.il`.
 - **Storage**: User uploads (property photos / videos) + nightly DB backups → **S3**.
 - **No Redis**: declared in the original compose but **zero references in source code**. Dropped from prod.
 
@@ -14,7 +14,7 @@
 ```
                             ┌─────────────────────────────────────┐
                             │   EC2  t4g.small (eu-north-1)       │
-   estia.tripzio.xyz  ───►  │   nginx (TLS, Let's Encrypt)        │
+   estia.co.il  ───►  │   nginx (TLS, Let's Encrypt)        │
                             │     │                               │
                             │     ├─ frontend  (nginx serving Vite dist)
                             │     └─ backend   (Fastify, port 4000)

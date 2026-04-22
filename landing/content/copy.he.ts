@@ -20,7 +20,7 @@ export const copy = {
     description:
       'CRM מודרני לסוכני נדל״ן בישראל: לקוחות, נכסים, פגישות, AI לתיאורי נכסים והתאמת לידים — בנייד. 30 יום חינם, בלי כרטיס אשראי.',
     og_alt: 'Estia — מערכת ניהול נדל״ן לסוכנים, עם אפליקציה לאייפון ולאנדרואיד.',
-    canonical: 'https://estia.tripzio.xyz/',
+    canonical: 'https://estia.co.il/',
   },
 
   nav: {
@@ -269,7 +269,7 @@ export const copy = {
         title: 'חברה',
         links: [
           // TODO(landing): wire real routes for terms / privacy when drafted.
-          { label: 'צור קשר',       href: 'mailto:hello@estia.tripzio.xyz' },
+          { label: 'צור קשר',       href: 'mailto:hello@estia.co.il' },
           { label: 'תנאי שימוש',    href: '#' },
           { label: 'מדיניות פרטיות', href: '#' },
         ],

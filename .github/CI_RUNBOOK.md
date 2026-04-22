@@ -70,7 +70,7 @@ Actions → Deploy → production → Run workflow
   skip_migrations = false
 ```
 
-Flow: checkout ref → typecheck + build on the runner (pre-deploy gate) → SSH to EC2 → rsync source → patch managed secrets into `.env` → `docker compose build --pull` → `up -d --remove-orphans` → `prisma migrate deploy` → write the SHA to `/home/ec2-user/estia-new/.deployed_sha` → 3-point smoke test against `estia.tripzio.xyz`.
+Flow: checkout ref → typecheck + build on the runner (pre-deploy gate) → SSH to EC2 → rsync source → patch managed secrets into `.env` → `docker compose build --pull` → `up -d --remove-orphans` → `prisma migrate deploy` → write the SHA to `/home/ec2-user/estia-new/.deployed_sha` → 3-point smoke test against `estia.co.il`.
 
 Smoke test asserts:
 - `GET /api/health` → `{"ok":true}`
@@ -112,7 +112,7 @@ Currently required in repo **Settings → Secrets and variables → Actions**:
 | `EC2_HOST` | `ec2-13-49-145-46.eu-north-1.compute.amazonaws.com` | Rarely |
 | `GOOGLE_CLIENT_ID` | OAuth | Google Cloud console |
 | `GOOGLE_CLIENT_SECRET` | OAuth | Google Cloud console |
-| `PUBLIC_ORIGIN` | `https://estia.tripzio.xyz` | n/a |
+| `PUBLIC_ORIGIN` | `https://estia.co.il` | n/a |
 | `POSTHOG_PROJECT_API_KEY` | PostHog public project token | PostHog dashboard |
 | `POSTHOG_HOST` | PostHog ingestion URL | n/a |
 | `SLACK_WEBHOOK_URL` | Incoming webhook for CI notifications (see §5.1) | Regenerate in Slack, replace the secret. |

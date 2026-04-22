@@ -3,7 +3,7 @@
 # What's already running by hand and is OUT OF SCOPE here:
 #   • EC2 t3 instance (i-… in eu-north-1 — see DEPLOYMENT_RUNBOOK.md)
 #   • Elastic IP attached to that instance
-#   • Route 53 A record estia.tripzio.xyz → that IP
+#   • DNS A record estia.co.il → that IP (managed in Cloudflare, proxied)
 #   • Security group allowing 22/80/443
 #
 # To bring those under Terraform later, run:

@@ -145,7 +145,7 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
         include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
       }));
     if (!property) return reply.code(404).send('Not found');
-    const origin = process.env.PUBLIC_ORIGIN || 'https://estia.tripzio.xyz';
+    const origin = process.env.PUBLIC_ORIGIN || 'https://estia.co.il';
     const url = `${origin}/agents/${agentSlug}/${propSlug}`;
     const img = property.images[0]?.url || '';
     const imgAbs = img.startsWith('http') ? img : `${origin}${img}`;
