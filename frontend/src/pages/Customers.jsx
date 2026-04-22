@@ -60,6 +60,7 @@ import { relativeDate } from '../lib/relativeDate';
 import { waUrl, telUrl } from '../lib/waLink';
 import { leadMatchesProperty } from './Properties';
 import CustomerFiltersPanel from '../components/CustomerFiltersPanel';
+import AdvancedFilters from '../components/AdvancedFilters';
 import SavedSearchMenu from '../components/SavedSearchMenu';
 import FavoriteStar from '../components/FavoriteStar';
 import './Customers.css';
@@ -220,6 +221,22 @@ export default function Customers() {
   const [favoriteIds, setFavoriteIds] = useState(() => new Set());
   const [onlyFavorites, setOnlyFavorites] = useState(false);
 
+  // L-A — inline shared <AdvancedFilters> panel ported from the
+  // properties page. Lead-specific fields (category desired,
+  // seriousness) ride along via the `extra` slot. Values live in
+  // `advLeadFilters` + stage into `serverFilters` on Apply / Clear.
+  const [showInlineAdvanced, setShowInlineAdvanced] = useState(false);
+  const [advLeadFilters, setAdvLeadFilters] = useState({
+    city: '',
+    minPrice: null,
+    maxPrice: null,
+    minRooms: '',
+    maxRooms: '',
+    lookingFor: '',   // '' | 'BUY' | 'RENT'
+    seriousness: '',  // '' | 'VERY' | 'MEDIUM' | 'SORT_OF'
+    customerStatus: '', // '' | 'ACTIVE' | 'INACTIVE' | 'COLD'
+  });
+
   const changeView = (v) => {
     setView(v);
     try { localStorage.setItem('estia-customers-view', v); } catch { /* ignore */ }
@@ -328,6 +345,26 @@ export default function Customers() {
       }
       // Sprint 7 B4 — "רק מועדפים" toggle narrows to the starred set.
       if (onlyFavorites && !favoriteIds.has(l.id)) return false;
+
+      // L-A — shared advanced-filter panel (inline). Client-side so
+      // the fetch isn't re-issued on every knob turn; backend filter
+      // drawer (CustomerFiltersPanel) continues to do server-side work
+      // via serverFilters.
+      if (advLeadFilters.city && l.city !== advLeadFilters.city) return false;
+      if (advLeadFilters.lookingFor && l.lookingFor !== advLeadFilters.lookingFor) return false;
+      if (advLeadFilters.seriousness && (l.seriousnessOverride || 'NONE') !== advLeadFilters.seriousness) return false;
+      if (advLeadFilters.customerStatus && (l.customerStatus || 'ACTIVE') !== advLeadFilters.customerStatus) return false;
+      if (advLeadFilters.minPrice != null && (l.budget == null || l.budget < Number(advLeadFilters.minPrice))) return false;
+      if (advLeadFilters.maxPrice != null && (l.budget == null || l.budget > Number(advLeadFilters.maxPrice))) return false;
+      if (advLeadFilters.minRooms !== '' && advLeadFilters.minRooms != null) {
+        const r = parseFloat(l.rooms);
+        if (!Number.isFinite(r) || r < Number(advLeadFilters.minRooms)) return false;
+      }
+      if (advLeadFilters.maxRooms !== '' && advLeadFilters.maxRooms != null) {
+        const r = parseFloat(l.rooms);
+        if (!Number.isFinite(r) || r > Number(advLeadFilters.maxRooms)) return false;
+      }
+
       if (!debouncedSearch) return true;
       const s = debouncedSearch.toLowerCase();
       return (
@@ -336,7 +373,7 @@ export default function Customers() {
         l.phone?.includes(s)
       );
     });
-  }, [leads, lookingForFilter, interestFilter, statusFilter, inactiveFilter, debouncedSearch, onlyFavorites, favoriteIds]);
+  }, [leads, lookingForFilter, interestFilter, statusFilter, inactiveFilter, debouncedSearch, onlyFavorites, favoriteIds, advLeadFilters]);
 
   // Table view keeps the numbered pager; card/dense view uses infinite
   // scroll. Both reset when filters change.
@@ -596,6 +633,7 @@ export default function Customers() {
           </button>
           <div className="view-toggle" role="group" aria-label={t('list.view.ariaLabel')}>
             <button
+              type="button"
               className={`view-toggle-btn ${view === 'cards' ? 'active' : ''}`}
               onClick={() => changeView('cards')}
               title={t('list.view.cardsTitle')}
@@ -604,6 +642,7 @@ export default function Customers() {
               {t('list.view.cards')}
             </button>
             <button
+              type="button"
               className={`view-toggle-btn ${view === 'list' ? 'active' : ''}`}
               onClick={() => changeView('list')}
               title={t('list.view.listTitle')}
@@ -627,6 +666,7 @@ export default function Customers() {
         <div className="filter-breadcrumb animate-in">
           <span>{t('list.filters.incoming.showing', { label: incomingFilterLabel })}</span>
           <button
+            type="button"
             className="fb-clear"
             onClick={() => {
               setStatusFilter('all');
@@ -689,6 +729,7 @@ export default function Customers() {
             ].map((f) => (
               <button
                 key={f.key}
+                type="button"
                 className={`filter-tab ${lookingForFilter === f.key ? 'active' : ''}`}
                 onClick={() => setLookingForFilter(f.key)}
               >
@@ -704,6 +745,7 @@ export default function Customers() {
             ].map((f) => (
               <button
                 key={f.key}
+                type="button"
                 className={`filter-tab ${interestFilter === f.key ? 'active' : ''}`}
                 onClick={() => setInterestFilter(f.key)}
               >
@@ -720,6 +762,7 @@ export default function Customers() {
             ].map((f) => (
               <button
                 key={f.key}
+                type="button"
                 className={`filter-tab ${statusFilter === f.key ? 'active' : ''}`}
                 onClick={() => setStatusFilter(f.key)}
               >
@@ -729,6 +772,89 @@ export default function Customers() {
           </div>
         </div>
       </div>
+
+      {/* L-A — shared AdvancedFilters panel for leads. Same layout the
+          properties page uses (N-11), with lead-specific selects
+          injected via the `extra` slot. `setShowInlineAdvanced`
+          toggles the panel; "נקה סינון" inside the panel clears +
+          collapses it (matches N-12). */}
+      <div className="customers-adv-toggle">
+        <button
+          type="button"
+          className={`btn btn-ghost btn-sm ${showInlineAdvanced ? 'is-active' : ''}`}
+          onClick={() => setShowInlineAdvanced((v) => !v)}
+          aria-expanded={showInlineAdvanced}
+        >
+          <SlidersHorizontal size={14} aria-hidden="true" />
+          <span>{showInlineAdvanced ? 'הסתר סינון מתקדם' : 'סינון מתקדם'}</span>
+        </button>
+      </div>
+      {showInlineAdvanced && (
+        <AdvancedFilters
+          className="animate-in"
+          config={{
+            fields: ['city', 'price', 'rooms'],
+            cities: Array.from(new Set(leads.map((l) => l.city).filter(Boolean))),
+            extra: (
+              <>
+                <div className="form-group">
+                  <label className="form-label">מחפש</label>
+                  <select
+                    className="form-input"
+                    value={advLeadFilters.lookingFor}
+                    onChange={(e) => setAdvLeadFilters((p) => ({ ...p, lookingFor: e.target.value }))}
+                  >
+                    <option value="">הכל</option>
+                    <option value="BUY">קנייה</option>
+                    <option value="RENT">השכרה</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">רצינות</label>
+                  <select
+                    className="form-input"
+                    value={advLeadFilters.seriousness}
+                    onChange={(e) => setAdvLeadFilters((p) => ({ ...p, seriousness: e.target.value }))}
+                  >
+                    <option value="">הכל</option>
+                    <option value="VERY">רציני מאוד</option>
+                    <option value="MEDIUM">בינוני</option>
+                    <option value="SORT_OF">פחות</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">סטטוס לקוח</label>
+                  <select
+                    className="form-input"
+                    value={advLeadFilters.customerStatus}
+                    onChange={(e) => setAdvLeadFilters((p) => ({ ...p, customerStatus: e.target.value }))}
+                  >
+                    <option value="">הכל</option>
+                    <option value="ACTIVE">פעיל</option>
+                    <option value="INACTIVE">לא פעיל</option>
+                    <option value="PAUSED">מוקפא</option>
+                  </select>
+                </div>
+              </>
+            ),
+          }}
+          values={advLeadFilters}
+          onChange={(k, v) => setAdvLeadFilters((p) => ({ ...p, [k]: v }))}
+          onClear={() => {
+            setAdvLeadFilters({
+              city: '',
+              minPrice: null,
+              maxPrice: null,
+              minRooms: '',
+              maxRooms: '',
+              lookingFor: '',
+              seriousness: '',
+              customerStatus: '',
+            });
+            setShowInlineAdvanced(false);
+          }}
+        />
+      )}
 
       {view === 'list' ? (
         <CustomerList
@@ -1256,6 +1382,7 @@ export default function Customers() {
               <div className="customer-card-footer cc-v2-footer">
                 <div className="customer-dates">
                   <button
+                    type="button"
                     className="cc-last-contact"
                     title={lead.lastContact ? absoluteTime(lead.lastContact) : t('list.card.lastContactTitle')}
                     onClick={() => patchLead(lead.id, { lastContact: new Date().toISOString() }, { success: t('list.patchSuccess.lastContactUpdated') })}
@@ -1293,6 +1420,7 @@ export default function Customers() {
                     <span className="hide-sm">{lead.phone}</span>
                   </a>
                   <button
+                    type="button"
                     className="btn btn-ghost btn-sm"
                     onClick={() => setOverflowLead(lead)}
                     title={t('list.card.moreActions')}
@@ -1641,10 +1769,10 @@ function CustomerList({
                     >
                       <WhatsAppIcon size={13} className="wa-green" />
                     </a>
-                    <button className="cl-btn" title={t('list.table.editTitle')} onClick={() => onEdit(lead)}>
+                    <button type="button" className="cl-btn" title={t('list.table.editTitle')} onClick={() => onEdit(lead)}>
                       <Edit3 size={13} />
                     </button>
-                    <button className="cl-btn danger" title={t('list.table.deleteTitle')} onClick={() => onDelete(lead)}>
+                    <button type="button" className="cl-btn danger" title={t('list.table.deleteTitle')} onClick={() => onDelete(lead)}>
                       <Trash2 size={13} />
                     </button>
                   </td>
@@ -1727,10 +1855,10 @@ function CustomerList({
               >
                 <WhatsAppIcon size={13} className="wa-green" />
               </a>
-              <button className="cl-btn" title={t('list.table.editTitle')} onClick={() => onEdit(lead)}>
+              <button type="button" className="cl-btn" title={t('list.table.editTitle')} onClick={() => onEdit(lead)}>
                 <Edit3 size={13} />
               </button>
-              <button className="cl-btn danger" title={t('list.table.deleteTitle')} onClick={() => onDelete(lead)}>
+              <button type="button" className="cl-btn danger" title={t('list.table.deleteTitle')} onClick={() => onDelete(lead)}>
                 <Trash2 size={13} />
               </button>
             </span>
@@ -1774,6 +1902,7 @@ function StatusPicker({ lead, onChange }) {
   return (
     <div className="status-picker" ref={wrapRef}>
       <button
+        type="button"
         className={`badge ${statusBadgeClass(lead.status)} status-badge-btn`}
         onClick={() => setOpen((v) => !v)}
         title={lead.statusExplanation || t('list.status.change')}
@@ -1795,6 +1924,7 @@ function StatusPicker({ lead, onChange }) {
           {['HOT', 'WARM', 'COLD'].map((s) => (
             <button
               key={s}
+              type="button"
               role="menuitem"
               className={`status-menu-item ${lead.status === s ? 'active' : ''}`}
               onClick={async () => {
@@ -1888,7 +2018,7 @@ function StatusInfoSheet({ lead, onClose, onChange }) {
         <div className="mpk-handle" />
         <header className="mpk-head">
           <h3>{t('list.statusSheet.title')}</h3>
-          <button className="mpk-close" onClick={onClose} aria-label={t('list.statusSheet.close')}>
+          <button type="button" className="mpk-close" onClick={onClose} aria-label={t('list.statusSheet.close')}>
             <X size={18} />
           </button>
         </header>
@@ -1920,7 +2050,7 @@ function StatusInfoSheet({ lead, onClose, onChange }) {
             </button>
           ))}
         </div>
-        <button className="mpk-cancel" onClick={onClose}>{t('list.statusSheet.cancel')}</button>
+        <button type="button" className="mpk-cancel" onClick={onClose}>{t('list.statusSheet.cancel')}</button>
       </div>
     </div>
   );
@@ -1988,7 +2118,7 @@ function FilterSheet({
         <div className="mpk-handle" />
         <header className="mpk-head">
           <h3>{t('list.filterSheet.title')}</h3>
-          <button className="mpk-close" onClick={onClose} aria-label={t('list.filterSheet.close')}>
+          <button type="button" className="mpk-close" onClick={onClose} aria-label={t('list.filterSheet.close')}>
             <X size={18} />
           </button>
         </header>

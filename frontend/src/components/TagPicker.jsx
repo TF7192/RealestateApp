@@ -35,7 +35,14 @@ export default function TagPicker({ entityType, entityId, readonly = false, onCh
   const btnRef = useRef(null);
 
   const refresh = useCallback(async () => {
-    if (!entityId) return;
+    // L-9 — without an entityId we can't fetch assignments; exit the
+    // loading state so the picker shows its empty UI instead of a
+    // perpetual spinner (matches P-9 for RemindersPanel).
+    if (!entityId) {
+      setAssigned([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [catalog, assignedRes] = await Promise.all([

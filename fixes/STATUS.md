@@ -39,8 +39,21 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
 | F-2 | Chat vs FAB overlap | Sub-2 | 🟢 | — | ✅ | ✅ (visual) | pending | FAB lifted to 84px; chat at 28/72px |
 | N-1..N-17 | Assets list polish | Sub-3 | 🟢 | ✅ | ✅ | ✅ (unit + e2e spec) | pending | 17/17 tasks shipped; 28 new unit + 3 Playwright baseline specs |
 | P-1..P-15 | Asset detail polish | Sub-4 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | 14 tasks shipped (P-8 not in scope); 31 new vitest cases; P-3 wires backend PDF route + new `PropertyAgreementsSection` |
-| O-1..O-10 | Owners | Sub-5 | ⚪ | — | — | — | — | |
-| L-1..L-13 | Leads | Sub-5 | ⚪ | — | — | — | — | |
+| O-3 | Owner-picker close button visual | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | explicit size/bg/color + focus ring |
+| O-7 | Phone normalization across owner surfaces | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | formatPhone on Owners.jsx, OwnerPicker, OwnerDetail |
+| O-8 | OwnerPhonesPanel delete refetch | Sub-5 | 🟢 | — | ✅ | ✅ (reviewed) | pending | confirmed existing await load() already refetches |
+| O-9 | שלח בוואטסאפ target=_blank | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | desktop toolbar + sticky bar both converted to <a target=_blank> |
+| O-1, O-2, O-4, O-5, O-6, O-10 | Owner form focus / card unification / region autocomplete / bulk actions / universal card | Sub-5 | ❓ | — | — | — | — | deferred — needs product review on expandable single-card flow; O-1 focus-loss not reproducible in current OwnerEditDialog (all SmartFields are module-scope) |
+| L-2 | Customers buttons missing type=button | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | added type="button" to all 17 bare <button> entries |
+| L-3 | Seriousness chip focus steal | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | same fix as L-2 + MobilePickers close/cancel buttons |
+| L-4 | Duplicate firstName/lastName | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | removed k1-first / k1-last inputs |
+| L-8 | Remove "הוסף תיאור קצר" | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | removed k1-desc description input |
+| L-9 | Panels loading forever | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | MatchingList + TagPicker exit loading on missing anchor; inline retry on MatchingList |
+| L-10 | Meeting "Not Found" error | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | specific 404/401/403 copy in LeadMeetingDialog |
+| L-11 | Meeting notes font/RTL | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | dir=rtl + font-body on textarea + CSS override |
+| L-13 | Lead edit "invalid data" | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | email regex guard + Math.round on budget; CustomerEditDialog + CustomerDetail |
+| L-A | Advanced filter port | Sub-5 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | shared <AdvancedFilters> inline on Customers.jsx with lead-specific extras |
+| L-1, L-5, L-6, L-7, L-12 | Street autocomplete / card layout / WA button / card-click / inline-edit → edit button | Sub-5 | ❓ | — | — | — | — | deferred — structural layout changes; L-1 server-side cache already in place for /api/geo/search (N-17) |
 | E-1 | צור עסקה button + Deal model | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit + integration spec + E2E spec) | pending | Additive Prisma migration (buyerId/sellerId/closeDate + CLOSED/CANCELLED); runMutation save; creation dialog with Lead/Owner/Property pickers |
 | E-2 | Chip label order (count first) | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit + E2E spec) | pending | `<span>{count}</span>{label}` |
 | E-3 | Deals table view | Sub-6 | 🟢 | ✅ | ✅ | ✅ (unit) | pending | ViewToggle + DataTable; `useViewMode('deals')` persistence |
@@ -274,3 +287,66 @@ Session: 2026-04-22. Lead: Adam (TF7192) · Executor: Claude (main thread).
   - Pre-existing failures (SellerCalculator, yad2ScanStore,
     VoiceCaptureFab review-dialog, Yad2ScanBanner close) were already
     failing on this worktree before this lane started — unchanged.
+- **2026-04-22T22:35Z** — Sub-5 lane partial ship (Owners + Leads + L-A):
+  - **O-3** `OwnerPicker.css` — explicit size + background + color + border
+    + `:focus-visible` ring on `.owner-picker-close` so the X renders
+    consistently across themes instead of inheriting only `.btn-ghost`.
+  - **O-7** `formatPhone` imported into `Owners.jsx`, `OwnerPicker.jsx`,
+    `OwnerDetail.jsx` and applied everywhere an owner phone is shown
+    (card, row, table cell, toolbar title). Call/SMS `href={telUrl(…)}`
+    still feeds raw digits to the device dialer.
+  - **O-8** Verified — the existing `OwnerPhonesPanel.confirmDelete`
+    already calls `await load()` after `deleteOwnerPhone`, mirroring the
+    `runMutation → reload` contract. No code change required.
+  - **O-9** `OwnerDetail.jsx` — both the desktop toolbar and the mobile
+    StickyActionBar WhatsApp affordances are now `<a target="_blank"
+    rel="noopener noreferrer" href={waUrl(...)}>` instead of buttons
+    wired to `openWhatsApp()`. Keeps the Estia session intact when the
+    user taps out to WhatsApp Web.
+  - **L-2 / L-3** `Customers.jsx` + `MobilePickers.jsx` — every bare
+    `<button>` inside the page now declares `type="button"` explicitly.
+    17 buttons updated. Segmented / RoomsChips already had the attribute.
+  - **L-4** `NewLead.jsx` — removed the duplicate `שם פרטי` / `שם משפחה`
+    inputs from the `פרטים מורחבים` section. The single "שם מלא" at the
+    top of the form is the canonical name.
+  - **L-8** `NewLead.jsx` — removed the `הוסף תיאור קצר` (`k1-desc`)
+    input. `הערות` textarea is the one free-form field.
+  - **L-9** `MatchingList.jsx` + `TagPicker.jsx` — exit `loading` state
+    when their anchor prop (leadId / propertyId / entityId) is missing
+    so the UI shows an empty state instead of spinning forever. Inline
+    `נסה שוב` retry button added to MatchingList's error state.
+  - **L-10** `LeadMeetingDialog.jsx` — translate the bare `404 "Not
+    Found"` into a Hebrew actionable message; also branches on
+    401/403 for "no permission" and falls through to the original
+    message otherwise.
+  - **L-11** `LeadMeetingDialog.jsx` + `.css` — notes textarea now
+    `dir="rtl" lang="he"` + forces `font-family: var(--font-body)` +
+    `unicode-bidi: plaintext` via `.lmd-textarea-he`. Fixes backwards
+    Hebrew on macOS themes where the dialog's default inherited a
+    LTR-only font stack.
+  - **L-13** `CustomerEditDialog.jsx` + `CustomerDetail.jsx` — coerce
+    the edit payload so zod on the server doesn't reject it. Half-typed
+    emails become `null` via a `/.+@.+\..+/` regex guard; budget goes
+    through `Math.round(Number(...))`; `rooms` and `name`/`phone` are
+    trimmed.
+  - **L-A** `Customers.jsx` + `Customers.css` — inline `<AdvancedFilters>`
+    panel (the shared component from N-11). `fields: ['city', 'price',
+    'rooms']` + lead-specific `extra` slot exposing `מחפש`, `רצינות`,
+    `סטטוס לקוח` selects. Wired into the page's client-side `filtered`
+    memo. "נקה סינון" resets + collapses the panel (matches N-12).
+  - Tests: 20 new passing vitest cases in
+    `tests/unit/frontend/owners-leads-fixes.test.js`. Full
+    `unit-frontend`: 222/226 (4 pre-existing worktree-env failures
+    unchanged — `api.test.js` + `sec-user-scoped-stores.test.js`
+    blocked by `posthog-js` missing from node_modules).
+  - Deferred (flagged ❓): O-1 (not reproducible — OwnerEditDialog has
+    no nested inner components and SmartFields are module-scope),
+    O-2 / O-4 / O-10 (single-expandable-card UX — needs product
+    review), O-5 (region autocomplete cache — N-17 already ships the
+    shared server-side `lruTtlCache` so this is partly there),
+    O-6 (owner bulk-actions toolbar — properties-style bulk bar port),
+    L-1 (street cache — same N-17 backend cache covers it),
+    L-5 / L-6 (card layout/WA button consistency — visual polish),
+    L-7 (entire-card-clickable — requires wrapping structure in
+    `<Link>`), L-12 (inline-edit → edit button — replaces current
+    inline pattern).

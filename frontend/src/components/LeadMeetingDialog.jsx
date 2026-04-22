@@ -71,8 +71,16 @@ export default function LeadMeetingDialog({ lead, onClose, onCreated }) {
       onCreated?.(res.meeting);
       onClose?.();
     } catch (e) {
+      // L-10 — the backend used to surface a bare "Not Found" when the
+      // lead or the calendar endpoint was unreachable. Translate it
+      // into a Hebrew-first, actionable message so agents know whether
+      // to retry, reconnect their calendar, or ping support.
       if (e?.data?.error?.code === 'calendar_not_connected') {
         setErr('Google Calendar לא מחובר — אפשר לבטל את הסנכרון ולשמור מקומית, או להתחבר בעמוד הפרופיל');
+      } else if (e?.status === 404 || /not\s*found/i.test(e?.message || '')) {
+        setErr('לא הצלחנו לקבוע את הפגישה — רענן את הדף ונסה שוב. אם זה חוזר, צור קשר עם התמיכה.');
+      } else if (e?.status === 401 || e?.status === 403) {
+        setErr('אין הרשאה ליצור פגישה לליד הזה. נסה להתחבר מחדש.');
       } else {
         setErr(e?.message || 'השמירה נכשלה');
       }
@@ -168,10 +176,14 @@ export default function LeadMeetingDialog({ lead, onClose, onCreated }) {
 
             <div className="lmd-field">
               <label>הערות</label>
+              {/* L-11 — force RTL + the app's Hebrew body font; previously
+                  this inherited the meeting dialog's mono/LTR default and
+                  showed Hebrew text backwards on some macOS themes. */}
               <textarea
-                className="lmd-textarea"
+                className="lmd-textarea lmd-textarea-he"
                 rows={3}
-                dir="auto"
+                dir="rtl"
+                lang="he"
                 autoCapitalize="sentences"
                 value={form.notes}
                 onChange={(e) => update('notes', e.target.value)}

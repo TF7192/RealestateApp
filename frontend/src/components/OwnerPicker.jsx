@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, X, UserPlus, Phone, Mail, Building2 } from 'lucide-react';
 import api from '../lib/api';
+import { formatPhone } from '../lib/phone';
 import Portal from './Portal';
 import OwnerEditDialog from './OwnerEditDialog';
 import { useViewportMobile } from '../hooks/mobile';
@@ -217,7 +218,7 @@ function OwnerPickerPanel({ onClose, sheetClass, isMobile, inputRef, q, setQ, lo
                   <strong>{o.name}</strong>
                   <div className="owner-picker-meta-sub">
                     {o.phone && (
-                      <span className="owner-picker-phone"><Phone size={11} />{o.phone}</span>
+                      <span className="owner-picker-phone"><Phone size={11} />{formatPhone(o.phone)}</span>
                     )}
                     {o.email && (
                       <span className="owner-picker-email"><Mail size={11} />{o.email}</span>

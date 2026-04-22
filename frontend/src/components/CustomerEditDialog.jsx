@@ -45,17 +45,31 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
     setBusy(true);
     setErr(null);
     try {
+      // L-13 — the backend's lead zod schema rejects non-integer
+      // budgets (`z.number().int()`) and email strings that don't pass
+      // `z.string().email()`. Coerce / drop client-side so a user who
+      // left a half-typed email doesn't see a bare "invalid data" from
+      // the server. `rooms` is a free-text string server-side; coerce
+      // to trimmed string or null.
+      const normalizedEmail =
+        typeof form.email === 'string' && form.email.trim()
+          ? form.email.trim()
+          : null;
+      const isLikelyEmail = normalizedEmail && /.+@.+\..+/.test(normalizedEmail);
+      const budgetNum = form.budget != null && form.budget !== ''
+        ? Math.max(0, Math.round(Number(form.budget)))
+        : null;
       const body = {
-        name: form.name,
-        phone: form.phone,
-        email: form.email || null,
+        name: form.name?.trim() || '',
+        phone: form.phone?.trim() || '',
+        email: isLikelyEmail ? normalizedEmail : null,
         interestType: form.interestType,
         lookingFor: form.lookingFor,
         city: form.city || null,
         street: form.street || null,
-        rooms: form.rooms || null,
+        rooms: (form.rooms && String(form.rooms).trim()) || null,
         priceRangeLabel: form.priceRangeLabel || null,
-        budget: form.budget != null && form.budget !== '' ? Number(form.budget) : null,
+        budget: Number.isFinite(budgetNum) ? budgetNum : null,
         sector: form.sector || null,
         schoolProximity: form.schoolProximity || null,
         balconyRequired: form.balconyRequired,

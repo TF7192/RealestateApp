@@ -24,7 +24,8 @@ import OwnerPhonesPanel from '../components/OwnerPhonesPanel';
 import { inputPropsForName, inputPropsForEmail, inputPropsForNotes } from '../lib/inputProps';
 import { useToast } from '../lib/toast';
 import { useViewportMobile } from '../hooks/mobile';
-import { telUrl } from '../lib/waLink';
+import { telUrl, waUrl } from '../lib/waLink';
+import { formatPhone } from '../lib/phone';
 import { openWhatsApp } from '../native/share';
 import { relativeDate } from '../lib/relativeDate';
 import haptics from '../lib/haptics';
@@ -135,7 +136,7 @@ export default function OwnerDetail() {
         <div className="od-toolbar-actions">
           {owner.phone && (
             <>
-              <a href={telUrl(owner.phone)} className="btn btn-secondary btn-sm" title={owner.phone}>
+              <a href={telUrl(owner.phone)} className="btn btn-secondary btn-sm" title={formatPhone(owner.phone)}>
                 <Phone size={14} />
                 התקשר
               </a>
@@ -147,15 +148,23 @@ export default function OwnerDetail() {
                 <MessageSquare size={14} />
                 SMS
               </a>
-              <button
-                type="button"
-                onClick={() => openWhatsApp({ phone: owner.phone, text: `שלום ${owner.name}` })}
+              {/* O-9 — WhatsApp links must open in a new tab so the agent
+                  doesn't lose the Estia session. An <a target="_blank">
+                  survives Capacitor WebView navigation (wa.me is
+                  recognized by the URL-handler bridge) and lets the web
+                  browser open a fresh tab instead of replacing the
+                  current one. */}
+              <a
+                href={waUrl(owner.phone, `שלום ${owner.name}`)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="btn btn-secondary btn-sm"
                 title="שלח בוואטסאפ"
+                onClick={() => haptics.tap()}
               >
                 <WhatsAppIcon size={14} className="wa-green" />
                 שלח בוואטסאפ
-              </button>
+              </a>
             </>
           )}
           {owner.email && (
@@ -228,18 +237,17 @@ export default function OwnerDetail() {
             <Phone size={18} />
             <span>התקשר</span>
           </a>
-          <button
-            type="button"
+          <a
+            href={waUrl(owner.phone, `שלום ${owner.name}`)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="btn btn-primary"
-            onClick={() => {
-              haptics.tap();
-              openWhatsApp({ phone: owner.phone, text: `שלום ${owner.name}` });
-            }}
+            onClick={() => haptics.tap()}
             aria-label={`וואטסאפ ל${owner.name}`}
           >
             <WhatsAppIcon size={18} />
             <span>שלח בוואטסאפ</span>
-          </button>
+          </a>
           <a
             href={`sms:${owner.phone}`}
             className="btn btn-secondary"

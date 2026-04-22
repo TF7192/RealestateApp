@@ -185,7 +185,7 @@ export function SuggestPicker({
               <div className="mpk-handle" />
               <header className="mpk-head">
                 <h3>{label || placeholder || 'בחר'}</h3>
-                <button className="mpk-close" onClick={() => setOpen(false)} aria-label="סגור">
+                <button type="button" className="mpk-close" onClick={() => setOpen(false)} aria-label="סגור">
                   <X size={18} />
                 </button>
               </header>
@@ -207,6 +207,7 @@ export function SuggestPicker({
               <div className="mpk-body">
                 {q && !filtered.some((o) => o === q) && (
                   <button
+                    type="button"
                     className="mpk-row mpk-row-custom"
                     onClick={() => {
                       onChange?.(q);
@@ -289,7 +290,7 @@ export function OverflowSheet({ open, onClose, title, actions = [] }) {
               );
             })}
           </div>
-          <button className="mpk-cancel" onClick={onClose}>ביטול</button>
+          <button type="button" className="mpk-cancel" onClick={onClose}>ביטול</button>
         </div>
       </div>
     </Portal>
