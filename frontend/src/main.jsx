@@ -5,6 +5,11 @@ import { ThemeProvider } from './lib/theme.jsx';
 import { ToastProvider } from './lib/toast.jsx';
 import './index.css';
 import './styles/print.css';
+// i18n must init before the first React render so useTranslation() has
+// resources on the initial paint. The module is side-effecty — importing
+// it calls i18n.init(). Default language is Hebrew; English stubs load
+// alongside. See frontend/src/i18n/index.js for the resource map.
+import './i18n';
 import App from './App.jsx';
 import { initAnalytics } from './lib/analytics.js';
 

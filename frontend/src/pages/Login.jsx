@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { LogIn, Building2, Mail, Lock, ArrowLeft, UserPlus } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { isNative } from '../native/platform';
@@ -8,14 +9,10 @@ import './Login.css';
 
 const AGENT_IMG = 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=900&q=80';
 
-const agentFeatures = [
-  'ניהול נכסים ובלעדיויות',
-  'מעקב לידים, קונים ועסקאות',
-  'שיווק ושיתוף נכסים',
-  'דפי נכס ללקוחות',
-];
+const FEATURE_KEYS = ['properties', 'leads', 'marketing', 'customerView'];
 
 export default function Login() {
+  const { t } = useTranslation('auth');
   const { login, signup } = useAuth();
   const [searchParams] = useSearchParams();
   // Landing-page CTAs send `?flow=signup` so visitors arriving from the
@@ -74,7 +71,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       if (flow === 'email-signup') {
-        if (form.password.length < 8) throw new Error('הסיסמה צריכה להיות באורך 8 תווים לפחות');
+        if (form.password.length < 8) throw new Error(t('errors.passwordTooShort'));
         await signup({
           email: form.email,
           password: form.password,
@@ -86,7 +83,7 @@ export default function Login() {
         await login({ email: form.email, password: form.password });
       }
     } catch (err) {
-      setError(err.message || (flow === 'email-signup' ? 'הרשמה נכשלה' : 'התחברות נכשלה'));
+      setError(err.message || t(flow === 'email-signup' ? 'errors.signupFailed' : 'errors.loginFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -115,38 +112,32 @@ export default function Login() {
               <h1>Estia</h1>
             </div>
 
-            <h2 className="login-tagline">מערכת ניהול נדל״ן</h2>
+            <h2 className="login-tagline">{t('tagline')}</h2>
 
             <div className="login-features-list">
-              {agentFeatures.map((f, i) => (
+              {FEATURE_KEYS.map((key, i) => (
                 <div
-                  key={f}
+                  key={key}
                   className="login-feature-item"
                   style={{ animationDelay: `${0.4 + i * 0.1}s` }}
                 >
                   <div className="feature-line" />
-                  <span>{f}</span>
+                  <span>{t(`features.${key}`)}</span>
                 </div>
               ))}
             </div>
 
             <div className="login-brand-badge">
               <Building2 size={14} />
-              <span>ממשק סוכנים</span>
+              <span>{t('badge')}</span>
             </div>
           </div>
         </div>
 
         <div className="login-form-panel">
           <div className="login-form-header">
-            <h2>
-              {flow === 'email-signup' ? 'הרשמה כסוכן' : 'כניסה למערכת'}
-            </h2>
-            <p>
-              {flow === 'email-signup'
-                ? 'צרו חשבון חדש — כך תתחילו'
-                : 'נהלו את הנכסים, הלידים והעסקאות שלכם'}
-            </p>
+            <h2>{t(flow === 'email-signup' ? 'titles.signup' : 'titles.login')}</h2>
+            <p>{t(flow === 'email-signup' ? 'subtitles.signup' : 'subtitles.login')}</p>
           </div>
 
           {!flow && (
@@ -158,11 +149,11 @@ export default function Login() {
                   <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                   <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                 </svg>
-                <span>כניסה עם Google</span>
+                <span>{t('buttons.google')}</span>
               </button>
 
               <div className="auth-divider">
-                <span>או</span>
+                <span>{t('divider')}</span>
               </div>
 
               <button
@@ -170,7 +161,7 @@ export default function Login() {
                 onClick={() => setFlow('email-login')}
               >
                 <Mail size={20} />
-                <span>כניסה עם אימייל וסיסמה</span>
+                <span>{t('buttons.emailLogin')}</span>
               </button>
 
               <button
@@ -178,7 +169,7 @@ export default function Login() {
                 onClick={() => setFlow('email-signup')}
               >
                 <UserPlus size={20} />
-                <span>יצירת חשבון חדש</span>
+                <span>{t('buttons.emailSignup')}</span>
               </button>
 
               {error && <div className="auth-error">{error}</div>}
@@ -193,13 +184,13 @@ export default function Login() {
                 onClick={() => { setFlow(null); setError(''); }}
               >
                 <ArrowLeft size={16} />
-                חזור
+                {t('buttons.back')}
               </button>
 
               {flow === 'email-signup' && (
                 <>
                   <div className="form-group">
-                    <label className="form-label">שם מלא</label>
+                    <label className="form-label">{t('fields.displayName')}</label>
                     <input
                       type="text"
                       autoComplete="name"
@@ -207,14 +198,14 @@ export default function Login() {
                       autoCorrect="off"
                       enterKeyHint="next"
                       className="form-input"
-                      placeholder="יוסי כהן"
+                      placeholder={t('placeholders.displayName')}
                       value={form.displayName}
                       onChange={(e) => update('displayName', e.target.value)}
                       required
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">טלפון (אופציונלי)</label>
+                    <label className="form-label">{t('fields.phone')}</label>
                     <input
                       type="tel"
                       inputMode="tel"
@@ -222,7 +213,7 @@ export default function Login() {
                       enterKeyHint="next"
                       dir="ltr"
                       className="form-input"
-                      placeholder="050-1234567"
+                      placeholder={t('placeholders.phone')}
                       value={form.phone}
                       onChange={(e) => update('phone', e.target.value)}
                     />
@@ -231,7 +222,7 @@ export default function Login() {
               )}
 
               <div className="form-group">
-                <label className="form-label">אימייל</label>
+                <label className="form-label">{t('fields.email')}</label>
                 <input
                   type="email"
                   inputMode="email"
@@ -242,7 +233,7 @@ export default function Login() {
                   enterKeyHint="next"
                   dir="ltr"
                   className="form-input"
-                  placeholder="you@example.com"
+                  placeholder={t('placeholders.email')}
                   value={form.email}
                   onChange={(e) => update('email', e.target.value)}
                   required
@@ -253,14 +244,19 @@ export default function Login() {
               <div className="form-group">
                 <label className="form-label">
                   <Lock size={13} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
-                  סיסמה {flow === 'email-signup' && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>(8 תווים לפחות)</span>}
+                  {t('fields.password')}{' '}
+                  {flow === 'email-signup' && (
+                    <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                      {t('fields.passwordHint')}
+                    </span>
+                  )}
                 </label>
                 <input
                   type="password"
                   autoComplete={flow === 'email-signup' ? 'new-password' : 'current-password'}
                   enterKeyHint="go"
                   className="form-input"
-                  placeholder="••••••••"
+                  placeholder={t('placeholders.password')}
                   value={form.password}
                   onChange={(e) => update('password', e.target.value)}
                   required
@@ -277,25 +273,23 @@ export default function Login() {
               >
                 {flow === 'email-signup' ? <UserPlus size={18} /> : <LogIn size={18} />}
                 {submitting
-                  ? 'רק רגע…'
-                  : flow === 'email-signup'
-                  ? 'יצירת חשבון'
-                  : 'כניסה'}
+                  ? t('shared:buttons.justAMoment')
+                  : t(flow === 'email-signup' ? 'buttons.submitSignup' : 'buttons.submitLogin')}
               </button>
 
               <div className="auth-switch">
                 {flow === 'email-login' ? (
                   <>
-                    אין חשבון?{' '}
+                    {t('switch.noAccount')}{' '}
                     <button type="button" onClick={() => { setFlow('email-signup'); setError(''); }}>
-                      להרשמה
+                      {t('switch.toSignup')}
                     </button>
                   </>
                 ) : (
                   <>
-                    כבר יש חשבון?{' '}
+                    {t('switch.hasAccount')}{' '}
                     <button type="button" onClick={() => { setFlow('email-login'); setError(''); }}>
-                      לכניסה
+                      {t('switch.toLogin')}
                     </button>
                   </>
                 )}
@@ -304,7 +298,7 @@ export default function Login() {
           )}
 
           <div className="login-footer">
-            <span>© 2025 Estia · מערכת לסוכני נדל״ן</span>
+            <span>{t('footer')}</span>
           </div>
         </div>
       </div>
