@@ -22,9 +22,14 @@
 }
 
 .ss-menu-pop {
-  position: absolute;
-  top: calc(100% + 6px);
-  inset-inline-start: 0;
+  /* Originally `position: absolute` inside `.ss-menu`, which meant the
+   * popover lived in whatever stacking context its ancestor created —
+   * and `.sticky-search` (z-index: 40) consistently won on /properties.
+   * `position: fixed` pulls the popover out of the ancestor stacking
+   * context entirely so a high z-index beats any page chrome. The
+   * trigger's geometry is applied inline from JSX via getBoundingClientRect
+   * (see SavedSearchMenu.jsx — position is set via style when open). */
+  position: fixed;
   min-width: 280px;
   max-width: 360px;
   max-height: 60vh;
@@ -34,20 +39,18 @@
   border-radius: 10px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
   padding: 10px;
-  /* N-6 — bump above the sticky search input + filter bar (both sit
-   * around z-index 10–20 depending on the host page). Keeping below the
-   * modal stack (z-index 900+) so dialogs still win. */
-  z-index: 120;
+  /* Well above .sticky-search (40), .bulk-bar (950 only renders in
+   * select-mode), and below the modal/dialog layer (1100+). */
+  z-index: 1000;
   animation: ss-menu-in 140ms ease;
 }
 
-/* Containing element forms its own stacking context so the popover
- * escapes the `.page-header-actions` row without sibling elements
- * painting over the menu. Must be HIGHER than the sticky search bar
- * underneath (`.sticky-search` sits at z-index 40) or the dropdown
- * lives inside a context pinned below the search input. */
 .ss-menu {
-  z-index: 60;
+  /* No forced stacking context here — with the popover `position: fixed`
+   * its z-index is global, so the trigger row doesn't need to lift
+   * itself above sibling chrome. Keeping position: relative only so the
+   * trigger remains correctly inline-flex alongside other toolbar items. */
+  position: relative;
 }
 
 @keyframes ss-menu-in {

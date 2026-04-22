@@ -1177,17 +1177,8 @@ export default function Customers() {
                           </div>
                         </div>
 
-                        <div className="customer-description" onClick={(e) => e.stopPropagation()}>
-                          <DescriptionInline
-                            value={lead.description || ''}
-                            onCommit={(v) => patchLead(
-                              lead.id,
-                              { description: v || null },
-                              { success: t('list.patchSuccess.descriptionUpdated') },
-                            )}
-                          />
-                        </div>
-
+                        {/* Description dropped on the mobile card too —
+                            keep only the notes field. */}
                         <div className="customer-notes">
                           <InlineText
                             value={lead.notes || ''}
@@ -1382,17 +1373,11 @@ export default function Customers() {
                 </div>
               </div>
 
-              <div className="customer-description cc-v2-description">
-                <DescriptionInline
-                  value={lead.description || ''}
-                  onCommit={(v) => patchLead(
-                    lead.id,
-                    { description: v || null },
-                    { success: t('list.patchSuccess.descriptionUpdated') },
-                  )}
-                />
-              </div>
-
+              {/* L-8 (cont.) — the lead card used to expose both a
+                  short-description field AND a notes field; that was
+                  two free-text surfaces side-by-side, so agents only
+                  used notes. Description input removed here; the
+                  value is still editable in the lead detail page. */}
               <div className="customer-notes cc-v2-notes">
                 <InlineText
                   value={lead.notes || ''}

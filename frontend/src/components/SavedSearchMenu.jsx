@@ -25,7 +25,37 @@ export default function SavedSearchMenu({ entityType, currentFilters, onLoad }) 
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const wrapRef = useRef(null);
+  const triggerRef = useRef(null);
+  // When the popover is position: fixed, we compute its anchor each
+  // time the menu opens (or when the trigger moves, e.g. on scroll).
+  const [popPos, setPopPos] = useState(null);
   const toast = useToast();
+
+  // Re-compute the popover's fixed anchor whenever open flips true or
+  // the viewport scrolls/resizes. RTL: anchor from the trigger's
+  // inline-start (its right edge in Hebrew layout) so the sheet
+  // naturally grows inward from the toolbar corner.
+  useEffect(() => {
+    if (!open) { setPopPos(null); return undefined; }
+    const place = () => {
+      const el = triggerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const isRTL = document.documentElement.dir === 'rtl';
+      // top: below the trigger with a small gap. left/right: anchored
+      // to the trigger edge appropriate for the document direction.
+      const top = r.bottom + 6;
+      if (isRTL) setPopPos({ top, right: window.innerWidth - r.right });
+      else setPopPos({ top, left: r.left });
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open]);
 
   // Fetch the saved-searches list each time the menu opens. Lists are
   // tiny (a few rows per agent) so there's no cache layer; re-fetching
@@ -105,6 +135,7 @@ export default function SavedSearchMenu({ entityType, currentFilters, onLoad }) 
   return (
     <div className="ss-menu" ref={wrapRef}>
       <button
+        ref={triggerRef}
         type="button"
         className="btn btn-ghost btn-sm ss-menu-trigger"
         onClick={() => setOpen((v) => !v)}
@@ -118,7 +149,12 @@ export default function SavedSearchMenu({ entityType, currentFilters, onLoad }) 
       </button>
 
       {open && (
-        <div className="ss-menu-pop" role="menu" aria-label="חיפושים שמורים">
+        <div
+          className="ss-menu-pop"
+          role="menu"
+          aria-label="חיפושים שמורים"
+          style={popPos || undefined}
+        >
           <div className="ss-menu-save-row">
             <input
               type="text"

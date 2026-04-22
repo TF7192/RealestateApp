@@ -29,6 +29,7 @@ import { formatFloor } from '../lib/formatFloor';
 import { useAuth } from '../lib/auth';
 import ConfirmDialog from '../components/ConfirmDialog';
 import QuickEditDrawer from '../components/QuickEditDrawer';
+import PropertyNotesDialog from '../components/PropertyNotesDialog';
 import EmptyState from '../components/EmptyState';
 import { useRouteScrollRestore } from '../hooks/useScrollRestore';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
@@ -701,6 +702,15 @@ export default function Properties() {
   const openQuickEdit = (e, prop) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setQuickEditFor(prop);
+  };
+
+  // Dedicated notes-only editor. Separate from the quick-edit drawer
+  // so "הוסף הערות" opens a focused single-field modal instead of a
+  // full form — less scroll, faster to type, easier to close.
+  const [notesEditFor, setNotesEditFor] = useState(null);
+  const openNotesEdit = (e, prop) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setNotesEditFor(prop);
   };
 
   const openSimilar = (e, prop) => {
@@ -1482,7 +1492,7 @@ export default function Properties() {
                 <button
                   type="button"
                   className="property-add-note-btn"
-                  onClick={(e) => openQuickEdit(e, prop)}
+                  onClick={(e) => openNotesEdit(e, prop)}
                   title="הוסף הערות לנכס"
                 >
                   <StickyNote size={13} aria-hidden="true" />
@@ -1570,6 +1580,16 @@ export default function Properties() {
           onSaved={(updated) => {
             // Optimistic: patch the row in place so the list reflects
             // the edit without a round-trip.
+            setItems((list) => list.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+          }}
+        />
+      )}
+
+      {notesEditFor && (
+        <PropertyNotesDialog
+          property={notesEditFor}
+          onClose={() => setNotesEditFor(null)}
+          onSaved={(updated) => {
             setItems((list) => list.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
           }}
         />
