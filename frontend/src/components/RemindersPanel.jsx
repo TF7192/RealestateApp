@@ -38,7 +38,15 @@ export default function RemindersPanel({
   }, [leadId, propertyId, customerId]);
 
   const refresh = useCallback(async () => {
-    if (!anchor) return;
+    // P-9 — if no anchor was passed, drop out of the loading state
+    // immediately instead of keeping the spinner up forever. PropertyDetail
+    // used to pass scope={{ propertyId }} (wrong prop shape) and the panel
+    // would hang; this guards the next caller that forgets to wire props.
+    if (!anchor) {
+      setLoading(false);
+      setItems([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -180,6 +188,10 @@ export default function RemindersPanel({
         <div className="rp-error" role="alert">
           <AlertCircle size={14} aria-hidden />
           <span>{error}</span>
+          {/* P-9 — retry is a plain button, no page reload. */}
+          <button type="button" className="btn btn-ghost btn-sm rp-retry" onClick={refresh}>
+            נסה שוב
+          </button>
         </div>
       ) : items.length === 0 ? (
         <EmptyState
