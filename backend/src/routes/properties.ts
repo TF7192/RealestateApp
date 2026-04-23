@@ -165,9 +165,15 @@ const propertyInput = z.object({
 });
 
 export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
-  app.get('/', async (req) => {
+  app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const q = listQuery.parse(req.query);
     const where: any = {};
+    // Always scope to the signed-in agent — prior behavior let a caller
+    // without `mine=1` / `agentId=` pull every property from every
+    // agency, and `?agentId=X` let an agent pull anyone else's catalog.
+    // The customer-facing share flow lives under /api/public/..., so
+    // scoping this endpoint is safe for the agent app.
+    where.agentId = requireUser(req).id;
     if (q.assetClass) where.assetClass = q.assetClass;
     if (q.category) where.category = q.category;
     if (q.status) where.status = q.status;
@@ -176,13 +182,6 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       // stored before the normalizer shipped still match queries
       // from dropdowns that carry the current canonical spelling.
       where.city = normalizeCity(q.city)?.value ?? q.city;
-    }
-    if (q.agentId) where.agentId = q.agentId;
-    // `mine=1` returns only the current agent's properties (requires auth)
-    if (q.mine === '1' || q.mine === 'true') {
-      const user = (req as any)[Symbol.for('estia.user')];
-      if (!user) return { items: [] };
-      where.agentId = user.id;
     }
     if (q.search) {
       where.OR = [
@@ -221,7 +220,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     return { items: items.map((p) => serialize(p, { compact: true })) };
   });
 
-  app.get('/:id', async (req, reply) => {
+  app.get('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const property = await prisma.property.findUnique({
       where: { id },
@@ -235,7 +234,12 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         _count: { select: { viewings: true, inquiries: true, prospects: true } },
       },
     });
-    if (!property) return reply.code(404).send({ error: { message: 'Not found' } });
+    // 404 for both "doesn't exist" and "belongs to another agent" — no
+    // leak about whether the id is valid. Customer-facing share flow
+    // has its own endpoint under /api/public/agents/:slug/properties/:slug.
+    if (!property || property.agentId !== requireUser(req).id) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
     return { property: serialize(property) };
   });
 

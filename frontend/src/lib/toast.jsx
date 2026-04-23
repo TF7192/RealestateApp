@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import haptics from './haptics';
 import './toast.css';
@@ -43,14 +43,19 @@ export function ToastProvider({ children }) {
     return id;
   }, [dismiss]);
 
-  // Convenience helpers
-  const api = {
+  // Convenience helpers. useMemo so the object reference is stable
+  // across re-renders — consumers use this as a hook dependency (e.g.,
+  // TagPicker's refresh callback), and a new reference each render
+  // triggers their effects in a tight loop that spams /api/tags/for
+  // until the rate-limiter 429s the property-detail page into
+  // "Property Not Found".
+  const api = useMemo(() => ({
     show: push,
     success: (m, o) => push(m, { ...o, kind: 'success' }),
     error: (m, o) => push(m, { ...o, kind: 'error' }),
     info: (m, o) => push(m, { ...o, kind: 'info' }),
     dismiss,
-  };
+  }), [push, dismiss]);
 
   return (
     <ToastContext.Provider value={api}>
