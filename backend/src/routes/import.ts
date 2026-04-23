@@ -10,6 +10,7 @@ import {
   CellError,
 } from '../lib/importNormalize.js';
 import { headerSignature, detectColumns, type EntityType } from '../lib/importDetect.js';
+import { normalizeAddress } from '../lib/addressNormalize.js';
 
 // Excel / CSV import routes.
 //
@@ -236,14 +237,17 @@ async function runLeadImport(
             ? `מ-${roomsMin}`
             : null;
 
+      // Snap city/street to the canonical registry spelling so rows
+      // imported from different vendor exports stay comparable.
+      const addr = normalizeAddress({ city, street });
       await prisma.lead.create({
         data: {
           agentId,
           name,
           phone: phone ?? '',
           email:         asString(invert(row, 'email')) ?? undefined,
-          city:          city ?? undefined,
-          street:        street ?? undefined,
+          city:          addr.city ?? city ?? undefined,
+          street:        addr.street ?? street ?? undefined,
           lookingFor:    asLookingFor(invert(row, 'lookingFor')) ?? undefined,
           interestType:  asInterestType(invert(row, 'interestType')) ?? undefined,
           budget:        budget ?? undefined,
@@ -283,21 +287,25 @@ async function runPropertyImport(
       const streetRaw = asString(invert(row, 'street'));
       const cityRaw   = asString(invert(row, 'city'));
       const addrSplit = splitAddress(streetRaw);
-      const city   = cityRaw ?? addrSplit.city ?? options.defaultCity ?? null;
-      const street = streetRaw && cityRaw ? streetRaw : addrSplit.street;
+      const cityInput   = cityRaw ?? addrSplit.city ?? options.defaultCity ?? null;
+      const streetInput = streetRaw && cityRaw ? streetRaw : addrSplit.street;
 
-      if (!street) throw new CellError('רחוב חסר — שורה דולגה');
-      if (!city)   throw new CellError('עיר חסרה — שורה דולגה או בחר עיר ברירת מחדל');
+      if (!streetInput) throw new CellError('רחוב חסר — שורה דולגה');
+      if (!cityInput)   throw new CellError('עיר חסרה — שורה דולגה או בחר עיר ברירת מחדל');
+
+      // Snap city/street to the government registry so rows imported
+      // from different vendor exports stay comparable. Falls back to
+      // the user-typed value when the registry doesn't recognize it.
+      const addr = normalizeAddress({ city: cityInput, street: streetInput });
+      const city   = addr.city   ?? cityInput;
+      const street = addr.street ?? streetInput;
 
       // Dedup by (agentId, normalized street + city) within this agent's props.
       if (options.skipDuplicates) {
-        const nStreet = street.trim().toLowerCase();
-        const nCity   = city.trim().toLowerCase();
         const dup = await prisma.property.findFirst({
           where: { agentId, street: { equals: street, mode: 'insensitive' }, city: { equals: city, mode: 'insensitive' } },
           select: { id: true },
         });
-        void nStreet; void nCity;
         if (dup) { job.skipped += 1; continue; }
       }
 

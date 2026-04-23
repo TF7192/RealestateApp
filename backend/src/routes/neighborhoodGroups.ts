@@ -5,6 +5,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { normalizeCity } from '../lib/addressNormalize.js';
 
 // Include shape reused by every responder so callers always get the
 // same payload. `sortOrder` lets the admin UI preserve the agent-
@@ -42,7 +43,7 @@ export const registerNeighborhoodGroupRoutes: FastifyPluginAsync = async (app) =
   app.get('/', async (req) => {
     const q = listQuery.parse(req.query);
     const where: any = {};
-    if (q.city)   where.city = q.city;
+    if (q.city)   where.city = normalizeCity(q.city)?.value ?? q.city;
     if (q.search) {
       where.OR = [
         { name:        { contains: q.search, mode: 'insensitive' } },
@@ -66,7 +67,7 @@ export const registerNeighborhoodGroupRoutes: FastifyPluginAsync = async (app) =
     try {
       const created = await prisma.neighborhoodGroup.create({
         data: {
-          city:        body.city,
+          city:        normalizeCity(body.city)?.value ?? body.city,
           name:        body.name,
           description: body.description,
           aliases:     body.aliases ?? [],
@@ -106,7 +107,9 @@ export const registerNeighborhoodGroupRoutes: FastifyPluginAsync = async (app) =
         await tx.neighborhoodGroup.update({
           where: { id },
           data: {
-            city:        body.city,
+            city:        body.city !== undefined
+              ? (normalizeCity(body.city)?.value ?? body.city)
+              : undefined,
             name:        body.name,
             description: body.description,
             aliases:     body.aliases,

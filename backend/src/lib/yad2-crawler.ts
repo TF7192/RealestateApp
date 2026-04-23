@@ -259,11 +259,22 @@ function normalize(item: any, section: Yad2Section): Yad2Listing | null {
   const token = pickStr(item.token, item.id, item.orderId);
   if (!token) return null;
   const a = item.address || {};
+  // Yad2 teasers sometimes omit `street` on purpose (agent hid it, or
+  // listing is positioned at neighborhood granularity only). Rather
+  // than write '—' and lose the geolocation signal, fall back through
+  // neighborhood → area → region → the ad title in that order. The
+  // canonical-address normalizer downstream will still correct
+  // spelling drift once we pick something non-empty.
+  const street =
+    pickStr(a.street?.text, a.street, item.street,
+            a.neighborhood?.text, a.neighborhood,
+            a.area?.text, a.area,
+            item.neighborhood, item.area) || '';
   return {
     sourceId: String(token),
     section,
     title: pickStr(item.title, item.subtitle),
-    street: pickStr(a.street?.text, a.street, item.street) || '',
+    street,
     city:   pickStr(a.city?.text,   a.city,   item.city)   || '',
     region: pickStr(a.region?.text, a.region),
     rooms:  pickNum(item.additionalDetails?.roomsCount,   item.rooms),

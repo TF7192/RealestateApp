@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { getUser } from '../middleware/auth.js';
 import { putUpload } from '../lib/storage.js';
 import { crawlAgency, mapSectionToAssetClass, type Yad2Listing } from '../lib/yad2-crawler.js';
+import { normalizeAddress } from '../lib/addressNormalize.js';
 
 /**
  * Yad2 import — agency-wide.
@@ -395,14 +396,20 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
           l.description || null,
         ].filter(Boolean) as string[];
 
+        // Snap Yad2's raw street/city strings to the government
+        // registry's canonical spellings so rows from different
+        // agencies stay comparable. If the registry doesn't recognize
+        // the value (rare neighborhoods, new developments), keep
+        // Yad2's original rather than writing '—' and losing the signal.
+        const addr = normalizeAddress({ city: l.city, street: l.street });
         const property = await prisma.property.create({
           data: {
             agentId,
             assetClass: map.assetClass,
             category: map.category,
             type: l.type || 'דירה',
-            street: l.street || '—',
-            city: l.city || '—',
+            street: addr.street ?? l.street ?? '',
+            city:   addr.city   ?? l.city   ?? '',
             owner: 'בעלים מ-Yad2',
             ownerPhone: '',
             marketingPrice: l.price ?? 0,
@@ -518,13 +525,15 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
         continue;
       }
       try {
+        const addr = normalizeAddress({ city: l.city, street: l.street });
         const property = await prisma.property.create({
           data: {
             agentId: u.id,
             assetClass: 'RESIDENTIAL',
             category: 'SALE',
             type: 'דירה',
-            street: l.street, city: l.city,
+            street: addr.street ?? l.street,
+            city:   addr.city   ?? l.city,
             owner: 'בעלים מ-Yad2', ownerPhone: '',
             marketingPrice: l.price ?? 0,
             sqm: l.sqm ?? 0,

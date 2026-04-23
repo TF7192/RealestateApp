@@ -6,6 +6,7 @@ import { tryServiceTokenAuth } from '../middleware/service-token.js';
 import { track as phTrack } from '../lib/analytics.js';
 import { evaluateLeadProperty } from '../lib/matching.js';
 import { logActivity } from '../lib/activity.js';
+import { normalizeAddress, normalizeCity } from '../lib/addressNormalize.js';
 
 const leadInput = z.object({
   name: z.string().min(1).max(120),
@@ -136,7 +137,7 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       if (v == null) return [];
       return (Array.isArray(v) ? v : [v]).map((x) => String(x)).filter(Boolean);
     };
-    const cities = toList(q.cities);
+    const cities = toList(q.cities).map((c) => normalizeCity(c)?.value ?? c);
     if (cities.length) where.city = { in: cities };
     const leadStatus = toList(q.leadStatus);
     if (leadStatus.length) where.leadStatus = { in: leadStatus };
@@ -345,5 +346,9 @@ function normalize(body: Partial<z.infer<typeof leadInput>>) {
     if (data[k]) data[k] = new Date(data[k]);
     if (data[k] === null) data[k] = null;
   }
+  // Snap city + street to their government-registered canonical form
+  // so rows stay comparable across spelling variants (שיינקין / שינקין,
+  // ת"א / תל אביב - יפו). Unrecognized values pass through unchanged.
+  Object.assign(data, normalizeAddress({ city: data.city, street: data.street }));
   return data;
 }

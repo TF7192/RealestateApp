@@ -12,6 +12,7 @@ import { track as phTrack } from '../lib/analytics.js';
 import { assertAllowedMime } from '../lib/uploadGuards.js';
 import { evaluateLeadProperty } from '../lib/matching.js';
 import { logActivity } from '../lib/activity.js';
+import { normalizeAddress, normalizeCity } from '../lib/addressNormalize.js';
 
 // Canonical action keys for newly-created properties. `externalCoop` is
 // kept in existing rows but new keys use the renamed `brokerCoop`.
@@ -170,7 +171,12 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     if (q.assetClass) where.assetClass = q.assetClass;
     if (q.category) where.category = q.category;
     if (q.status) where.status = q.status;
-    if (q.city) where.city = q.city;
+    if (q.city) {
+      // Normalize the incoming city filter so "שיינקין..."-era rows
+      // stored before the normalizer shipped still match queries
+      // from dropdowns that carry the current canonical spelling.
+      where.city = normalizeCity(q.city)?.value ?? q.city;
+    }
     if (q.agentId) where.agentId = q.agentId;
     // `mine=1` returns only the current agent's properties (requires auth)
     if (q.mine === '1' || q.mine === 'true') {
@@ -829,6 +835,9 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
   if (data.balconySize === 0 && data.balconyType !== undefined) {
     data.balconyType = null;
   }
+  // Snap city + street to their government-registered canonical form so
+  // rows stay comparable across spelling variants. See addressNormalize.ts.
+  Object.assign(data, normalizeAddress({ city: data.city, street: data.street }));
   return data;
 }
 

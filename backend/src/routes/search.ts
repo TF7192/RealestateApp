@@ -6,6 +6,19 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { normalizeCity } from '../lib/addressNormalize.js';
+
+// Generate all spellings we should search for. When the user types a
+// known city variant ("ת"א", "תל-אביב", "Tel Aviv" later) we want to
+// also match rows stored under the canonical ("תל אביב - יפו") — and
+// vice versa. We can't do the same for streets here because street
+// disambiguation needs a city hint, which global search doesn't have.
+function expandTerm(term: string): string[] {
+  const out = new Set<string>([term]);
+  const canonical = normalizeCity(term)?.value;
+  if (canonical && canonical !== term) out.add(canonical);
+  return [...out];
+}
 
 const q = z.object({
   q:    z.string().min(1).max(120),
@@ -18,19 +31,16 @@ export const registerSearchRoutes: FastifyPluginAsync = async (app) => {
     const uid  = requireUser(req).id;
     const term = parsed.q;
     const take = parsed.take ?? 10;
+    const terms = expandTerm(term);
+    // For each field × each term, emit a `contains` clause.
+    const anyOf = (fields: string[]) =>
+      fields.flatMap((f) =>
+        terms.map((t) => ({ [f]: { contains: t, mode: 'insensitive' } as const })),
+      );
 
     const [properties, leads, owners, deals] = await Promise.all([
       prisma.property.findMany({
-        where: {
-          agentId: uid,
-          OR: [
-            { street:      { contains: term, mode: 'insensitive' } },
-            { city:        { contains: term, mode: 'insensitive' } },
-            { type:        { contains: term, mode: 'insensitive' } },
-            { neighborhood:{ contains: term, mode: 'insensitive' } },
-            { owner:       { contains: term, mode: 'insensitive' } },
-          ],
-        },
+        where: { agentId: uid, OR: anyOf(['street', 'city', 'type', 'neighborhood', 'owner']) },
         select: { id: true, street: true, city: true, type: true, marketingPrice: true },
         take,
         orderBy: { updatedAt: 'desc' },
@@ -39,10 +49,8 @@ export const registerSearchRoutes: FastifyPluginAsync = async (app) => {
         where: {
           agentId: uid,
           OR: [
-            { name:  { contains: term, mode: 'insensitive' } },
-            { phone: { contains: term } },
-            { email: { contains: term, mode: 'insensitive' } },
-            { city:  { contains: term, mode: 'insensitive' } },
+            ...anyOf(['name', 'email', 'city']),
+            ...terms.map((t) => ({ phone: { contains: t } })),
           ],
         },
         select: { id: true, name: true, phone: true, city: true, status: true },
@@ -53,9 +61,8 @@ export const registerSearchRoutes: FastifyPluginAsync = async (app) => {
         where: {
           agentId: uid,
           OR: [
-            { name:  { contains: term, mode: 'insensitive' } },
-            { phone: { contains: term } },
-            { email: { contains: term, mode: 'insensitive' } },
+            ...anyOf(['name', 'email']),
+            ...terms.map((t) => ({ phone: { contains: t } })),
           ],
         },
         select: { id: true, name: true, phone: true, email: true },
@@ -63,15 +70,7 @@ export const registerSearchRoutes: FastifyPluginAsync = async (app) => {
         orderBy: { updatedAt: 'desc' },
       }),
       prisma.deal.findMany({
-        where: {
-          agentId: uid,
-          OR: [
-            { propertyStreet: { contains: term, mode: 'insensitive' } },
-            { city:           { contains: term, mode: 'insensitive' } },
-            { buyerAgent:     { contains: term, mode: 'insensitive' } },
-            { sellerAgent:    { contains: term, mode: 'insensitive' } },
-          ],
-        },
+        where: { agentId: uid, OR: anyOf(['propertyStreet', 'city', 'buyerAgent', 'sellerAgent']) },
         select: {
           id: true, propertyStreet: true, city: true, status: true, closedPrice: true,
         },
