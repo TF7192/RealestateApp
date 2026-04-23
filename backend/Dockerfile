@@ -30,6 +30,11 @@ ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
+# Non-TS runtime assets (Hebrew TTFs for pdfkit). tsc does not copy
+# anything outside the TS graph, so src/assets never lands in /dist
+# without this explicit copy. When it's missing the agreement PDF
+# silently falls back to Helvetica and renders Hebrew as blank glyphs.
+COPY --from=build /app/src/assets ./dist/assets
 COPY package.json ./
 # tsx runs the seed script in production without a separate build step
 RUN npm install --no-save tsx@4.19.1 --cache /tmp/npm-cache --no-audit --no-fund
