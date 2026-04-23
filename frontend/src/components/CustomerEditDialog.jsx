@@ -32,6 +32,17 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
     acRequired: !!lead.acRequired,
     storageRequired: !!lead.storageRequired,
     preApproval: !!lead.preApproval,
+    // Commercial-lead brief fields — only surfaced when interestType === 'COMMERCIAL'.
+    sqmGrossMin: lead.sqmGrossMin ?? null,
+    sqmNetMin: lead.sqmNetMin ?? null,
+    workstationsMin: lead.workstationsMin ?? null,
+    buildStateRequired: lead.buildStateRequired || '',
+    accessibilityRequired: !!lead.accessibilityRequired,
+    kitchenetteRequired: !!lead.kitchenetteRequired,
+    floorShelterRequired: !!lead.floorShelterRequired,
+    inOfficeToiletsRequired: !!lead.inOfficeToiletsRequired,
+    onFloorToiletsRequired: !!lead.onFloorToiletsRequired,
+    openSpaceRequired: !!lead.openSpaceRequired,
     status: lead.status || 'WARM',
     source: lead.source || '',
     notes: lead.notes || '',
@@ -79,6 +90,19 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
         acRequired: form.acRequired,
         storageRequired: form.storageRequired,
         preApproval: form.preApproval,
+        sqmGrossMin: form.sqmGrossMin != null && form.sqmGrossMin !== ''
+          ? Math.max(0, Math.round(Number(form.sqmGrossMin))) : null,
+        sqmNetMin: form.sqmNetMin != null && form.sqmNetMin !== ''
+          ? Math.max(0, Math.round(Number(form.sqmNetMin))) : null,
+        workstationsMin: form.workstationsMin != null && form.workstationsMin !== ''
+          ? Math.max(0, Math.round(Number(form.workstationsMin))) : null,
+        buildStateRequired: form.buildStateRequired || null,
+        accessibilityRequired: form.accessibilityRequired,
+        kitchenetteRequired: form.kitchenetteRequired,
+        floorShelterRequired: form.floorShelterRequired,
+        inOfficeToiletsRequired: form.inOfficeToiletsRequired,
+        onFloorToiletsRequired: form.onFloorToiletsRequired,
+        openSpaceRequired: form.openSpaceRequired,
         status: form.status,
         source: form.source || null,
         notes: form.notes || null,
@@ -206,6 +230,67 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                 </label>
               ))}
             </div>
+
+            {form.interestType === 'COMMERCIAL' && (
+              <>
+                <h4 style={{ margin: '18px 0 8px', fontSize: 14, fontWeight: 700 }}>
+                  דרישות עסקיות
+                </h4>
+                <div className="deal-form-grid">
+                  <div className="form-group">
+                    <label className="form-label">מ״ר ברוטו (מינ׳)</label>
+                    <NumberField
+                      unit="מ״ר"
+                      placeholder="60"
+                      value={form.sqmGrossMin}
+                      onChange={(v) => update('sqmGrossMin', v)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">מ״ר נטו (מינ׳)</label>
+                    <NumberField
+                      unit="מ״ר"
+                      placeholder="48"
+                      value={form.sqmNetMin}
+                      onChange={(v) => update('sqmNetMin', v)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">מס׳ עמדות עבודה</label>
+                    <NumberField
+                      placeholder="3"
+                      value={form.workstationsMin}
+                      onChange={(v) => update('workstationsMin', v)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">מעטפת / גמר</label>
+                    <SelectField
+                      value={form.buildStateRequired}
+                      onChange={(v) => update('buildStateRequired', v)}
+                      placeholder="לא משנה"
+                      options={['מעטפת', 'גמר', 'חדש מקבלן', 'משופץ']}
+                    />
+                  </div>
+                </div>
+                <div className="checkbox-grid">
+                  {[
+                    { key: 'openSpaceRequired', label: 'חלל פתוח' },
+                    { key: 'kitchenetteRequired', label: 'מטבחון' },
+                    { key: 'inOfficeToiletsRequired', label: 'שירותים במשרד' },
+                    { key: 'onFloorToiletsRequired', label: 'שירותים בקומה' },
+                    { key: 'floorShelterRequired', label: 'ממ״ק' },
+                    { key: 'accessibilityRequired', label: 'גישה לנכים' },
+                  ].map(({ key, label }) => (
+                    <label key={key} className="checkbox-item">
+                      <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />
+                      <span className="checkbox-custom" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
 
             <div className="deal-form-actions">
               <button className="btn btn-primary" onClick={save} disabled={busy}>

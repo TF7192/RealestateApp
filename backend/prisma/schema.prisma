@@ -760,6 +760,22 @@ model Lead {
   safeRoomRequired   Boolean          @default(false)
   acRequired         Boolean          @default(false)
   storageRequired    Boolean          @default(false)
+  // Commercial-lead requirement block — mirrors the commercial half
+  // of the Property schema. Agents capture these when a business
+  // client briefs a brokerage for office / shop / workspace space
+  // ("need ≥60 מ"ר ברוטו, shell finish, 3 workstations, kitchenette,
+  // ממ"ק, accessibility"). All optional — private-home leads leave
+  // them empty.
+  sqmGrossMin             Int?
+  sqmNetMin               Int?
+  accessibilityRequired   Boolean  @default(false)
+  buildStateRequired      String?  // "מעטפת" / "גמר" / specific finish
+  workstationsMin         Int?     // מספר עמדות עבודה
+  kitchenetteRequired     Boolean  @default(false)
+  floorShelterRequired    Boolean  @default(false) // ממ"ק
+  inOfficeToiletsRequired Boolean  @default(false) // שירותים בתוך המשרד
+  onFloorToiletsRequired  Boolean  @default(false) // שירותים משותפים בקומה
+  openSpaceRequired       Boolean  @default(false) // חלל פתוח
   schoolProximity    String?
   source             String?
   // `status` is the thermal temperature rating (HOT/WARM/COLD). New in

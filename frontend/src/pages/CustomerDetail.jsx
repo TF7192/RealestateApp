@@ -111,9 +111,15 @@ export default function CustomerDetail() {
     setError(null);
     try {
       // Prefer the dedicated endpoint; gracefully fall back to a list scan.
+      // Note: GET /api/leads/:id responds with `{ lead }` — unwrap so the
+      // state holds the bare record. Without this the edit-dialog seeds
+      // (`lead.name || ''` etc.) all resolved to undefined → empty fields.
       let fetched = null;
       if (typeof api.getLead === 'function') {
-        try { fetched = await api.getLead(id); }
+        try {
+          const res = await api.getLead(id);
+          fetched = res?.lead ?? res;
+        }
         catch (e) {
           if (e?.status !== 404) {
             const list = await api.listLeads();
