@@ -16,16 +16,17 @@
 //      surface (PropertyDetail card, a global banner, a toast) can react
 //      without having to own the polling loop itself.
 //
-// Tiny pub-sub — no Redux, no Zustand. Mirrors the shape of
-// yad2ScanStore on purpose so the pattern is recognizable.
+// M-1 — durable across reload + navigation (mirrors yad2 Y-1):
+//   Running (propertyId, kind, jobId) tuples are persisted to
+//   sessionStorage. On module init we re-attach the poll loop for each
+//   tuple so an agent can click "משוך נתונים", navigate to customers,
+//   reload the tab, and still get the completion toast when nadlan's
+//   crawl finishes.
 
 import { api } from './api';
 
 /** @typedef {'idle'|'running'|'done'|'error'} ScanStatus */
 
-/** Per (propertyId, kind) state. `byKey` holds the map so the card can
- *  render "this property is still scanning" without polluting the
- *  scan history of another open property tab. */
 /** @type {Record<string, {
  *    status: ScanStatus,
  *    propertyId: string,
@@ -39,8 +40,39 @@ let state = {};
 
 const listeners = new Set();
 
+// M-1: one sessionStorage slot holds a map of key → running-job
+// descriptor `{ jobId, propertyId, kind, startedAt }`. Completed scans
+// are NOT persisted — the backend's MarketContext table is the source
+// of truth for results; the card reads it via marketContextGet on mount.
+const RUNNING_KEY = 'estia-market-running-scans';
+
 function keyFor(propertyId, kind) {
   return `${propertyId}:${kind}`;
+}
+
+function readRunningMap() {
+  try {
+    const raw = sessionStorage.getItem(RUNNING_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function writeRunning(key, payload) {
+  try {
+    const map = readRunningMap();
+    map[key] = payload;
+    sessionStorage.setItem(RUNNING_KEY, JSON.stringify(map));
+  } catch { /* ignore private-mode */ }
+}
+
+function clearRunning(key) {
+  try {
+    const map = readRunningMap();
+    if (key in map) {
+      delete map[key];
+      sessionStorage.setItem(RUNNING_KEY, JSON.stringify(map));
+    }
+  } catch { /* ignore */ }
 }
 
 function emit() {
@@ -74,8 +106,8 @@ export function subscribeMarketScan(fn) {
 
 // In-memory inflight map so two simultaneous startRefresh() calls for
 // the same key share the same Promise. Dies on page reload, which is
-// fine — the backend's own coalescing catches the "same page, two
-// fetches" race.
+// fine — the M-1 rehydration path below picks up the running jobId
+// from sessionStorage and re-attaches a new poll loop.
 const inflight = new Map();
 // SEC-1 — bumped by resetForLogout so late poll results from the
 // previous session can't apply state or fire the completion event
@@ -116,6 +148,14 @@ export function startRefresh(propertyId, kind = 'buy') {
   const promise = (async () => {
     try {
       const { jobId } = await api.marketContextRefreshStart(propertyId, kind);
+      // M-1 — persist the running jobId so a reload/nav-away can
+      // re-attach the poll instead of losing the completion event.
+      writeRunning(key, {
+        jobId,
+        propertyId,
+        kind,
+        startedAt: state[key]?.startedAt || Date.now(),
+      });
       const result = await pollJob(jobId);
       if (myEpoch !== sessionEpoch) return result; // session changed
       setScan(key, { status: 'done', finishedAt: Date.now(), result });
@@ -133,6 +173,7 @@ export function startRefresh(propertyId, kind = 'buy') {
       throw e;
     } finally {
       inflight.delete(key);
+      clearRunning(key);
     }
   })();
 
@@ -150,7 +191,10 @@ async function pollJob(jobId) {
     const snap = await api.marketJobStatus(jobId);
     if (snap.status === 'done')  return snap.result;
     if (snap.status === 'error') {
-      throw new Error(snap.error?.message || 'שליפת נתוני השוק נכשלה');
+      const env = snap.error || {};
+      const err = new Error(env.message || 'שליפת נתוני השוק נכשלה');
+      err.status = env.status;
+      throw err;
     }
     await sleep(POLL_INTERVAL_MS);
   }
@@ -160,6 +204,7 @@ async function pollJob(jobId) {
  *  dismisses the banner or starts a fresh scan. */
 export function clearScanFor(propertyId, kind) {
   const key = keyFor(propertyId, kind);
+  clearRunning(key);
   if (!state[key]) return;
   const next = { ...state };
   delete next[key];
@@ -170,14 +215,76 @@ export function clearScanFor(propertyId, kind) {
 /**
  * SEC-1 — reset all market-scan state for the current browser.
  *
- * Called from `AuthProvider.logout()` and from the 401 bounce handler.
- * The store itself holds no sessionStorage (scans don't rehydrate), but
- * the in-memory `state` map + any inflight polling promises still leak
- * across users on the same browser unless we wipe them here.
+ * Called from `AuthProvider.logout()` and from the 401 bounce handler
+ * so residual scan data from User A can never leak into User B's
+ * session on the same browser.
  */
 export function resetForLogout() {
   inflight.clear();
   sessionEpoch += 1;
   state = {};
+  try { sessionStorage.removeItem(RUNNING_KEY); } catch { /* ignore */ }
   emit();
 }
+
+// ────────────────────────────────────────────────────────────────
+// M-1 rehydration — on module init, re-attach poll loops for any
+// (propertyId, kind) jobs that were in flight when the previous page
+// unloaded (tab close, reload, or a navigation that unmounted the
+// card). The backend is the source of truth: if it says done/error →
+// apply + dispatch; still running → resume polling; 404 → drop the
+// key and stay idle.
+// ────────────────────────────────────────────────────────────────
+function resumeJob(persisted) {
+  const key = keyFor(persisted.propertyId, persisted.kind);
+  const myEpoch = sessionEpoch;
+  if (state[key]?.status === 'running') return; // already tracked
+  setScan(key, {
+    status: 'running',
+    propertyId: persisted.propertyId,
+    kind: persisted.kind,
+    startedAt: persisted.startedAt || Date.now(),
+    finishedAt: null,
+    result: null,
+    error: null,
+  });
+  const promise = (async () => {
+    try {
+      const result = await pollJob(persisted.jobId);
+      if (myEpoch !== sessionEpoch) return result;
+      setScan(key, { status: 'done', finishedAt: Date.now(), result });
+      window.dispatchEvent(new CustomEvent('market-scan-complete', {
+        detail: { propertyId: persisted.propertyId, kind: persisted.kind, ok: true, result },
+      }));
+      return result;
+    } catch (e) {
+      if (myEpoch !== sessionEpoch) return null;
+      // 404 — job was GC'd server-side. Silent drop back to idle.
+      if (e?.status === 404) {
+        clearScanFor(persisted.propertyId, persisted.kind);
+        return null;
+      }
+      const msg = e?.message || 'שליפת נתוני השוק נכשלה';
+      setScan(key, { status: 'error', finishedAt: Date.now(), error: msg });
+      window.dispatchEvent(new CustomEvent('market-scan-complete', {
+        detail: { propertyId: persisted.propertyId, kind: persisted.kind, ok: false, error: msg },
+      }));
+      return null;
+    } finally {
+      inflight.delete(key);
+      clearRunning(key);
+    }
+  })();
+  inflight.set(key, promise);
+}
+
+// Microtask so subscribers attached during module bootstrap (useEffect
+// in MarketScanBanner) can pick up the 'running' state transition.
+Promise.resolve().then(() => {
+  const map = readRunningMap();
+  for (const [, persisted] of Object.entries(map)) {
+    if (persisted?.jobId && persisted?.propertyId && persisted?.kind) {
+      resumeJob(persisted);
+    }
+  }
+});
