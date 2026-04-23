@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Estia Lead-Match Bot · מידע ופנייה</title>
+  <style>
+    :root {
+      --gold: #b48b4c;
+      --ink: #1e1a14;
+      --ink-muted: #6b6356;
+      --bg: #faf6ee;
+      --card: #ffffff;
+      --border: rgba(30, 26, 20, 0.1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      font-family: 'Assistant', 'Heebo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+    header { margin-bottom: 32px; }
+    .mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--gold);
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 0.3px;
+    }
+    .mark-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--gold);
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin-top: 14px;
+      letter-spacing: -0.3px;
+    }
+    .sub {
+      color: var(--ink-muted);
+      margin-top: 6px;
+      font-size: 16px;
+    }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 24px;
+      margin-block-end: 16px;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--gold);
+      letter-spacing: -0.1px;
+    }
+    p { color: var(--ink); font-size: 15px; }
+    p + p { margin-top: 10px; }
+    ul { list-style: none; padding: 0; margin-top: 8px; }
+    ul li {
+      position: relative;
+      padding-inline-start: 20px;
+      margin-block: 6px;
+      font-size: 15px;
+    }
+    ul li::before {
+      content: "✓";
+      position: absolute;
+      inset-inline-start: 0;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    ul.dont li::before { content: "✗"; color: #c04b1f; }
+    .contact {
+      background: linear-gradient(165deg, rgba(180, 139, 76, 0.1), rgba(180, 139, 76, 0.02));
+      border-color: rgba(180, 139, 76, 0.25);
+    }
+    .contact a {
+      color: var(--gold);
+      font-weight: 700;
+      text-decoration: none;
+      border-bottom: 1px dashed var(--gold);
+    }
+    .contact a:hover { border-bottom-style: solid; }
+    footer {
+      margin-top: 28px;
+      color: var(--ink-muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    footer a { color: var(--ink-muted); }
+    /* English block sits below, smaller, for any non-Hebrew reader who
+       lands here (Yad2 ops staff, etc.). */
+    .en {
+      direction: ltr;
+      text-align: left;
+      margin-top: 40px;
+      padding-top: 32px;
+      border-top: 1px dashed var(--border);
+    }
+    .en h2 { font-size: 16px; }
+    .en p, .en li { font-size: 14px; }
+    .en .mark { font-size: 14px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="mark"><span class="mark-dot"></span>Estia · CRM לסוכני נדל״ן</span>
+    <h1>שלום 👋</h1>
+    <p class="sub">
+      הגעת לכאן כי User-Agent שלנו שלח אותך. הנה מי אנחנו ומה הבוט שלנו עושה —
+      בקצרה, ובשקיפות מלאה.
+    </p>
+  </header>
+
+  <section>
+    <h2>מה זה Estia</h2>
+    <p>
+      Estia היא מערכת CRM ייעודית לסוכני נדל״ן בישראל. סוכנים משתמשים במערכת
+      כדי לנהל נכסים, לידים ופגישות.
+    </p>
+    <p>
+      אחת התכונות שלנו — <strong>Lead Matches</strong> — עוזרת לסוכן לדעת
+      כאשר מתפרסם באינטרנט נכס ציבורי שמתאים ללקוח פוטנציאלי שלו. כדי להציג
+      את ההתאמות האלה, אנחנו קוראים אחת ל-30 דקות כמה מודעות חדשות מהעמוד
+      הציבורי של yad2.co.il — בדיוק אותן מודעות שכל גולש באינטרנט רואה.
+    </p>
+  </section>
+
+  <section>
+    <h2>מה הבוט שלנו עושה</h2>
+    <ul>
+      <li>קורא רק עמודי חיפוש ציבוריים של yad2 — ללא כניסה, ללא עקיפה של תשלום, ללא גישה לאזור אישי.</li>
+      <li>פועל לאט: בקשה אחת בזמן נתון, לפחות 8 שניות בין בקשות.</li>
+      <li>עד 5 מודעות חדשות לאזור × עד 7 אזורים × אחת ל-30 דקות, רק בין 06:00–21:00 שעון ישראל. תקרה יומית קשיחה.</li>
+      <li>מציג על כל מודעה שמקבל סוכן את הלוגו של yad2 וקישור בולט חזרה למודעה המקורית.</li>
+      <li>מכבד את <code>robots.txt</code> שלכם ומעדכן לפיו.</li>
+      <li>מזדהה בכנות ב-User-Agent (זה שהביא אותך לכאן) — בלי התחזות לדפדפן רגיל.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>מה הבוט שלנו לא עושה</h2>
+    <ul class="dont">
+      <li>לא קורא פרטי קשר אישיים של מוכרים (טלפון, שם, כתובת פרטית).</li>
+      <li>לא מעתיק תמונות לשרת שלנו — אנחנו רק מקשרים למקור.</li>
+      <li>לא מסחר ב-API או במאגר מוצרים — המידע משמש לסוכנים שלנו בלבד, פנימית.</li>
+      <li>לא מסתובב בין כתובות IP, לא משתמש בפרוקסי, לא פותר CAPTCHA.</li>
+      <li>לא מתעקש כשחוסמים — קוד 429 או 403 עוצר אותנו אוטומטית.</li>
+    </ul>
+  </section>
+
+  <section class="contact">
+    <h2>יצירת קשר · בקשת הסרה</h2>
+    <p>
+      אם אתם מ-yad2 וברצונכם שנפסיק, או שיש לכם בקשה / שאלה / משוב —
+      אני אישית עונה על כל פנייה. בכנות: אם תבקשו להפסיק, נפסיק באותו יום.
+      אין לנו שום עניין להציק.
+    </p>
+    <p>
+      <strong>אימייל ישיר:</strong>
+      <a href="mailto:talfuks1234@gmail.com?subject=Estia%20Lead-Match%20Bot">talfuks1234@gmail.com</a>
+    </p>
+    <p>
+      <strong>אתר:</strong>
+      <a href="https://estia.co.il">estia.co.il</a>
+    </p>
+  </section>
+
+  <div class="en">
+    <span class="mark"><span class="mark-dot"></span>Estia Lead-Match Bot · Info &amp; Contact</span>
+    <section style="margin-top: 12px;">
+      <h2>What we are</h2>
+      <p>
+        Estia is a CRM for real-estate agents in Israel. One of our
+        features, "Lead Matches", notifies an agent when a public
+        listing appears online that fits an active lead they're
+        working with. To surface those matches we fetch a small,
+        rate-limited slice of yad2.co.il's public search pages —
+        exactly the pages any unauthenticated visitor can see.
+      </p>
+    </section>
+    <section>
+      <h2>How the bot behaves</h2>
+      <ul>
+        <li>Public search pages only. No login, no paywall bypass, no private-area access.</li>
+        <li>One request in flight at a time; ≥8s between requests.</li>
+        <li>Up to 5 newest listings per area × up to 7 areas × once every 30 minutes, 06:00–21:00 Israel time. Hard daily cap.</li>
+        <li>Every listing rendered in our app shows the Yad2 logo and a prominent link back to the original listing.</li>
+        <li>Honest User-Agent (the one that sent you here). No browser impersonation.</li>
+        <li>Respects robots.txt. Backs off immediately on 429 / 403 / Cloudflare challenge.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Takedown &amp; contact</h2>
+      <p>
+        If you're from Yad2 and want us to stop, or have any question
+        or feedback — I respond personally and same-day. If you ask
+        us to stop, we stop. No exceptions.
+      </p>
+      <p>
+        Email:
+        <a href="mailto:talfuks1234@gmail.com?subject=Estia%20Lead-Match%20Bot">talfuks1234@gmail.com</a>
+      </p>
+    </section>
+  </div>
+
+  <footer>
+    Estia · <a href="https://estia.co.il">estia.co.il</a>
+  </footer>
+</main>
+</body>
+</html>
