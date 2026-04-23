@@ -349,6 +349,9 @@ function normalize(body: Partial<z.infer<typeof leadInput>>) {
   // Snap city + street to their government-registered canonical form
   // so rows stay comparable across spelling variants (שיינקין / שינקין,
   // ת"א / תל אביב - יפו). Unrecognized values pass through unchanged.
-  Object.assign(data, normalizeAddress({ city: data.city, street: data.street }));
+  // Only the string fields — Lead has no cityCode / streetCode columns.
+  const addr = normalizeAddress({ city: data.city, street: data.street });
+  if (addr.city)   data.city   = addr.city;
+  if (addr.street) data.street = addr.street;
   return data;
 }

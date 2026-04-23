@@ -848,7 +848,11 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
   }
   // Snap city + street to their government-registered canonical form so
   // rows stay comparable across spelling variants. See addressNormalize.ts.
-  Object.assign(data, normalizeAddress({ city: data.city, street: data.street }));
+  // We only want the string overlays — Property has no cityCode /
+  // streetCode columns, so drop those before Prisma sees them.
+  const addr = normalizeAddress({ city: data.city, street: data.street });
+  if (addr.city)   data.city   = addr.city;
+  if (addr.street) data.street = addr.street;
   return data;
 }
 
