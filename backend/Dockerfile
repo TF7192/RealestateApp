@@ -35,6 +35,10 @@ COPY --from=build /app/prisma ./prisma
 # without this explicit copy. When it's missing the agreement PDF
 # silently falls back to Helvetica and renders Hebrew as blank glyphs.
 COPY --from=build /app/src/assets ./dist/assets
+# Same story for the Population-Authority streets registry — it's
+# imported by addressNormalize.ts via resolveJsonModule, but tsc
+# doesn't emit .json files, so it would be missing at runtime.
+COPY --from=build /app/src/data ./dist/data
 COPY package.json ./
 # tsx runs the seed script in production without a separate build step
 RUN npm install --no-save tsx@4.19.1 --cache /tmp/npm-cache --no-audit --no-fund

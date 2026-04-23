@@ -47,17 +47,23 @@ const PAREN_RE = /\([^)]*\)/g;
 // suffix on each number ("15א").
 const HOUSE_NUM_RE = /(?:\s+\d+[א-ת]?)+\s*$/;
 
-// Street-prefix aliases the government registry uses interchangeably.
-// We normalize in both directions: queries typed with the long form
-// ("שדרות הרצל") still match registry entries stored short ("שד הרצל"),
-// and vice versa. Applied only at the start of the key — mid-string
-// occurrences of these words (rare) are left alone.
+// Street-prefix qualifiers the government registry mixes freely —
+// same street can appear as "הרצל", "שד הרצל", or "שדרות הרצל" depending
+// on city. We strip them on BOTH sides of the comparison so the bare
+// street name becomes the match key. The display name keeps the
+// registry's original (so "שד הרצל" stays visible to the agent) — it
+// just isn't what we match on.
+//
+// Applied only at the start of the key, and each entry requires a
+// following space — bare qualifiers ("דרך" on its own) are NOT
+// stripped, so they remain short and the length-filter rejects them
+// rather than matching any long street that happens to start with דרך.
 const PREFIX_ALIASES: Array<[RegExp, string]> = [
-  [/^(שדרות|שדרה|שד'?)\s+/, 'שד '],
-  [/^(רחוב|רח'?)\s+/, ''],           // "רחוב הרצל" / "רח' הרצל" → "הרצל"
-  [/^(דרך|דר'?)\s+/, 'דרך '],
-  [/^(סמטת?|סמ'?)\s+/, 'סמטת '],
-  [/^(כיכר|ככר)\s+/, 'כיכר '],
+  [/^(שדרות|שדרה|שד'?)\s+/, ''],
+  [/^(רחוב|רח'?)\s+/, ''],
+  [/^(דרך|דר'?)\s+/, ''],
+  [/^(סמטת?|סמ'?)\s+/, ''],
+  [/^(כיכר|ככר)\s+/, ''],
 ];
 
 export function normKey(s: string): string {
@@ -74,8 +80,19 @@ export function normKey(s: string): string {
   for (const [re, sub] of PREFIX_ALIASES) {
     if (re.test(k)) { k = k.replace(re, sub).trim(); break; }
   }
+  // Bare qualifier with no street name attached ("דרך", "שד", etc.)
+  // carries no useful signal — return empty so matching short-circuits.
+  if (STANDALONE_QUALIFIERS.has(k)) return '';
   return k;
 }
+
+const STANDALONE_QUALIFIERS = new Set([
+  'שד', 'שדרה', 'שדרות',
+  'רח', 'רחוב',
+  'דר', 'דרך',
+  'סמ', 'סמטה', 'סמטת',
+  'ככר', 'כיכר',
+]);
 
 // ── Indexes ─────────────────────────────────────────────────────────
 // Built once at module init. `cityByKey` maps normalized city name →
@@ -263,6 +280,9 @@ export function normalizeStreet(
   const append = (name: string) => (houseSuffix ? `${name} ${houseSuffix}` : name);
 
   const key = normKey(trimmed);
+  // Empty key means the input was a bare qualifier ("דרך" / "שד" /
+  // "רחוב") with no actual street name. Nothing meaningful to match.
+  if (!key) return null;
   const keyTight = key.replace(/\s+/g, '');
   const exact =
     cityEntry.streets.find((s) => s.key === key) ||

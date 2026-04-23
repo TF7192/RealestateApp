@@ -21,11 +21,17 @@ describe('normKey', () => {
     expect(normKey('הרצל 15/3')).toBe('הרצל');
     expect(normKey('הרצל 15-17')).toBe('הרצל');
   });
-  it('folds שדרות / רחוב prefixes', () => {
-    expect(normKey('שדרות הרצל')).toBe('שד הרצל');
-    expect(normKey("שד' הרצל")).toBe('שד הרצל');
+  it('strips שדרות / רחוב / דרך prefixes so "הרצל" matches "שד הרצל"', () => {
+    expect(normKey('שדרות הרצל')).toBe('הרצל');
+    expect(normKey("שד' הרצל")).toBe('הרצל');
     expect(normKey('רחוב שנקין')).toBe('שנקין');
     expect(normKey("רח' שנקין")).toBe('שנקין');
+    expect(normKey('דרך מנחם בגין')).toBe('מנחם בגין');
+  });
+  it('returns empty for bare qualifier ("דרך", "שד") — no street name', () => {
+    expect(normKey('דרך')).toBe('');
+    expect(normKey('שד')).toBe('');
+    expect(normKey('רחוב')).toBe('');
   });
 });
 
@@ -80,9 +86,20 @@ describe('normalizeStreet', () => {
     const out = normalizeStreet('שדרות הרצל 15', 'רמלה');
     expect(out?.value).toBe('שד הרצל 15');
   });
+  it('snaps bare "הרצל 40" to Ramla\'s registered "שד הרצל" — NOT the different "הראל"', () => {
+    // Pre-fix, a 1-edit Levenshtein would incorrectly snap הרצל → הראל.
+    // With prefix-stripping on both sides, הרצל matches the בש"ד הרצל"
+    // entry exactly so the fuzzy pass never runs.
+    const out = normalizeStreet('הרצל 40', 'רמלה');
+    expect(out?.value).toBe('שד הרצל 40');
+  });
   it('does not mis-route הרצל into the nearby "שדרות הרמבלס"', () => {
     const out = normalizeStreet('שדרות הרצל 15', 'רמלה');
     expect(out?.value).not.toMatch(/רמבלס/);
+  });
+  it('returns null for a bare qualifier ("דרך") — no specific street to snap to', () => {
+    expect(normalizeStreet('דרך', 'ראשון לציון')).toBeNull();
+    expect(normalizeStreet('רחוב', 'תל אביב')).toBeNull();
   });
   it('preserves apartment-style house suffixes (15א, 15/3)', () => {
     expect(normalizeStreet('שינקין 42א', 'תל אביב')?.value).toBe('שיינקין 42א');
