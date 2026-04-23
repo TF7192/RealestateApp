@@ -213,3 +213,63 @@
 @keyframes market-spin {
   to { transform: rotate(-360deg); }
 }
+
+/* Rooms filter — chip row above the KPIs. */
+.market-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.market-filter-label {
+  font-size: 12.5px;
+  color: var(--text-secondary, #54503e);
+  margin-inline-end: 4px;
+}
+.market-chip {
+  background: var(--bg-secondary, #f7f3ec);
+  border: 1px solid var(--border, rgba(30, 26, 20, 0.1));
+  color: var(--text-secondary, #54503e);
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.market-chip:hover { border-color: #b48b4c; }
+.market-chip.is-active {
+  background: #b48b4c;
+  border-color: #b48b4c;
+  color: #fff;
+}
+
+/* Sparkline — hover tooltip. */
+.market-spark-wrap { position: relative; }
+.market-spark-svg { cursor: crosshair; }
+.market-spark-tip {
+  position: absolute;
+  top: -4px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, rgba(30, 26, 20, 0.1));
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+.market-spark-tip strong { color: var(--text, #1e1a14); font-size: 12.5px; }
+.market-spark-tip-count { color: var(--text-muted, #888); font-size: 11.5px; }
+
+/* Show-more button under the table. */
+.market-more {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--border, rgba(30, 26, 20, 0.06));
+}
