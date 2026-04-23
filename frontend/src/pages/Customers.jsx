@@ -29,6 +29,7 @@ import {
   CheckCircle2,
   User,
   Star,
+  Upload,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useRouteScrollRestore } from '../hooks/useScrollRestore';
@@ -662,6 +663,14 @@ export default function Customers() {
               the sidebar entry and competed with "ליד חדש" (4×/day vs
               1×/month). Canonical header pattern: primary CTA rightmost,
               tertiary actions into overflow menus. */}
+          <Link
+            to="/import/leads"
+            className="btn btn-ghost btn-sm"
+            title="ייבוא לידים מ-Excel / CSV"
+          >
+            <Upload size={14} aria-hidden="true" />
+            <span>ייבוא מ-Excel</span>
+          </Link>
           <Link to="/customers/new" className="btn btn-primary">
             <UserPlus size={18} />
             {t('list.newLead')}

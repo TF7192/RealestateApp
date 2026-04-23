@@ -596,6 +596,22 @@ export const api = {
   // Poll until status !== 'running'. Used by marketScanStore.
   marketJobStatus: (jobId) => request(`/market/jobs/${encodeURIComponent(jobId)}`),
 
+  // Excel / CSV import. `type` is 'leads' or 'properties'.
+  startImport: (type, body) => request(`/import/${type}/start`, {
+    method: 'POST', body,
+    // Imports up to 2,000 rows at a time — give the initial POST a
+    // generous timeout since zod validation + the job-spawn can take
+    // a second or two on a warm cache miss.
+    timeoutMs: 60_000,
+  }),
+  getImportJob:  (jobId) => request(`/import/jobs/${encodeURIComponent(jobId)}`),
+  listImportMappings: (entityType, headerSig) => {
+    const qs = new URLSearchParams({ entityType, ...(headerSig ? { headerSig } : {}) }).toString();
+    return request(`/import/mappings?${qs}`);
+  },
+  saveImportMapping: (entityType, headerSig, mapping) =>
+    request('/import/mappings', { method: 'PUT', body: { entityType, headerSig, mapping } }),
+
   // Neighborhoods (G1)
   listNeighborhoods:   (params = {}) => request(`/neighborhoods${qsFrom(params)}`),
   createNeighborhood:  (body) => request('/neighborhoods', { method: 'POST', body }),

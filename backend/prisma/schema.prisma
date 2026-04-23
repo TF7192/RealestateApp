@@ -355,6 +355,9 @@ model User {
   primaryForProperties Property[]         @relation("PrimaryAgent")
   // Sprint 1 / MLS parity — Task D1.
   reminders            Reminder[]         @relation("AgentReminders")
+  // Excel import — saved column mappings keyed by header signature so
+  // repeat imports from the same vendor format auto-apply last choice.
+  importMappings       ImportMapping[]
   reminderAnchors      Reminder[]         @relation("ReminderCustomer")
   // Sprint 1 / MLS parity — Task K2.
   leadAssignments      LeadAgent[]        @relation("LeadAssignments")
@@ -582,11 +585,15 @@ model Property {
   assignees        PropertyAssignee[]
   adverts          Advert[]
 
+  // Excel-import tag. Same purpose as Lead.importBatchId.
+  importBatchId    String?
+
   @@unique([agentId, slug])
   @@index([agentId])
   @@index([city])
   @@index([assetClass, category, status])
   @@index([propertyOwnerId])
+  @@index([importBatchId])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -812,10 +819,16 @@ model Lead {
   // across their history (repeat buyers / combined transactions).
   dealsAsBuyer    Deal[]              @relation("DealBuyer")
 
+  // Excel-import tag. Set on every Lead row created via the wizard so
+  // an agent who realises the mapping was wrong can bulk-delete the
+  // batch from the list page.
+  importBatchId   String?
+
   @@index([agentId])
   @@index([status])
   @@index([customerStatus])
   @@index([city])
+  @@index([importBatchId])
 }
 
 // Sprint 1 / MLS parity — Task K2. Composite-PK join table for
@@ -1329,4 +1342,27 @@ model MarketContext {
 
   @@unique([cityKey, streetKey, kind])
   @@index([fetchedAt])
+}
+
+// ────────────────────────────────────────────────────────────────────
+// ImportMapping — saved column mapping per (agent, entityType, header
+// signature). When the wizard detects the same header shape an agent
+// uploaded before, we pre-apply their last choice so repeat imports
+// from the same vendor export need zero clicks in the mapping step.
+//
+// `headerSig` is a hash of the normalized header row (lowercased,
+// trimmed, sorted). `mapping` is `{ [header]: estiaField | 'skip' }`.
+// ────────────────────────────────────────────────────────────────────
+model ImportMapping {
+  id         String   @id @default(cuid())
+  agentId    String
+  agent      User     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  entityType String   // "LEAD" | "PROPERTY"
+  headerSig  String
+  mapping    Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([agentId, entityType, headerSig])
+  @@index([agentId])
 }

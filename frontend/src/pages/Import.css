@@ -1,0 +1,380 @@
+.imp-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+}
+
+.imp-head { margin-bottom: 24px; }
+.imp-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.imp-back:hover { color: var(--gold); }
+.imp-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.imp-title h1 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0;
+}
+.imp-beta {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(180, 139, 76, 0.14);
+  color: var(--gold);
+}
+.imp-sub {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-top: 8px;
+  max-width: 640px;
+}
+
+.imp-err {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: rgba(185, 28, 28, 0.08);
+  color: #b91c1c;
+  border: 1px solid rgba(185, 28, 28, 0.2);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+/* ── Step scaffolding ─────────────────────────────────────────── */
+.imp-step {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  margin-block-end: 14px;
+}
+.imp-step-on {
+  box-shadow: 0 4px 18px rgba(30, 26, 20, 0.06);
+  border-color: var(--gold-border);
+}
+.imp-step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.imp-step-head h2 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+}
+.imp-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.imp-step-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.imp-step-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  justify-content: flex-end;
+}
+
+/* ── Step 1 drop zone ─────────────────────────────────────────── */
+.imp-drop {
+  border: 2px dashed var(--gold-border);
+  border-radius: 16px;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: rgba(180, 139, 76, 0.04);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s;
+}
+.imp-drop:hover {
+  background: rgba(180, 139, 76, 0.09);
+  border-color: var(--gold);
+}
+.imp-drop strong { font-size: 15px; font-weight: 600; }
+.imp-drop span { font-size: 12.5px; color: var(--text-muted); }
+.imp-drop svg { color: var(--gold); margin-bottom: 6px; }
+
+/* ── Step 2 mapping table ─────────────────────────────────────── */
+.imp-auto-hint {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--gold);
+  font-weight: 600;
+}
+.imp-map-table {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.imp-map-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 1fr;
+  gap: 12px;
+  padding: 10px 14px;
+  align-items: center;
+  font-size: 13.5px;
+}
+.imp-map-row + .imp-map-row { border-top: 1px solid var(--border); }
+.imp-map-head {
+  background: var(--bg-elevated);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.imp-map-header { font-weight: 600; }
+.imp-map-sample {
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.imp-map-auto { color: var(--gold); flex-shrink: 0; }
+.imp-map-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.imp-map-select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-glow);
+}
+@media (max-width: 680px) {
+  .imp-map-row { grid-template-columns: 1fr; gap: 4px; }
+  .imp-map-head { display: none; }
+}
+
+.imp-field {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.imp-field label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.imp-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.imp-missing {
+  list-style: none;
+  padding: 10px 14px;
+  margin-top: 14px;
+  background: rgba(180, 83, 9, 0.08);
+  border: 1px solid rgba(180, 83, 9, 0.22);
+  border-radius: 10px;
+}
+.imp-missing li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #a04e09;
+}
+
+/* ── Step 3 preview ──────────────────────────────────────────── */
+.imp-preview-count {
+  margin-inline-start: auto;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.imp-preview-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.imp-preview-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-inline-end: 4px;
+}
+.imp-preview-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s;
+}
+.imp-preview-row-sel {
+  border-color: var(--gold);
+  background: rgba(180, 139, 76, 0.05);
+}
+.imp-preview-row-invalid {
+  opacity: 0.65;
+  background: rgba(185, 28, 28, 0.04);
+  border-color: rgba(185, 28, 28, 0.2);
+  cursor: not-allowed;
+}
+.imp-preview-cells {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+.imp-preview-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.imp-preview-cell small {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+.imp-preview-cell strong {
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.imp-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--success, #15803d);
+  white-space: nowrap;
+}
+.imp-preview-row-invalid .imp-preview-badge { color: #b91c1c; }
+
+@media (max-width: 680px) {
+  .imp-preview-cells { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Step 4 progress ─────────────────────────────────────────── */
+.imp-progress-bar-wrap p {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.imp-progress-bar {
+  height: 10px;
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.imp-progress-fill {
+  height: 100%;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+  transition: width 0.25s ease;
+}
+.imp-progress-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.imp-spin { animation: imp-spin 1s linear infinite; }
+@keyframes imp-spin { to { transform: rotate(360deg); } }
+
+.imp-done {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.imp-done-stat {
+  text-align: center;
+  padding: 18px 12px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+}
+.imp-done-stat strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.imp-done-stat span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.imp-done-stat-err strong { color: #b91c1c; }
+
+.imp-done-errors {
+  grid-column: 1 / -1;
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+.imp-done-errors summary { cursor: pointer; color: var(--text-muted); }
+.imp-done-errors ul { list-style: none; padding: 8px 0 0; }
+.imp-done-errors li { padding: 4px 0; color: var(--text-primary); }
+
+.imp-done .imp-step-actions {
+  grid-column: 1 / -1;
+}
+@media (max-width: 520px) {
+  .imp-done { grid-template-columns: 1fr 1fr; }
+  .imp-done-stat-err { grid-column: 1 / -1; }
+}

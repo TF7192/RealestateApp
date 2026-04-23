@@ -22,6 +22,7 @@ import { registerMeRoutes } from './routes/me.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerYad2Routes } from './routes/yad2.js';
+import { registerImportRoutes } from './routes/import.js';
 import { registerMarketRoutes } from './routes/market.js';
 import { registerSitemapRoute } from './routes/sitemap.js';
 import { registerProspectRoutes } from './routes/prospects.js';
@@ -233,6 +234,7 @@ export async function build() {
   await app.register(registerChatRoutes, { prefix: '/api/chat' });
   await app.register(registerAdminRoutes, { prefix: '/api/admin' });
   await app.register(registerYad2Routes,  { prefix: '/api/integrations/yad2' });
+  await app.register(registerImportRoutes, { prefix: '/api/import' });
   await app.register(registerMarketRoutes, { prefix: '/api/market' });
   await app.register(registerProspectRoutes, { prefix: '/api' });
   // P-3 — prospect agreement PDF + lead-link endpoints. Same /api prefix

@@ -23,6 +23,7 @@ import {
   Copy,
   Edit3,
   StickyNote,
+  Upload,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
@@ -876,6 +877,14 @@ export default function Properties() {
               {copiedLink ? <Check size={14} aria-hidden="true" /> : <LinkIcon size={14} aria-hidden="true" />}
               <span>{copiedLink ? 'הקישור הועתק' : 'קישור ללקוח'}</span>
             </button>
+            <Link
+              to="/import/properties"
+              className="btn btn-ghost btn-sm"
+              title="ייבוא נכסים מ-Excel / CSV"
+            >
+              <Upload size={14} aria-hidden="true" />
+              <span>ייבוא מ-Excel</span>
+            </Link>
             <Link to="/properties/new" className="btn btn-primary">
               <Plus size={18} />
               קליטת נכס חדש
