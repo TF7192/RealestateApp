@@ -194,16 +194,25 @@ function toNum(v: unknown): number | null {
 }
 
 // ── SPA navigation ──────────────────────────────────────────────
-// Always routes through the buy view first — that's the only way to
-// get an addressId out of the autocomplete. Rent data is NOT deal-data:
-// it's aggregated monthly averages served as a static JSON keyed by
-// neighborhoodId, which we fetch separately (see fetchRentAggregates).
+// The autocomplete can resolve into four view types depending on the
+// query's specificity + whether the city has registered neighborhoods:
+//   - ?view=address&id=<addressId>          (e.g. "סוקולוב 12 ראשון לציון")
+//   - ?view=street&id=<streetId>            (e.g. "לאה גולדברג נס ציונה")
+//   - ?view=settlement&id=<settlementId>    (e.g. just a city name)
+//   - ?view=neighborhood&id=<neighborhoodId>
+// Any of these is a valid "resolved" view for us. Rent data is
+// aggregated at either the neighborhood or settlement level, so we
+// pick the right S3 path based on which id we got.
+type ResolvedView = {
+  kind: 'address' | 'street' | 'settlement' | 'neighborhood';
+  id: string;
+};
 async function driveSpa(
   page: Page,
   city: string,
   street: string,
   log: (m: string) => void,
-) {
+): Promise<ResolvedView> {
   await page.goto('https://www.nadlan.gov.il/', {
     waitUntil: 'domcontentloaded',
     timeout: NAV_TIMEOUT_MS,
@@ -216,61 +225,91 @@ async function driveSpa(
   await page.waitForTimeout(1500);
   await input.press('Enter');
   try {
-    await page.waitForURL(/view=address/i, { timeout: 15_000 });
+    await page.waitForURL(/view=(address|street|settlement|neighborhood)/i, { timeout: 15_000 });
   } catch {
-    log(`nadlan: query "${query}" did not resolve to an address view`);
+    log(`nadlan: query "${query}" did not resolve to a known view`);
     throw new Error('address_not_resolved');
   }
   await page.waitForTimeout(DATA_WAIT_MS);
+
+  const url = page.url();
+  const m = url.match(/view=(address|street|settlement|neighborhood)(?:&|.*&)id=(\d+)/i)
+    ?? url.match(/[?&]id=(\d+)/);
+  if (!m) throw new Error('address_not_resolved');
+  // Two capture shapes above; normalise.
+  const kind = (m.length === 3 ? m[1] : 'address') as ResolvedView['kind'];
+  const id   = m.length === 3 ? m[2] : m[1];
+  return { kind, id };
 }
 
-// Rent view on nadlan.gov.il is aggregated, not per-deal. The static
-// JSON at /api/pages/neighborhood/rent/<neighborhoodId>.json exposes
-// `trends.rooms[i].graphData[]` — one entry per (year, month, rooms)
-// with the neighborhood's average monthly rent. We synthesise one
-// "deal" per entry so the existing MarketContextCard can render the
-// timeline without frontend changes.
-async function fetchRentAggregates(
+// Aggregated rent JSON. nadlan.gov.il serves a tree of pre-computed
+// rent stats at:
+//   /api/pages/neighborhood/rent/<neighborhoodId>.json
+//   /api/pages/settlement/rent/<settlementId>.json
+//   /api/pages/street/rent/<streetId>.json        (not always present)
+// Each has a `trends.rooms[i].graphData[]` shape: one entry per
+// (year, month, rooms) with the area's average monthly rent for that
+// room count. We synthesise one "deal" per entry so the existing
+// MarketContextCard can render the timeline without frontend changes.
+//
+// Strategy: try the most specific level first (whatever the SPA
+// resolved to), fall back to broader levels if that 404s or has no
+// graphData.
+async function fetchAggregates(
   page: Page,
-  neighborhoodId: number,
-): Promise<NadlanDeal[]> {
-  const url = `https://data.nadlan.gov.il/api/pages/neighborhood/rent/${neighborhoodId}.json`;
-  let json: any = null;
-  try {
-    json = await page.evaluate(async (u: string) => {
-      const r = await fetch(u);
-      if (!r.ok) return null;
-      return await r.json();
-    }, url);
-  } catch { return []; }
-  if (!json) return [];
-
-  const out: NadlanDeal[] = [];
-  const roomBuckets: any[] = Array.isArray(json?.trends?.rooms) ? json.trends.rooms : [];
-  for (const bucket of roomBuckets) {
-    const rooms = toNum(bucket?.numRooms);
-    const graph: any[] = Array.isArray(bucket?.graphData) ? bucket.graphData : [];
-    for (const g of graph) {
-      const price = toNum(g?.neighborhoodPrice ?? g?.settlementPrice);
-      const y = toNum(g?.year);
-      const m = toNum(g?.month);
-      if (!price || !y || !m) continue;
-      // Format dealDate as first of the month — frontend parses this.
-      const dealDate = `${y}-${String(m).padStart(2, '0')}-01`;
-      out.push({
-        street: json.neighborhoodName || null,
-        city: json.settlementName || null,
-        dealDate,
-        price,
-        rooms,
-        sqm: null,
-        floor: null,
-        buildYear: null,
-        pricePerSqm: null,
-      });
-    }
+  kind: 'buy' | 'rent',
+  view: ResolvedView,
+  settlementIdFromDeals: string | null,
+  neighborhoodIdFromDeals: string | null,
+): Promise<{ deals: NadlanDeal[]; source: string | null }> {
+  const attempts: { scope: string; id: string }[] = [];
+  if (view.kind === 'address' || view.kind === 'street') {
+    if (neighborhoodIdFromDeals) attempts.push({ scope: 'neighborhood', id: neighborhoodIdFromDeals });
+    if (settlementIdFromDeals)   attempts.push({ scope: 'settlement',   id: settlementIdFromDeals });
   }
-  return out;
+  if (view.kind === 'neighborhood') attempts.push({ scope: 'neighborhood', id: view.id });
+  if (view.kind === 'settlement')   attempts.push({ scope: 'settlement',   id: view.id });
+  if (!attempts.find((a) => a.id === view.id)) attempts.push({ scope: view.kind, id: view.id });
+
+  for (const { scope, id } of attempts) {
+    const url = `https://data.nadlan.gov.il/api/pages/${scope}/${kind}/${id}.json`;
+    let json: any = null;
+    try {
+      json = await page.evaluate(async (u: string) => {
+        const r = await fetch(u);
+        if (!r.ok) return null;
+        return await r.json();
+      }, url);
+    } catch { continue; }
+    if (!json) continue;
+
+    const roomBuckets: any[] = Array.isArray(json?.trends?.rooms) ? json.trends.rooms : [];
+    const out: NadlanDeal[] = [];
+    for (const bucket of roomBuckets) {
+      const rooms = toNum(bucket?.numRooms);
+      const graph: any[] = Array.isArray(bucket?.graphData) ? bucket.graphData : [];
+      for (const g of graph) {
+        // Prefer the tightest area's price available.
+        const price = toNum(g?.neighborhoodPrice ?? g?.settlementPrice ?? g?.countryPrice);
+        const y = toNum(g?.year);
+        const m = toNum(g?.month);
+        if (!price || !y || !m) continue;
+        out.push({
+          street: json.neighborhoodName || json.settlementName || null,
+          city: json.settlementName || null,
+          dealDate: `${y}-${String(m).padStart(2, '0')}-01`,
+          price,
+          rooms,
+          sqm: null,
+          floor: null,
+          buildYear: null,
+          pricePerSqm: null,
+        });
+      }
+    }
+    if (out.length > 0) return { deals: out, source: url };
+  }
+  return { deals: [], source: null };
 }
 
 // ── Public API ──────────────────────────────────────────────────
@@ -294,20 +333,33 @@ export async function fetchNadlanMarket(
 
   const ctx = await newCrawlContext();
   const bodyPromises: Promise<{ url: string; buf: Buffer | null }>[] = [];
+  // Track static-JSON page URLs the SPA loads in the background.
+  // Their paths encode IDs we need for the rent-aggregate fallback
+  // (e.g. `/pages/settlement/buy/7200.json` tells us settlementId=7200
+  // even when deal-data came back empty).
+  const observedPageUrls: string[] = [];
 
   ctx.on('response', (resp) => {
     const u = resp.url();
-    if (!/api\.nadlan\.gov\.il\/deal-data/.test(u)) return;
-    bodyPromises.push(
-      resp.body()
-        .then((buf) => ({ url: u, buf }))
-        .catch(() => ({ url: u, buf: null as Buffer | null })),
-    );
+    if (/api\.nadlan\.gov\.il\/deal-data/.test(u)) {
+      bodyPromises.push(
+        resp.body()
+          .then((buf) => ({ url: u, buf }))
+          .catch(() => ({ url: u, buf: null as Buffer | null })),
+      );
+      return;
+    }
+    if (/data\.nadlan\.gov\.il\/api\/pages\/[a-z]+\/(buy|rent)\/\d+\.json/.test(u)) {
+      // Dedupe by ignoring the cache-bust query string.
+      const clean = u.split('?')[0];
+      if (!observedPageUrls.includes(clean)) observedPageUrls.push(clean);
+    }
   });
 
+  let view: ResolvedView;
   const page = await ctx.newPage();
   try {
-    await driveSpa(page, city, street, log);
+    view = await driveSpa(page, city, street, log);
   } catch (e) {
     const msg = (e as Error).message || 'unknown';
     result.error = msg === 'address_not_resolved' ? 'no_address_match' : 'nav_failed';
@@ -318,37 +370,69 @@ export async function fetchNadlanMarket(
   const settled = await Promise.all(bodyPromises);
   result.apiSources = settled.map((s) => s.url).slice(0, 10);
 
-  // Parse buy deals + discover neighborhoodId for the rent branch.
+  // Parse buy deals + harvest neighborhoodId / settlementId from the
+  // items to feed the rent-aggregate fetcher.
   const buyDeals: NadlanDeal[] = [];
-  let neighborhoodId: number | null = null;
+  let neighborhoodId: string | null = null;
+  let settlementId: string | null = null;
   for (const s of settled) {
     if (!s.buf) continue;
     const json = decodeNadlanBody(s.buf);
     if (!json) continue;
     const items: any[] = Array.isArray(json?.data?.items) ? json.data.items : [];
     for (const it of items) {
-      if (!neighborhoodId && it?.neighborhoodId) {
-        const n = toNum(it.neighborhoodId);
-        if (n) neighborhoodId = n;
+      if (!neighborhoodId && it?.neighborhoodId) neighborhoodId = String(it.neighborhoodId);
+      if (!settlementId && (it?.settlmentID ?? it?.settlementId)) {
+        settlementId = String(it.settlmentID ?? it.settlementId);
       }
     }
     buyDeals.push(...extractDeals(json));
   }
 
-  if (kind === 'buy') {
-    result.deals = buyDeals;
-  } else {
-    // Rent — swap to the aggregated JSON. Needs neighborhoodId pulled
-    // from the buy response.
-    if (!neighborhoodId) {
-      log('nadlan: no neighborhoodId found in buy response — cannot fetch rent aggregates');
-      result.error = 'no_neighborhood_id';
-    } else {
-      result.deals = await fetchRentAggregates(page, neighborhoodId);
-      result.apiSources.push(
-        `https://data.nadlan.gov.il/api/pages/neighborhood/rent/${neighborhoodId}.json`,
-      );
+  // Harvest any IDs revealed by the SPA's background page fetches.
+  // Pattern: /pages/<kind>/<buy|rent>/<id>.json. Prefer the narrowest
+  // available scope (neighborhood > street > settlement).
+  const observedIds: { scope: 'neighborhood' | 'settlement' | 'street'; id: string }[] = [];
+  for (const u of observedPageUrls) {
+    const m = u.match(/\/pages\/([a-z]+)\/(buy|rent)\/(\d+)\.json/);
+    if (!m) continue;
+    const scope = m[1] as 'neighborhood' | 'settlement' | 'street';
+    if (scope === 'neighborhood' || scope === 'settlement' || scope === 'street') {
+      if (!observedIds.find((o) => o.scope === scope && o.id === m[3])) {
+        observedIds.push({ scope, id: m[3] });
+      }
     }
+  }
+  if (!neighborhoodId) {
+    const o = observedIds.find((o) => o.scope === 'neighborhood');
+    if (o) neighborhoodId = o.id;
+  }
+  if (!settlementId) {
+    const o = observedIds.find((o) => o.scope === 'settlement');
+    if (o) settlementId = o.id;
+  }
+
+  if (kind === 'buy') {
+    if (buyDeals.length > 0) {
+      result.deals = buyDeals;
+    } else {
+      // deal-data came back empty (small settlement, street view, etc.).
+      // Fall back to the aggregated settlement/neighborhood buy JSON —
+      // same shape as rent, just a different path.
+      const { deals, source } = await fetchAggregates(
+        page, 'buy', view, settlementId, neighborhoodId,
+      );
+      result.deals = deals;
+      if (source) result.apiSources.push(source);
+      if (deals.length === 0) result.error = 'no_buy_data';
+    }
+  } else {
+    const { deals, source } = await fetchAggregates(
+      page, 'rent', view, settlementId, neighborhoodId,
+    );
+    result.deals = deals;
+    if (source) result.apiSources.push(source);
+    if (deals.length === 0) result.error = 'no_rent_data';
   }
 
   // De-dup by (date, price, sqm, street).
