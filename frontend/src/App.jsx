@@ -38,6 +38,9 @@ const Yad2Import = lazy(() => import('./pages/Yad2Import'));
 // Excel / CSV import wizard — shared between /import/leads and
 // /import/properties. Lazy so xlsx (~300KB) isn't in the main bundle.
 const Import = lazy(() => import('./pages/Import'));
+// Landing page the sidebar links to — picks leads vs properties and
+// drops the agent into the wizard above.
+const ImportPicker = lazy(() => import('./pages/ImportPicker'));
 // MLS parity — Sprint 1/4/5 new pages. Lazy so each lands in its own
 // chunk and the Dashboard-first-paint budget doesn't regress.
 const Reports = lazy(() => import('./pages/Reports'));
@@ -282,6 +285,7 @@ function AppRoutes() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/calculator" element={<SellerCalculator />} />
             <Route path="/integrations/yad2" element={<Yad2Import />} />
+            <Route path="/import" element={<ImportPicker />} />
             <Route path="/import/:type" element={<Import />} />
             {/* MLS parity — Sprint 4/5/1 standalone pages. */}
             <Route path="/reports" element={<Reports />} />

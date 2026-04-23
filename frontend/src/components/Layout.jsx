@@ -25,6 +25,7 @@ import {
   MessageCircle,
   Calculator,
   Download as DownloadIcon,
+  Upload as UploadIcon,
   BarChart2,
   Activity as ActivityIcon,
   Bell,
@@ -68,6 +69,7 @@ const navItems = [
   { path: '/templates', icon: FileText, labelKey: 'menu.templates' },
   { path: '/calculator', icon: Calculator, labelKey: 'menu.calculator' },
   { path: '/integrations/yad2', icon: DownloadIcon, labelKey: 'menu.yad2Import' },
+  { path: '/import', icon: UploadIcon, labelKey: 'menu.excelImport' },
 ];
 
 const quickActions = [
