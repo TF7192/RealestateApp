@@ -821,6 +821,17 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
   // propertyOwnerId is handled separately in the route — strip it from the
   // raw update payload so it doesn't bypass the resolveOwnerId() pathway.
   delete data.propertyOwnerId;
+  // primaryAgentId must go through the relation on Prisma's update
+  // input — the generated type exposes `primaryAgent: { connect }` /
+  // `{ disconnect }` but rejects the raw FK scalar, which was the
+  // root cause of the "Unknown argument `primaryAgentId`" 500s on
+  // every property save after the 2026-04-23 deploy.
+  if (data.primaryAgentId !== undefined) {
+    data.primaryAgent = data.primaryAgentId
+      ? { connect: { id: data.primaryAgentId } }
+      : { disconnect: true };
+    delete data.primaryAgentId;
+  }
   if (data.exclusiveStart) data.exclusiveStart = new Date(data.exclusiveStart);
   if (data.exclusiveEnd) data.exclusiveEnd = new Date(data.exclusiveEnd);
   // Sprint 1 / MLS parity — Task J9. `exclusivityExpire` is orthogonal
