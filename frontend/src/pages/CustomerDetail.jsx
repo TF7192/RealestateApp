@@ -282,7 +282,7 @@ export default function CustomerDetail() {
               codebase; pulling it up into the left column so it sits
               above the lead summary. */}
           <div className="cd-section cd-section-embedded">
-            <MatchingList leadId={lead.id} />
+            <MatchingList leadId={lead.id} title="נכסים תואמים" />
           </div>
           <LeadSummaryPanel lead={lead} onEdit={() => setEditOpen(true)} />
           <section className="cd-section cd-tags-section" aria-label={t('detail.sections.tagsAria')}>
