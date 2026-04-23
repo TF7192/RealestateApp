@@ -29,7 +29,10 @@ import MatchingList from '../components/MatchingList';
 import CustomerEditDialog from '../components/CustomerEditDialog';
 import { Edit3 } from 'lucide-react';
 import ActivityPanel from '../components/ActivityPanel';
-import LeadSearchProfilesEditor from '../components/LeadSearchProfilesEditor';
+// LeadSearchProfilesEditor removed from the detail page — the main
+// search prefs (city, street, rooms, price, purpose) are already in
+// the LeadSummaryPanel + CustomerEditDialog. Agents consistently
+// couldn't tell what the "פרופילי חיפוש" block was meant for.
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
 import {
   CUSTOMER_STATUS_LABELS,
@@ -286,9 +289,6 @@ export default function CustomerDetail() {
             <h3 className="cd-section-title">{t('detail.sections.tags')}</h3>
             <TagPicker entityType="LEAD" entityId={lead.id} />
           </section>
-          <div className="cd-section cd-section-embedded">
-            <LeadSearchProfilesEditor leadId={lead.id} />
-          </div>
         </div>
         <div className="cd-timeline-col">
           <div className="cd-section cd-section-embedded">
