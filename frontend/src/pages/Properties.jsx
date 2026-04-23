@@ -40,6 +40,7 @@ import TransferPropertyDialog from '../components/TransferPropertyDialog';
 import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import StickyActionBar from '../components/StickyActionBar';
+import Portal from '../components/Portal';
 import { OverflowSheet } from '../components/MobilePickers';
 import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
 import PageTour from '../components/PageTour';
@@ -1615,41 +1616,45 @@ export default function Properties() {
         );
       })()}
 
-      {/* Floating bulk action bar — slides up from the bottom thumb
-          zone the moment selection mode kicks in. Empty state shows
-          "בחר נכסים…" hint so the agent doesn't think the screen is
-          frozen. Action button stays disabled until ≥1 picked. */}
+      {/* Floating bulk action bar — Portal-ed to document.body so it
+          escapes any ancestor stacking/containing block (Properties is
+          deep inside the app layout which has transformed / will-
+          change wrappers that trapped the bar inside the page flow).
+          Empty state shows "בחר נכסים…" hint so the agent doesn't
+          think the screen is frozen. */}
       {selectMode && (
-        <div className="bulk-bar" role="region" aria-label="פעולות על מספר נכסים">
-          <div className="bulk-bar-inner">
-            <span className="bulk-bar-count">
-              {selectedIds.size > 0
-                ? <><strong>{selectedIds.size}</strong> נבחרו</>
-                : 'בחר נכסים'}
-            </span>
-            <div className="bulk-bar-actions">
-              <button
-                type="button"
-                className="bulk-bar-btn bulk-bar-danger"
-                disabled={selectedIds.size === 0 || bulkBusy}
-                onClick={() => { haptics.press(); setBulkConfirm(true); }}
-              >
-                <Trash2 size={16} />
-                {bulkBusy && bulkProgress
-                  ? `מוחק ${bulkProgress.done}/${bulkProgress.total}…`
-                  : 'מחק'}
-              </button>
-              <button
-                type="button"
-                className="bulk-bar-btn bulk-bar-ghost"
-                onClick={exitSelect}
-                disabled={bulkBusy}
-              >
-                ביטול
-              </button>
+        <Portal>
+          <div className="bulk-bar" role="region" aria-label="פעולות על מספר נכסים">
+            <div className="bulk-bar-inner">
+              <span className="bulk-bar-count">
+                {selectedIds.size > 0
+                  ? <><strong>{selectedIds.size}</strong> נבחרו</>
+                  : 'בחר נכסים'}
+              </span>
+              <div className="bulk-bar-actions">
+                <button
+                  type="button"
+                  className="bulk-bar-btn bulk-bar-danger"
+                  disabled={selectedIds.size === 0 || bulkBusy}
+                  onClick={() => { haptics.press(); setBulkConfirm(true); }}
+                >
+                  <Trash2 size={16} />
+                  {bulkBusy && bulkProgress
+                    ? `מוחק ${bulkProgress.done}/${bulkProgress.total}…`
+                    : 'מחק'}
+                </button>
+                <button
+                  type="button"
+                  className="bulk-bar-btn bulk-bar-ghost"
+                  onClick={exitSelect}
+                  disabled={bulkBusy}
+                >
+                  ביטול
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {waShare && (
