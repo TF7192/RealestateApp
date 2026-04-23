@@ -1,44 +1,41 @@
 // nadlan.gov.il market-context crawler — Playwright edition.
 //
-// Why Playwright:
-//   nadlan.gov.il migrated to a React SPA backed by api.nadlan.gov.il,
-//   and every API call is gated by a reCAPTCHA-Enterprise token that the
-//   SPA mints in-page. Direct HTTP to the API returns 403. A real
-//   Chromium loads the page, reCAPTCHA Enterprise scores the session
-//   invisibly, and the SPA's XHRs succeed — we just intercept the JSON
-//   responses as they fly by.
+// Flow (verified 2026-04-23):
+//   1. Load https://www.nadlan.gov.il/ (SPA hydrates).
+//   2. Type the free-text address into the autocomplete input
+//      (placeholder "הקלד כתובת / שם רחוב / שם ישוב").
+//   3. Press Enter. The SPA resolves text → addressId via
+//      es.govmap.gov.il/TldSearch and navigates to
+//      `/?view=address&id=<addressId>&page=deals`.
+//   4. The SPA XHRs `api.nadlan.gov.il/deal-data` (POST). The response
+//      is declared `content-type: application/json` but the body is a
+//      bare base64 string of gzipped JSON — NOT raw JSON. We must
+//      base64-decode + gunzip + JSON.parse ourselves.
+//   5. For rent, after (3) we navigate to the same URL with
+//      `page=rent` and wait for another `deal-data` call.
 //
-// Architecture mirrors yad2-crawler:
-//   - One lazy-launched Chromium per process.
-//   - Fresh BrowserContext per crawl (no cross-lookup cookie bleed).
-//   - Images/fonts/media/stylesheets aborted — we only need the JSON.
-//   - Intercept responses to api.nadlan.gov.il via ctx.on('response').
+// Prior shape `?search=<query>&page=deals` no longer does anything —
+// it just loads the landing page. Hence "no transactions" everywhere.
 //
-// We do NOT navigate to the "buy/rent" landing and try to click through
-// UIs. We go directly to the search URL shape the SPA itself uses when
-// you open a settlement/neighborhood, and harvest whatever XHRs it
-// kicks off. Stable enough in practice; if the SPA reshapes URLs we
-// only need to update the `buildUrls()` helper.
+// reCAPTCHA Enterprise still scores the session invisibly; we drop
+// the `navigator.webdriver` flag so it grades us like a human visitor.
 
-import { chromium, type Browser, type BrowserContext, type Response } from 'playwright';
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import zlib from 'node:zlib';
 
 const NAV_TIMEOUT_MS = 30_000;
 const DATA_WAIT_MS = 15_000;
+const SEARCH_INPUT_SELECTOR = 'input[placeholder*="הקלד"]';
 
-// Polite desktop Chrome UA. No headless mode fingerprint if we can
-// help it (launch args below drop the `navigator.webdriver` flag).
 const DESKTOP_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 export type NadlanKind = 'buy' | 'rent';
 
 export interface NadlanDeal {
-  // Minimal shape we surface to the frontend. The underlying API
-  // returns much more, but we trim to only what the property-detail
-  // card actually renders, to keep the payload small when we cache it.
   street?: string | null;
   city?: string | null;
-  dealDate?: string | null;   // ISO-ish; pass-through
+  dealDate?: string | null;
   price?: number | null;
   rooms?: number | null;
   sqm?: number | null;
@@ -51,10 +48,8 @@ export interface NadlanResult {
   kind: NadlanKind;
   queryCity: string;
   queryStreet: string;
-  fetchedAt: string;          // ISO
+  fetchedAt: string;
   deals: NadlanDeal[];
-  // Raw samples of API URLs we observed, for debug + future shape
-  // migrations. Trimmed to 10 entries so logs don't blow up.
   apiSources: string[];
   error?: string;
 }
@@ -93,16 +88,13 @@ async function newCrawlContext(): Promise<BrowserContext> {
       'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
     },
   });
-  // Drop WebDriver flag so reCAPTCHA Enterprise scores us like a
-  // normal visitor.
   await ctx.addInitScript(() => {
     try {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     } catch { /* already defined */ }
   });
-  // Block the asset byte-weight we don't need. Keep images OFF but
-  // keep stylesheets ON — the SPA lazy-loads data only after it
-  // hydrates and the hydration path touches CSS.
+  // Block bytes we don't need. Keep CSS — the SPA only fires its XHRs
+  // after hydration, and hydration touches stylesheets.
   await ctx.route('**/*', (route) => {
     const t = route.request().resourceType();
     if (t === 'image' || t === 'font' || t === 'media') return route.abort();
@@ -127,62 +119,158 @@ function ensureShutdownHook() {
   process.once('SIGINT', shutdown);
 }
 
-// ── URL shapes ──────────────────────────────────────────────────
-//
-// The SPA uses `https://www.nadlan.gov.il/?view=...&query=...&page=...`.
-// We try the "search" entrypoint which accepts free-text and then
-// narrows to the right scope. `query` is an address string.
-function buildUrls(city: string, street: string, kind: NadlanKind): string[] {
-  const q = encodeURIComponent(`${street} ${city}`.trim());
-  const page = kind === 'rent' ? 'rent' : 'deals';
-  return [
-    `https://www.nadlan.gov.il/?search=${q}&page=${page}`,
-    `https://www.nadlan.gov.il/?view=search&query=${q}&page=${page}`,
-  ];
+// ── Body decoding ────────────────────────────────────────────────
+// api.nadlan.gov.il/deal-data returns base64(gzip(json)) with a
+// bogus `content-type: application/json` header. Decode ourselves.
+function decodeNadlanBody(buf: Buffer): any | null {
+  try {
+    const s = buf.toString('utf8');
+    if (!s) return null;
+    // Raw gzip fallback, just in case they ever stop base64-ing.
+    if (buf[0] === 0x1f && buf[1] === 0x8b) {
+      return JSON.parse(zlib.gunzipSync(buf).toString('utf8'));
+    }
+    // Raw JSON fallback — trim whitespace.
+    const trimmed = s.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      return JSON.parse(trimmed);
+    }
+    // Expected path: base64 of gzipped JSON. "H4sI" is the base64
+    // signature of the gzip magic bytes.
+    if (!s.startsWith('H4sI')) return null;
+    const bin = Buffer.from(s, 'base64');
+    if (bin[0] !== 0x1f || bin[1] !== 0x8b) return null;
+    return JSON.parse(zlib.gunzipSync(bin).toString('utf8'));
+  } catch {
+    return null;
+  }
 }
 
-// Heuristic to pick the right JSON off a generic API response. The
-// nadlan API hangs a lot of things off /deal-data, /deal-info,
-// /settlement/<kind>/<id>, /neighborhood/<kind>/<id>. We accept any
-// of those and look for an array of deals inside.
-function extractDeals(json: unknown, kind: NadlanKind): NadlanDeal[] {
-  const visit = (node: any): any[] => {
-    if (!node) return [];
-    if (Array.isArray(node)) {
-      // Take the first array-of-objects that looks like deals.
-      const asDeals = node.filter((x) => x && typeof x === 'object'
-        && (x.priceOfDeal != null || x.price != null || x.dealAmount != null || x.avgDealPrice != null));
-      if (asDeals.length > 0) return asDeals;
-      // Otherwise descend.
-      const deeper: any[] = [];
-      for (const item of node) deeper.push(...visit(item));
-      return deeper;
-    }
-    if (typeof node === 'object') {
-      const deeper: any[] = [];
-      for (const v of Object.values(node)) deeper.push(...visit(v));
-      return deeper;
-    }
-    return [];
-  };
-  const candidates = visit(json).slice(0, 50);
-  return candidates.map<NadlanDeal>((d) => ({
-    street: d.streetName || d.street || d.address || null,
-    city: d.city || d.settlementName || d.settlement || null,
-    dealDate: d.dealDate || d.dealDateTime || d.date || d.signDate || null,
-    price: toNum(d.priceOfDeal ?? d.price ?? d.dealAmount ?? d.avgDealPrice),
-    rooms: toNum(d.numOfRooms ?? d.rooms),
-    sqm: toNum(d.dealNatureArea ?? d.area ?? d.sqm),
-    floor: toNum(d.floorNumber ?? d.floor),
-    buildYear: toNum(d.buildYear ?? d.yearBuilt),
-    pricePerSqm: toNum(d.pricePerSqm ?? d.avgPricePerSqm),
-  }));
+// ── Deal extraction ──────────────────────────────────────────────
+// Primary shape: { statusCode, data: { total_rows, items: [...] } }
+// Each item has dealAmount, dealDate, roomNum, assetArea, yearBuilt,
+// address, floor (Hebrew string like "קומה 3"), neighborhoodName, etc.
+function extractDeals(json: any): NadlanDeal[] {
+  const items: any[] = Array.isArray(json?.data?.items)
+    ? json.data.items
+    : Array.isArray(json?.items)
+    ? json.items
+    : [];
+  if (items.length === 0) return [];
+
+  return items
+    .filter((d) => d && typeof d === 'object')
+    .map<NadlanDeal>((d) => {
+      const price = toNum(d.dealAmount ?? d.priceOfDeal ?? d.price);
+      const sqm = toNum(d.assetArea ?? d.dealNatureArea ?? d.area);
+      const rawFloor = d.floor;
+      // Floor arrives as Hebrew text ("קומה 3", "קרקע", "חנייה").
+      // Try to pull a number out; fall back to null.
+      const floorNum = typeof rawFloor === 'number'
+        ? rawFloor
+        : typeof rawFloor === 'string'
+          ? toNum(rawFloor.replace(/[^\d\-]/g, ''))
+          : null;
+      return {
+        street: (d.address as string) || (d.streetName as string) || null,
+        city: (d.settlementName as string) || (d.neighborhoodName as string) || null,
+        dealDate: (d.dealDate as string) || (d.signDate as string) || null,
+        price,
+        rooms: toNum(d.roomNum ?? d.numOfRooms ?? d.rooms),
+        sqm,
+        floor: floorNum,
+        buildYear: toNum(d.yearBuilt ?? d.buildYear),
+        pricePerSqm:
+          toNum(d.pricePerSqm ?? d.avgPricePerSqm)
+          ?? (price && sqm ? Math.round(price / sqm) : null),
+      };
+    });
 }
 
 function toNum(v: unknown): number | null {
-  if (v == null) return null;
+  if (v == null || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+// ── SPA navigation ──────────────────────────────────────────────
+// Always routes through the buy view first — that's the only way to
+// get an addressId out of the autocomplete. Rent data is NOT deal-data:
+// it's aggregated monthly averages served as a static JSON keyed by
+// neighborhoodId, which we fetch separately (see fetchRentAggregates).
+async function driveSpa(
+  page: Page,
+  city: string,
+  street: string,
+  log: (m: string) => void,
+) {
+  await page.goto('https://www.nadlan.gov.il/', {
+    waitUntil: 'domcontentloaded',
+    timeout: NAV_TIMEOUT_MS,
+  });
+  const input = await page.waitForSelector(SEARCH_INPUT_SELECTOR, {
+    timeout: 12_000,
+  });
+  const query = `${street} ${city}`.trim();
+  await input.fill(query);
+  await page.waitForTimeout(1500);
+  await input.press('Enter');
+  try {
+    await page.waitForURL(/view=address/i, { timeout: 15_000 });
+  } catch {
+    log(`nadlan: query "${query}" did not resolve to an address view`);
+    throw new Error('address_not_resolved');
+  }
+  await page.waitForTimeout(DATA_WAIT_MS);
+}
+
+// Rent view on nadlan.gov.il is aggregated, not per-deal. The static
+// JSON at /api/pages/neighborhood/rent/<neighborhoodId>.json exposes
+// `trends.rooms[i].graphData[]` — one entry per (year, month, rooms)
+// with the neighborhood's average monthly rent. We synthesise one
+// "deal" per entry so the existing MarketContextCard can render the
+// timeline without frontend changes.
+async function fetchRentAggregates(
+  page: Page,
+  neighborhoodId: number,
+): Promise<NadlanDeal[]> {
+  const url = `https://data.nadlan.gov.il/api/pages/neighborhood/rent/${neighborhoodId}.json`;
+  let json: any = null;
+  try {
+    json = await page.evaluate(async (u: string) => {
+      const r = await fetch(u);
+      if (!r.ok) return null;
+      return await r.json();
+    }, url);
+  } catch { return []; }
+  if (!json) return [];
+
+  const out: NadlanDeal[] = [];
+  const roomBuckets: any[] = Array.isArray(json?.trends?.rooms) ? json.trends.rooms : [];
+  for (const bucket of roomBuckets) {
+    const rooms = toNum(bucket?.numRooms);
+    const graph: any[] = Array.isArray(bucket?.graphData) ? bucket.graphData : [];
+    for (const g of graph) {
+      const price = toNum(g?.neighborhoodPrice ?? g?.settlementPrice);
+      const y = toNum(g?.year);
+      const m = toNum(g?.month);
+      if (!price || !y || !m) continue;
+      // Format dealDate as first of the month — frontend parses this.
+      const dealDate = `${y}-${String(m).padStart(2, '0')}-01`;
+      out.push({
+        street: json.neighborhoodName || null,
+        city: json.settlementName || null,
+        dealDate,
+        price,
+        rooms,
+        sqm: null,
+        floor: null,
+        buildYear: null,
+        pricePerSqm: null,
+      });
+    }
+  }
+  return out;
 }
 
 // ── Public API ──────────────────────────────────────────────────
@@ -199,68 +287,74 @@ export async function fetchNadlanMarket(
     deals: [],
     apiSources: [],
   };
-
   if (!city || !street) {
     result.error = 'missing city or street';
     return result;
   }
 
   const ctx = await newCrawlContext();
-  const apiJsonPromises: Promise<{ url: string; json: unknown }>[] = [];
-  const onResponse = (resp: Response) => {
-    const url = resp.url();
-    if (!/api\.nadlan\.gov\.il|nadlan\.gov\.il\/api\//.test(url)) return;
-    const ct = resp.headers()['content-type'] || '';
-    if (!/application\/json/i.test(ct)) return;
-    apiJsonPromises.push(
-      resp.json()
-        .then((j: unknown) => ({ url, json: j }))
-        .catch(() => ({ url, json: null })),
+  const bodyPromises: Promise<{ url: string; buf: Buffer | null }>[] = [];
+
+  ctx.on('response', (resp) => {
+    const u = resp.url();
+    if (!/api\.nadlan\.gov\.il\/deal-data/.test(u)) return;
+    bodyPromises.push(
+      resp.body()
+        .then((buf) => ({ url: u, buf }))
+        .catch(() => ({ url: u, buf: null as Buffer | null })),
     );
-  };
-  ctx.on('response', onResponse);
+  });
 
   const page = await ctx.newPage();
-  const urls = buildUrls(city, street, kind);
-  let navigated = false;
-  for (const u of urls) {
-    try {
-      await page.goto(u, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
-      navigated = true;
-      break;
-    } catch (e) {
-      log(`nadlan: nav failed ${u}: ${(e as Error).message}`);
-    }
-  }
-  if (!navigated) {
-    result.error = 'nav_failed';
+  try {
+    await driveSpa(page, city, street, log);
+  } catch (e) {
+    const msg = (e as Error).message || 'unknown';
+    result.error = msg === 'address_not_resolved' ? 'no_address_match' : 'nav_failed';
     await ctx.close();
     return result;
   }
 
-  // Give the SPA time to hydrate + fire its XHRs + receive responses.
-  // We don't know exactly which endpoint carries the data in any
-  // given view, so we wait a bounded window and then collect what we
-  // saw.
-  await page.waitForTimeout(DATA_WAIT_MS);
-  ctx.off('response', onResponse);
-
-  const settled = await Promise.all(apiJsonPromises);
+  const settled = await Promise.all(bodyPromises);
   result.apiSources = settled.map((s) => s.url).slice(0, 10);
 
+  // Parse buy deals + discover neighborhoodId for the rent branch.
+  const buyDeals: NadlanDeal[] = [];
+  let neighborhoodId: number | null = null;
   for (const s of settled) {
-    const deals = extractDeals(s.json, kind);
-    if (deals.length > 0) {
-      result.deals.push(...deals);
-      if (result.deals.length >= 50) break;
+    if (!s.buf) continue;
+    const json = decodeNadlanBody(s.buf);
+    if (!json) continue;
+    const items: any[] = Array.isArray(json?.data?.items) ? json.data.items : [];
+    for (const it of items) {
+      if (!neighborhoodId && it?.neighborhoodId) {
+        const n = toNum(it.neighborhoodId);
+        if (n) neighborhoodId = n;
+      }
+    }
+    buyDeals.push(...extractDeals(json));
+  }
+
+  if (kind === 'buy') {
+    result.deals = buyDeals;
+  } else {
+    // Rent — swap to the aggregated JSON. Needs neighborhoodId pulled
+    // from the buy response.
+    if (!neighborhoodId) {
+      log('nadlan: no neighborhoodId found in buy response — cannot fetch rent aggregates');
+      result.error = 'no_neighborhood_id';
+    } else {
+      result.deals = await fetchRentAggregates(page, neighborhoodId);
+      result.apiSources.push(
+        `https://data.nadlan.gov.il/api/pages/neighborhood/rent/${neighborhoodId}.json`,
+      );
     }
   }
 
-  // De-dup by (date, price, sqm). The API sometimes returns the same
-  // deal via multiple endpoints.
+  // De-dup by (date, price, sqm, street).
   const seen = new Set<string>();
   result.deals = result.deals.filter((d) => {
-    const k = `${d.dealDate || ''}|${d.price || ''}|${d.sqm || ''}|${d.street || ''}`;
+    const k = `${d.dealDate || ''}|${d.price || ''}|${d.sqm || ''}|${d.street || ''}|${d.rooms || ''}`;
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
