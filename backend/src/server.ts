@@ -23,6 +23,7 @@ import { registerChatRoutes } from './routes/chat.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerYad2Routes } from './routes/yad2.js';
 import { registerMarketRoutes } from './routes/market.js';
+import { registerSitemapRoute } from './routes/sitemap.js';
 import { registerProspectRoutes } from './routes/prospects.js';
 import { registerProspectPdfRoutes } from './routes/prospect-pdf.js';
 import { registerCalendarRoutes } from './routes/calendar.js';
@@ -250,6 +251,10 @@ export async function build() {
   await app.register(registerNeighborhoodGroupRoutes, { prefix: '/api/neighborhood-groups' });
   await app.register(registerSavedSearchRoutes, { prefix: '/api/saved-searches' });
   await app.register(registerFavoriteRoutes, { prefix: '/api/favorites' });
+
+  // /sitemap.xml — root-scoped so Google Search Console finds it at
+  // the conventional URL. Not under /api.
+  await app.register(registerSitemapRoute);
 
   // Request lifecycle observability — assigns a request_id, logs
   // method/route/status/duration, and sends an api_request event to
