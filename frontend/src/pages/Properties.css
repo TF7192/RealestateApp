@@ -1141,16 +1141,29 @@
  * devices. Desktop has no bottom tab bar so 18px is fine. */
 .bulk-bar {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Anchor to viewport bottom-center regardless of scroll position.
+     Was animating `transform: translateY(...)` which overwrote the
+     `translateX(-50%)` that keeps the bar centered — the element
+     landed off-center (right of viewport on RTL) the moment the
+     keyframes finished. Use inset-inline centering without transform
+     so the animation can keep its own transform without fighting
+     the positioning. */
+  inset-inline-start: 50%;
+  margin-inline-start: calc(-1 * min(50vw - 8px, 280px));
   bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
   z-index: 950;
   display: flex;
   justify-content: center;
   width: calc(100vw - 16px);
   max-width: 560px;
+  /* Parent is transparent + a pass-through container so clicks only
+     land on the actual action buttons inside. Children explicitly
+     re-enable pointer events. */
   pointer-events: none;
   animation: bulk-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bulk-bar > * {
+  pointer-events: auto;
 }
 
 @media (min-width: 821px) {
