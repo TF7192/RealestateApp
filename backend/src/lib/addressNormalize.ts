@@ -22,8 +22,15 @@
 // row stored as "שנקין". Write paths call it right before Prisma
 // create/update so newly stored data is canonical.
 
-import rawData from '../data/israelStreets.json';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
+// Load the registry JSON via readFileSync rather than ESM import.
+// Node 24 requires `with { type: 'json' }` on ESM JSON imports; tsc
+// transpiles the attribute differently across versions and the
+// runtime on prod was rejecting it. readFileSync is version-agnostic
+// and works identically under tsx / node / ts-node.
 type RegistryCity = {
   code: number;
   name: string;
@@ -31,7 +38,11 @@ type RegistryCity = {
 };
 type Registry = { version: string; source: string; cities: RegistryCity[] };
 
-const registry = rawData as Registry;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const registry = JSON.parse(
+  readFileSync(resolve(__dirname, '../data/israelStreets.json'), 'utf8'),
+) as Registry;
 
 // ── Normalization key ────────────────────────────────────────────────
 // Folds a user-typed Hebrew (or English) place name down to a form we
