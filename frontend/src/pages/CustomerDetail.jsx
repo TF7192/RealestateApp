@@ -26,6 +26,8 @@ import LeadMeetingDialog from '../components/LeadMeetingDialog';
 import TagPicker from '../components/TagPicker';
 import RemindersPanel from '../components/RemindersPanel';
 import MatchingList from '../components/MatchingList';
+import CustomerEditDialog from '../components/CustomerEditDialog';
+import { Edit3 } from 'lucide-react';
 import ActivityPanel from '../components/ActivityPanel';
 import LeadSearchProfilesEditor from '../components/LeadSearchProfilesEditor';
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
@@ -95,6 +97,11 @@ export default function CustomerDetail() {
   const [error, setError] = useState(null);
   const [matchCount, setMatchCount] = useState(0);
   const [meetingOpen, setMeetingOpen] = useState(false);
+  // L-12 — replace inline edit form with a modal, mirroring the edit
+  // button pattern on the property detail page. Detail view is now
+  // read-only + actionable; editing is a deliberate "open the form"
+  // gesture, not a background state the agent is always in.
+  const [editOpen, setEditOpen] = useState(false);
 
   const loadLead = useCallback(async () => {
     setLoading(true);
@@ -234,6 +241,14 @@ export default function CustomerDetail() {
             <Calendar size={14} />
             {t('detail.toolbar.scheduleMeeting')}
           </button>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => { haptics.tap(); setEditOpen(true); }}
+            title="ערוך פרטי לקוח"
+          >
+            <Edit3 size={14} />
+            ערוך
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={() => printPage()} title={t('detail.toolbar.printTitle')}>
             <Printer size={14} />
             {t('detail.toolbar.print')}
@@ -258,20 +273,19 @@ export default function CustomerDetail() {
           left; the new MLS-parity panels stack in the right column. */}
       <div className="cd-grid">
         <div className="cd-form-col">
+          {/* Property matches lead the way — this is the primary
+              reason an agent opens a lead's page (who can I pitch to
+              them today?). Matches component already lives in the
+              codebase; pulling it up into the left column so it sits
+              above the lead summary. */}
+          <div className="cd-section cd-section-embedded">
+            <MatchingList leadId={lead.id} />
+          </div>
+          <LeadSummaryPanel lead={lead} onEdit={() => setEditOpen(true)} />
           <section className="cd-section cd-tags-section" aria-label={t('detail.sections.tagsAria')}>
             <h3 className="cd-section-title">{t('detail.sections.tags')}</h3>
             <TagPicker entityType="LEAD" entityId={lead.id} />
           </section>
-          <CustomerEditForm
-            lead={lead}
-            onSaved={async (next) => {
-              setLead((cur) => ({ ...cur, ...next }));
-              toast.success(t('detail.saved'));
-              // Re-fetch to pick up any server-derived fields
-              try { await loadLead(); } catch { /* ignore */ }
-            }}
-            toast={toast}
-          />
           <div className="cd-section cd-section-embedded">
             <LeadSearchProfilesEditor leadId={lead.id} />
           </div>
@@ -281,15 +295,115 @@ export default function CustomerDetail() {
             <RemindersPanel leadId={lead.id} />
           </div>
           <div className="cd-section cd-section-embedded">
-            <MatchingList leadId={lead.id} />
-          </div>
-          <div className="cd-section cd-section-embedded">
             <ActivityPanel entityType="Lead" entityId={lead.id} />
           </div>
           <ActivityTimeline lead={lead} />
         </div>
       </div>
+
+      {editOpen && (
+        <CustomerEditDialog
+          lead={lead}
+          onClose={() => setEditOpen(false)}
+          onSaved={async () => {
+            setEditOpen(false);
+            toast.success(t('detail.saved'));
+            try { await loadLead(); } catch { /* ignore */ }
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// LeadSummaryPanel — read-only snapshot of the lead's profile. Used
+// to be an inline form that looked like an "edit" view; replaced with
+// a summary card matching the property detail page pattern so the
+// lead page defaults to "here's what you need to act on", with a
+// deliberate "ערוך" button to open the edit dialog.
+// ──────────────────────────────────────────────────────────────────
+function LeadSummaryPanel({ lead, onEdit }) {
+  const { t } = useTranslation('customers');
+
+  const fmtPrice = (n) => {
+    if (!Number.isFinite(n) || n === 0) return null;
+    if (n >= 1_000_000) return `₪${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `₪${Math.round(n / 1_000)}K`;
+    return `₪${n.toLocaleString('he-IL')}`;
+  };
+  const priceRange = (() => {
+    const lo = fmtPrice(lead.priceMin);
+    const hi = fmtPrice(lead.priceMax);
+    if (lo && hi) return `${lo} – ${hi}`;
+    if (lo) return `מ-${lo}`;
+    if (hi) return `עד ${hi}`;
+    return null;
+  })();
+  const roomsRange = (() => {
+    const lo = Number.isFinite(lead.roomsMin) ? lead.roomsMin : null;
+    const hi = Number.isFinite(lead.roomsMax) ? lead.roomsMax : null;
+    if (lo != null && hi != null) return lo === hi ? `${lo}` : `${lo} – ${hi}`;
+    if (lo != null) return `מ-${lo}`;
+    if (hi != null) return `עד ${hi}`;
+    return null;
+  })();
+  const lookingLabel = lead.lookingFor === 'RENT' ? 'שכירות' : 'קנייה';
+  const interestLabel = lead.interestType === 'COMMERCIAL' ? 'מסחרי' : 'פרטי';
+
+  // The short list of "what an agent needs to know at a glance". Nulls
+  // drop out so the card doesn't read as a pile of em-dashes on a new
+  // lead with sparse data.
+  const rows = [
+    ['טלפון',            lead.phone],
+    ['אימייל',           lead.email],
+    ['עיר מבוקשת',       lead.city],
+    ['רחוב מבוקש',       lead.street],
+    ['מחפש',             `${lookingLabel} · ${interestLabel}`],
+    ['טווח מחיר',        priceRange],
+    ['חדרים',            roomsRange],
+    ['מקור',             lead.source],
+    ['סקטור',            lead.sector],
+    ['אישור עקרוני',     lead.preApproval ? 'יש' : null],
+  ].filter(([, v]) => v != null && v !== '');
+
+  return (
+    <section className="cd-section cd-summary" aria-label="פרטי לקוח">
+      <header className="cd-summary-head">
+        <h3 className="cd-section-title">פרטי לקוח</h3>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={onEdit}
+          title="ערוך פרטי לקוח"
+        >
+          <Edit3 size={14} />
+          ערוך
+        </button>
+      </header>
+
+      {rows.length === 0 ? (
+        <p className="cd-summary-empty">
+          {t('detail.notes.emptyLead', { defaultValue: 'עוד לא מולאו פרטים על הלקוח הזה.' })}
+        </p>
+      ) : (
+        <dl className="cd-summary-grid">
+          {rows.map(([label, value]) => (
+            <div className="cd-summary-row" key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {lead.notes && (
+        <div className="cd-summary-notes">
+          <span className="cd-summary-notes-label">הערות</span>
+          <p>{lead.notes}</p>
+        </div>
+      )}
+    </section>
   );
 }
 

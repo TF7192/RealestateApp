@@ -355,3 +355,75 @@
 .cd-tags-section {
   margin-bottom: 12px;
 }
+
+/* Lead summary panel — replaces the inline edit form. Reads as a
+ * quick-glance snapshot (two-column dl on desktop, one-column on
+ * mobile) with an "ערוך" button in the header to open the modal. */
+.cd-summary {
+  margin-bottom: 12px;
+}
+.cd-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+.cd-summary-head .cd-section-title {
+  margin: 0;
+}
+.cd-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 18px;
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .cd-summary-grid { grid-template-columns: 1fr; }
+}
+.cd-summary-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cd-summary-row dt {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+.cd-summary-row dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cd-summary-notes {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.cd-summary-notes-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+.cd-summary-notes p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.cd-summary-empty {
+  margin: 0;
+  padding: 14px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
