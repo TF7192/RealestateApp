@@ -38,6 +38,14 @@ function validatePhone(raw) {
   if (!v) return null; // optional
   return PHONE_RE.test(v.replace(/\s/g, '')) ? null : 'מספר טלפון לא תקין';
 }
+
+// Format as the user types: strip non-digits, cap at 10 digits,
+// insert "-" after the 3-digit prefix (050-1234567).
+function formatPhone(raw) {
+  const digits = (raw || '').replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+}
 function validateLicense(raw) {
   const digits = (raw || '').replace(/\D/g, '');
   if (!digits) return 'מספר רישיון הוא שדה חובה';
@@ -89,7 +97,7 @@ export default function Onboarding() {
   };
   const back = () => { setErr(null); setStep((s) => Math.max(0, s - 1)); };
 
-  const finish = async () => {
+  const finish = async (destination = '/dashboard') => {
     setErr(null);
     if (licenseErr) { setStep(0); setErr(licenseErr); return; }
     if (phoneErr) { setStep(0); setErr(phoneErr); return; }
@@ -107,7 +115,7 @@ export default function Onboarding() {
       });
       await refresh();
       toast.success('ברוך הבא');
-      navigate('/dashboard', { replace: true });
+      navigate(destination, { replace: true });
     } catch (e) {
       const msg = e?.message || 'שמירה נכשלה';
       setErr(msg);
@@ -184,8 +192,9 @@ export default function Onboarding() {
                 type="tel"
                 inputMode="tel"
                 dir="ltr"
+                maxLength={11}
                 value={form.phone}
-                onChange={(v) => setF('phone', v)}
+                onChange={(v) => setF('phone', formatPhone(v))}
                 placeholder="050-0000000"
                 hint="נשתמש רק להתראות קריטיות ולסנכרון WhatsApp."
                 error={form.phone && phoneErr}
@@ -258,14 +267,27 @@ export default function Onboarding() {
                 בוחרים איך להתחיל — אפשר לדלג ולהוסיף מאוחר יותר.
               </p>
               {[
-                { icon: <Upload size={18} />, t: 'ייבוא מ-Excel',    d: 'נכסים, לקוחות ובעלים במכה אחת' },
-                { icon: <Plus size={18} />,   t: 'הוספה ידנית',      d: 'הקלדת הנכס והליד הראשון בעצמי' },
-                { icon: <ArrowLeft size={18} />, t: 'התחלה ריקה',   d: 'פשוט להתחיל, להוסיף בהדרגה' },
+                { icon: <Upload size={18} />,    t: 'ייבוא מ-Excel', d: 'נכסים, לקוחות ובעלים במכה אחת', to: '/import' },
+                { icon: <Plus size={18} />,      t: 'הוספה ידנית',   d: 'הקלדת הנכס והליד הראשון בעצמי', to: '/properties/new' },
+                { icon: <ArrowLeft size={18} />, t: 'התחלה ריקה',    d: 'פשוט להתחיל, להוסיף בהדרגה',     to: '/dashboard' },
               ].map((o, i) => (
-                <div key={i} style={{
-                  background: T.white, border: `1px solid ${T.border}`, borderRadius: 14,
-                  padding: 16, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12,
-                }}>
+                <button
+                  key={i}
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => finish(o.to)}
+                  style={{
+                    ...FONT, width: '100%', textAlign: 'inherit',
+                    cursor: submitting ? 'wait' : 'pointer',
+                    background: T.white, border: `1px solid ${T.border}`, borderRadius: 14,
+                    padding: 16, marginBottom: 10,
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    color: T.ink, transition: 'border-color 140ms, transform 140ms',
+                    opacity: submitting ? 0.7 : 1,
+                  }}
+                  onMouseOver={(e) => { if (!submitting) e.currentTarget.style.borderColor = T.gold; }}
+                  onMouseOut={(e) => { e.currentTarget.style.borderColor = T.border; }}
+                >
                   <div style={{
                     width: 40, height: 40, borderRadius: 10, background: T.goldSoft, color: T.gold,
                     display: 'grid', placeItems: 'center', flexShrink: 0,
@@ -274,7 +296,8 @@ export default function Onboarding() {
                     <div style={{ fontSize: 15, fontWeight: 700 }}>{o.t}</div>
                     <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{o.d}</div>
                   </div>
-                </div>
+                  <ArrowLeft size={15} aria-hidden="true" style={{ color: T.muted }} />
+                </button>
               ))}
               <div style={{
                 background: T.goldSoft, border: `1px solid ${T.gold}`, borderRadius: 12,

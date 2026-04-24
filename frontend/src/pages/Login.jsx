@@ -29,6 +29,15 @@ const DT = {
 };
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
+// Keystroke phone formatter — "050" → "050-" → "050-123" → "050-1234567".
+// Module-scope so the sub-component Desktop/MobileLogin can reference it
+// without threading it through props.
+function formatPhone(raw) {
+  const digits = (raw || '').replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+}
+
 export default function Login() {
   const { login, signup } = useAuth();
   const [searchParams] = useSearchParams();
@@ -225,7 +234,7 @@ function DesktopLogin(p) {
             {isSignup && (
               <>
                 <DField label="שם מלא" placeholder="אדם ברקוביץ" value={form.displayName} onChange={(v) => update('displayName', v)} icon={<User size={15} />} />
-                <DField label="טלפון (רשות)" type="tel" inputMode="tel" dir="ltr" placeholder="050-0000000" value={form.phone} onChange={(v) => update('phone', v)} icon={<Phone size={15} />} />
+                <DField label="טלפון (רשות)" type="tel" inputMode="tel" dir="ltr" maxLength={11} placeholder="050-0000000" value={form.phone} onChange={(v) => update('phone', formatPhone(v))} icon={<Phone size={15} />} />
               </>
             )}
             <DField label="אימייל" type="email" inputMode="email" dir="ltr" placeholder="name@domain.co.il" value={form.email} onChange={(v) => update('email', v)} icon={<Mail size={15} />} />
@@ -315,7 +324,7 @@ function MobileLogin(p) {
         {isSignup && (
           <>
             <MField label="שם מלא" placeholder="אדם ברקוביץ" value={form.displayName} onChange={(v) => update('displayName', v)} icon={<User size={16} />} />
-            <MField label="טלפון (רשות)" type="tel" inputMode="tel" dir="ltr" placeholder="050-0000000" value={form.phone} onChange={(v) => update('phone', v)} icon={<Phone size={16} />} />
+            <MField label="טלפון (רשות)" type="tel" inputMode="tel" dir="ltr" maxLength={11} placeholder="050-0000000" value={form.phone} onChange={(v) => update('phone', formatPhone(v))} icon={<Phone size={16} />} />
           </>
         )}
         <MField label="אימייל" type="email" inputMode="email" dir="ltr" placeholder="name@domain.co.il" value={form.email} onChange={(v) => update('email', v)} icon={<Mail size={16} />} />
