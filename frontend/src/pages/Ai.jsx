@@ -24,10 +24,17 @@ const DT = {
 };
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
+// Broker-specific prompts — wired to the agent's own data, not generic
+// selling-skills chat. Each prompt implies an action the AI chat page
+// can run against /api/ai/chat with context pulled from the caller's
+// leads / properties / deals.
 const SUGGESTED_PROMPTS = [
-  'נסח לי הודעת WhatsApp ללקוח חמים שעדיין לא חזר',
-  'איך אני מטפל בהתנגדות על מחיר?',
-  'הצע לי סקריפט פתיחה לפגישה עם קונה ראשון',
+  'תכתוב הודעת תזכורת לכל הלידים שמחפשים דירה בראשון לציון',
+  'תבדוק לי איזה ליד לא קיבל מענה בשבוע האחרון',
+  'סכם לי את העסקאות שנסגרו החודש',
+  'איזה נכסים במלאי שלי מתאימים לליד החם האחרון שהוספתי?',
+  'הצע לי טקסט שיווק לפנטהאוז על הים שאני משווק',
+  'הכן לי תזכורות מעקב לכל הלידים שבסטטוס פושר',
 ];
 
 export default function Ai() {
@@ -139,40 +146,49 @@ export default function Ai() {
           )}
         </div>
 
-        {/* Input row */}
+        {/* Input row — textarea + send button share a single rounded
+            white pill so the composer reads as one control instead of
+            a floating button next to a tall textarea. Button is inset
+            inside the pill, centered to the textarea's midline. */}
         <form
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
           style={{
             borderTop: `1px solid ${DT.border}`,
             background: DT.cream4,
             padding: 12,
-            display: 'flex', gap: 10, alignItems: 'flex-end',
           }}
         >
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="שאל/י כל דבר על מכירה, ליד, או ניסוח הודעה…"
-            rows={2}
-            style={{
-              ...FONT,
-              flex: 1, resize: 'none',
-              padding: '10px 12px', borderRadius: 10,
-              border: `1px solid ${DT.border}`,
-              background: DT.white, color: DT.ink,
-              fontSize: 14, lineHeight: 1.6, outline: 'none',
-              textAlign: 'right',
-            }}
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            aria-label="שלח"
-            style={(loading || !input.trim()) ? disabledBtn() : primaryBtn()}
-          >
-            {loading ? <Loader2 size={16} className="estia-spin" /> : <Send size={16} />}
-          </button>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: DT.white, border: `1px solid ${DT.border}`,
+            borderRadius: 14,
+            padding: '6px 6px 6px 14px',
+            boxShadow: '0 2px 6px rgba(30,26,20,0.04)',
+          }}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="שאל/י כל דבר על מכירה, ליד, או ניסוח הודעה…"
+              rows={1}
+              style={{
+                ...FONT,
+                flex: 1, resize: 'none',
+                padding: '8px 2px',
+                border: 'none', background: 'transparent', color: DT.ink,
+                fontSize: 14, lineHeight: 1.6, outline: 'none',
+                textAlign: 'right', maxHeight: 160, minHeight: 36,
+              }}
+            />
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              aria-label="שלח"
+              style={(loading || !input.trim()) ? disabledBtn() : primaryBtn()}
+            >
+              {loading ? <Loader2 size={16} className="estia-spin" /> : <Send size={16} />}
+            </button>
+          </div>
         </form>
       </div>
 
@@ -290,9 +306,11 @@ function primaryBtn() {
     ...FONT,
     background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
     border: 'none', color: DT.ink,
-    width: 44, height: 44, borderRadius: 10, cursor: 'pointer',
-    display: 'grid', placeItems: 'center',
-    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    // Inset inside the composer pill — 36×36 circle, no shadow so it
+    // sits flush with the white pill background instead of appearing
+    // to float below it.
+    width: 36, height: 36, borderRadius: 10, cursor: 'pointer',
+    display: 'grid', placeItems: 'center', flexShrink: 0,
   };
 }
 function disabledBtn() {
