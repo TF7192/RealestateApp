@@ -270,6 +270,7 @@ export default function Layout({ onLogout }) {
           onLogout={onLogout}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
+          user={user}
         />
       )}
 
@@ -374,7 +375,7 @@ function HiddenScrollbarStyles() {
 function SidebarInner({
   primary, tools, favorites = [],
   location, agentName, agentInitial, agentAvatarUrl = null,
-  onLogout, collapsed = false,
+  onLogout, collapsed = false, user = null,
 }) {
   // Single-active resolver: of all items whose `to` is a prefix of the
   // current pathname, keep only the longest match. Without this,
@@ -471,8 +472,9 @@ function SidebarInner({
         )}
       </nav>
 
-      {/* Upgrade card (hidden when collapsed to preserve width) */}
-      {!collapsed && (
+      {/* Upgrade card — hidden when collapsed AND hidden for agents
+          who are already premium (no point nagging a paying user). */}
+      {!collapsed && !user?.isPremium && (
         <div style={{ padding: '10px 12px' }}>
           <div style={{
             background: `linear-gradient(160deg, rgba(180,139,76,0.28), rgba(180,139,76,0.12))`,

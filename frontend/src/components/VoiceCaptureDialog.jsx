@@ -271,47 +271,15 @@ export default function VoiceCaptureDialog({
 
   if (!inline && !open) return null;
 
-  const Chrome = ({ children }) => {
-    if (inline) {
-      return (
-        <div ref={panelRef} style={{ ...FONT, color: DT.ink }}>
-          {children}
-        </div>
-      );
-    }
-    return (
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="הקלטה חכמה"
-        onClick={(e) => {
-          if (e.target === e.currentTarget && !busy && !recording) onClose?.();
-        }}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 60,
-          background: 'rgba(30,26,20,0.55)',
-          display: 'grid', placeItems: 'center',
-          padding: 16,
-        }}
-      >
-        <div
-          ref={panelRef}
-          style={{
-            ...FONT, color: DT.ink, background: DT.white,
-            borderRadius: 18, maxWidth: 720, width: '100%',
-            maxHeight: '92vh', overflow: 'auto',
-            border: `1px solid ${DT.border}`,
-            boxShadow: '0 20px 40px rgba(30,26,20,0.25)',
-          }}
-        >
-          {children}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <Chrome>
+  // The dialog body — inlined rather than wrapped in a nested Chrome
+  // component. Declaring Chrome inside the parent made it a new
+  // component type on every render, so React unmounted + remounted
+  // the whole subtree on every keystroke (agents couldn't edit the
+  // extracted fields — the input lost focus + scroll reset after
+  // every character). Inline JSX re-uses the same DOM tree so typing
+  // works normally.
+  const body = (
+    <>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
@@ -692,7 +660,44 @@ export default function VoiceCaptureDialog({
           50% { opacity: 0.5; transform: scale(1.2); }
         }
       `}</style>
-    </Chrome>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div ref={panelRef} style={{ ...FONT, color: DT.ink }}>
+        {body}
+      </div>
+    );
+  }
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="הקלטה חכמה"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy && !recording) onClose?.();
+      }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 60,
+        background: 'rgba(30,26,20,0.55)',
+        display: 'grid', placeItems: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        ref={panelRef}
+        style={{
+          ...FONT, color: DT.ink, background: DT.white,
+          borderRadius: 18, maxWidth: 720, width: '100%',
+          maxHeight: '92vh', overflow: 'auto',
+          border: `1px solid ${DT.border}`,
+          boxShadow: '0 20px 40px rgba(30,26,20,0.25)',
+        }}
+      >
+        {body}
+      </div>
+    </div>
   );
 }
 

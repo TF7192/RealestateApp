@@ -37,9 +37,33 @@ const SUGGESTED_PROMPTS = [
   'הכן לי תזכורות מעקב לכל הלידים שבסטטוס פושר',
 ];
 
+const PERSIST_KEY = 'estia-ai-chat-v1';
+// Keep the last 5 user+assistant turns (10 messages) in localStorage so
+// a page refresh doesn't wipe a live conversation. Anything older is
+// trimmed — we never want to ship the full transcript to the server.
+const PERSIST_TURNS = 5;
+
+function loadPersistedMessages() {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .slice(-PERSIST_TURNS * 2);
+  } catch { return []; }
+}
+function persistMessages(messages) {
+  try {
+    const trimmed = messages.slice(-PERSIST_TURNS * 2);
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(trimmed));
+  } catch { /* quota errors etc. — fine, non-critical */ }
+}
+
 export default function Ai() {
   // messages: [{ role: 'user'|'assistant', content: string }]
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => loadPersistedMessages());
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
@@ -51,6 +75,10 @@ export default function Ai() {
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [messages, loading]);
+
+  // Persist the (trimmed) transcript on every change so a refresh
+  // doesn't wipe the conversation.
+  useEffect(() => { persistMessages(messages); }, [messages]);
 
   const handleSend = async (content) => {
     const text = String(content ?? input).trim();
