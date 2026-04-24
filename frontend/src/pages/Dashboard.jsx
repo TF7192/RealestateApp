@@ -340,10 +340,15 @@ export default function Dashboard() {
               }}>
                 {isNext && (
                   <div style={{
-                    position: 'absolute', insetInlineEnd: -18, top: '50%',
+                    // Sits flush inside the card (was bleeding past the
+                    // edge at insetInlineEnd: -18). Keep a small outside
+                    // gap with `insetInlineEnd: 2` so it still reads as a
+                    // ribbon, not a full-width label.
+                    position: 'absolute', insetInlineEnd: 2, top: '50%',
                     transform: 'translateY(-50%)',
                     background: DT.gold, color: DT.ink, fontSize: 9, fontWeight: 800,
-                    padding: '2px 6px', borderRadius: 99,
+                    padding: '2px 7px', borderRadius: 99,
+                    boxShadow: '0 2px 6px rgba(180,139,76,0.3)',
                   }}>הבא</div>
                 )}
                 <div style={{ width: 54, textAlign: 'center' }}>
