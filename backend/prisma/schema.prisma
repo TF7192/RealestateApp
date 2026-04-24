@@ -930,17 +930,23 @@ model UploadedFile {
   id           String   @id @default(cuid())
   ownerId      String
   owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  kind         String // "property_image" | "signed_agreement" | "other"
+  kind         String // "property_image" | "signed_agreement" | "document" | "other"
   originalName String
   mimeType     String
   sizeBytes    Int
-  path         String // relative path on disk inside /uploads
+  path         String // relative path on disk inside /uploads (S3 key in prod)
+  // Sprint 6 — Documents library. Free-form user labels (e.g. "חוזים",
+  // "סקרים") for the /documents page filter pill row. Empty array by
+  // default; legacy rows (property images / signed agreements) never
+  // populate it.
+  tags         String[] @default([])
   createdAt    DateTime @default(now())
 
   agreements Agreement[]
 
   @@index([ownerId])
   @@index([kind])
+  @@index([ownerId, kind])
 }
 
 enum MessageTemplateKind {

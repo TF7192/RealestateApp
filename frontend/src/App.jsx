@@ -52,6 +52,9 @@ const ActivityLog = lazy(() => import('./pages/ActivityLog'));
 const Reminders = lazy(() => import('./pages/Reminders'));
 // Sprint 4 — in-app notifications full-page list + read endpoints.
 const Notifications = lazy(() => import('./pages/Notifications'));
+// Sprint 6 — Documents library (S3-backed pdf/dwg/zip/xlsx). Lazy so
+// the cards grid + file icons don't weigh down the main bundle.
+const Documents = lazy(() => import('./pages/Documents'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Office = lazy(() => import('./pages/Office'));
 const Team = lazy(() => import('./pages/Team'));
@@ -309,6 +312,9 @@ function AppRoutes() {
                 above, matching the pattern used for /reminders and the
                 other Layout-wrapped routes. */}
             <Route path="/notifications" element={<Notifications />} />
+            {/* Sprint 6 — Documents library (pdf/dwg/zip/xlsx).
+                S3-backed; route matches `api.listDocuments` / `api.uploadDocument`. */}
+            <Route path="/documents" element={<Documents />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/office" element={<Office />} />
             <Route path="/team" element={<Team />} />

@@ -758,6 +758,32 @@ export const api = {
       retries: 1,
     }),
 
+  // Sprint 6 — Documents library. S3-backed /documents page (pdf/dwg/
+  // zip/xlsx). `params` accepts `kind` (one of the mime families above)
+  // and `tag` (repeatable). Response is { items: [{ id, originalName,
+  // mimeType, sizeBytes, tags, kind, createdAt, url }] }.
+  listDocuments: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v === undefined || v === null || v === '') return;
+      if (Array.isArray(v)) v.forEach((vv) => qs.append(k, String(vv)));
+      else qs.set(k, String(v));
+    });
+    const s = qs.toString();
+    return request(`/documents${s ? `?${s}` : ''}`);
+  },
+  uploadDocument: (file, tags) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const list = Array.isArray(tags) ? tags : tags ? [tags] : [];
+    for (const t of list) {
+      const v = String(t || '').trim();
+      if (v) fd.append('tags', v);
+    }
+    return request('/documents', { method: 'POST', body: fd });
+  },
+  deleteDocument: (id) => request(`/documents/${id}`, { method: 'DELETE' }),
+
   // Favorites (B4)
   listFavorites:       (entityType) => {
     const qs = entityType ? `?${new URLSearchParams({ entityType }).toString()}` : '';

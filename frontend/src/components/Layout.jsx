@@ -27,7 +27,7 @@ import {
   Bell, Search, Plus, MessageCircle, LogOut, Menu, X,
   ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
   Activity as ActivityIcon, Tag, Download as DownloadIcon, Heart,
-  Star,
+  Star, FolderOpen,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
@@ -72,6 +72,7 @@ const PRIMARY_NAV = [
   { k: 'transfers',   to: '/transfers',  label: 'העברות',     Icon: ArrowLeftRight },
   { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
   { k: 'activity',    to: '/activity',   label: 'פעילות',     Icon: ActivityIcon },
+  { k: 'documents',   to: '/documents',  label: 'מסמכים',     Icon: FolderOpen },
   { k: 'inbox',       to: '/admin/chats', label: 'הודעות צ׳אט', Icon: MessageSquare, adminOnly: true },
 ];
 const TOOL_NAV = [

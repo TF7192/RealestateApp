@@ -45,6 +45,7 @@ import { registerLeadSearchProfileRoutes } from './routes/leadSearchProfiles.js'
 import { registerSearchRoutes } from './routes/search.js';
 import { registerActivityRoutes } from './routes/activity.js';
 import { registerAdvertRoutes } from './routes/adverts.js';
+import { registerDocumentRoutes } from './routes/documents.js';
 import { registerAiRoutes } from './routes/ai.js';
 import {
   registerNeighborhoodRoutes,
@@ -254,6 +255,7 @@ export async function build() {
   await app.register(registerSearchRoutes, { prefix: '/api/search' });
   await app.register(registerActivityRoutes, { prefix: '/api/activity' });
   await app.register(registerAdvertRoutes, { prefix: '/api' });
+  await app.register(registerDocumentRoutes, { prefix: '/api' });
   await app.register(registerAiRoutes, { prefix: '/api/ai' });
   await app.register(registerNeighborhoodRoutes, { prefix: '/api/neighborhoods' });
   await app.register(registerNeighborhoodGroupRoutes, { prefix: '/api/neighborhood-groups' });
