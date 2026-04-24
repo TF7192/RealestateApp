@@ -1045,6 +1045,14 @@ model LeadMeeting {
   startsAt      DateTime
   endsAt        DateTime
   googleEventId String?
+  // Sprint 5 / AI — voice summariser. `audioKey` is the storage key of
+  // the uploaded voice note (S3 path in prod; `local://tmp/<uuid>.webm`
+  // when S3 was unreachable during tests). `summary` holds the Hebrew
+  // prose for quick rendering; `summaryJson` holds the structured payload
+  // `{ summary, actionItems, nextSteps }` consumed by the meeting card.
+  audioKey      String?
+  summary       String?
+  summaryJson   Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
