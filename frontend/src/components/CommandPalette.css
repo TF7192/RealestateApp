@@ -166,3 +166,28 @@
   align-items: center;
   gap: 4px;
 }
+
+/* Sprint 7 — "ראה את כל התוצאות" deep-link into /search?q=. */
+.cmdp-see-all {
+  margin-inline-start: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.cmdp-see-all:hover:not(:disabled) {
+  background: var(--gold-glow);
+  color: var(--text-primary);
+}
+
+.cmdp-see-all:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

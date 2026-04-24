@@ -278,6 +278,20 @@ export default function CommandPalette({ open, onClose }) {
             <span><kbd>↑</kbd><kbd>↓</kbd> ניווט</span>
             <span><kbd>Enter</kbd> פתח</span>
             <span><kbd>Esc</kbd> סגור</span>
+            {/* Sprint 7 — deep-link to the full /search results page */}
+            <button
+              type="button"
+              className="cmdp-see-all"
+              disabled={!q.trim()}
+              onClick={() => {
+                const query = q.trim();
+                if (!query) return;
+                onClose();
+                navigate(`/search?q=${encodeURIComponent(query)}`);
+              }}
+            >
+              ראה את כל התוצאות ←
+            </button>
           </div>
         </div>
       </div>

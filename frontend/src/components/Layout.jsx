@@ -83,7 +83,7 @@ const TOOL_NAV = [
   // Sprint 7 — the agent's own business-card page (/agent-card).
   { k: 'agent-card', to: '/agent-card',       label: 'הכרטיס שלי',     Icon: IdCard },
   { k: 'team',       to: '/team',             label: 'הצוות שלי',      Icon: UsersRound },
-  { k: 'office',     to: '/office',           label: 'משרד / צוות',    Icon: UsersRound },
+  { k: 'office',     to: '/office',           label: 'המשרד',          Icon: Building2 },
   { k: 'tags',       to: '/settings/tags',    label: 'ניהול תגיות',    Icon: Tag },
   { k: 'settings',   to: '/settings',         label: 'הגדרות',         Icon: Settings },
   // Sprint 7 — in-app help surface. Lives in the tools rail so it's

@@ -26,6 +26,17 @@ export default defineWorkspace([
   },
   {
     plugins: [(await import('@vitejs/plugin-react')).default()],
+    resolve: {
+      // Unit-frontend tests live OUTSIDE the frontend root, so without
+      // these aliases Vite can't resolve frontend-only deps (lucide,
+      // react-router-dom) when a test renders a frontend component.
+      // Mirrors the richer alias block the `frontend` project uses.
+      alias: [
+        { find: /^react-router-dom$/, replacement: path.join(frontendRoot, 'node_modules/react-router-dom') },
+        { find: /^react-router$/,     replacement: path.join(frontendRoot, 'node_modules/react-router') },
+        { find: /^lucide-react$/,     replacement: path.join(frontendRoot, 'node_modules/lucide-react') },
+      ],
+    },
     test: {
       name: 'unit-frontend',
       environment: 'jsdom',

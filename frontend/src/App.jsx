@@ -71,6 +71,9 @@ const Calendar = lazy(() => import('./pages/Calendar'));
 const MapPage = lazy(() => import('./pages/Map'));
 const Office = lazy(() => import('./pages/Office'));
 const Team = lazy(() => import('./pages/Team'));
+// Sprint 7 — full-page results for the global search (?q=foo). Links
+// from CommandPalette's new "ראה את כל התוצאות" footer button.
+const SearchResults = lazy(() => import('./pages/SearchResults'));
 const TagSettings = lazy(() => import('./pages/TagSettings'));
 const Settings = lazy(() => import('./pages/Settings'));
 // Sprint 7 — in-app FAQ + support-channel hub (/help). Lazy so the
@@ -364,6 +367,11 @@ function AppRoutes() {
             <Route path="/map" element={<MapPage />} />
             <Route path="/office" element={<Office />} />
             <Route path="/team" element={<Team />} />
+            {/* Sprint 7 — full-page results for the ⌘K global search.
+                Reads ?q= from the URL and renders 4 buckets. The
+                palette's "ראה את כל התוצאות" footer button deep-
+                navigates here with the current query. */}
+            <Route path="/search" element={<SearchResults />} />
             {/* Sprint 7 — /help renders the in-app FAQ + support channels
                 (WhatsApp / email / contact form). Static JSON registry,
                 no Intercom. */}
