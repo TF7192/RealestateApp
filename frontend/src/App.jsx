@@ -49,6 +49,7 @@ const ImportPicker = lazy(() => import('./pages/ImportPicker'));
 const Reports = lazy(() => import('./pages/Reports'));
 const ActivityLog = lazy(() => import('./pages/ActivityLog'));
 const Reminders = lazy(() => import('./pages/Reminders'));
+const Calendar = lazy(() => import('./pages/Calendar'));
 const Office = lazy(() => import('./pages/Office'));
 const TagSettings = lazy(() => import('./pages/TagSettings'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -304,6 +305,7 @@ function AppRoutes() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/activity" element={<ActivityLog />} />
             <Route path="/reminders" element={<Reminders />} />
+            <Route path="/calendar" element={<Calendar />} />
             <Route path="/office" element={<Office />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/tags" element={<TagSettings />} />

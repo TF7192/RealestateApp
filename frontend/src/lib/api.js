@@ -260,6 +260,17 @@ export const api = {
   // connect is a redirect, we navigate directly rather than fetch it.
   calendarConnectUrl: () => `${import.meta.env.VITE_API_URL || '/api'}/integrations/calendar/connect`,
 
+  // Sprint 4 — flat cross-lead meetings list for the /calendar page.
+  // Optional `from` / `to` ISO strings bound the window.
+  listMeetings: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+    });
+    const s = qs.toString();
+    return request(`/meetings${s ? `?${s}` : ''}`);
+  },
+
   // 7.2 — Lead meetings
   listLeadMeetings:  (leadId)       => request(`/integrations/calendar/leads/${leadId}/meetings`),
   createLeadMeeting: (leadId, body) => request(`/integrations/calendar/leads/${leadId}/meetings`, { method: 'POST', body }),

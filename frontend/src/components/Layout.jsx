@@ -68,6 +68,7 @@ const PRIMARY_NAV = [
   { k: 'owners',      to: '/owners',     label: 'בעלים',      Icon: Crown },
   { k: 'deals',       to: '/deals',      label: 'עסקאות',     Icon: Banknote },
   { k: 'calendar',    to: '/reminders',  label: 'יומן',       Icon: CalendarDays },
+  { k: 'calendar-month', to: '/calendar', label: 'לוח שנה',    Icon: CalendarDays },
   { k: 'transfers',   to: '/transfers',  label: 'העברות',     Icon: ArrowLeftRight },
   { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
   { k: 'activity',    to: '/activity',   label: 'פעילות',     Icon: ActivityIcon },
