@@ -250,14 +250,21 @@ export default function VoiceCaptureDialog({
   const handleUse = () => {
     const kind = activeKind === 'unclear' ? preferKind : activeKind;
     const payload = { kind, fields: editedFields };
-    // Same-page flow: parent's onUse prefills the form in place.
-    if (!kindMismatch) {
-      onUse?.(payload);
+    // Route-level case: no matching parent form (inline auto-mode on
+    // /voice-demo, or the top-bar "AI" quick-create button). Always
+    // stash + navigate so the right create page picks up the payload.
+    const parentCanAccept =
+      typeof onUse === 'function' &&
+      (kind === 'lead' || kind === 'property') &&
+      kind === preferKind;
+    if (parentCanAccept) {
+      onUse(payload);
       onClose?.();
       return;
     }
     // Cross-page flow: stash + redirect so the target page picks up
-    // the payload on mount.
+    // the payload on mount. Only valid when we actually know the kind.
+    if (kind !== 'lead' && kind !== 'property') return;
     try {
       sessionStorage.setItem('estia-voice-prefill', JSON.stringify(payload));
     } catch { /* noop */ }
