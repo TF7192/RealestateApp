@@ -25,6 +25,7 @@ import { registerAdminRoutes } from './routes/admin.js';
 import { registerYad2Routes } from './routes/yad2.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerMarketRoutes } from './routes/market.js';
+import { registerMarketingRoutes } from './routes/marketing.js';
 import { registerSitemapRoute } from './routes/sitemap.js';
 import { registerProspectRoutes } from './routes/prospects.js';
 import { registerProspectPdfRoutes } from './routes/prospect-pdf.js';
@@ -248,6 +249,10 @@ export async function build() {
   await app.register(registerYad2Routes,  { prefix: '/api/integrations/yad2' });
   await app.register(registerImportRoutes, { prefix: '/api/import' });
   await app.register(registerMarketRoutes, { prefix: '/api/market' });
+  // Sprint 9 / marketing (lane B) — aggregation + inquiry→lead promotion
+  // for the agent-facing "ניהול שיווקי" dashboard. Distinct prefix from
+  // /api/market (nadlan market-context).
+  await app.register(registerMarketingRoutes, { prefix: '/api/marketing' });
   await app.register(registerProspectRoutes, { prefix: '/api' });
   // P-3 — prospect agreement PDF + lead-link endpoints. Same /api prefix
   // so the routes sit next to /api/prospects/* from registerProspectRoutes.
