@@ -73,6 +73,7 @@ export default function Onboarding() {
   }, [user?.phone]); // eslint-disable-line react-hooks/exhaustive-deps
   const [err, setErr] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [exiting, setExiting] = useState(false);
   const [cityOptions, setCityOptions] = useState([]);
 
   useEffect(() => {
@@ -124,15 +125,16 @@ export default function Onboarding() {
         city: form.city.trim() || null,
       });
       toast.success('ברוך הבא');
-      // Force a real browser navigation to the chosen destination.
-      // Using react-router's navigate() races against the route-element
-      // `<Route path="/onboarding" element={<Navigate to="/dashboard" />}>`
-      // guard — after refresh() flips needsOnboarding=false, that guard
-      // would snap the URL to /dashboard before our navigate fired, so
-      // every card ended up on the dashboard regardless of choice.
-      // A hard navigation loads the destination directly + picks up a
-      // fresh /me response along the way.
-      window.location.assign(destination);
+      // Smooth exit: fade the page out first, THEN do the hard nav.
+      // The hard nav is still required — using react-router's navigate
+      // races against the App.jsx `<Route path="/onboarding" element=
+      // {<Navigate to="/dashboard" />}>` guard which fires the moment
+      // refresh() flips needsOnboarding=false, so it always wins and
+      // sent every card to /dashboard. A 320ms fade + location.assign
+      // lets the user see the submission settle before the new page
+      // mounts.
+      setExiting(true);
+      setTimeout(() => { window.location.assign(destination); }, 320);
       return;
     } catch (e) {
       const msg = e?.message || 'שמירה נכשלה';
@@ -147,6 +149,9 @@ export default function Onboarding() {
     <div dir="rtl" lang="he" style={{
       ...FONT, background: T.cream, color: T.ink, minHeight: '100vh',
       display: 'flex', justifyContent: 'center', padding: 0,
+      opacity: exiting ? 0 : 1,
+      transform: exiting ? 'translateY(-8px)' : 'translateY(0)',
+      transition: 'opacity 280ms ease, transform 280ms ease',
     }}>
       <div style={{
         width: '100%', maxWidth: 520,
