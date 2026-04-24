@@ -6,21 +6,35 @@
 // ─────────────────────────────────────────────────────────────
 // Status bar
 // ─────────────────────────────────────────────────────────────
-function IOSStatusBar({ dark = false, time = '9:41' }) {
+function IOSStatusBar({ dark = false, time = '9:41', scale = 1 }) {
   const c = dark ? '#fff' : '#000';
+  // Narrow-device preset: the design originally sized this bar for a
+  // 402-wide phone (gap:154, padding:21/24/19, time fs:17). At smaller
+  // widths that gap overflows and the time gets clipped behind the
+  // island. Re-flow on a horizontal layout and scale inner sizes when
+  // the caller (IOSDevice) requests a sub-1 scale.
+  const narrow = scale < 1;
+  const pad = narrow ? `${Math.round(14 * scale)}px ${Math.round(18 * scale)}px ${Math.round(12 * scale)}px` : '21px 24px 19px';
+  const timeFs = narrow ? Math.max(10, Math.round(17 * scale)) : 17;
+  const iconScale = narrow ? Math.max(0.65, scale) : 1;
   return (
     <div style={{
-      display: 'flex', gap: 154, alignItems: 'center', justifyContent: 'center',
-      padding: '21px 24px 19px', boxSizing: 'border-box',
+      display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: pad, boxSizing: 'border-box',
       position: 'relative', zIndex: 20, width: '100%',
+      gap: 12,
     }}>
-      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 1.5 }}>
+      <div style={{ display: 'flex', alignItems: 'center', minWidth: 40 }}>
         <span style={{
           fontFamily: '-apple-system, "SF Pro", system-ui', fontWeight: 590,
-          fontSize: 17, lineHeight: '22px', color: c,
+          fontSize: timeFs, lineHeight: '1', color: c,
         }}>{time}</span>
       </div>
-      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, paddingTop: 1, paddingRight: 1 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: Math.max(4, Math.round(7 * iconScale)),
+        transform: `scale(${iconScale})`, transformOrigin: narrow ? 'right center' : 'center',
+      }}>
         <svg width="19" height="12" viewBox="0 0 19 12">
           <rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill={c}/>
           <rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill={c}/>
@@ -191,9 +205,21 @@ function IOSDevice({
   children, width = 402, height = 874, dark = false,
   title, keyboard = false,
 }) {
+  // Scale the hard-coded iPhone-15-Pro chrome (island, corner radius,
+  // home indicator) when the caller passes a narrower `width`. The
+  // landing-mobile section renders two 260-wide phones; at the old
+  // fixed 126×37 island that was eating ~48% of the phone's width and
+  // clipping through the bezel. Keep full size at ≥402, scale below.
+  const s = Math.min(1, width / 402);
+  const islandW = Math.round(126 * s);
+  const islandH = Math.round(37 * s);
+  const islandTop = Math.max(6, Math.round(11 * s));
+  const radius = Math.round(48 * s);
+  const homeBarW = Math.round(139 * s);
+  const homeBarHeight = Math.round(34 * s);
   return (
     <div style={{
-      width, height, borderRadius: 48, overflow: 'hidden',
+      width, height, borderRadius: radius, overflow: 'hidden',
       position: 'relative', background: dark ? '#000' : '#F2F2F7',
       boxShadow: '0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.12)',
       fontFamily: '-apple-system, system-ui, sans-serif',
@@ -201,12 +227,13 @@ function IOSDevice({
     }}>
       {/* dynamic island */}
       <div style={{
-        position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
-        width: 126, height: 37, borderRadius: 24, background: '#000', zIndex: 50,
+        position: 'absolute', top: islandTop, left: '50%', transform: 'translateX(-50%)',
+        width: islandW, height: islandH, borderRadius: Math.round(islandH / 2),
+        background: '#000', zIndex: 50,
       }} />
       {/* status bar (absolute) */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-        <IOSStatusBar dark={dark} />
+        <IOSStatusBar dark={dark} scale={s} />
       </div>
       {/* nav + content */}
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -217,11 +244,11 @@ function IOSDevice({
       {/* home indicator — always on top */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 60,
-        height: 34, display: 'flex', justifyContent: 'center', alignItems: 'flex-end',
-        paddingBottom: 8, pointerEvents: 'none',
+        height: homeBarHeight, display: 'flex', justifyContent: 'center', alignItems: 'flex-end',
+        paddingBottom: Math.round(8 * s), pointerEvents: 'none',
       }}>
         <div style={{
-          width: 139, height: 5, borderRadius: 100,
+          width: homeBarW, height: Math.max(3, Math.round(5 * s)), borderRadius: 100,
           background: dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.25)',
         }} />
       </div>
