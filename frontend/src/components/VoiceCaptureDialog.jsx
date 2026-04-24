@@ -634,19 +634,19 @@ export default function VoiceCaptureDialog({
             <button
               type="button"
               onClick={handleUse}
-              disabled={activeKind === 'unclear' || fieldKeys.length === 0}
+              disabled={activeKind === 'unclear'}
               style={{
                 ...FONT,
-                background: activeKind === 'unclear' || fieldKeys.length === 0
+                background: activeKind === 'unclear'
                   ? DT.cream3
                   : `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
                 color: DT.ink, border: 'none',
                 padding: '10px 18px', borderRadius: 10,
                 fontSize: 13, fontWeight: 800,
-                cursor: activeKind === 'unclear' || fieldKeys.length === 0 ? 'not-allowed' : 'pointer',
-                opacity: activeKind === 'unclear' || fieldKeys.length === 0 ? 0.55 : 1,
+                cursor: activeKind === 'unclear' ? 'not-allowed' : 'pointer',
+                opacity: activeKind === 'unclear' ? 0.55 : 1,
                 display: 'inline-flex', gap: 6, alignItems: 'center',
-                boxShadow: activeKind === 'unclear' || fieldKeys.length === 0
+                boxShadow: activeKind === 'unclear'
                   ? 'none'
                   : '0 4px 12px rgba(180,139,76,0.28)',
               }}
