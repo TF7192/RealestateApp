@@ -14,7 +14,13 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund
+# `npm ci` is the deterministic install path — it refuses to run when
+# package.json + package-lock.json are out of sync, which surfaces
+# lockfile drift at build time instead of at `tsc` time. Previous use
+# of `npm install` here let a drifted lockfile sneak through and the
+# /voice-ingest route imports (openai, @anthropic-ai/sdk) to go
+# missing in the final image.
+RUN npm ci --no-audit --no-fund
 
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
