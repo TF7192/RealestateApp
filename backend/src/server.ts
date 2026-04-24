@@ -48,6 +48,7 @@ import { registerActivityRoutes } from './routes/activity.js';
 import { registerAdvertRoutes } from './routes/adverts.js';
 import { registerDocumentRoutes } from './routes/documents.js';
 import { registerAiRoutes } from './routes/ai.js';
+import { registerContactRoutes } from './routes/contact.js';
 import {
   registerNeighborhoodRoutes,
   registerSavedSearchRoutes,
@@ -259,6 +260,9 @@ export async function build() {
   await app.register(registerAdvertRoutes, { prefix: '/api' });
   await app.register(registerDocumentRoutes, { prefix: '/api' });
   await app.register(registerAiRoutes, { prefix: '/api/ai' });
+  // Sprint 5.1 — public contact form endpoint (no auth; in-memory IP
+  // rate limit lives inside the route itself).
+  await app.register(registerContactRoutes, { prefix: '/api/contact' });
   await app.register(registerNeighborhoodRoutes, { prefix: '/api/neighborhoods' });
   await app.register(registerNeighborhoodGroupRoutes, { prefix: '/api/neighborhood-groups' });
   await app.register(registerSavedSearchRoutes, { prefix: '/api/saved-searches' });

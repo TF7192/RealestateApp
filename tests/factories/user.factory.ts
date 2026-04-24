@@ -9,6 +9,11 @@ export interface UserFactoryInput {
   // Plain password; defaults to 'Password1!' (also the seeded demo pw).
   // Hashed before insert so the login endpoint can verify normally.
   password?: string;
+  // Sprint 5.1 — Premium gate. Defaults to TRUE for test-created users
+  // so existing suites that exercise the AI + meetings happy-path keep
+  // passing without touching every test. Explicit `isPremium: false`
+  // is used by the dedicated premium-gate test to assert the 402 branch.
+  isPremium?: boolean;
 }
 
 /**
@@ -39,6 +44,10 @@ export async function createUser(
       provider: AuthProvider.EMAIL,
       passwordHash,
       slug,
+      // Test agents default to isPremium=true so the existing AI /
+      // meetings suites keep hitting the happy-path. The dedicated
+      // premium-gate test opts out with `isPremium: false`.
+      isPremium: input.isPremium ?? true,
       agentProfile:    role === UserRole.AGENT    ? { create: {} } : undefined,
       customerProfile: role === UserRole.CUSTOMER ? { create: {} } : undefined,
     },

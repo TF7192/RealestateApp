@@ -20,6 +20,7 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { requirePremium } from '../middleware/requirePremium.js';
 import { buildAnthropic } from '../lib/anthropic.js';
 import { putMeetingAudio } from '../lib/meetingAudio.js';
 
@@ -102,7 +103,11 @@ export const registerMeetingRoutes: FastifyPluginAsync = async (app) => {
   // returns a useful response: it persists audioKey=`local://tmp/<uuid>.webm`,
   // fills in a canned mock summary, and logs a warn so operators know the
   // summary wasn't model-generated.
-  app.post('/:id/summarize', { onRequest: [app.requireAgent] }, async (req, reply) => {
+  app.post('/:id/summarize', {
+    // Sprint 5.1 — premium gate on the voice summariser. Feature
+    // label surfaced to the frontend dialog via 402 envelope.
+    onRequest: [app.requireAgent, requirePremium({ feature: 'סיכום פגישות' })],
+  }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const user = requireUser(req);
 

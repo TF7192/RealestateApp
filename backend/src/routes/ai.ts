@@ -14,6 +14,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { requireUser } from '../middleware/auth.js';
+import { requirePremium } from '../middleware/requirePremium.js';
 import { logActivity } from '../lib/activity.js';
 import { prisma } from '../lib/prisma.js';
 import { buildAnthropic } from '../lib/anthropic.js';
@@ -161,7 +162,10 @@ export const registerAiRoutes: FastifyPluginAsync = async (app) => {
   app.post(
     '/describe-property',
     {
-      onRequest: [app.requireAgent],
+      // Sprint 5.1 — premium gate. The gate returns 402 for free-tier
+      // users; the frontend's api.js interceptor catches it and opens
+      // the "שדרגו" dialog with the feature label.
+      onRequest: [app.requireAgent, requirePremium({ feature: 'Estia AI' })],
       // Claude calls are slow (5-20s) and each one costs a few cents.
       // 20/min per agent is generous for "I want to regenerate once or
       // twice" while cutting off scripted abuse.
@@ -425,7 +429,8 @@ ${JSON.stringify(candidates, null, 2)}
   app.get(
     '/match-leads',
     {
-      onRequest: [app.requireAgent],
+      // Sprint 5.1 — premium gate. See /describe-property for rationale.
+      onRequest: [app.requireAgent, requirePremium({ feature: 'Estia AI' })],
       // Heavier than describe-property — a single call can ship a few
       // hundred leads. 10/min is enough for "browse matches" but blocks
       // automated abuse.
@@ -519,7 +524,8 @@ ${JSON.stringify(candidates, null, 2)}
   app.get(
     '/match-properties',
     {
-      onRequest: [app.requireAgent],
+      // Sprint 5.1 — premium gate.
+      onRequest: [app.requireAgent, requirePremium({ feature: 'Estia AI' })],
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     },
     async (req, reply) => {

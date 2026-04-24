@@ -121,6 +121,19 @@ async function request(path, {
         ) {
           broadcastUnauthorized();
         }
+        // Sprint 5.1 — universal premium gate. Any 402 with the
+        // `{ error: 'PREMIUM_REQUIRED', feature }` envelope is broadcast
+        // to the app root, which mounts the PremiumGateDialog and
+        // surfaces a "שדרגו כדי להשתמש ב-{feature}" CTA. The original
+        // error still throws so the caller can bail out of whatever
+        // flow triggered the gated call.
+        if (res.status === 402 && data?.error === 'PREMIUM_REQUIRED') {
+          try {
+            window.dispatchEvent(new CustomEvent('estia:premium-gate', {
+              detail: { feature: data.feature || '' },
+            }));
+          } catch { /* non-browser env */ }
+        }
         // Retry-able server-side hiccups on GETs.
         if (!isWrite && [502, 503, 504].includes(res.status) && attempt < maxAttempts) {
           await sleep(200 * 2 ** (attempt - 1));
@@ -169,6 +182,11 @@ function safeParse(text) {
 }
 
 export const api = {
+  // Sprint 5.1 — public contact form. POSTs { subject, body,
+  // fromName?, fromEmail? }; backend mails talfuks1234@gmail.com via
+  // SES. No auth required.
+  sendContact: (body) => request('/contact', { method: 'POST', body }),
+
   // Auth
   signup: (body) => request('/auth/signup', { method: 'POST', body }),
   login: (body) => request('/auth/login', { method: 'POST', body }),

@@ -31,6 +31,11 @@ import Onboarding from './pages/Onboarding';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Transfers from './pages/Transfers';
+// Sprint 5.1 — public "צרו קשר" page + premium-gate dialog. Both
+// small enough to live in the main bundle; the dialog is mounted
+// once at the root and opens on a window event from lib/api.js.
+import Contact from './pages/Contact';
+import PremiumGateDialog from './components/PremiumGateDialog';
 // S13: Templates, AdminChats, CommandPalette are heavy and not on the
 // critical path for the first page paint. Lazy-load them so the main
 // bundle drops ~90KB and cold-start on cellular gets noticeably faster.
@@ -142,8 +147,21 @@ function AppRoutes() {
   // mobile header search icon).
   const { open: paletteOpen, closePalette, togglePalette } = useGlobalSearch();
   const [helpOpen, setHelpOpen] = useState(false);
+  // Sprint 5.1 — premium gate. lib/api.js broadcasts this event on
+  // every 402 PREMIUM_REQUIRED response; we read the feature label
+  // off the detail and feed it into the dialog mounted below.
+  const [premiumFeature, setPremiumFeature] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const onGate = (e) => {
+      const f = e?.detail?.feature;
+      setPremiumFeature(typeof f === 'string' && f ? f : 'Estia Premium');
+    };
+    window.addEventListener('estia:premium-gate', onGate);
+    return () => window.removeEventListener('estia:premium-gate', onGate);
+  }, []);
 
   useScrollRestore();
   useDocumentTitle();
@@ -220,6 +238,9 @@ function AppRoutes() {
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          {/* Sprint 5.1 — public contact form. Linked from the
+              premium-gate dialog + landing footer; accessible without auth. */}
+          <Route path="/contact" element={<Contact />} />
           {/* SEO-friendly public routes */}
           <Route path="/agents/:agentSlug" element={<AgentPortal />} />
           <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
@@ -359,6 +380,9 @@ function AppRoutes() {
               reaches the kiosk page instead of a 404. ProspectSign is
               self-contained (no Layout / nav), so no session leakage. */}
           <Route path="/public/p/:token" element={<ProspectSign />} />
+          {/* Sprint 5.1 — authed users can reach /contact too. The
+              page renders its own full-bleed shell without the app Layout. */}
+          <Route path="/contact" element={<Contact />} />
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
           <Route path="/p/:id" element={<CustomerPropertyView />} />
           <Route path="/a/:agentId" element={<AgentPortal />} />
@@ -383,6 +407,15 @@ function AppRoutes() {
       <ChatWidget />
       <Yad2ScanBanner />
       <MarketScanBanner />
+      {/* Sprint 5.1 — premium gate. Mounted at the authed root so any
+          gated API call (Estia AI, meeting summariser, …) surfaces the
+          "שדרגו" dialog without the calling page needing plumbing. */}
+      {premiumFeature && (
+        <PremiumGateDialog
+          featureName={premiumFeature}
+          onClose={() => setPremiumFeature(null)}
+        />
+      )}
     </>
   );
 }

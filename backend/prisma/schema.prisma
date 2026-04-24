@@ -325,6 +325,13 @@ model User {
   officeId String?
   office   Office? @relation(fields: [officeId], references: [id], onDelete: SetNull)
 
+  // Sprint 5.1 — Universal premium gate. Defaults to FALSE; every
+  // 3rd-party-integration feature (Estia AI, meeting summariser, …)
+  // runs through the `requirePremium` middleware which returns 402
+  // PREMIUM_REQUIRED for non-premium callers. The frontend's global
+  // fetch wrapper catches the status and opens the "שדרגו" dialog.
+  isPremium Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
