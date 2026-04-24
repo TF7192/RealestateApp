@@ -354,12 +354,17 @@ function SidebarInner({
           display: 'flex', alignItems: 'center', gap: 10,
           textDecoration: 'none', flex: 1, minWidth: 0,
         }}>
+          {/* Sprint 8 brand sweep — diamond glyph matches the favicon
+              + the claude-design bundle's LogoMark. Kept as a CSS
+              tile so it recolors per surface (sidebar = dark panel so
+              we use the gold gradient for contrast). */}
           <div style={{
             width: 34, height: 34, borderRadius: 9,
             background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
             display: 'grid', placeItems: 'center', color: DT.ink,
-            fontWeight: 900, fontSize: 17, letterSpacing: -1, flexShrink: 0,
-          }}>E</div>
+            fontWeight: 900, fontSize: 18, letterSpacing: -1, flexShrink: 0,
+            boxShadow: '0 4px 16px rgba(180,139,76,0.35), inset 0 1px 0 rgba(255,255,255,0.3)',
+          }}>◆</div>
           {!collapsed && (
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: -0.3 }}>Estia</div>

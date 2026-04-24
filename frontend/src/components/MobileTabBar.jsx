@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  Home, Users, Building2, CalendarDays, MoreHorizontal,
+  Home, Users, Building2, MoreHorizontal,
   X, Sparkles, LogOut,
 } from 'lucide-react';
 import haptics from '../lib/haptics';
@@ -21,11 +21,14 @@ const T = {
 };
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
+// Matches the claude-design bundle's mobile TabBar: dashboard · leads ·
+// properties · ai · more. Sparkles marks the AI tab as premium so the
+// gold hue pulls the eye to the sprint-5 feature surface.
 const QUICK_TABS = [
   { to: '/dashboard',  label: 'בית',     Icon: Home },
   { to: '/customers',  label: 'לידים',    Icon: Users },
   { to: '/properties', label: 'נכסים',    Icon: Building2 },
-  { to: '/reminders',  label: 'יומן',     Icon: CalendarDays },
+  { to: '/ai',         label: 'Estia AI', Icon: Sparkles },
 ];
 
 export default function MobileTabBar({
