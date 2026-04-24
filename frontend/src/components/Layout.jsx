@@ -91,18 +91,18 @@ const PRIMARY_NAV = [
   { k: 'admin-chats', to: '/admin/chats', label: 'הודעות צ׳אט', Icon: MessageSquare, adminOnly: true },
 ];
 const TOOL_NAV = [
-  { k: 'yad2',      to: '/integrations/yad2', label: 'ייבוא מ-Yad2', Icon: DownloadIcon, premium: true },
-  { k: 'import',    to: '/import',            label: 'ייבוא אקסל',    Icon: Upload },
+  // Single unified ייבוא entry — the /import landing page now offers
+  // Yad2 + Excel as two action cards. "תבניות" and "ניהול תגיות" are
+  // reachable via /settings so they don't bloat the side rail. The
+  // agent's personal "הכרטיס שלי" link moved under the profile row at
+  // the bottom of the sidebar.
+  { k: 'import',    to: '/import',            label: 'ייבוא',         Icon: Upload },
   { k: 'calculator', to: '/calculator',       label: 'מחשבון',         Icon: Calculator },
-  { k: 'templates',  to: '/templates',        label: 'תבניות',         Icon: FileText },
   // Sprint 9 — Marketing hub. Lives next to /documents in the tools rail
   // so the "שיווק / פרסום" surface is one click away from anywhere.
   { k: 'marketing',  to: '/marketing',        label: 'ניהול שיווקי',   Icon: Megaphone },
-  // Sprint 7 — the agent's own business-card page (/agent-card).
-  { k: 'agent-card', to: '/agent-card',       label: 'הכרטיס שלי',     Icon: IdCard },
   { k: 'team',       to: '/team',             label: 'הצוות שלי',      Icon: UsersRound },
-  { k: 'office',     to: '/office',           label: 'המשרד',          Icon: Building2 },
-  { k: 'tags',       to: '/settings/tags',    label: 'ניהול תגיות',    Icon: Tag },
+  { k: 'office',     to: '/office',           label: 'המשרד שלי',      Icon: Building2 },
   { k: 'settings',   to: '/settings',         label: 'הגדרות',         Icon: Settings },
   // Sprint 7 — in-app help surface. Lives in the tools rail so it's
   // always one click away, with a matching ? icon in the topbar.
@@ -443,7 +443,11 @@ function SidebarInner({
           avatar wired). The logout button stays separate so a
           distracted click doesn't sign the user out. */}
       <div style={{
-        padding: `10px ${collapsed ? 10 : 14}px 12px`,
+        // User ask 2026-04-25 — nudge the profile row closer to the
+        // very bottom of the sidebar (was 12 px bottom padding; the
+        // gap read as "too far from the bottom"). 4 px bottom pulls
+        // it lower without clipping the descender on Hebrew letters.
+        padding: `10px ${collapsed ? 10 : 14}px 4px`,
         borderTop: '1px solid rgba(255,255,255,0.06)',
         display: 'flex', alignItems: 'center', gap: 6,
       }}>
@@ -501,6 +505,18 @@ function SidebarInner({
             </span>
           )}
         </NavLink>
+        {!collapsed && (
+          <NavLink
+            to="/agent-card"
+            title="הכרטיס שלי"
+            aria-label="הכרטיס שלי"
+            style={{
+              background: 'transparent', border: 'none', color: DT.sidebarMuted,
+              cursor: 'pointer', padding: 4, display: 'inline-flex', flexShrink: 0,
+              textDecoration: 'none',
+            }}
+          ><IdCard size={16} /></NavLink>
+        )}
         {!collapsed && (
           <button
             type="button"
