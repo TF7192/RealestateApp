@@ -69,6 +69,10 @@ const PRIMARY_NAV = [
   { k: 'deals',       to: '/deals',      label: 'עסקאות',     Icon: Banknote },
   { k: 'calendar',    to: '/reminders',  label: 'יומן',       Icon: CalendarDays },
   { k: 'calendar-month', to: '/calendar', label: 'לוח שנה',    Icon: CalendarDays },
+  // Sprint 7 — Estia AI chat. Gold Sparkles icon + "חדש" badge so the
+  // new surface surfaces for agents who are already in the app. Links
+  // into /ai which is premium-gated on the backend.
+  { k: 'ai',          to: '/ai',         label: 'Estia AI',   Icon: Sparkles, badge: 'חדש' },
   { k: 'transfers',   to: '/transfers',  label: 'העברות',     Icon: ArrowLeftRight },
   { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
   { k: 'activity',    to: '/activity',   label: 'פעילות',     Icon: ActivityIcon },

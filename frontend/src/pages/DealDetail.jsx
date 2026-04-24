@@ -20,6 +20,7 @@ import { DealEditModal } from './Deals';
 import { relativeDate } from '../lib/relativeDate';
 import { absoluteTime } from '../lib/time';
 import { formatPhone } from '../lib/phone';
+import OfferReviewPanel from '../components/OfferReviewPanel';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -216,6 +217,12 @@ export default function DealDetail() {
       }}>
         <PartiesCard deal={deal} />
         <TimelineCard deal={deal} items={activity} />
+      </div>
+
+      {/* Sprint 7 — AI offer-review. Sits below the two-column block so
+          it has room for the recommended-counter card + reasoning. */}
+      <div style={{ marginTop: 16 }}>
+        <OfferReviewPanel deal={deal} />
       </div>
 
       {editing && (

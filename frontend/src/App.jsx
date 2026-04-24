@@ -92,6 +92,11 @@ const NeighborhoodAdmin = lazy(() => import('./pages/NeighborhoodAdmin'));
 // own chunk.
 const Contracts = lazy(() => import('./pages/Contracts'));
 const ContractDetail = lazy(() => import('./pages/ContractDetail'));
+// Sprint 7 — AI surfaces. /ai (chat) + /meetings/:id (pre-meeting
+// brief) land in their own lazy chunks so agents who never open them
+// don't pay the bundle cost.
+const Ai = lazy(() => import('./pages/Ai'));
+const MeetingDetail = lazy(() => import('./pages/MeetingDetail'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import { AuthProvider, useAuth } from './lib/auth';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
@@ -393,6 +398,10 @@ function AppRoutes() {
                 e-sign flow. List + detail (preview + type-to-sign). */}
             <Route path="/contracts" element={<Contracts />} />
             <Route path="/contracts/:id" element={<ContractDetail />} />
+            {/* Sprint 7 — AI surfaces. /ai is the open-ended chat page;
+                /meetings/:id is the pre-meeting brief detail page. */}
+            <Route path="/ai" element={<Ai />} />
+            <Route path="/meetings/:id" element={<MeetingDetail />} />
             {/* Legacy + alias routes — redirect.
                 `/assets` is a reasonable English guess for "נכסים"
                 (literally "assets") — hitting the 404 felt like a bug

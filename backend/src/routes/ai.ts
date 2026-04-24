@@ -609,4 +609,358 @@ ${JSON.stringify(candidates, null, 2)}
       return { matches };
     }
   );
+
+  // ─── Sprint 7 — Pre-meeting AI brief ───────────────────────────────
+  //
+  // POST /api/ai/meeting-brief { meetingId }
+  //   200:  { brief, checklist: string[], talkingPoints: string[] }
+  //   401:  not signed in
+  //   404:  meeting doesn't exist / belongs to another agent
+  //   503:  ANTHROPIC_API_KEY not configured
+  //
+  // Loads the meeting + its lead + up to 20 of the agent's recent
+  // ACTIVE properties, hands the whole pack to Claude Opus 4.7, and
+  // asks for a structured Hebrew prep card: a short paragraph brief,
+  // a bullet-list checklist (things to bring / prepare), and a list
+  // of conversation points tailored to the lead's profile.
+  const meetingBriefBody = z.object({
+    meetingId: z.string().min(1).max(64),
+  });
+
+  app.post(
+    '/meeting-brief',
+    {
+      onRequest: [app.requireAgent, requirePremium({ feature: 'Estia AI' })],
+      // Single Claude call per invocation; 20/min matches describe-property.
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      const user = requireUser(req);
+      const { meetingId } = meetingBriefBody.parse(req.body);
+
+      const meeting = await prisma.leadMeeting.findUnique({
+        where: { id: meetingId },
+        include: { lead: true },
+      });
+      if (!meeting || meeting.agentId !== user.id) {
+        return reply.code(404).send({ error: { message: 'Not found' } });
+      }
+
+      const client = buildAnthropic();
+      if (!client) {
+        return reply.code(503).send({
+          error: {
+            message: 'שירות ה-AI לא מוגדר — חסר מפתח ANTHROPIC_API_KEY',
+            code: 'ai_not_configured',
+          },
+        });
+      }
+
+      // Pull a handful of recent ACTIVE properties. The brief references
+      // "which of your active listings might fit" — capping at 20 keeps
+      // the prompt bounded even for power users.
+      const recentProperties = await prisma.property.findMany({
+        where: { agentId: user.id, status: 'ACTIVE' },
+        orderBy: { updatedAt: 'desc' },
+        take: 20,
+      });
+
+      const lead = meeting.lead;
+      const leadFacts: string[] = [];
+      if (lead?.name) leadFacts.push(`שם: ${lead.name}`);
+      if (lead?.phone) leadFacts.push(`טלפון: ${lead.phone}`);
+      if (lead?.city) leadFacts.push(`עיר: ${lead.city}`);
+      if (lead?.budget) leadFacts.push(`תקציב: ₪${lead.budget.toLocaleString('he-IL')}`);
+      if (lead?.rooms != null) leadFacts.push(`חדרים: ${lead.rooms}`);
+      if (lead?.lookingFor) leadFacts.push(`מחפש: ${lead.lookingFor === 'BUY' ? 'קנייה' : 'שכירות'}`);
+      if (lead?.interestType) leadFacts.push(`סוג עניין: ${lead.interestType}`);
+      if (lead?.status) leadFacts.push(`סטטוס: ${lead.status}`);
+      if (lead?.notes) leadFacts.push(`הערות: ${lead.notes.slice(0, 300)}`);
+
+      const propertySummaries = recentProperties.map((p) => {
+        const price = p.marketingPrice ? `₪${p.marketingPrice.toLocaleString('he-IL')}` : '—';
+        return `- ${p.street || ''} ${p.city || ''} · ${p.rooms ?? '?'} חד׳ · ${price}`;
+      }).join('\n');
+
+      const userPrompt = `הכן brief קצר לקראת פגישה עם לקוח נדל"ן.
+
+פרטי הפגישה:
+- כותרת: ${meeting.title}
+- מועד: ${meeting.startsAt.toISOString()}
+${meeting.location ? `- מיקום: ${meeting.location}` : ''}
+${meeting.notes ? `- הערות הסוכן: ${meeting.notes.slice(0, 400)}` : ''}
+
+פרטי הלקוח:
+${leadFacts.length ? leadFacts.join('\n') : '(אין פרטים מלאים)'}
+
+נכסים פעילים של הסוכן (עד 20 האחרונים):
+${propertySummaries || '(אין נכסים פעילים)'}
+
+הנחיות:
+1. כתוב brief קצר (3-4 משפטים בעברית) שמסכם מי הלקוח, מה הוא מחפש, ומה המטרה המיידית של הפגישה.
+2. הוסף צ'ק-ליסט של 4-6 פריטים פרקטיים להכנה לפגישה.
+3. הוסף 4-6 נקודות שיחה (talking points) שיעזרו לסוכן להוביל את השיחה — התייחס לפרטי הלקוח ולנכסים הרלוונטיים אם יש כאלה.
+4. אל תמציא עובדות שלא ברשימה.
+5. החזר את התשובה בפורמט XML הזה בדיוק, ללא טקסט נוסף:
+
+<brief>[הפסקה של ה-brief]</brief>
+<check>פריט 1</check>
+<check>פריט 2</check>
+<check>פריט 3</check>
+<check>פריט 4</check>
+<point>נקודת שיחה 1</point>
+<point>נקודת שיחה 2</point>
+<point>נקודת שיחה 3</point>
+<point>נקודת שיחה 4</point>`;
+
+      let brief = '';
+      let checklist: string[] = [];
+      let talkingPoints: string[] = [];
+      try {
+        const response = await client.messages.create({
+          model: 'claude-opus-4-7',
+          max_tokens: 2048,
+          system:
+            'אתה יועץ מכירות בכיר בתחום הנדל"ן הישראלי. אתה מכין briefs מקצועיים, קצרים ופרקטיים, בעברית טבעית. אל תמציא עובדות.',
+          messages: [{ role: 'user', content: userPrompt }],
+        });
+        const textBlock = response.content.find((b) => b.type === 'text');
+        const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
+
+        const briefMatch = raw.match(/<brief>([\s\S]*?)<\/brief>/);
+        brief = (briefMatch?.[1] ?? '').trim();
+        checklist = Array.from(raw.matchAll(/<check>([\s\S]*?)<\/check>/g))
+          .map((m) => m[1].trim())
+          .filter(Boolean);
+        talkingPoints = Array.from(raw.matchAll(/<point>([\s\S]*?)<\/point>/g))
+          .map((m) => m[1].trim())
+          .filter(Boolean);
+
+        // Fallback: if the model ignored the schema, hand back the raw
+        // text as the brief rather than an empty payload.
+        if (!brief && raw) brief = raw.trim();
+      } catch (e: any) {
+        req.log.error({ err: e, meetingId }, 'ai meeting-brief upstream error');
+        return reply.code(502).send({
+          error: {
+            message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב',
+            code: 'ai_upstream_error',
+          },
+        });
+      }
+
+      await logActivity({
+        agentId: user.id,
+        actorId: user.id,
+        verb: 'ai_meeting_brief',
+        entityType: 'LeadMeeting',
+        entityId: meeting.id,
+        summary: `brief לפגישה נוצר: ${meeting.title}`,
+      });
+
+      return { brief, checklist, talkingPoints };
+    }
+  );
+
+  // ─── Sprint 7 — Buyer-offer review ─────────────────────────────────
+  //
+  // POST /api/ai/offer-review { dealId, offerAmount }
+  //   200:  { recommendedCounter, confidence, reasoning }
+  //   401 / 404 / 503: same pattern as meeting-brief.
+  //
+  // Loads the deal + its linked property + up to 10 comparable nearby
+  // properties (same city, same asset class) and asks Claude for a
+  // counter-price recommendation with reasoning + confidence chip.
+  const offerReviewBody = z.object({
+    dealId: z.string().min(1).max(64),
+    offerAmount: z.number().int().positive(),
+  });
+
+  app.post(
+    '/offer-review',
+    {
+      onRequest: [app.requireAgent, requirePremium({ feature: 'Estia AI' })],
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      const user = requireUser(req);
+      const { dealId, offerAmount } = offerReviewBody.parse(req.body);
+
+      const deal = await prisma.deal.findUnique({
+        where: { id: dealId },
+        include: { property: true },
+      });
+      if (!deal || deal.agentId !== user.id) {
+        return reply.code(404).send({ error: { message: 'Not found' } });
+      }
+
+      const client = buildAnthropic();
+      if (!client) {
+        return reply.code(503).send({
+          error: {
+            message: 'שירות ה-AI לא מוגדר — חסר מפתח ANTHROPIC_API_KEY',
+            code: 'ai_not_configured',
+          },
+        });
+      }
+
+      // Comparable nearby properties — same city + asset class, bound to
+      // the agent's inventory (we only have rights to read their own
+      // listings). Excludes the deal's own property if it's linked.
+      const comps = await prisma.property.findMany({
+        where: {
+          agentId: user.id,
+          city: deal.city,
+          assetClass: deal.assetClass,
+          NOT: deal.propertyId ? { id: deal.propertyId } : undefined,
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 10,
+      });
+
+      const compsText = comps.map((p) => {
+        const price = p.marketingPrice ? `₪${p.marketingPrice.toLocaleString('he-IL')}` : '—';
+        const rooms = p.rooms != null ? `${p.rooms} חד׳` : '?';
+        const sqm = p.sqm ? `${p.sqm} מ״ר` : '?';
+        return `- ${p.street || ''} · ${rooms} · ${sqm} · ${price}`;
+      }).join('\n');
+
+      const userPrompt = `עזור לסוכן נדל"ן להעריך הצעת קונה ולהציע מחיר נגדי.
+
+פרטי העסקה:
+- נכס: ${deal.propertyStreet}, ${deal.city}
+- סוג: ${deal.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'} · ${deal.category === 'SALE' ? 'מכירה' : 'השכרה'}
+- מחיר שיווק: ₪${deal.marketingPrice.toLocaleString('he-IL')}
+${deal.property?.sqm ? `- שטח: ${deal.property.sqm} מ״ר` : ''}
+${deal.property?.rooms != null ? `- חדרים: ${deal.property.rooms}` : ''}
+${deal.property?.floor != null ? `- קומה: ${deal.property.floor}` : ''}
+
+הצעת הקונה: ₪${offerAmount.toLocaleString('he-IL')}
+
+השוואה לנכסים דומים באזור:
+${compsText || '(אין נכסים להשוואה)'}
+
+הנחיות:
+1. הצע מחיר נגדי סביר (מספר שלם בש"ח) שקרוב למחיר השיווק אך לוקח בחשבון את הפער מההצעה ואת נתוני ההשוואה.
+2. תן רמת ביטחון: low / medium / high.
+3. נמק ב-2-3 משפטים קצרים בעברית — התייחס לפער מההצעה, להשוואה, ולנסיבות הנראות מהנתונים.
+4. אל תמציא עובדות.
+5. החזר בפורמט XML הזה בדיוק, ללא טקסט נוסף:
+
+<counter>מספר שלם בלבד</counter>
+<confidence>low|medium|high</confidence>
+<reasoning>הנימוק בעברית</reasoning>`;
+
+      let recommendedCounter = deal.marketingPrice;
+      let confidence: 'low' | 'medium' | 'high' = 'low';
+      let reasoning = '';
+      try {
+        const response = await client.messages.create({
+          model: 'claude-opus-4-7',
+          max_tokens: 1024,
+          system:
+            'אתה יועץ מחיר לסוכני נדל"ן בישראל. אתה מדייק, מחושב, ולא ממציא עובדות. אתה מחזיר תשובות בפורמט XML מדויק.',
+          messages: [{ role: 'user', content: userPrompt }],
+        });
+        const textBlock = response.content.find((b) => b.type === 'text');
+        const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
+
+        const counterMatch = raw.match(/<counter>\s*(\d+)\s*<\/counter>/);
+        if (counterMatch) {
+          const n = parseInt(counterMatch[1], 10);
+          if (Number.isFinite(n) && n > 0) recommendedCounter = n;
+        }
+        const confMatch = raw.match(/<confidence>\s*(low|medium|high)\s*<\/confidence>/i);
+        if (confMatch) confidence = confMatch[1].toLowerCase() as typeof confidence;
+        const reasonMatch = raw.match(/<reasoning>([\s\S]*?)<\/reasoning>/);
+        reasoning = (reasonMatch?.[1] ?? '').trim();
+      } catch (e: any) {
+        req.log.error({ err: e, dealId }, 'ai offer-review upstream error');
+        return reply.code(502).send({
+          error: {
+            message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב',
+            code: 'ai_upstream_error',
+          },
+        });
+      }
+
+      await logActivity({
+        agentId: user.id,
+        actorId: user.id,
+        verb: 'ai_offer_review',
+        entityType: 'Deal',
+        entityId: deal.id,
+        summary: `סקירת הצעת AI: ₪${offerAmount.toLocaleString('he-IL')} → ₪${recommendedCounter.toLocaleString('he-IL')}`,
+      });
+
+      return { recommendedCounter, confidence, reasoning };
+    }
+  );
+
+  // ─── Sprint 7 — Estia AI chat (/ai page) ───────────────────────────
+  //
+  // POST /api/ai/chat { messages: [{role, content}] }
+  //   200:  { reply }
+  //   401 / 503: standard.
+  //
+  // Open-ended chat — single-session, no server-side history. The
+  // frontend keeps the transcript in local state and replays it on
+  // every call so Claude sees the full context.
+  const chatBody = z.object({
+    messages: z.array(z.object({
+      role: z.enum(['user', 'assistant']),
+      // 4,000 chars per message is already a generous essay — stops
+      // runaway paste-the-whole-CSV-into-chat behavior from blowing up
+      // the prompt budget.
+      content: z.string().min(1).max(4000),
+    })).min(1).max(40),
+  });
+
+  app.post(
+    '/chat',
+    {
+      onRequest: [app.requireAgent, requirePremium({ feature: 'Estia AI' })],
+      // Chat is the most-used surface; allow a little more headroom than
+      // the one-shot analysis endpoints. 30/min per agent is enough for
+      // an active conversation but cuts off scripted abuse.
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      const user = requireUser(req);
+      const { messages } = chatBody.parse(req.body);
+
+      const client = buildAnthropic();
+      if (!client) {
+        return reply.code(503).send({
+          error: {
+            message: 'שירות ה-AI לא מוגדר — חסר מפתח ANTHROPIC_API_KEY',
+            code: 'ai_not_configured',
+          },
+        });
+      }
+
+      let replyText = '';
+      try {
+        const response = await client.messages.create({
+          model: 'claude-opus-4-7',
+          max_tokens: 2048,
+          system:
+            'אתה Estia AI — עוזר מקצועי לסוכני נדל"ן ישראלים. אתה עונה בעברית, בקיצור וענייניות, ומוכן לעזור עם ניסוח הודעות, ניתוח לקוחות, והחלטות מכירה. אל תמציא עובדות.',
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        });
+        const textBlock = response.content.find((b) => b.type === 'text');
+        replyText = textBlock && textBlock.type === 'text' ? textBlock.text.trim() : '';
+      } catch (e: any) {
+        req.log.error({ err: e }, 'ai chat upstream error');
+        return reply.code(502).send({
+          error: {
+            message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב',
+            code: 'ai_upstream_error',
+          },
+        });
+      }
+
+      return { reply: replyText };
+    }
+  );
 };

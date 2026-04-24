@@ -789,6 +789,42 @@ export const api = {
       retries: 1,
     }),
 
+  // Sprint 7 — Pre-meeting AI brief. Backend loads the meeting + lead +
+  // agent's recent properties and asks Claude for a structured prep
+  // card: { brief, checklist: string[], talkingPoints: string[] }.
+  // 503 if ANTHROPIC_API_KEY is missing.
+  aiMeetingBrief: (meetingId) =>
+    request('/ai/meeting-brief', {
+      method: 'POST',
+      body: { meetingId },
+      timeoutMs: 60_000,
+      retries: 1,
+    }),
+
+  // Sprint 7 — Buyer-offer review. Backend returns
+  // { recommendedCounter, confidence: 'low'|'medium'|'high', reasoning }
+  // for a given deal + current offer amount. Used by OfferReviewPanel
+  // inside DealDetail.
+  aiOfferReview: (dealId, offerAmount) =>
+    request('/ai/offer-review', {
+      method: 'POST',
+      body: { dealId, offerAmount },
+      timeoutMs: 60_000,
+      retries: 1,
+    }),
+
+  // Sprint 7 — Estia AI chat. The /ai page keeps the transcript in
+  // client state and replays it on every call (no server-side history).
+  // `messages` is `[{ role: 'user'|'assistant', content: string }]`.
+  // Returns `{ reply }`; 503 if the key is missing.
+  aiChat: (messages) =>
+    request('/ai/chat', {
+      method: 'POST',
+      body: { messages },
+      timeoutMs: 60_000,
+      retries: 1,
+    }),
+
   // Sprint 6 — Documents library. S3-backed /documents page (pdf/dwg/
   // zip/xlsx). `params` accepts `kind` (one of the mime families above)
   // and `tag` (repeatable). Response is { items: [{ id, originalName,
