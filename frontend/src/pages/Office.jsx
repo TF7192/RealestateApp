@@ -1,37 +1,48 @@
+// Office (DOffice / ScreenOffice) — sprint-8.x port of the claude.ai/
+// design "Estia Refined Pages" bundle. Inline Cream & Gold DT styles;
+// all copy inline Hebrew, RTL.
+//
+// Same API surface + feature set as before (this is a layout refresh,
+// not a rewrite):
+//   - getOffice()                → office + nested members
+//   - listOfficeInvites()        → pending (OWNER-only, 403-tolerant)
+//   - createOffice()             → first-time user flow
+//   - searchAgentByEmail()       → resolves an existing user to invite
+//   - addOfficeMember()          → attaches an existing user
+//   - createOfficeInvite()       → email-based claim-on-login invite
+//   - revokeOfficeInvite() / removeOfficeMember() → housekeeping
+//
+// Members come back nested as `res.office.members` — the fix in 5e17b60.
+// Non-OWNERs still see a read-only members list; a plain AGENT with no
+// office still sees the create-office form (the server atomically
+// promotes them to OWNER on first createOffice).
+//
+// Distinct from /team — /team = quarterly KPI scoreboard, /office =
+// identity + membership admin. We cross-link to /team from the header.
+
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Building2,
-  UserPlus,
-  Users,
-  Mail,
-  Crown,
-  Trash2,
-  Plus,
-  Copy,
-  Send,
-  X,
+  Building2, UserPlus, Users, Mail, Crown, Trash2, Plus, Copy, Send,
+  X, Sparkles, Trophy, AlertCircle,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useToast, optimisticUpdate } from '../lib/toast';
 import { displayText } from '../lib/display';
-import EmptyState from '../components/EmptyState';
 import ConfirmDialog from '../components/ConfirmDialog';
-import './Office.css';
 
-// A1 — Office page.
-//
-// For users who belong to an office: show name + member list, let the
-// OWNER invite new members (lookup by email → userId → addOfficeMember)
-// or remove existing members with a confirmation.
-//
-// For users with no office: show a "create office" form (first user
-// becomes OWNER automatically on the server).
-//
-// Non-OWNER members see a read-only members list. Non-OWNERs also
-// shouldn't hit this page at all — we redirect to / if there's no
-// office (i.e. an AGENT without an office doesn't get offered the
-// create form). The OWNER role check reads user.role from useAuth().
+const DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14', ink2: '#3a3226',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
+  success: '#15803d', danger: '#b91c1c',
+};
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 export default function Office() {
   const { user } = useAuth();
@@ -68,8 +79,8 @@ export default function Office() {
       const res = await api.getOffice();
       setOffice(res?.office || null);
       // Members come back nested inside `office.members` (the Prisma
-      // include), not as a sibling `res.members`. The previous read
-      // was always empty → "חברי המשרד" table was blank.
+      // include), not as a sibling `res.members`. Regressing this
+      // blanks the members table — don't.
       setMembers(res?.office?.members || []);
       // Invites are OWNER-only on the server; skip the request for
       // non-OWNER sessions to avoid a noisy 403 in the network panel.
@@ -78,7 +89,6 @@ export default function Office() {
           const inv = await api.listOfficeInvites();
           setInvites(inv?.items || []);
         } catch {
-          // Silent — leaves the pending-invites section empty.
           setInvites([]);
         }
       } else {
@@ -98,14 +108,6 @@ export default function Office() {
   }, [toast, user?.role]);
 
   useEffect(() => { load(); }, [load]);
-
-  // Any authenticated user without an office should see the create
-  // form — the server promotes them to OWNER atomically when they
-  // create their first office. The previous "non-owner → /dashboard"
-  // redirect was a chicken-and-egg: a plain AGENT could never reach
-  // the page that would make them an OWNER.
-  // Non-owners who ARE in someone else's office still see a read-only
-  // members list, which is handled by the render below.
 
   const handleCreate = async (e) => {
     e?.preventDefault?.();
@@ -195,100 +197,210 @@ export default function Office() {
     } catch { /* toast handled */ }
   };
 
+  // ─── Render states ────────────────────────────────────────────
+
   if (loading) {
     return (
-      <div className="office-page" dir="rtl">
-        <div className="office-skel" aria-hidden />
+      <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.muted, fontSize: 14 }}>
+        טוען…
       </div>
     );
   }
 
-  // No office yet — owner sees the create form.
+  // No office yet — any authenticated user sees the create form
+  // (the server atomically promotes the creator to OWNER).
   if (!office) {
     return (
-      <div className="office-page" dir="rtl">
-        <header className="office-header">
-          <div className="office-title">
-            <Building2 size={22} aria-hidden="true" />
-            <h1>משרד</h1>
+      <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
+        <div style={{ maxWidth: 560 }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            marginBottom: 8,
+          }}>
+            <span style={{
+              background: DT.goldSoft, color: DT.goldDark,
+              width: 36, height: 36, borderRadius: 10,
+              display: 'grid', placeItems: 'center',
+            }}>
+              <Building2 size={18} aria-hidden="true" />
+            </span>
+            <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.7, margin: 0 }}>
+              צור/י משרד
+            </h1>
           </div>
-          <p className="office-subtitle">
-            צור/י משרד חדש כדי להזמין סוכנים לעבודה משותפת על נכסים ולקוחות.
+          <p style={{ fontSize: 13, color: DT.muted, margin: '0 0 20px', lineHeight: 1.7 }}>
+            הקמת המשרד מאפשרת להזמין סוכנים, לעבוד יחד על נכסים ולקוחות
+            ולראות דוחות צוות ברבעון. הסוכן שיוצר את המשרד הופך אוטומטית
+            למנהל (OWNER).
           </p>
-        </header>
-        <section className="office-card" aria-label="יצירת משרד">
-          <form className="office-form" onSubmit={handleCreate}>
-            <label className="office-field">
-              <span>שם המשרד</span>
-              <input
-                type="text"
-                value={officeName}
-                onChange={(e) => setOfficeName(e.target.value)}
-                placeholder="למשל: נדלן הגולן"
-                aria-label="שם המשרד"
-                required
-              />
-            </label>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={creating || !officeName.trim()}
-            >
-              <Plus size={16} aria-hidden="true" />
-              <span>{creating ? 'יוצר…' : 'צור משרד'}</span>
-            </button>
-          </form>
-        </section>
+
+          <section
+            aria-label="יצירת משרד"
+            style={{
+              background: DT.white, border: `1px solid ${DT.border}`,
+              borderRadius: 14, padding: 20,
+            }}
+          >
+            <form onSubmit={handleCreate} style={{
+              display: 'flex', flexDirection: 'column', gap: 14,
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label
+                  htmlFor="office-name"
+                  style={{
+                    fontSize: 11, fontWeight: 700, color: DT.muted,
+                    textTransform: 'uppercase', letterSpacing: 0.3,
+                  }}
+                >
+                  שם המשרד
+                </label>
+                <input
+                  id="office-name"
+                  type="text"
+                  value={officeName}
+                  onChange={(e) => setOfficeName(e.target.value)}
+                  placeholder="למשל: נדלן הגולן"
+                  aria-label="שם המשרד"
+                  required
+                  style={inputStyle()}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="submit"
+                  disabled={creating || !officeName.trim()}
+                  style={primaryBtn(creating || !officeName.trim())}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  {creating ? 'יוצר…' : 'צור משרד'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="office-page" dir="rtl">
-      <header className="office-header">
-        <div className="office-title">
-          <Building2 size={22} aria-hidden="true" />
-          <h1>{displayText(office.name)}</h1>
-        </div>
-        <p className="office-subtitle">
-          ניהול המשרד וצוות הסוכנים.
-        </p>
-      </header>
+  const pendingCount = invites.length;
+  const memberCount = members.length;
+  const ownerCount = members.filter((m) => m.role === 'OWNER').length;
 
-      {isOwner && (
-        <section className="office-card" aria-label="הזמנת סוכן">
-          <h2 className="office-card-title">
-            <UserPlus size={16} aria-hidden="true" />
-            <span>הזמנת סוכן</span>
+  return (
+    <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
+      {/* Title row + cross-link to /team */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+        gap: 16, marginBottom: 18, flexWrap: 'wrap',
+      }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.7, margin: 0 }}>
+            ניהול המשרד
+          </h1>
+          <div style={{ fontSize: 13, color: DT.muted, marginTop: 2 }}>
+            {isOwner
+              ? 'הזמנת סוכנים, ניהול חברים והזמנות בהמתנה.'
+              : 'צוות המשרד וחברי הצוות הפעילים.'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link to="/team" style={secondaryBtn()}>
+            <Trophy size={14} /> דוח צוות
+          </Link>
+        </div>
+      </div>
+
+      {/* Header card — office identity + KPI strip */}
+      <div style={{
+        background: DT.white, border: `1px solid ${DT.border}`,
+        borderRadius: 14, padding: 20, marginBottom: 16,
+        display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap',
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 14, flexShrink: 0,
+          background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+          color: DT.ink, display: 'grid', placeItems: 'center',
+        }}>
+          <Building2 size={30} aria-hidden="true" />
+        </div>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: 0 }}>
+            {displayText(office.name)}
           </h2>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 10,
+            fontSize: 13, color: DT.muted, marginTop: 6, flexWrap: 'wrap',
+          }}>
+            <span style={chipStyle()}>
+              <Users size={12} /> {memberCount} חברים
+            </span>
+            {ownerCount > 0 && (
+              <span style={chipStyle()}>
+                <Crown size={12} /> {ownerCount} מנהל/ת
+              </span>
+            )}
+            {isOwner && pendingCount > 0 && (
+              <span style={chipStyle()}>
+                <Mail size={12} /> {pendingCount} בהמתנה
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Invite section (OWNER-only) */}
+      {isOwner && (
+        <section
+          aria-label="הזמנת סוכן"
+          style={sectionCard({ marginBottom: 16 })}
+        >
+          <h3 style={sectionTitle()}>
+            <UserPlus size={16} /> הזמנת סוכן
+          </h3>
+
+          {/* Mode toggle */}
           <div
-            className="office-invite-modes"
             role="radiogroup"
             aria-label="סוג הזמנה"
+            style={{
+              display: 'inline-flex', background: DT.cream2,
+              padding: 4, borderRadius: 10, gap: 4, marginBottom: 14,
+            }}
           >
-            <button
-              type="button"
-              role="radio"
-              aria-checked={inviteMode === 'existing'}
-              className={`btn ${inviteMode === 'existing' ? 'btn-primary' : 'btn-ghost'}`}
+            <ModePill
+              active={inviteMode === 'existing'}
               onClick={() => setInviteMode('existing')}
-            >
-              קיים במערכת
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={inviteMode === 'email'}
-              className={`btn ${inviteMode === 'email' ? 'btn-primary' : 'btn-ghost'}`}
+              label="קיים במערכת"
+            />
+            <ModePill
+              active={inviteMode === 'email'}
               onClick={() => setInviteMode('email')}
-            >
-              הזמן לפי אימייל
-            </button>
+              label="הזמן לפי אימייל"
+            />
           </div>
-          <form className="office-form office-form-row" onSubmit={handleInvite}>
-            <label className="office-field office-field-grow">
-              <span>{inviteMode === 'existing' ? 'אימייל' : 'אימייל החבר החדש'}</span>
+
+          <form
+            onSubmit={handleInvite}
+            style={{
+              display: 'flex', gap: 10, alignItems: 'flex-end',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 4,
+              flex: 1, minWidth: 220,
+            }}>
+              <label
+                htmlFor="invite-email"
+                style={{
+                  fontSize: 11, fontWeight: 700, color: DT.muted,
+                  textTransform: 'uppercase', letterSpacing: 0.3,
+                }}
+              >
+                {inviteMode === 'existing' ? 'אימייל הסוכן' : 'אימייל החבר החדש'}
+              </label>
               <input
+                id="invite-email"
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
@@ -296,26 +408,33 @@ export default function Office() {
                 aria-label={inviteMode === 'existing' ? 'אימייל הסוכן' : 'אימייל להזמנה'}
                 dir="ltr"
                 required
+                style={inputStyle()}
               />
-            </label>
+            </div>
             <button
               type="submit"
-              className="btn btn-primary"
               disabled={inviting || !inviteEmail.trim()}
+              style={primaryBtn(inviting || !inviteEmail.trim())}
             >
-              {inviteMode === 'existing' ? (
-                <Mail size={14} aria-hidden="true" />
-              ) : (
-                <Send size={14} aria-hidden="true" />
-              )}
-              <span>{inviting ? 'מזמין…' : 'הזמן'}</span>
+              {inviteMode === 'existing'
+                ? <Mail size={14} aria-hidden="true" />
+                : <Send size={14} aria-hidden="true" />}
+              {inviting ? 'מזמין…' : 'הזמן'}
             </button>
           </form>
+
+          {/* Surface the last-created invite URL so the OWNER can copy
+              it by hand (we don't ship email yet). */}
           {inviteMode === 'email' && lastInviteUrl && (
             <div
-              className="office-invite-link"
               role="group"
               aria-label="קישור ההזמנה שנוצר"
+              style={{
+                display: 'flex', gap: 8, marginTop: 12,
+                padding: 10, background: DT.cream4,
+                border: `1px solid ${DT.border}`, borderRadius: 10,
+                alignItems: 'center', flexWrap: 'wrap',
+              }}
             >
               <input
                 type="text"
@@ -324,100 +443,166 @@ export default function Office() {
                 aria-label="קישור ההזמנה"
                 dir="ltr"
                 onFocus={(e) => e.target.select()}
+                style={{
+                  ...FONT,
+                  flex: 1, minWidth: 200,
+                  background: DT.white,
+                  border: `1px solid ${DT.border}`,
+                  borderRadius: 8, padding: '8px 10px',
+                  fontSize: 12, color: DT.ink2,
+                  fontFamily: 'monospace, Assistant',
+                }}
               />
               <button
                 type="button"
-                className="btn btn-secondary"
                 onClick={() => handleCopyInvite(lastInviteUrl)}
+                style={secondaryBtn()}
               >
-                <Copy size={14} aria-hidden="true" />
-                <span>העתק קישור</span>
+                <Copy size={13} aria-hidden="true" />
+                העתק קישור
               </button>
             </div>
           )}
         </section>
       )}
 
-      {isOwner && invites.length > 0 && (
-        <section className="office-card" aria-label="הזמנות בהמתנה">
-          <h2 className="office-card-title">
-            <Mail size={16} aria-hidden="true" />
-            <span>הזמנות בהמתנה ({invites.length})</span>
-          </h2>
-          <ul className="office-members">
-            {invites.map((inv) => (
-              <li key={inv.id} className="office-member">
-                <div className="office-member-body">
-                  <div className="office-member-name">
-                    {displayText(inv.email)}
-                  </div>
-                  <div className="office-member-email">
-                    {displayText(inv.inviteUrl)}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => handleCopyInvite(inv.inviteUrl)}
-                  aria-label={`העתק קישור ל-${inv.email}`}
-                >
-                  <Copy size={14} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost office-remove"
-                  onClick={() => handleRevokeInvite(inv.id)}
-                  aria-label={`בטל הזמנה ל-${inv.email}`}
-                >
-                  <X size={14} aria-hidden="true" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className="office-card" aria-label="חברי המשרד">
-        <h2 className="office-card-title">
-          <Users size={16} aria-hidden="true" />
-          <span>חברי המשרד ({members.length})</span>
-        </h2>
-        {members.length === 0 ? (
-          <EmptyState
-            icon={<Users size={32} />}
-            title="אין עדיין חברים"
-            description={isOwner ? 'הזמן/י סוכנים באמצעות הטופס שלמעלה.' : ''}
-          />
-        ) : (
-          <ul className="office-members">
-            {members.map((m) => (
-              <li key={m.id} className="office-member">
-                <div className="office-member-body">
-                  <div className="office-member-name">
-                    {displayText(m.displayName || m.email)}
-                    {m.role === 'OWNER' && (
-                      <span className="office-member-badge" aria-label="בעלים">
-                        <Crown size={12} aria-hidden="true" /> בעלים
-                      </span>
+      {/* Two-col grid: members + pending invites (if OWNER). Falls
+          back to a single column on narrow viewports via auto-fit. */}
+      <div style={{
+        display: 'grid', gap: 16,
+        gridTemplateColumns: isOwner && pendingCount > 0
+          ? 'repeat(auto-fit, minmax(320px, 1fr))'
+          : '1fr',
+      }}>
+        {/* Members */}
+        <section style={sectionCard()} aria-label="חברי המשרד">
+          <h3 style={sectionTitle()}>
+            <Users size={16} /> חברי המשרד
+            <span style={{ color: DT.muted, fontWeight: 700, fontSize: 12 }}>
+              · {memberCount}
+            </span>
+          </h3>
+          {memberCount === 0 ? (
+            <EmptyBlock
+              icon={<Users size={24} />}
+              title="אין עדיין חברים"
+              body={isOwner
+                ? 'הזמן/י סוכנים באמצעות הטופס שלמעלה.'
+                : 'ברגע שמנהל/ת המשרד יוסיפ/ו חברים, הם יופיעו כאן.'}
+            />
+          ) : (
+            <ul style={listReset}>
+              {members.map((m) => (
+                <li key={m.id}>
+                  <div style={memberRow()}>
+                    <MemberAvatar member={m} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontWeight: 700, fontSize: 13,
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                      }}>
+                        {displayText(m.displayName || m.email)}
+                        {m.role === 'OWNER' && (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            background: DT.goldSoft, color: DT.goldDark,
+                            padding: '2px 7px', borderRadius: 99,
+                            fontWeight: 800, fontSize: 10,
+                          }}>
+                            <Crown size={10} aria-hidden="true" />
+                            בעלים
+                          </span>
+                        )}
+                      </div>
+                      {m.email && m.email !== m.displayName && (
+                        <div style={{
+                          fontSize: 11, color: DT.muted, marginTop: 2,
+                          direction: 'ltr', textAlign: 'right',
+                        }}>
+                          {m.email}
+                        </div>
+                      )}
+                    </div>
+                    {isOwner && m.role !== 'OWNER' && (
+                      <button
+                        type="button"
+                        onClick={() => setPendingRemove(m)}
+                        aria-label={`הסר את ${m.displayName || m.email}`}
+                        style={iconBtn()}
+                        title="הסר מהמשרד"
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                      </button>
                     )}
                   </div>
-                  <div className="office-member-email">{displayText(m.email)}</div>
-                </div>
-                {isOwner && m.role !== 'OWNER' && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost office-remove"
-                    onClick={() => setPendingRemove(m)}
-                    aria-label={`הסר את ${m.displayName || m.email}`}
-                  >
-                    <Trash2 size={14} aria-hidden="true" />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Pending invites (OWNER-only) */}
+        {isOwner && pendingCount > 0 && (
+          <section style={sectionCard()} aria-label="הזמנות בהמתנה">
+            <h3 style={sectionTitle()}>
+              <Mail size={16} /> הזמנות בהמתנה
+              <span style={{ color: DT.muted, fontWeight: 700, fontSize: 12 }}>
+                · {pendingCount}
+              </span>
+            </h3>
+            <ul style={listReset}>
+              {invites.map((inv) => (
+                <li key={inv.id}>
+                  <div style={memberRow()}>
+                    <span style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      background: DT.cream3, color: DT.goldDark,
+                      display: 'grid', placeItems: 'center',
+                    }}>
+                      <Mail size={16} aria-hidden="true" />
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontWeight: 700, fontSize: 13,
+                        direction: 'ltr', textAlign: 'right',
+                      }}>
+                        {displayText(inv.email)}
+                      </div>
+                      <div style={{
+                        fontSize: 11, color: DT.muted, marginTop: 2,
+                        overflow: 'hidden', textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        direction: 'ltr', textAlign: 'right',
+                      }}
+                      title={inv.inviteUrl}>
+                        {displayText(inv.inviteUrl)}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyInvite(inv.inviteUrl)}
+                      aria-label={`העתק קישור ל-${inv.email}`}
+                      style={iconBtn()}
+                      title="העתק קישור"
+                    >
+                      <Copy size={14} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRevokeInvite(inv.id)}
+                      aria-label={`בטל הזמנה ל-${inv.email}`}
+                      style={iconBtn({ danger: true })}
+                      title="בטל הזמנה"
+                    >
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
-      </section>
+      </div>
 
       {pendingRemove && (
         <ConfirmDialog
@@ -431,3 +616,155 @@ export default function Office() {
     </div>
   );
 }
+
+// ─── Atoms ──────────────────────────────────────────────────
+
+function ModePill({ active, onClick, label }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      style={{
+        ...FONT,
+        background: active ? DT.white : 'transparent',
+        color: active ? DT.ink : DT.muted,
+        border: active ? `1px solid ${DT.border}` : '1px solid transparent',
+        padding: '7px 14px', borderRadius: 8, cursor: 'pointer',
+        fontSize: 12, fontWeight: 700,
+        boxShadow: active ? '0 1px 2px rgba(30,26,20,0.04)' : 'none',
+        transition: 'background 0.15s',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MemberAvatar({ member }) {
+  const name = member?.displayName || member?.email || '?';
+  const initial = name.charAt(0).toUpperCase();
+  const isOwner = member?.role === 'OWNER';
+  return (
+    <div style={{
+      width: 36, height: 36, borderRadius: 99, flexShrink: 0,
+      background: isOwner
+        ? `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`
+        : `linear-gradient(160deg, ${DT.cream3}, ${DT.cream2})`,
+      color: DT.ink, display: 'grid', placeItems: 'center',
+      fontWeight: 800, fontSize: 15,
+    }}>
+      {initial}
+    </div>
+  );
+}
+
+function EmptyBlock({ icon, title, body }) {
+  return (
+    <div style={{
+      padding: '28px 16px', textAlign: 'center', color: DT.muted,
+    }}>
+      <div style={{
+        color: DT.gold, marginBottom: 8,
+        display: 'inline-grid', placeItems: 'center',
+      }} aria-hidden="true">
+        {icon}
+      </div>
+      <div style={{
+        fontSize: 15, fontWeight: 800, color: DT.ink, marginBottom: 4,
+      }}>
+        {title}
+      </div>
+      {body && (
+        <p style={{ fontSize: 13, margin: 0, lineHeight: 1.7 }}>{body}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Style helpers ─────────────────────────────────────────
+
+function sectionCard(extra) {
+  return {
+    background: DT.white, border: `1px solid ${DT.border}`,
+    borderRadius: 14, padding: 20, ...(extra || {}),
+  };
+}
+function sectionTitle() {
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    fontSize: 14, fontWeight: 800, margin: '0 0 14px', color: DT.ink,
+    letterSpacing: -0.2,
+  };
+}
+function inputStyle() {
+  return {
+    ...FONT,
+    background: DT.white, color: DT.ink,
+    border: `1px solid ${DT.border}`, borderRadius: 10,
+    padding: '10px 12px', fontSize: 14,
+    outline: 'none',
+  };
+}
+function chipStyle() {
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    background: DT.goldSoft, color: DT.goldDark,
+    padding: '3px 10px', borderRadius: 99,
+    fontWeight: 700, fontSize: 11,
+  };
+}
+function primaryBtn(disabled) {
+  return {
+    ...FONT,
+    background: disabled
+      ? DT.cream3
+      : `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+    border: 'none', color: DT.ink,
+    padding: '10px 16px', borderRadius: 10,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    fontSize: 13, fontWeight: 800,
+    display: 'inline-flex', gap: 6, alignItems: 'center',
+    boxShadow: disabled ? 'none' : '0 4px 10px rgba(180,139,76,0.3)',
+    opacity: disabled ? 0.75 : 1,
+  };
+}
+function secondaryBtn() {
+  return {
+    ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
+    padding: '9px 14px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 13, fontWeight: 700,
+    display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.ink,
+    textDecoration: 'none',
+  };
+}
+function iconBtn(opts = {}) {
+  const { danger } = opts;
+  return {
+    ...FONT,
+    background: danger ? 'rgba(185,28,28,0.06)' : DT.white,
+    border: `1px solid ${danger ? 'rgba(185,28,28,0.2)' : DT.border}`,
+    padding: 8, borderRadius: 10, cursor: 'pointer',
+    color: danger ? DT.danger : DT.ink,
+    display: 'inline-grid', placeItems: 'center',
+    flexShrink: 0,
+  };
+}
+function memberRow() {
+  return {
+    display: 'flex', alignItems: 'center', gap: 12,
+    padding: '10px 12px', borderRadius: 10,
+    background: DT.cream4, border: `1px solid ${DT.border}`,
+  };
+}
+
+const listReset = {
+  listStyle: 'none', padding: 0, margin: 0,
+  display: 'flex', flexDirection: 'column', gap: 6,
+};
+
+// Suppress unused-import warnings for icons reserved for near-term
+// features (Sparkles on create-office illustration, AlertCircle on
+// error banners — wired in when the relevant state surfaces).
+void Sparkles; void AlertCircle;
