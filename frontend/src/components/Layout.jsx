@@ -792,6 +792,25 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
                 fontSize: 12, fontWeight: 700,
               }}
             ><Plus size={14} /> נכס חדש</button>
+            {/* AI quick-create — opens the voice ingest flow; detected
+                kind (lead vs property) routes to the right form with
+                the extracted fields pre-filled. */}
+            <button
+              type="button"
+              onClick={() => navigate('/voice-demo')}
+              aria-label="יצירה חכמה מהקלטה"
+              title="דברו — ה-AI ימלא את הטופס"
+              style={{
+                ...FONT,
+                background: 'rgba(180,139,76,0.08)',
+                border: `1px solid ${DT.gold}`,
+                padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
+                color: DT.goldDark, display: 'inline-flex', gap: 6, alignItems: 'center',
+                fontSize: 12, fontWeight: 800,
+              }}
+            >
+              <Sparkles size={13} /> AI
+            </button>
             {/* Sprint 10 — התאמות פומביות CTA with red badge counting pool
                 properties that match *this* agent's leads. Gold-on-cream
                 to read as a "feature" rather than a primary action. */}
