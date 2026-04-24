@@ -361,7 +361,7 @@ function SidebarInner({
           {!collapsed && (
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: -0.3 }}>Estia</div>
-              <div style={{ fontSize: 10, color: DT.sidebarMuted, fontWeight: 600 }}>נדל״ן AI</div>
+              <div style={{ fontSize: 10, color: DT.sidebarMuted, fontWeight: 600 }}>למתווכי נדל״ן</div>
             </div>
           )}
         </NavLink>
