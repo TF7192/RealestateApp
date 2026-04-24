@@ -501,6 +501,274 @@ async function main() {
   }
   console.log(`✓ demo office "${OFFICE_NAME}" with ${teamAgents.length} agents + pipelines`);
 
+  // ─── Public-matches pool — cross-office variety ─────────────────
+  //
+  // The /public-matches surface ranks pool properties by how many of
+  // the viewer's leads match. To make the page feel rich on the demo
+  // (דנה / office.demo), we sprinkle ~12 listings across the team
+  // agents + one synthetic out-of-office "remote" agent so the pool
+  // spans 6+ cities, both deal categories (SALE/RENT), residential +
+  // commercial, and a wide rooms / price spread.
+  //
+  // Idempotent on re-run: the team agents' properties are already
+  // wiped above (line ~438). The remote agent is the only new actor,
+  // so we wipe their property rows here before recreating.
+  const remoteAgentEmail = 'remote.demo@estia.app';
+  const remoteAgent = await prisma.user.upsert({
+    where: { email: remoteAgentEmail },
+    update: { isPremium: false },
+    create: {
+      email: remoteAgentEmail,
+      passwordHash: await argon2.hash(managerPassword),
+      role: 'AGENT',
+      // No officeId — this agent is intentionally outside דנה's office
+      // so the pool feels like a real cross-agent marketplace.
+      displayName: 'איתי שגב',
+      phone: '050-5550301',
+      isPremium: false,
+      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=80',
+      agentProfile: {
+        create: {
+          agency: 'נדל״ן צפון השרון',
+          title: 'סוכן נדל״ן',
+          license: '52301',
+          bio: 'מומחה לנכסים בהרצליה, רעננה וכפר סבא. שיתוף פעולה עם סוכנים אחרים — אחד מעקרונות הקריירה.',
+        },
+      },
+    },
+  });
+  await prisma.property.deleteMany({ where: { agentId: remoteAgent.id } });
+
+  // Photo pool — Unsplash real-estate / interior photos. Mix of
+  // existing seed URLs + fresh ones for visual variety on the grid.
+  const poolPhotos: string[][] = [
+    ['https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&q=80',
+     'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80',
+     'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&q=80',
+     'https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800&q=80',
+     'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1560185007-cde436f6a4d0?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1599809275671-b5942cabc7a2?w=800&q=80',
+     'https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1567496898669-ee935f5f647a?w=800&q=80',
+     'https://images.unsplash.com/photo-1558211583-d26f610c1eb1?w=800&q=80'],
+    ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'],
+  ];
+
+  type PoolSeed = {
+    agentIdx: number; // 0..2 = teamAgents, 3 = remoteAgent
+    assetClass: 'RESIDENTIAL' | 'COMMERCIAL';
+    category: 'SALE' | 'RENT';
+    type: string;
+    street: string; city: string; neighborhood?: string;
+    owner: string; ownerPhone: string;
+    marketingPrice: number; sqm: number;
+    rooms?: number | null; floor?: number; totalFloors?: number;
+    elevator?: boolean; renovated?: string; parking?: boolean;
+    storage?: boolean; balconySize?: number; ac?: boolean;
+    safeRoom?: boolean; buildingAge?: number;
+    publicMatchNote: string;
+  };
+  const poolProperties: PoolSeed[] = [
+    // 1. תל אביב — 4 חדרים, דירת מגורים יוקרתית למכירה
+    {
+      agentIdx: 0,
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
+      street: 'יהודה הלוי 88', city: 'תל אביב', neighborhood: 'לב העיר',
+      owner: 'נירית הלל', ownerPhone: '050-7770111',
+      marketingPrice: 4_350_000, sqm: 102, rooms: 4, floor: 4, totalFloors: 7,
+      elevator: true, renovated: 'משופצת', parking: true, storage: true,
+      balconySize: 12, ac: true, safeRoom: true, buildingAge: 14,
+      publicMatchNote: 'בעלת רצינית — מוכנה לשיתוף פעולה מלא עם סוכנים, גמישות במחיר.',
+    },
+    // 2. ירושלים — דירה 3.5 חדרים למכירה במחיר נוח
+    {
+      agentIdx: 3,
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
+      street: 'בצלאל 17', city: 'ירושלים', neighborhood: 'נחלאות',
+      owner: 'שלמה אברגיל', ownerPhone: '052-7770222',
+      marketingPrice: 2_780_000, sqm: 78, rooms: 3.5, floor: 2, totalFloors: 4,
+      elevator: false, renovated: 'משופצת', parking: false, storage: false,
+      balconySize: 6, ac: true, safeRoom: false, buildingAge: 50,
+      publicMatchNote: 'נכס בלב נחלאות, אופי ייחודי — מתאים למשפחה צעירה.',
+    },
+    // 3. חיפה — פנטהאוז עם נוף
+    {
+      agentIdx: 3,
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'פנטהאוז',
+      street: 'מוריה 134', city: 'חיפה', neighborhood: 'כרמל מערבי',
+      owner: 'מירב סופר', ownerPhone: '054-7770333',
+      marketingPrice: 3_200_000, sqm: 145, rooms: 5, floor: 12, totalFloors: 12,
+      elevator: true, renovated: 'חדש מקבלן', parking: true, storage: true,
+      balconySize: 50, ac: true, safeRoom: true, buildingAge: 3,
+      publicMatchNote: 'פנטהאוז עם נוף ים פנורמי, חניה כפולה ומחסן.',
+    },
+    // 4. הרצליה — דופלקס יוקרתי
+    {
+      agentIdx: 3,
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דופלקס',
+      street: 'רחוב הנדיב 22', city: 'הרצליה', neighborhood: 'הרצליה פיתוח',
+      owner: 'עידן ברגר', ownerPhone: '058-7770444',
+      marketingPrice: 5_450_000, sqm: 175, rooms: 5.5, floor: 3, totalFloors: 4,
+      elevator: true, renovated: 'משופץ', parking: true, storage: true,
+      balconySize: 28, ac: true, safeRoom: true, buildingAge: 11,
+      publicMatchNote: 'דופלקס מרווח עם גינה פרטית, בעלים מוכנים לפנות תוך 60 יום.',
+    },
+    // 5. רמת גן — דירה משפחתית 4 חדרים למכירה
+    {
+      agentIdx: 1,
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
+      street: 'אבא הלל 64', city: 'רמת גן', neighborhood: 'מרכז העיר',
+      owner: 'רונן ביטון', ownerPhone: '050-7770555',
+      marketingPrice: 3_100_000, sqm: 96, rooms: 4, floor: 6, totalFloors: 9,
+      elevator: true, renovated: 'משופצת', parking: true, storage: false,
+      balconySize: 10, ac: true, safeRoom: true, buildingAge: 17,
+      publicMatchNote: 'נכס משופץ ברמה גבוהה, ליד פארק הירקון וקו רכבת קלה.',
+    },
+    // 6. גבעתיים — דירה 3 חדרים, בניין בוטיק
+    {
+      agentIdx: 1,
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
+      street: 'כצנלסון 50', city: 'גבעתיים', neighborhood: 'בורוכוב',
+      owner: 'אלינור פדידה', ownerPhone: '052-7770666',
+      marketingPrice: 2_490_000, sqm: 72, rooms: 3, floor: 2, totalFloors: 5,
+      elevator: false, renovated: 'משופצת', parking: false, storage: false,
+      balconySize: 7, ac: true, safeRoom: false, buildingAge: 40,
+      publicMatchNote: 'דירה שקטה ברחוב ירוק, פוטנציאל השבחה — בעלים בלחץ למכור.',
+    },
+    // 7. ראשון לציון — דירה 5 חדרים למכירה
+    {
+      agentIdx: 2,
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
+      street: 'ההגנה 45', city: 'ראשון לציון', neighborhood: 'נחלת יהודה',
+      owner: 'יואב לוין', ownerPhone: '054-7770777',
+      marketingPrice: 2_980_000, sqm: 118, rooms: 5, floor: 8, totalFloors: 14,
+      elevator: true, renovated: 'משופצת', parking: true, storage: true,
+      balconySize: 14, ac: true, safeRoom: true, buildingAge: 7,
+      publicMatchNote: 'דירה מרווחת עם 2 חניות וממ״ד, אזור משפחות מבוקש.',
+    },
+    // 8. רעננה — בית פרטי (קוטג׳)
+    {
+      agentIdx: 3,
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'בית פרטי',
+      street: 'אחוזה 240', city: 'רעננה', neighborhood: 'רעננה הירוקה',
+      owner: 'שירה ויסברגר', ownerPhone: '058-7770888',
+      marketingPrice: 5_200_000, sqm: 210, rooms: 6, floor: null, totalFloors: 2,
+      elevator: false, renovated: 'משופץ', parking: true, storage: true,
+      balconySize: 25, ac: true, safeRoom: true, buildingAge: 22,
+      publicMatchNote: 'קוטג׳ עם גינה 250 מ״ר ובריכה פרטית, אזורי רישום מצוינים.',
+    },
+    // 9. כפר סבא — דירה להשכרה
+    {
+      agentIdx: 3,
+      assetClass: 'RESIDENTIAL', category: 'RENT', type: 'דירה',
+      street: 'ויצמן 110', city: 'כפר סבא', neighborhood: 'מרכז העיר',
+      owner: 'דקלה ברנע', ownerPhone: '050-7770999',
+      marketingPrice: 7_200, sqm: 80, rooms: 3.5, floor: 4, totalFloors: 8,
+      elevator: true, renovated: 'משופצת', parking: true, storage: false,
+      balconySize: 9, ac: true, safeRoom: true, buildingAge: 12,
+      publicMatchNote: 'דירה זמינה מיידית, בעלים מעדיפים שוכרים יציבים לטווח ארוך.',
+    },
+    // 10. נתניה — דירה 4 חדרים להשכרה עם נוף ים
+    {
+      agentIdx: 0,
+      assetClass: 'RESIDENTIAL', category: 'RENT', type: 'דירה',
+      street: 'דיזנגוף 8', city: 'נתניה', neighborhood: 'עיר ימים',
+      owner: 'אבי כרמלי', ownerPhone: '052-7771010',
+      marketingPrice: 9_800, sqm: 110, rooms: 4, floor: 17, totalFloors: 22,
+      elevator: true, renovated: 'חדש מקבלן', parking: true, storage: true,
+      balconySize: 16, ac: true, safeRoom: true, buildingAge: 4,
+      publicMatchNote: 'דירת יוקרה במגדל, נוף ים מהסלון, מתאים גם לדיפלומטים.',
+    },
+    // 11. תל אביב — דירת חדר להשכרה (סטודיו) — נקודת מחיר נוחה
+    {
+      agentIdx: 2,
+      assetClass: 'RESIDENTIAL', category: 'RENT', type: 'דירה',
+      street: 'פלורנטין 30', city: 'תל אביב', neighborhood: 'פלורנטין',
+      owner: 'ליאון חורי', ownerPhone: '054-7771111',
+      marketingPrice: 6_300, sqm: 42, rooms: 2, floor: 1, totalFloors: 3,
+      elevator: false, renovated: 'משופצת', parking: false, storage: false,
+      balconySize: 4, ac: true, safeRoom: false, buildingAge: 60,
+      publicMatchNote: 'סטודיו אורבני בלב פלורנטין, מתאים לסטודנטים או צעירים.',
+    },
+    // 12. הרצליה — חנות מסחרית להשכרה
+    {
+      agentIdx: 0,
+      assetClass: 'COMMERCIAL', category: 'RENT', type: 'חנות',
+      street: 'סוקולוב 78', city: 'הרצליה', neighborhood: 'מרכז הרצליה',
+      owner: 'עומר שגיא', ownerPhone: '058-7771212',
+      marketingPrice: 14_500, sqm: 95, rooms: null, floor: 0, totalFloors: 4,
+      elevator: false, renovated: 'משופץ', parking: true, storage: true,
+      balconySize: 0, ac: true, safeRoom: false, buildingAge: 18,
+      publicMatchNote: 'חנות בחזית רחוב מבוקש, חלון ראווה רחב, מתאימה לרשת.',
+    },
+  ];
+
+  // Pre-resolve agent ids for fast lookup. Index 0..2 = team, 3 = remote.
+  const poolAgentIds = [
+    teamAgents[0].id,
+    teamAgents[1].id,
+    teamAgents[2].id,
+    remoteAgent.id,
+  ];
+
+  // Date helpers — local to this block since the shared `atOffset`
+  // helper is defined later in the manager-demo section.
+  const dayMsPool = 24 * 60 * 60 * 1000;
+  const nowPool = Date.now();
+  const exclusiveEndPool = new Date(nowPool + 180 * dayMsPool);
+  const marketingStartPool = new Date(nowPool - 14 * dayMsPool);
+
+  let poolCreated = 0;
+  for (let i = 0; i < poolProperties.length; i++) {
+    const p = poolProperties[i];
+    const photos = poolPhotos[i % poolPhotos.length];
+    await prisma.property.create({
+      data: {
+        agentId: poolAgentIds[p.agentIdx],
+        assetClass: p.assetClass,
+        category: p.category,
+        type: p.type,
+        street: p.street,
+        city: p.city,
+        neighborhood: p.neighborhood ?? null,
+        owner: p.owner,
+        ownerPhone: p.ownerPhone,
+        marketingPrice: p.marketingPrice,
+        sqm: p.sqm,
+        rooms: p.rooms ?? null,
+        floor: p.floor ?? null,
+        totalFloors: p.totalFloors ?? null,
+        elevator: p.elevator ?? false,
+        renovated: p.renovated ?? null,
+        parking: p.parking ?? false,
+        storage: p.storage ?? false,
+        balconySize: p.balconySize ?? 0,
+        ac: p.ac ?? false,
+        safeRoom: p.safeRoom ?? false,
+        buildingAge: p.buildingAge ?? null,
+        sector: 'כללי',
+        status: 'ACTIVE',
+        isPublicMatch: true,
+        publicMatchAt: new Date(),
+        publicMatchNote: p.publicMatchNote,
+        exclusiveStart: new Date(),
+        exclusiveEnd: exclusiveEndPool,
+        marketingStartDate: marketingStartPool,
+        images: { create: photos.map((url, j) => ({ url, sortOrder: j })) },
+      },
+    });
+    poolCreated += 1;
+  }
+  console.log(`✓ public-matches pool: ${poolCreated} listings across ${new Set(poolProperties.map((p) => p.city)).size} cities (${poolAgentIds.length - 1} team agents + 1 remote)`);
+
   // ─── Manager demo data (reminders / activity / transfers /
   // invites / Yad2 scan history) ──────────────────────────────────
   //
