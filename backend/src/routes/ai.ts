@@ -18,6 +18,7 @@ import { requirePremium } from '../middleware/requirePremium.js';
 import { logActivity } from '../lib/activity.js';
 import { prisma } from '../lib/prisma.js';
 import { buildAnthropic } from '../lib/anthropic.js';
+import { CHAT_TOOLS, runChatTool } from '../lib/aiChatTools.js';
 
 const AI_AGENT_URL = (process.env.AI_AGENT_URL || 'http://estia-ai-agent:8080').replace(/\/$/, '');
 
@@ -939,17 +940,94 @@ ${compsText || '(אין נכסים להשוואה)'}
         });
       }
 
+      // Sprint 10 — tool-use loop. Claude now has read-only access to
+      // the signed-in agent's book (leads, properties, deals,
+      // reminders, office members, free-text search, summary counts)
+      // via the CHAT_TOOLS schemas in lib/aiChatTools.ts. All tool
+      // calls are agentId-scoped; none of them write.
+      //
+      // Loop termination: Anthropic returns stop_reason="tool_use"
+      // until it has enough context to answer, then "end_turn" with
+      // the final assistant text. We cap at 6 iterations so a
+      // pathological "keep calling tools forever" run can't burn
+      // credits. A single user turn rarely needs >3 tool calls for
+      // CRM questions.
+      const SYSTEM = [
+        'אתה Estia AI — עוזר מקצועי לסוכני נדל"ן ישראלים.',
+        'תענה בעברית, קצר וענייני. אל תמציא עובדות.',
+        '',
+        'יש לך גישת קריאה בלבד לנתוני הסוכן/ת המחובר/ת דרך הכלים (tools).',
+        'השתמש/י בכלים כאשר השאלה דורשת נתונים אמיתיים — לדוגמה "כמה לידים חמים יש לי", "מה הנכסים שלי בתל אביב", "מה התזכורות שלי להיום".',
+        'קודם תקרא/י את הנתונים דרך הכלים, ורק אז תנסח/י תשובה מבוססת.',
+        'אם אין לך תוצאה מהכלי — אמור/י במפורש שלא נמצאו נתונים, אל תמציא.',
+        'לעולם אל תחזיר/י מזהים ארוכים (id) ללקוח — עדיף שם, כתובת, או מספר טלפון.',
+      ].join('\n');
+
+      type ContentBlock =
+        | { type: 'text'; text: string }
+        | { type: 'tool_use'; id: string; name: string; input: Record<string, any> };
+      type AssistantMsg = { role: 'assistant'; content: ContentBlock[] };
+      type UserMsg = { role: 'user'; content: string | Array<{ type: 'tool_result'; tool_use_id: string; content: string }> };
+
+      const convo: Array<AssistantMsg | UserMsg> =
+        messages.map((m) => ({ role: m.role, content: m.content } as any));
+
       let replyText = '';
       try {
-        const response = await client.messages.create({
-          model: 'claude-opus-4-7',
-          max_tokens: 2048,
-          system:
-            'אתה Estia AI — עוזר מקצועי לסוכני נדל"ן ישראלים. אתה עונה בעברית, בקיצור וענייניות, ומוכן לעזור עם ניסוח הודעות, ניתוח לקוחות, והחלטות מכירה. אל תמציא עובדות.',
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        });
-        const textBlock = response.content.find((b) => b.type === 'text');
-        replyText = textBlock && textBlock.type === 'text' ? textBlock.text.trim() : '';
+        for (let iter = 0; iter < 6; iter += 1) {
+          const response = await client.messages.create({
+            model: 'claude-opus-4-7',
+            max_tokens: 2048,
+            system: SYSTEM,
+            tools: CHAT_TOOLS,
+            messages: convo as any,
+          });
+
+          // Record the assistant turn (blocks verbatim so tool_use ids
+          // stay matched with the tool_result we send back next).
+          const assistantBlocks = response.content as ContentBlock[];
+          convo.push({ role: 'assistant', content: assistantBlocks });
+
+          if (response.stop_reason !== 'tool_use') {
+            const text = assistantBlocks
+              .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+              .map((b) => b.text)
+              .join('\n')
+              .trim();
+            replyText = text;
+            break;
+          }
+
+          // Run every tool_use block in parallel, then feed the
+          // results back as a single user turn.
+          const toolUses = assistantBlocks.filter(
+            (b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use',
+          );
+          const results = await Promise.all(
+            toolUses.map(async (tu) => {
+              try {
+                const out = await runChatTool(tu.name, tu.input || {}, { agentId: user.id });
+                return {
+                  type: 'tool_result' as const,
+                  tool_use_id: tu.id,
+                  content: JSON.stringify(out),
+                };
+              } catch (e: any) {
+                req.log.warn({ err: e, tool: tu.name }, 'chat tool failed');
+                return {
+                  type: 'tool_result' as const,
+                  tool_use_id: tu.id,
+                  content: JSON.stringify({ error: e?.message || 'tool failed' }),
+                };
+              }
+            }),
+          );
+          convo.push({ role: 'user', content: results });
+        }
+
+        if (!replyText) {
+          replyText = 'לא הצלחתי להרכיב תשובה. נסו/י לנסח את השאלה שוב.';
+        }
       } catch (e: any) {
         req.log.error({ err: e }, 'ai chat upstream error');
         return reply.code(502).send({
