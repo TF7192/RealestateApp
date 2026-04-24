@@ -170,6 +170,157 @@ const INITIAL_FORM = {
   brokerNotes: '',
 };
 
+// ─── Cream & Gold DT tokens ────────────────────────────────────────────
+// Inline design-tokens used by the wizard's OUTER shell (page wrapper,
+// step header, step progress, step footer buttons). Per-step form
+// bodies still ride on the existing `.form-section` / `.intake-form`
+// CSS, which already renders cream & gold via light-mode tokens.
+const NP_DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)',
+  success: '#15803d', danger: '#b91c1c',
+};
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
+
+const NP_STY = {
+  pageShell: { ...FONT, padding: 28, color: NP_DT.ink, minHeight: '100%' },
+  backLink: {
+    ...FONT,
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    color: NP_DT.muted, textDecoration: 'none',
+    fontSize: 13, fontWeight: 700,
+    marginBottom: 14,
+  },
+  headerCard: {
+    ...FONT,
+    background: NP_DT.white,
+    border: `1px solid ${NP_DT.border}`,
+    borderRadius: 14,
+    padding: '18px 22px',
+    marginBottom: 14,
+    boxShadow: '0 1px 2px rgba(30,26,20,0.04)',
+  },
+  headerTitle: { fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: 0, color: NP_DT.ink },
+  headerSub: { fontSize: 13, color: NP_DT.muted, marginTop: 4 },
+  stepsWrap: {
+    ...FONT,
+    display: 'flex', alignItems: 'stretch', gap: 10,
+    marginBottom: 14, flexWrap: 'wrap',
+  },
+  stepBtn: {
+    ...FONT,
+    flex: '1 1 220px',
+    display: 'flex', alignItems: 'center', gap: 10,
+    textAlign: 'start',
+    background: NP_DT.white,
+    border: `1px solid ${NP_DT.border}`,
+    borderRadius: 12,
+    padding: '12px 14px',
+    cursor: 'pointer',
+    color: NP_DT.ink,
+  },
+  stepBtnActive: {
+    ...FONT,
+    flex: '1 1 220px',
+    display: 'flex', alignItems: 'center', gap: 10,
+    textAlign: 'start',
+    background: `linear-gradient(180deg, ${NP_DT.goldLight}, ${NP_DT.gold})`,
+    border: `1px solid ${NP_DT.goldDark}`,
+    borderRadius: 12,
+    padding: '12px 14px',
+    cursor: 'pointer',
+    color: NP_DT.ink,
+    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+  },
+  stepBtnDone: {
+    ...FONT,
+    flex: '1 1 220px',
+    display: 'flex', alignItems: 'center', gap: 10,
+    textAlign: 'start',
+    background: NP_DT.goldSoft,
+    border: `1px solid ${NP_DT.gold}`,
+    borderRadius: 12,
+    padding: '12px 14px',
+    cursor: 'pointer',
+    color: NP_DT.ink,
+  },
+  stepNo: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: 28, height: 28, borderRadius: '50%',
+    background: NP_DT.cream2, color: NP_DT.ink,
+    fontWeight: 800, fontSize: 13, flex: '0 0 auto',
+  },
+  stepLabelStrong: { display: 'block', fontWeight: 800, fontSize: 14, lineHeight: 1.2 },
+  stepLabelSub: { display: 'block', fontSize: 11, color: NP_DT.muted, marginTop: 2 },
+  stepLine: {
+    alignSelf: 'center',
+    width: 20, height: 1, background: NP_DT.border, flex: '0 0 auto',
+  },
+  stepBody: {
+    ...FONT,
+    background: NP_DT.cream4,
+    border: `1px solid ${NP_DT.border}`,
+    borderRadius: 14,
+    padding: 20,
+    marginBottom: 14,
+  },
+  errorBox: {
+    ...FONT,
+    display: 'inline-flex', alignItems: 'center', gap: 8,
+    background: 'rgba(185,28,28,0.06)', color: NP_DT.danger,
+    border: `1px solid rgba(185,28,28,0.18)`, borderRadius: 10,
+    padding: '8px 12px', fontSize: 13, fontWeight: 600,
+    marginBottom: 12,
+  },
+  draftBanner: {
+    ...FONT,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: 10, flexWrap: 'wrap',
+    background: NP_DT.goldSoft, color: NP_DT.ink,
+    border: `1px solid ${NP_DT.gold}`, borderRadius: 12,
+    padding: '10px 14px', fontSize: 13, fontWeight: 600,
+    marginBottom: 12,
+  },
+  draftAge: { color: NP_DT.muted, fontWeight: 500 },
+  footerRow: {
+    ...FONT,
+    display: 'flex', gap: 10, flexWrap: 'wrap',
+    marginTop: 6,
+  },
+  primaryBtn: {
+    ...FONT,
+    background: `linear-gradient(180deg, ${NP_DT.goldLight}, ${NP_DT.gold})`,
+    border: 'none', color: NP_DT.ink,
+    padding: '11px 20px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 14, fontWeight: 800,
+    display: 'inline-flex', gap: 8, alignItems: 'center',
+    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    textDecoration: 'none',
+  },
+  secondaryBtn: {
+    ...FONT,
+    background: NP_DT.white, color: NP_DT.ink,
+    border: `1px solid ${NP_DT.border}`,
+    padding: '11px 20px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 14, fontWeight: 700,
+    display: 'inline-flex', gap: 8, alignItems: 'center',
+    textDecoration: 'none',
+  },
+  ghostBtn: {
+    ...FONT,
+    background: 'transparent', color: NP_DT.ink,
+    border: `1px solid ${NP_DT.border}`,
+    padding: '11px 20px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 14, fontWeight: 700,
+    display: 'inline-flex', gap: 8, alignItems: 'center',
+  },
+};
+
 /**
  * Two-step property wizard — serves BOTH create and edit.
  *
@@ -671,11 +822,11 @@ export default function NewProperty() {
 
   if (isEdit && loadingExisting) {
     return (
-      <div className="form-page np-wizard">
-        <div className="page-header animate-in">
+      <div className="form-page np-wizard" style={NP_STY.pageShell}>
+        <div className="page-header animate-in" style={NP_STY.headerCard}>
           <div className="page-header-info">
-            <h2>טוען נכס…</h2>
-            <p>רגע, מביאים את הפרטים המעודכנים</p>
+            <h2 style={NP_STY.headerTitle}>טוען נכס…</h2>
+            <p style={NP_STY.headerSub}>רגע, מביאים את הפרטים המעודכנים</p>
           </div>
         </div>
       </div>
@@ -723,7 +874,10 @@ export default function NewProperty() {
   };
 
   return (
-    <div className={`form-page np-wizard has-sticky-bar ${isEdit ? 'np-is-edit' : ''}`}>
+    <div
+      className={`form-page np-wizard has-sticky-bar ${isEdit ? 'np-is-edit' : ''}`}
+      style={NP_STY.pageShell}
+    >
       {!isEdit && (
         <PageTour
           pageKey="new-property"
@@ -734,73 +888,75 @@ export default function NewProperty() {
           ]}
         />
       )}
-      <Link to={backTarget} className="back-link animate-in">
+      <Link to={backTarget} className="back-link animate-in" style={NP_STY.backLink}>
         <ArrowRight size={16} />
         {backLabel}
       </Link>
 
-      <div className="page-header animate-in">
+      <div className="page-header animate-in" style={NP_STY.headerCard}>
         <div className="page-header-info">
-          <h2>{headerTitle}</h2>
-          <p>{headerSub}</p>
+          <h2 style={NP_STY.headerTitle}>{headerTitle}</h2>
+          <p style={NP_STY.headerSub}>{headerSub}</p>
         </div>
         {/* Voice shortcut removed with VoiceCaptureButton (see imports). */}
       </div>
 
       {draftBanner && !isEdit && (
-        <div className="draft-banner animate-in" role="status">
+        <div className="draft-banner animate-in" role="status" style={NP_STY.draftBanner}>
           <span>
             נמצאה טיוטה שנשמרה
             {draftBanner.savedAt && (
-              <span className="draft-banner-age"> · {relLabel(draftBanner.savedAt)}</span>
+              <span className="draft-banner-age" style={NP_STY.draftAge}> · {relLabel(draftBanner.savedAt)}</span>
             )}
           </span>
-          <div className="draft-banner-actions">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>שחזר</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft}>מחק</button>
+          <div className="draft-banner-actions" style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft} style={NP_STY.secondaryBtn}>שחזר</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft} style={NP_STY.ghostBtn}>מחק</button>
           </div>
         </div>
       )}
 
-      <div className="np-steps animate-in animate-in-delay-1">
+      <div className="np-steps animate-in animate-in-delay-1" style={NP_STY.stepsWrap}>
         <button
           type="button"
           className={`np-step np-step-btn ${step === 1 ? 'active' : step > 1 ? 'done' : ''}`}
           onClick={() => goToStep(1)}
           aria-current={step === 1 ? 'step' : undefined}
           disabled={!isEdit && !propertyId && step === 1}
+          style={step === 1 ? NP_STY.stepBtnActive : step > 1 ? NP_STY.stepBtnDone : NP_STY.stepBtn}
         >
-          <span className="np-step-no">{step > 1 ? <CheckCircle2 size={14} /> : '1'}</span>
+          <span className="np-step-no" style={NP_STY.stepNo}>{step > 1 ? <CheckCircle2 size={14} /> : '1'}</span>
           <div>
-            <strong>יסודות</strong>
-            <span>{isEdit ? 'כתובת, מחיר, בעל הנכס' : '7 שדות · שמירה יוצרת את הנכס'}</span>
+            <strong style={NP_STY.stepLabelStrong}>יסודות</strong>
+            <span style={NP_STY.stepLabelSub}>{isEdit ? 'כתובת, מחיר, בעל הנכס' : '7 שדות · שמירה יוצרת את הנכס'}</span>
           </div>
         </button>
-        <div className="np-step-line" />
+        <div className="np-step-line" style={NP_STY.stepLine} />
         <button
           type="button"
           className={`np-step np-step-btn ${step === 2 ? 'active' : ''}`}
           onClick={() => goToStep(2)}
           aria-current={step === 2 ? 'step' : undefined}
           disabled={!isEdit && !propertyId}
+          style={step === 2 ? NP_STY.stepBtnActive : NP_STY.stepBtn}
         >
-          <span className="np-step-no">2</span>
+          <span className="np-step-no" style={NP_STY.stepNo}>2</span>
           <div>
-            <strong>חבילת שיווק</strong>
-            <span>{isEdit ? 'מאפיינים, תמונות, בלעדיות' : 'מאפיינים, תמונות, בלעדיות · לא חובה עכשיו'}</span>
+            <strong style={NP_STY.stepLabelStrong}>חבילת שיווק</strong>
+            <span style={NP_STY.stepLabelSub}>{isEdit ? 'מאפיינים, תמונות, בלעדיות' : 'מאפיינים, תמונות, בלעדיות · לא חובה עכשיו'}</span>
           </div>
         </button>
       </div>
 
       {error && (
-        <div className="np-error animate-in">
+        <div className="np-error animate-in" style={NP_STY.errorBox}>
           <AlertCircle size={14} />
           {error}
         </div>
       )}
 
       {step === 1 ? (
-        <form id="np-form-step1" onSubmit={saveStep1} className="intake-form animate-in animate-in-delay-2">
+        <form id="np-form-step1" onSubmit={saveStep1} className="intake-form animate-in animate-in-delay-2" style={NP_STY.stepBody}>
           <div className="form-section">
             <h3 className="form-section-title">סיווג ומחיר</h3>
             <div className="form-row form-row-3">
@@ -1030,16 +1186,16 @@ export default function NewProperty() {
             </div>
           </div>
 
-          <div className="form-actions form-actions-desktop">
-            <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
+          <div className="form-actions form-actions-desktop" style={NP_STY.footerRow}>
+            <button type="submit" className="btn btn-primary btn-lg" disabled={submitting} style={NP_STY.primaryBtn}>
               <Save size={18} />
               {submitting ? 'שומר…' : isEdit ? 'עדכן והמשך' : 'שמור והמשך'}
             </button>
-            <Link to={backTarget} className="btn btn-secondary btn-lg">ביטול</Link>
+            <Link to={backTarget} className="btn btn-secondary btn-lg" style={NP_STY.secondaryBtn}>ביטול</Link>
           </div>
         </form>
       ) : (
-        <form id="np-form-step2" onSubmit={saveStep2} className="intake-form animate-in animate-in-delay-2">
+        <form id="np-form-step2" onSubmit={saveStep2} className="intake-form animate-in animate-in-delay-2" style={NP_STY.stepBody}>
           <div className="form-section">
             <h3 className="form-section-title">מאפיינים</h3>
             <div className="form-row form-row-4">
@@ -1614,12 +1770,12 @@ export default function NewProperty() {
             )}
           </div>
 
-          <div className="form-actions form-actions-desktop">
-            <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
+          <div className="form-actions form-actions-desktop" style={NP_STY.footerRow}>
+            <button type="submit" className="btn btn-primary btn-lg" disabled={submitting} style={NP_STY.primaryBtn}>
               <Save size={18} />
               {submitting ? 'שומר…' : isEdit ? 'שמור שינויים' : 'שמור וסיים'}
             </button>
-            <button type="button" className="btn btn-ghost btn-lg" onClick={skipStep2}>
+            <button type="button" className="btn btn-ghost btn-lg" onClick={skipStep2} style={NP_STY.ghostBtn}>
               {isEdit ? 'חזור לכרטיס' : 'דלג להמשך מאוחר יותר'}
             </button>
           </div>
