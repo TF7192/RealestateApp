@@ -214,6 +214,97 @@ export default function Ai() {
   );
 }
 
+// Tiny, safe Markdown subset renderer. Supports the patterns Claude
+// actually emits in this chat: **bold**, *italic*, ### headings
+// (levels 1–3), "- " / "* " / "1. " bullets, `inline code`, and
+// [links](href) (http/https only). No `dangerouslySetInnerHTML`, no
+// external dep — every node is a regular React element so XSS can't
+// slip through.
+function renderInline(text, keyPrefix) {
+  // Tokenise inline styling with one pass. Order matters: code first
+  // so backticks don't get eaten by the bold/italic passes.
+  const out = [];
+  let i = 0;
+  let idx = 0;
+  const push = (node) => { out.push(node); idx += 1; };
+  while (i < text.length) {
+    const rest = text.slice(i);
+    // `code`
+    let m = rest.match(/^`([^`]+)`/);
+    if (m) { push(<code key={`${keyPrefix}-c-${idx}`} style={{ background: '#efe9df', padding: '1px 5px', borderRadius: 4, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.92em' }}>{m[1]}</code>); i += m[0].length; continue; }
+    // **bold**
+    m = rest.match(/^\*\*([^*]+)\*\*/);
+    if (m) { push(<strong key={`${keyPrefix}-b-${idx}`} style={{ fontWeight: 800 }}>{renderInline(m[1], `${keyPrefix}-b-${idx}`)}</strong>); i += m[0].length; continue; }
+    // *italic* (single asterisk — avoid eating bullets by requiring non-space after *)
+    m = rest.match(/^\*(\S[^*]*)\*/);
+    if (m) { push(<em key={`${keyPrefix}-i-${idx}`}>{renderInline(m[1], `${keyPrefix}-i-${idx}`)}</em>); i += m[0].length; continue; }
+    // [label](href)
+    m = rest.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+    if (m) { push(<a key={`${keyPrefix}-l-${idx}`} href={m[2]} target="_blank" rel="noopener noreferrer" style={{ color: '#b48b4c', textDecoration: 'underline' }}>{m[1]}</a>); i += m[0].length; continue; }
+    // Plain char — coalesce runs of plain text into one node.
+    const stopAt = rest.search(/`|\*\*|\*|\[[^\]]+\]\(https?/);
+    const chunkEnd = stopAt === -1 ? rest.length : Math.max(1, stopAt);
+    push(rest.slice(0, chunkEnd));
+    i += chunkEnd;
+  }
+  return out;
+}
+
+function renderMarkdown(raw) {
+  // Block-level: split on blank lines, then decide per-block.
+  const blocks = String(raw || '').split(/\n{2,}/);
+  const nodes = [];
+  blocks.forEach((block, bi) => {
+    const key = `b-${bi}`;
+    // Heading: ### / ## / #
+    const h = block.match(/^(#{1,3})\s+(.*)$/);
+    if (h) {
+      const level = h[1].length; // 1..3
+      const Tag = level === 1 ? 'h3' : level === 2 ? 'h4' : 'h5';
+      const fontSize = level === 1 ? 17 : level === 2 ? 15 : 14;
+      nodes.push(
+        <Tag key={key} style={{ fontWeight: 800, fontSize, margin: '8px 0 4px', color: '#1e1a14' }}>
+          {renderInline(h[2].trim(), key)}
+        </Tag>
+      );
+      return;
+    }
+    // Bullet / numbered list: every line in the block starts with -, *, or a number.
+    const lines = block.split(/\n/).filter(Boolean);
+    const isBullet = lines.every((l) => /^(\s*[-*]\s+|\s*\d+[.)]\s+)/.test(l));
+    if (isBullet && lines.length > 0) {
+      const numbered = /^\s*\d+[.)]/.test(lines[0]);
+      const Tag = numbered ? 'ol' : 'ul';
+      nodes.push(
+        <Tag key={key} style={{ margin: '4px 0', paddingInlineStart: 22 }}>
+          {lines.map((l, li) => {
+            const txt = l.replace(/^(\s*[-*]\s+|\s*\d+[.)]\s+)/, '');
+            return (
+              <li key={`${key}-${li}`} style={{ margin: '2px 0', lineHeight: 1.6 }}>
+                {renderInline(txt, `${key}-${li}`)}
+              </li>
+            );
+          })}
+        </Tag>
+      );
+      return;
+    }
+    // Plain paragraph — preserve hard newlines inside with <br>.
+    const plainLines = block.split(/\n/);
+    nodes.push(
+      <p key={key} style={{ margin: '4px 0', lineHeight: 1.65 }}>
+        {plainLines.map((l, li) => (
+          <span key={`${key}-${li}`}>
+            {renderInline(l, `${key}-${li}`)}
+            {li < plainLines.length - 1 ? <br /> : null}
+          </span>
+        ))}
+      </p>
+    );
+  });
+  return nodes;
+}
+
 function Bubble({ role, content, loading }) {
   const isUser = role === 'user';
   return (
@@ -234,7 +325,10 @@ function Bubble({ role, content, loading }) {
         border: `1px solid ${DT.border}`,
         color: DT.ink,
         fontSize: 14, lineHeight: 1.65,
-        whiteSpace: 'pre-wrap',
+        // User bubbles keep pre-wrap (they typed it); assistant bubbles
+        // render markdown so **bold** / ### headings / bullets display
+        // rich instead of raw.
+        whiteSpace: isUser ? 'pre-wrap' : 'normal',
       }}>
         {loading ? (
           <span style={{
@@ -242,7 +336,7 @@ function Bubble({ role, content, loading }) {
           }}>
             <Loader2 size={14} className="estia-spin" /> חושב…
           </span>
-        ) : content}
+        ) : isUser ? content : renderMarkdown(content)}
       </div>
       {isUser && (
         <div style={avatar(DT.cream2, DT.ink)}>

@@ -566,6 +566,12 @@ export const api = {
   // Sprint 10 — close the office. body: { mode: 'delete'|'transfer', newOwnerId? }.
   closeOffice:         (body) => request('/office/close', { method: 'POST', body }),
   removeOfficeMember:  (id) => request(`/office/members/${id}`, { method: 'DELETE' }),
+  // Invites addressed to the current user — shown on /office before
+  // the caller has an office of their own.
+  listMyOfficeInvites: () => request('/office/invites/mine'),
+  acceptOfficeInvite:  (id) => request(`/office/invites/${id}/accept`, { method: 'POST' }),
+  // Promote a member to OWNER without closing the office.
+  promoteOfficeMember: (id) => request(`/office/members/${id}/promote`, { method: 'POST' }),
   // A1 fill-in — email-based invites. The server returns a surrogate
   // inviteUrl ({origin}/accept-invite?token=<id>) that the owner can
   // copy/share manually; the invite resolves automatically when the

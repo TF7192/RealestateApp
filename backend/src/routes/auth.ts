@@ -294,6 +294,10 @@ function publicUser(u: any) {
     profileCompletedAt: u.profileCompletedAt || null,
     hasCompletedTutorial: !!u.hasCompletedTutorial,
     firstLoginPlatform: u.firstLoginPlatform || null,
+    // Sprint 5.1 — clients gate premium-only buttons on this flag
+    // client-side so premium users skip the upsell modal. The real
+    // gate still runs server-side on the protected routes.
+    isPremium: !!u.isPremium,
     agentProfile: u.agentProfile ?? undefined,
     customerProfile: u.customerProfile ?? undefined,
   };

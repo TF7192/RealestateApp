@@ -180,6 +180,12 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     if (existing?.officeId === me.officeId) {
       return reply.code(409).send({ error: { message: 'User already a member of this office' } });
     }
+    // User is a member of a DIFFERENT office — reject so the inviter
+    // sees a useful error instead of silently queuing an invite that
+    // would conflict when accepted.
+    if (existing?.officeId && existing.officeId !== me.officeId) {
+      return reply.code(409).send({ error: { message: 'הסוכן/ית כבר חבר/ה במשרד אחר' } });
+    }
     // Upsert the invite. Inviting the same email twice resets
     // revokedAt/acceptedAt so a revoked invite can be re-issued.
     const invite = await prisma.officeInvite.upsert({
@@ -211,6 +217,100 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     });
     const items = rows.map((r) => ({ ...r, inviteUrl: inviteUrl(r.id) }));
     return { items };
+  });
+
+  // GET /api/office/invites/mine — invites addressed to the caller's
+  // email. Used by the "Create office" page so an invitee sees pending
+  // invites before they create their own office.
+  app.get('/invites/mine', { onRequest: [app.requireAuth] }, async (req) => {
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { email: true, officeId: true },
+    });
+    if (!me) return { items: [] };
+    const rows = await prisma.officeInvite.findMany({
+      where: {
+        email: { equals: me.email.trim().toLowerCase(), mode: 'insensitive' },
+        acceptedAt: null,
+        revokedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        office: { select: { id: true, name: true } },
+        invitedBy: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+    return { items: rows.map((r) => ({ ...r, inviteUrl: inviteUrl(r.id) })) };
+  });
+
+  // POST /api/office/invites/:id/accept — caller joins the inviting
+  // office as an AGENT. Rejected if the caller is already in a
+  // different office (they must leave first).
+  app.post('/invites/:id/accept', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { id: true, email: true, officeId: true, role: true },
+    });
+    if (!me) return reply.code(404).send({ error: { message: 'User not found' } });
+    const invite = await prisma.officeInvite.findUnique({ where: { id } });
+    if (!invite || invite.revokedAt || invite.acceptedAt) {
+      return reply.code(404).send({ error: { message: 'Invite not found' } });
+    }
+    if (invite.email.toLowerCase() !== me.email.toLowerCase()) {
+      return reply.code(403).send({ error: { message: 'Invite is for a different email' } });
+    }
+    if (me.officeId && me.officeId !== invite.officeId) {
+      return reply.code(409).send({ error: { message: 'כבר חבר/ה במשרד אחר — עזוב/י קודם את המשרד הקיים' } });
+    }
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: me.id },
+        data: {
+          officeId: invite.officeId,
+          // Joining someone else's office as AGENT — never preserve a
+          // lingering OWNER role from a previous office.
+          role: 'AGENT',
+        },
+      });
+      await tx.officeInvite.update({
+        where: { id: invite.id },
+        data: { acceptedAt: new Date(), acceptedById: me.id },
+      });
+    });
+    await logActivity({
+      agentId: me.id, actorId: me.id,
+      verb: 'joined', entityType: 'Office', entityId: invite.officeId,
+      summary: 'הצטרפות למשרד דרך הזמנה',
+    });
+    return { ok: true, officeId: invite.officeId };
+  });
+
+  // POST /api/office/members/:id/promote — promote a fellow member to
+  // OWNER without closing the office. Caller stays OWNER too (multi-
+  // owner offices are fine). Idempotent.
+  app.post('/members/:id/promote', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!me?.officeId) {
+      return reply.code(404).send({ error: { message: 'No office attached to your user' } });
+    }
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target || target.officeId !== me.officeId) {
+      return reply.code(404).send({ error: { message: 'User not in your office' } });
+    }
+    if (target.role === 'OWNER') return { ok: true, already: true };
+    await prisma.user.update({ where: { id }, data: { role: 'OWNER' } });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'promoted', entityType: 'Office', entityId: me.officeId,
+      summary: `קידום למנהל/ת: ${target.displayName ?? target.email}`,
+      metadata: { memberId: target.id },
+    });
+    return { ok: true };
   });
 
   app.delete('/invites/:id', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {

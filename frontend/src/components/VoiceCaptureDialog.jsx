@@ -357,65 +357,86 @@ export default function VoiceCaptureDialog({
         )}
       </div>
 
-      {/* Record strip */}
+      {/* Record strip — big centered mic button with the timer + status
+          directly underneath. Previous layout put the button + timer in
+          the same row which read as cramped and unbalanced in RTL. */}
       <div style={{
         padding: inline ? '6px 0 0' : '18px 22px 0',
       }}>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
-          padding: 16, background: DT.cream4,
-          border: `1px solid ${DT.border}`, borderRadius: 14,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: 12, padding: '22px 18px',
+          background: DT.cream4,
+          border: `1px solid ${DT.border}`, borderRadius: 16,
+          position: 'relative',
         }}>
           {!recording ? (
             <button
               type="button"
               onClick={start}
               disabled={busy}
+              aria-label={result ? 'הקלט שוב' : 'התחל הקלטה'}
               style={{
                 ...FONT,
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '11px 20px', borderRadius: 999, border: 'none',
+                display: 'inline-flex', alignItems: 'center', gap: 10,
+                padding: '14px 28px', borderRadius: 999, border: 'none',
                 background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
-                color: DT.ink, fontSize: 14, fontWeight: 800,
+                color: DT.ink, fontSize: 15, fontWeight: 800,
                 cursor: busy ? 'wait' : 'pointer',
                 opacity: busy ? 0.55 : 1,
-                boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
+                boxShadow: '0 6px 18px rgba(180,139,76,0.32)',
+                minWidth: 200,
+                justifyContent: 'center',
               }}
             >
-              <Mic size={16} />
-              {result ? 'הקלט/י שוב' : 'התחל/י הקלטה'}
+              <Mic size={18} />
+              <span>{result ? 'הקלט/י שוב' : 'התחל/י הקלטה'}</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={stop}
+              aria-label="עצור הקלטה"
               style={{
                 ...FONT,
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '11px 20px', borderRadius: 999, border: 'none',
+                display: 'inline-flex', alignItems: 'center', gap: 10,
+                padding: '14px 28px', borderRadius: 999, border: 'none',
                 background: DT.danger, color: DT.white,
-                fontSize: 14, fontWeight: 800, cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(185,28,28,0.25)',
+                fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                boxShadow: '0 6px 18px rgba(185,28,28,0.28)',
+                minWidth: 200, justifyContent: 'center',
               }}
             >
-              <Square size={16} /> עצור/י
+              <Square size={18} fill="currentColor" /> <span>עצור/י</span>
             </button>
           )}
+
+          {/* Timer + status row — directionally neutral (numeric LTR is
+              forced with a BDI) so the "00:00 / 2:00" never flips in RTL. */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
-            fontSize: 14, color: DT.ink, fontVariantNumeric: 'tabular-nums',
-            fontWeight: 700,
+            color: DT.muted, fontSize: 13, fontWeight: 600,
           }}>
-            <span>{mm}:{ss}</span>
-            <span style={{ fontSize: 11, color: DT.muted, fontWeight: 500 }}>
-              / {Math.floor(MAX_SECONDS / 60)}:00
-            </span>
+            <bdi style={{
+              direction: 'ltr',
+              color: recording ? DT.danger : DT.ink,
+              fontVariantNumeric: 'tabular-nums',
+              fontSize: 15, fontWeight: 800,
+              letterSpacing: 0.5,
+            }}>{mm}:{ss}</bdi>
+            <span aria-hidden style={{ color: DT.muted, opacity: 0.6 }}>/</span>
+            <bdi style={{
+              direction: 'ltr',
+              color: DT.muted, fontVariantNumeric: 'tabular-nums',
+              fontSize: 13, fontWeight: 600,
+            }}>{Math.floor(MAX_SECONDS / 60)}:00</bdi>
             {recording && (
               <span
                 aria-label="מקליט"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
-                  color: DT.danger, fontSize: 12, fontWeight: 700,
+                  color: DT.danger, fontSize: 12, fontWeight: 800,
+                  marginInlineStart: 6,
                 }}
               >
                 <span style={{
@@ -430,6 +451,7 @@ export default function VoiceCaptureDialog({
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 color: DT.goldDark, fontSize: 12, fontWeight: 700,
+                marginInlineStart: 6,
               }}>
                 <Loader2 size={13} style={{ animation: 'vcd-spin 1s linear infinite' }} />
                 מתמלל ושולף…

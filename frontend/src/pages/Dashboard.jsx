@@ -5,7 +5,7 @@
 // of firing — the feature is gated behind the upgrade path.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Users, Calendar as CalendarIcon, Banknote, BarChart2,
   Sparkles, X, Star, Activity as ActivityIcon,
@@ -177,7 +177,13 @@ export default function Dashboard() {
     return                         { greeting: 'לילה טוב',    greetingEmoji: '🌙' };
   })();
 
-  const openPremium = () => setPremiumOpen(true);
+  const navigate = useNavigate();
+  // Sprint 10 — premium users skip the upsell modal and go straight
+  // to the real AI surface. Free-tier users still see the old teaser.
+  const openPremium = () => {
+    if (user?.isPremium) { navigate('/ai'); return; }
+    setPremiumOpen(true);
+  };
 
   return (
     <div dir="rtl" style={{

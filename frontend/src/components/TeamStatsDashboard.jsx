@@ -8,7 +8,7 @@
 //
 // Layout persists per-user to localStorage. Default = 6 widgets.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, X, RotateCcw, GripVertical } from 'lucide-react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -385,7 +385,7 @@ function PriceTable({ rows }) {
         <tr style={{ color: DT.muted, fontSize: 11, textAlign: 'right' }}>
           <th style={{ padding: '4px 0', fontWeight: 700 }}>עיר</th>
           <th style={{ padding: '4px 0', fontWeight: 700, textAlign: 'left' }}>חציון</th>
-          <th style={{ padding: '4px 0', fontWeight: 700, textAlign: 'left' }}>n</th>
+          <th style={{ padding: '4px 0', fontWeight: 700, textAlign: 'left' }}>כמות נכסים</th>
         </tr>
       </thead>
       <tbody>

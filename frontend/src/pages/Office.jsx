@@ -155,30 +155,22 @@ export default function Office() {
     if (!email) return;
     setInviting(true);
     try {
-      if (inviteMode === 'existing') {
-        const found = await api.searchAgentByEmail(email);
-        const agent = found?.agent || found?.user;
-        if (!agent?.id) {
-          toast.error('לא נמצא סוכן עם כתובת זו');
-          return;
-        }
-        await api.addOfficeMember({ userId: agent.id });
-        toast.success('הסוכן הוזמן למשרד');
-      } else {
-        // Email-invite path: server stores an OfficeInvite row and
-        // returns an inviteUrl we surface for manual copy/share.
-        const res = await api.createOfficeInvite({ email });
-        const url = res?.invite?.inviteUrl || '';
-        setLastInviteUrl(url);
-        toast.success('ההזמנה נוצרה — העתק/י את הקישור ושלח/י לסוכן');
-      }
+      // Both "existing" and "email" paths now funnel through the same
+      // OfficeInvite record so the target always accepts explicitly —
+      // no silent attachments that preserve a lingering OWNER role.
+      const res = await api.createOfficeInvite({ email });
+      const url = res?.invite?.inviteUrl || '';
+      setLastInviteUrl(url);
+      toast.success(inviteMode === 'existing'
+        ? 'ההזמנה נשלחה — הסוכן/ית יראו אותה בדף "המשרד שלי"'
+        : 'ההזמנה נוצרה — העתק/י את הקישור ושלח/י לסוכן');
       setInviteEmail('');
       await load();
     } catch (err) {
       if (err?.status === 409) {
-        toast.error('הסוכן כבר חבר במשרד');
+        toast.error(err?.message || 'הסוכן/ית כבר חבר/ה במשרד');
       } else {
-        toast.error('ההזמנה נכשלה');
+        toast.error(err?.message || 'ההזמנה נכשלה');
       }
     } finally {
       setInviting(false);
@@ -231,7 +223,9 @@ export default function Office() {
   }
 
   // No office yet — any authenticated user sees the create form
-  // (the server atomically promotes the creator to OWNER).
+  // (the server atomically promotes the creator to OWNER). Plus any
+  // pending invites addressed to this user show above the form so
+  // they can join an existing office instead of creating a new one.
   if (!office) {
     return (
       <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
@@ -248,9 +242,15 @@ export default function Office() {
               <Building2 size={18} aria-hidden="true" />
             </span>
             <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.7, margin: 0 }}>
-              צור/י משרד
+              המשרד שלי
             </h1>
           </div>
+
+          <PendingInvitesBlock toast={toast} onAccepted={async () => {
+            await refresh?.();
+            await load();
+          }} />
+
           <p style={{ fontSize: 13, color: DT.muted, margin: '0 0 20px', lineHeight: 1.7 }}>
             הקמת המשרד מאפשרת להזמין סוכנים, לעבוד יחד על נכסים ולקוחות
             ולראות דוחות צוות ברבעון. הסוכן שיוצר את המשרד הופך אוטומטית
@@ -562,15 +562,35 @@ export default function Office() {
                       )}
                     </div>
                     {isOwner && m.role !== 'OWNER' && (
-                      <button
-                        type="button"
-                        onClick={() => setPendingRemove(m)}
-                        aria-label={`הסר את ${m.displayName || m.email}`}
-                        style={iconBtn()}
-                        title="הסר מהמשרד"
-                      >
-                        <Trash2 size={14} aria-hidden="true" />
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await optimisticUpdate(toast, {
+                                label: 'מקדם…',
+                                success: `${m.displayName || m.email} הפכ/ה למנהל/ת`,
+                                onSave: () => api.promoteOfficeMember(m.id),
+                              });
+                              await load();
+                            } catch { /* toast handled */ }
+                          }}
+                          aria-label={`מנה את ${m.displayName || m.email} למנהל`}
+                          style={iconBtn()}
+                          title="מנה למנהל"
+                        >
+                          <Crown size={14} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingRemove(m)}
+                          aria-label={`הסר את ${m.displayName || m.email}`}
+                          style={iconBtn()}
+                          title="הסר מהמשרד"
+                        >
+                          <Trash2 size={14} aria-hidden="true" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </li>
@@ -806,6 +826,98 @@ const listReset = {
 // features (Sparkles on create-office illustration, AlertCircle on
 // error banners — wired in when the relevant state surfaces).
 void Sparkles; void AlertCircle;
+
+// ─── PendingInvitesBlock ─────────────────────────────────────
+// Shown on the "no office" screen. Lists any OfficeInvite rows the
+// server has for this user's email and lets them accept one —
+// accepting flips their role in-place (AGENT) and attaches them to
+// the inviting office. Quiet when empty so the create-office form
+// stays the primary CTA.
+function PendingInvitesBlock({ toast, onAccepted }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.listMyOfficeInvites()
+      .then((r) => { if (!cancelled) setItems(r?.items || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+  if (loading || items.length === 0) return null;
+  const accept = async (invite) => {
+    setBusyId(invite.id);
+    try {
+      await api.acceptOfficeInvite(invite.id);
+      toast?.success?.(`הצטרפת ל-${invite.office?.name || 'המשרד'}`);
+      await onAccepted?.();
+    } catch (e) {
+      toast?.error?.(e?.message || 'קבלת ההזמנה נכשלה');
+    } finally {
+      setBusyId(null);
+    }
+  };
+  return (
+    <section
+      aria-label="הזמנות ממתינות"
+      style={{
+        background: DT.white, border: `1px solid ${DT.gold}`,
+        borderRadius: 14, padding: 18, marginBottom: 16,
+        boxShadow: '0 4px 14px rgba(180,139,76,0.15)',
+      }}
+    >
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        color: DT.goldDark, fontSize: 11, fontWeight: 700, letterSpacing: 0.8,
+        marginBottom: 6,
+      }}>
+        <Mail size={12} /> הזמנה ממתינה
+      </div>
+      <h3 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 10px', color: DT.ink }}>
+        {items.length === 1
+          ? 'הוזמנת למשרד'
+          : `הוזמנת ל-${items.length} משרדים`}
+      </h3>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map((it) => (
+          <li key={it.id} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 10, padding: '10px 12px', borderRadius: 10,
+            background: DT.cream4, border: `1px solid ${DT.border}`,
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: DT.ink }}>
+                {displayText(it.office?.name)}
+              </div>
+              <div style={{ fontSize: 12, color: DT.muted, marginTop: 2 }}>
+                מ-{it.invitedBy?.displayName || it.invitedBy?.email || 'מנהל המשרד'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => accept(it)}
+              disabled={busyId === it.id}
+              style={{
+                ...FONT,
+                background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+                color: DT.ink, border: 'none',
+                padding: '8px 14px', borderRadius: 10,
+                fontSize: 12, fontWeight: 800,
+                cursor: busyId === it.id ? 'wait' : 'pointer',
+                opacity: busyId === it.id ? 0.55 : 1,
+                boxShadow: '0 2px 6px rgba(180,139,76,0.25)',
+              }}
+            >
+              {busyId === it.id ? 'מצטרף…' : 'אשר/י והצטרפ/י'}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 // ─── CloseOfficeDialog ───────────────────────────────────────────
 // Two-mode close flow: transfer ownership to an existing member, or

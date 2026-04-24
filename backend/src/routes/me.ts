@@ -195,5 +195,8 @@ function toPublic(user: any) {
     // until the first-login form is submitted and the server stamps
     // this column via POST /api/me/profile.
     profileCompletedAt: user.profileCompletedAt || null,
+    // Same flag the auth-login response exposes. Clients read it to
+    // skip the premium upsell modal when the row really is premium.
+    isPremium: !!user.isPremium,
   };
 }

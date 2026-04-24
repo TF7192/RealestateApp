@@ -197,12 +197,16 @@ function AppRoutes() {
 
   useEffect(() => {
     const onGate = (e) => {
+      // Premium users never see the upsell — the backend cleared
+      // them, any 402 for them is a stale / misrouted call we shouldn't
+      // nag about.
+      if (user?.isPremium) return;
       const f = e?.detail?.feature;
       setPremiumFeature(typeof f === 'string' && f ? f : 'Estia Premium');
     };
     window.addEventListener('estia:premium-gate', onGate);
     return () => window.removeEventListener('estia:premium-gate', onGate);
-  }, []);
+  }, [user?.isPremium]);
 
   useScrollRestore();
   useDocumentTitle();
