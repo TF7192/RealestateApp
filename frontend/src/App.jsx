@@ -69,6 +69,10 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 // Sprint 6 — Documents library (S3-backed pdf/dwg/zip/xlsx). Lazy so
 // the cards grid + file icons don't weigh down the main bundle.
 const Documents = lazy(() => import('./pages/Documents'));
+// Sprint 9 — Marketing hub (/marketing). Three-tab surface (overview /
+// landing-page inquiries / agreements). Lazy so the KPI + sparkline
+// rendering doesn't weigh down first paint for agents who never open it.
+const Marketing = lazy(() => import('./pages/Marketing'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 // Sprint 7 — Leaflet map of the agent's properties. Lazy so the
 // ~150KB leaflet + react-leaflet chunk doesn't weigh down first paint
@@ -371,6 +375,9 @@ function AppRoutes() {
             {/* Sprint 6 — Documents library (pdf/dwg/zip/xlsx).
                 S3-backed; route matches `api.listDocuments` / `api.uploadDocument`. */}
             <Route path="/documents" element={<Documents />} />
+            {/* Sprint 9 — Marketing hub. KPIs + landing-page inquiry
+                inbox + brokerage-agreement status. */}
+            <Route path="/marketing" element={<Marketing />} />
             <Route path="/calendar" element={<Calendar />} />
             {/* Sprint 7 — /map shows property pins on a Leaflet /
                 OpenStreetMap tile layer. Auth-gated via the outer

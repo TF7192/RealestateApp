@@ -67,6 +67,26 @@ export default function PropertyLandingPage() {
     return () => { cancelled = true; };
   }, [agentSlug, propertySlug]);
 
+  // Sprint 9 — landing-page view tracker. Fire-and-forget POST on mount,
+  // de-duped via sessionStorage so a SPA re-render or the agent mashing
+  // refresh doesn't spam the endpoint. Errors are swallowed — tracking
+  // must never break the landing page render.
+  useEffect(() => {
+    if (!agentSlug || !propertySlug) return;
+    try {
+      const key = `estia-viewed-${agentSlug}-${propertySlug}`;
+      if (sessionStorage.getItem(key) === '1') return;
+      sessionStorage.setItem(key, '1');
+      api.trackPublicPropertyView(agentSlug, propertySlug).catch(() => {});
+    } catch {
+      // sessionStorage can throw in privacy-mode Safari or SSR; never
+      // let that break the page. Trying the fetch without de-dup is
+      // acceptable — at worst the server sees a couple extra views.
+      try { api.trackPublicPropertyView(agentSlug, propertySlug).catch(() => {}); }
+      catch { /* swallow */ }
+    }
+  }, [agentSlug, propertySlug]);
+
   const property = data?.property;
   const agent = data?.agent;
   const images = property?.images || [];
