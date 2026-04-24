@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { User, UserCircle, Sun, Moon, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield, Calculator, Download as DownloadIcon, BarChart2, Activity as ActivityIcon, Bell, Tag, Building2 } from 'lucide-react';
+import { User, UserCircle, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield, Calculator, Download as DownloadIcon, BarChart2, Activity as ActivityIcon, Bell, Tag, Building2 } from 'lucide-react';
 
 const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
 import { useAuth } from '../lib/auth';
-import { useTheme } from '../lib/theme';
 import haptics from '../lib/haptics';
 import Portal from './Portal';
 import './MobileMoreSheet.css';
@@ -14,7 +13,6 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
   const { t } = useTranslation('nav');
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { theme, toggle: toggleTheme } = useTheme();
   const [copied, setCopied] = useState(false);
   const sheetRef = useRef(null);
   const [dragY, setDragY] = useState(0);
@@ -232,18 +230,6 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
           </section>
 
           <section className="mms-section">
-            <button className="mms-row" onClick={() => { haptics.tap(); toggleTheme(); }}>
-              <span className="mms-row-icon">
-                {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-              </span>
-              <span className="mms-row-text">
-                <strong>{theme === 'light' ? t('theme.dark') : t('theme.light')}</strong>
-                <small>{t('mobileMore.themeSub')}</small>
-              </span>
-              <span className={`mms-switch ${theme === 'dark' ? 'on' : ''}`}>
-                <span />
-              </span>
-            </button>
             <button className="mms-row" onClick={() => go('/profile')}>
               <span className="mms-row-icon"><User size={18} /></span>
               <span className="mms-row-text"><strong>{t('mobileMore.profile.title')}</strong><small>{t('mobileMore.profile.sub')}</small></span>

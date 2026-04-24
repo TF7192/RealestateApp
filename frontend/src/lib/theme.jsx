@@ -1,38 +1,28 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 
 const ThemeContext = createContext(null);
-const STORAGE_KEY = 'estia-theme';
 
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  document.documentElement.style.colorScheme = theme;
+// Claude-design port mandates a single Cream & Gold palette across
+// every surface — no dark mode anywhere. The toggle remains as a
+// no-op so the existing Profile / MobileMoreSheet entry points keep
+// compiling; it just can't flip the page to a dark surface.
+function applyLight() {
+  if (typeof document === 'undefined') return;
+  document.documentElement.setAttribute('data-theme', 'light');
+  document.documentElement.style.colorScheme = 'light';
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'light';
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === 'dark' || stored === 'light') return stored;
-    } catch { /* storage disabled */ }
-    // First visit — always default to light. (We used to follow the OS's
-    // prefers-color-scheme, but the app's identity is the warm paper +
-    // gold palette, so light is the intended first impression. Users who
-    // want dark can still toggle from the sidebar.)
-    return 'light';
-  });
+  useEffect(() => { applyLight(); }, []);
 
-  useEffect(() => {
-    applyTheme(theme);
-    try { localStorage.setItem(STORAGE_KEY, theme); } catch { /* storage disabled */ }
-  }, [theme]);
-
-  const toggle = useCallback(() => {
-    setTheme((t) => (t === 'light' ? 'dark' : 'light'));
-  }, []);
+  const value = {
+    theme: 'light',
+    toggle: () => {},
+    setTheme: () => {},
+  };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggle, setTheme }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

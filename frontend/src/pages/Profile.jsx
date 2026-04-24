@@ -14,9 +14,6 @@ import {
   IdCard,
   FileText,
   AlertCircle,
-  Sun,
-  Moon,
-  Palette,
   Calendar,
   LinkIcon,
   Unlink,
@@ -26,7 +23,6 @@ import {
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useToast } from '../lib/toast';
-import { useTheme } from '../lib/theme';
 import { inputPropsForName } from '../lib/inputProps';
 import { PhoneField } from '../components/SmartFields';
 import './Profile.css';
@@ -34,7 +30,6 @@ import './Profile.css';
 export default function Profile() {
   const navigate = useNavigate();
   const { user, refresh, logout } = useAuth();
-  const { theme, toggle: toggleTheme } = useTheme();
   const toast = useToast();
   const fileInput = useRef(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -274,38 +269,8 @@ export default function Profile() {
             lands back on /profile?calendar=connected. */}
         <CalendarSection />
 
-        {/* P5-M5: theme toggle reachable on mobile without needing the sidebar */}
-        <section className="profile-section">
-          <div className="profile-section-head">
-            <Palette size={16} />
-            <h3>מראה</h3>
-            <span>בהיר / כהה — נשמר במכשיר</span>
-          </div>
-          <div className="profile-theme-row">
-            <button
-              type="button"
-              className={`profile-theme-opt ${theme === 'light' ? 'sel' : ''}`}
-              onClick={() => { if (theme !== 'light') toggleTheme(); }}
-            >
-              <Sun size={18} />
-              <div>
-                <strong>בהיר</strong>
-                <small>יומי, קלאסי</small>
-              </div>
-            </button>
-            <button
-              type="button"
-              className={`profile-theme-opt ${theme === 'dark' ? 'sel' : ''}`}
-              onClick={() => { if (theme !== 'dark') toggleTheme(); }}
-            >
-              <Moon size={18} />
-              <div>
-                <strong>כהה</strong>
-                <small>לילה, נוח לעיניים</small>
-              </div>
-            </button>
-          </div>
-        </section>
+        {/* Dark-theme toggle removed — the app is Cream & Gold only
+            per the claude-design port. */}
 
         {err && (
           <div className="profile-error">
