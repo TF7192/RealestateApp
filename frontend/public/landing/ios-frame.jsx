@@ -202,7 +202,7 @@ function IOSList({ header, children, dark = false }) {
 // Device frame
 // ─────────────────────────────────────────────────────────────
 function IOSDevice({
-  children, width = 402, height = 874, dark = false,
+  children, width = 402, height, dark = false,
   title, keyboard = false,
 }) {
   // Scale the hard-coded iPhone-15-Pro chrome (island, corner radius,
@@ -211,6 +211,12 @@ function IOSDevice({
   // fixed 126×37 island that was eating ~48% of the phone's width and
   // clipping through the bezel. Keep full size at ≥402, scale below.
   const s = Math.min(1, width / 402);
+  // If the caller only passes `width`, derive `height` from the real
+  // iPhone-15-Pro aspect ratio (402×874). The original default was a
+  // fixed 874 — which turned 260-wide phones into 260×874 (1:3.4),
+  // extending them way below their container and clipping the bottom
+  // bezel / home indicator. Explicit height overrides still win.
+  if (height == null) height = Math.round(874 * (width / 402));
   const islandW = Math.round(126 * s);
   const islandH = Math.round(37 * s);
   const islandTop = Math.max(6, Math.round(11 * s));
