@@ -601,6 +601,8 @@ model Property {
   adverts          Advert[]
   // Sprint 6 — in-house digital contracts attached to this property.
   contracts        Contract[]
+  // Sprint 9 — anonymous page-view tracking for marketing surfaces.
+  views            PropertyView[]
 
   // Excel-import tag. Same purpose as Lead.importBatchId.
   importBatchId    String?
@@ -1505,4 +1507,34 @@ model Contract {
   @@index([propertyId])
   @@index([leadId])
   @@index([type])
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Sprint 9 / marketing surfaces (lane A) — anonymous page-view counter
+// for the per-property public landing page. One row per (property ×
+// visitor × UTC-day); the tracker endpoint in `marketingTrack.ts`
+// dedups same-day reloads via the unique constraint below. Aggregation
+// endpoints (served by a sibling lane) fan the composite
+// (propertyId, viewedAt) index for counts and daily bucketing.
+//
+// The `visitorHash` column is a SHA-256 of (ip + userAgent + UTC-date);
+// we deliberately do NOT store the raw IP. A same-day refresh collides
+// on the unique index and the tracker route swallows the P2002 as a
+// dedup. A different day produces a fresh hash (date is part of the
+// input) and therefore a new row.
+// ────────────────────────────────────────────────────────────────────
+model PropertyView {
+  id          String   @id @default(cuid())
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  // SHA-256 of (ip + user-agent + date-in-UTC). Same visitor hitting
+  // the page twice in the same UTC day dedupes to a single row via the
+  // unique constraint below. Different days → new row.
+  visitorHash String
+  referrer    String?
+  userAgent   String?
+  viewedAt    DateTime @default(now())
+
+  @@unique([propertyId, visitorHash, viewedAt])
+  @@index([propertyId, viewedAt])
 }

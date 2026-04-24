@@ -36,6 +36,7 @@ import { registerTransferRoutes } from './routes/transfers.js';
 import { registerTemplateRoutes } from './routes/templates.js';
 import { registerGeoRoutes } from './routes/geo.js';
 import { registerPublicRoutes } from './routes/public.js';
+import { registerMarketingTrackRoutes } from './routes/marketingTrack.js';
 import { registerOwnerRoutes, registerOwnerPhoneRoutes } from './routes/owners.js';
 import { registerOfficeRoutes } from './routes/office.js';
 import { registerTeamRoutes } from './routes/team.js';
@@ -236,6 +237,10 @@ export async function build() {
   await app.register(registerTemplateRoutes, { prefix: '/api/templates' });
   await app.register(registerGeoRoutes, { prefix: '/api/geo' });
   await app.register(registerPublicRoutes, { prefix: '/api/public' });
+  // Sprint 9 / marketing (lane A) — public page-view tracker. Shares
+  // the /api/public prefix so it sits alongside the existing inquiry
+  // + landing-page routes; no auth, rate-limited by the global plugin.
+  await app.register(registerMarketingTrackRoutes, { prefix: '/api/public' });
   await app.register(registerOwnerRoutes, { prefix: '/api/owners' });
   await app.register(registerOwnerPhoneRoutes, { prefix: '/api' });
   await app.register(registerChatRoutes, { prefix: '/api/chat' });
