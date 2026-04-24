@@ -1114,15 +1114,18 @@ export default function Properties() {
       )}
 
       {loading && showPropsSkel ? (
-        <div className="empty-state">
+        // Reserve the same vertical real-estate the populated grid
+        // typically takes, so the page doesn't reflow when properties
+        // arrive. Lighthouse flagged the empty-state → grid swap as
+        // the source of a 0.20 CLS on /properties.
+        <div className="empty-state" style={{ minHeight: 600 }}>
           <Building2 size={48} />
           <h3>טוען נכסים…</h3>
         </div>
       ) : loading ? (
-        // Fast-load window: render the filters/header but nothing where
-        // the grid will appear, so fast fetches swap straight to real
-        // data without a "loading" placeholder flash.
-        null
+        // Fast-load window: sized placeholder where the grid will appear
+        // so fast fetches swap straight to real data without a CLS jump.
+        <div aria-hidden="true" style={{ minHeight: 600 }} />
       ) : (viewMode === 'table' && !isMobile) ? (
         <DataTable
           ariaLabel="טבלת נכסים"

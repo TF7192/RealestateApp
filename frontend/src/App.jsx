@@ -9,41 +9,49 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { App as CapApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import Layout from './components/Layout';
+// Critical-path authed pages: Dashboard + Customers + Properties +
+// PropertyDetail are the four routes the agent lands on first after
+// login. Keep them eager so the main bundle has them inline.
 import Dashboard from './pages/Dashboard';
 import Properties from './pages/Properties';
 import PropertyDetail from './pages/PropertyDetail';
-import NewProperty from './pages/NewProperty';
-import NewLead from './pages/NewLead';
 import Customers from './pages/Customers';
 import CustomerDetail from './pages/CustomerDetail';
-import Owners from './pages/Owners';
-import OwnerDetail from './pages/OwnerDetail';
-import Deals from './pages/Deals';
-import DealDetail from './pages/DealDetail';
 import Login from './pages/Login';
-import AgentPortal from './pages/AgentPortal';
-import PropertyLandingPage from './pages/PropertyLandingPage';
-import CustomerPropertyView from './pages/CustomerPropertyView';
-import ProspectSign from './pages/ProspectSign';
-import NotFound from './pages/NotFound';
-import Profile from './pages/Profile';
+// Perf 2026-04-25 — secondary authed pages were eagerly imported and
+// dragged ~150KB of code into the main bundle that ~80% of sessions
+// never touch on first paint. Lazy them so each lands in its own chunk
+// and the main bundle drops accordingly. The Suspense fallback at the
+// app root already handles the brief skeleton between click + chunk.
+const NewProperty = lazy(() => import('./pages/NewProperty'));
+const NewLead = lazy(() => import('./pages/NewLead'));
+const Owners = lazy(() => import('./pages/Owners'));
+const OwnerDetail = lazy(() => import('./pages/OwnerDetail'));
+const Deals = lazy(() => import('./pages/Deals'));
+const DealDetail = lazy(() => import('./pages/DealDetail'));
+const AgentPortal = lazy(() => import('./pages/AgentPortal'));
+const PropertyLandingPage = lazy(() => import('./pages/PropertyLandingPage'));
+const CustomerPropertyView = lazy(() => import('./pages/CustomerPropertyView'));
+const ProspectSign = lazy(() => import('./pages/ProspectSign'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const Profile = lazy(() => import('./pages/Profile'));
 // Sprint 7 — two small new pages (agent business-card + full per-lead
-// history timeline). Both land in the main bundle since they're tiny.
-import AgentCard from './pages/AgentCard';
-import LeadHistory from './pages/LeadHistory';
+// history timeline). Lazy so neither weighs down first paint.
+const AgentCard = lazy(() => import('./pages/AgentCard'));
+const LeadHistory = lazy(() => import('./pages/LeadHistory'));
 // Sprint 7 — /inbox premium-gated placeholder. The WhatsApp Business
 // integration is deferred until Meta approves Estia as a Tech
 // Provider; the page gives the sidebar entry a real route to point
 // at and funnels early-access interest to /contact.
-import Inbox from './pages/Inbox';
-import Onboarding from './pages/Onboarding';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Transfers from './pages/Transfers';
-// Sprint 5.1 — public "צרו קשר" page + premium-gate dialog. Both
-// small enough to live in the main bundle; the dialog is mounted
-// once at the root and opens on a window event from lib/api.js.
-import Contact from './pages/Contact';
+const Inbox = lazy(() => import('./pages/Inbox'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Transfers = lazy(() => import('./pages/Transfers'));
+// Sprint 5.1 — public "צרו קשר" page + premium-gate dialog. The page
+// itself is lazy (only reached from premium-gate or landing footer);
+// the dialog is mounted once at the root and stays eager.
+const Contact = lazy(() => import('./pages/Contact'));
 import PremiumGateDialog from './components/PremiumGateDialog';
 // S13: Templates, AdminChats, CommandPalette are heavy and not on the
 // critical path for the first page paint. Lazy-load them so the main
@@ -458,9 +466,18 @@ function AppRoutes() {
         </Suspense>
       )}
       <ShortcutsOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
-      <Suspense fallback={null}>
-        <OnboardingTour />
-      </Suspense>
+      {/* Perf 2026-04-25 — only mount (and therefore import) the tour
+          chunk when there's any chance it will run. OnboardingTour
+          itself bails out for OWNER/CUSTOMER roles, mobile/native, and
+          users who already finished the tour, but the lazy chunk still
+          downloaded for everyone. Gate the mount so the joyride bundle
+          (~26 KB transferred) only lands for AGENTs who haven't
+          completed it on a desktop browser. */}
+      {user && user.role === 'AGENT' && !user.hasCompletedTutorial && (
+        <Suspense fallback={null}>
+          <OnboardingTour />
+        </Suspense>
+      )}
       {/* Headless — renders the in-app developer chat panel when the
           topbar chat button dispatches `estia:open-chat`. The floating
           launcher is gone; the topbar is the single entry point. */}

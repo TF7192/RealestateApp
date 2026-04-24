@@ -250,7 +250,34 @@ function OverviewTab({ isMobile, navigate }) {
         ))}
       </section>
 
-      {/* Top performers */}
+      {/* Top performers — Perf 2026-04-25: Lighthouse flagged this section
+          as the biggest CLS contributor (~0.28) on /marketing. Skeleton
+          placeholder while loading reserves the same vertical space the
+          rendered cards will take, so the per-property table below
+          doesn't jump when data arrives. */}
+      {loading && (
+        <section
+          aria-hidden="true"
+          style={{
+            background: DT.white, border: `1px solid ${DT.border}`,
+            borderRadius: 14, padding: isMobile ? 14 : 18,
+            marginBottom: isMobile ? 14 : 18,
+            // Match the rendered section's typical height so reflow stays flat.
+            minHeight: isMobile ? 280 : 200,
+          }}
+        >
+          <div className="estia-mkt-skel" style={{ height: 14, width: 60, marginBottom: 12 }} />
+          <div className="estia-mkt-skel" style={{ height: 18, width: 160, marginBottom: 14 }} />
+          <div style={{
+            display: 'grid', gap: 10,
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+          }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="estia-mkt-skel" style={{ height: isMobile ? 64 : 110 }} />
+            ))}
+          </div>
+        </section>
+      )}
       {!loading && topPerformers.length > 0 && (
         <section
           aria-label="המנצחים השבוע"

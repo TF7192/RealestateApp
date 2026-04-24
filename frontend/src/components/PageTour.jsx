@@ -1,10 +1,20 @@
-import { useEffect, useReducer, useState } from 'react';
-import { Joyride, STATUS, ACTIONS } from 'react-joyride';
+import { lazy, Suspense, useEffect, useReducer, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
-import { areToursKilled, killAllTours, subscribeTourKill } from '../lib/tourKill';
-import { tourStyles, floaterProps, TourTooltip } from './OnboardingTour';
+import { areToursKilled, subscribeTourKill } from '../lib/tourKill';
+
+// Perf 2026-04-25 — react-joyride (~26 KB transferred + ~2 KB CSS)
+// shouldn't ship to non-AGENT sessions. PageTour was previously
+// statically importing the heavy `Joyride` symbol AND the OnboardingTour
+// CSS via the named re-exports, which dragged the whole tour bundle
+// (and its render-blocking CSS) into every page that mounted a tour
+// (Properties, PropertyDetail, NewProperty, Templates, Transfers).
+// OWNER + CUSTOMER + already-completed-AGENT + mobile sessions paid
+// that cost for nothing. Splitting the actual Joyride mount into a
+// lazy inner component means the chunk only loads when shouldRun is
+// satisfied and the timer is about to start.
+const JoyrideInner = lazy(() => import('./PageTourInner'));
 
 /**
  * PageTour — per-page explainer. Skip/Done both funnel through the
@@ -41,33 +51,11 @@ export default function PageTour({ pageKey, steps, delay = 700 }) {
     return () => clearTimeout(t);
   }, [user, pageKey, steps?.length, delay, isMobile]);
 
-  const handleCallback = ({ status, action }) => {
-    if (
-      action === ACTIONS.CLOSE ||
-      action === ACTIONS.SKIP ||
-      status === STATUS.FINISHED ||
-      status === STATUS.SKIPPED
-    ) killAllTours();
-  };
-
   if (areToursKilled() || !run) return null;
 
   return (
-    <Joyride
-      run={run}
-      steps={steps.map((s) => ({ disableBeacon: true, placement: 'auto', ...s }))}
-      continuous
-      showProgress={steps.length > 1}
-      showSkipButton
-      hideCloseButton
-      scrollToFirstStep={false}
-      disableScrolling={false}
-      disableOverlayClose
-      tooltipComponent={TourTooltip}
-      locale={{ back: 'הקודם', last: 'סיימתי', next: 'הבא', skip: 'דלג על הסיור' }}
-      callback={handleCallback}
-      styles={tourStyles}
-      floaterProps={floaterProps}
-    />
+    <Suspense fallback={null}>
+      <JoyrideInner steps={steps} />
+    </Suspense>
   );
 }

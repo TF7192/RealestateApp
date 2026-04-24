@@ -132,6 +132,23 @@ export default function Dashboard() {
     () => leads.filter((l) => (l.status || '').toUpperCase() === 'HOT').slice(0, 4),
     [leads],
   );
+  // Today card must only surface reminders whose dueAt falls inside
+  // the user's local "today" — backend returns the upcoming window
+  // so we filter client-side to stop yesterday bleeding in after
+  // midnight.
+  const todaysReminders = useMemo(() => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+    return (meetings || [])
+      .filter((m) => {
+        if (!m.dueAt) return false;
+        if (m.status && m.status !== 'PENDING') return false;
+        const t = new Date(m.dueAt).getTime();
+        return t >= startOfDay && t < endOfDay;
+      })
+      .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+  }, [meetings]);
   const aiPriorities = useMemo(
     () => computeAiPriorities({ leads, properties, deals, meetings }),
     [leads, properties, deals, meetings],
@@ -253,11 +270,16 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Main grid: AI priorities + today's schedule */}
+      {/* Main grid: AI priorities + today's schedule.
+          Perf 2026-04-25: reserve a minHeight so the bottom pipeline +
+          hot-leads grid doesn't jump when API data lands. Lighthouse
+          flagged a CLS score of ~0.17 on this surface; the reserve
+          eliminates the visible push. */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)',
         gap: 14, marginBottom: 14,
+        minHeight: 360,
       }}>
         <DCard>
           <div style={{
@@ -333,18 +355,18 @@ export default function Dashboard() {
             marginBottom: 14,
           }}>
             <div style={{ fontSize: 15, fontWeight: 800 }}>
-              היום · {meetings.length || 0} תזכורות
+              היום · {todaysReminders.length || 0} תזכורות
             </div>
             <Link to="/reminders" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
               יומן מלא
             </Link>
           </div>
-          {meetings.length === 0 && (
+          {todaysReminders.length === 0 && (
             <div style={{ fontSize: 13, color: DT.muted, padding: '12px 0' }}>
-              אין פגישות מתוזמנות להיום — הוסיפו תזכורת כדי לראות אותה כאן.
+              אין תזכורות להיום — הוסיפו תזכורת כדי לראות אותה כאן.
             </div>
           )}
-          {meetings.slice(0, 4).map((m, i) => {
+          {todaysReminders.slice(0, 4).map((m, i) => {
             const when = m.dueAt ? new Date(m.dueAt) : null;
             const time = when
               ? when.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
@@ -353,7 +375,7 @@ export default function Dashboard() {
             return (
               <div key={m.id || i} style={{
                 display: 'flex', gap: 10, padding: '10px 0',
-                borderBottom: i === Math.min(3, meetings.length - 1) ? 'none' : `1px solid ${DT.border}`,
+                borderBottom: i === Math.min(3, todaysReminders.length - 1) ? 'none' : `1px solid ${DT.border}`,
                 position: 'relative',
               }}>
                 {isNext && (
@@ -397,11 +419,14 @@ export default function Dashboard() {
         </DCard>
       </div>
 
-      {/* Bottom grid: pipeline + hot leads */}
+      {/* Bottom grid: pipeline + hot leads.
+          Perf 2026-04-25: matched min-height so the API-arrival fill
+          doesn't shift this row either. */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
         gap: 14,
+        minHeight: 320,
       }}>
         <DCard>
           <div style={{

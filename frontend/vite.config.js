@@ -42,5 +42,29 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // Perf 2026-04-25 — split heavy vendor code out of the main bundle
+    // so first-paint downloads only what it needs. lucide-react has
+    // 141 importers across the app; React + react-dom + react-router
+    // stay in their own chunk so a route change keeps them cached
+    // separately from the app code; xlsx (~330 KB) lands only on the
+    // /import wizard; leaflet only on /map; joyride only when an
+    // AGENT runs a tour.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('/lucide-react/')) return 'lucide';
+          if (id.includes('/react-router')) return 'react-router';
+          if (id.includes('/react-dom/') || id.match(/\/react\/[^/]*$/)) return 'react';
+          if (id.includes('/i18next') || id.includes('/react-i18next')) return 'i18n';
+          if (id.includes('/leaflet') || id.includes('/react-leaflet')) return 'maps';
+          if (id.includes('/xlsx/')) return 'xlsx';
+          if (id.includes('/posthog-js/')) return 'analytics';
+          if (id.includes('/react-joyride/')) return 'joyride';
+          if (id.includes('@capacitor')) return 'capacitor';
+          return undefined;
+        },
+      },
+    },
   },
 });
