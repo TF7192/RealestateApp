@@ -587,8 +587,17 @@ export const api = {
   updateAdvert:        (id, body) => request(`/adverts/${id}`, { method: 'PATCH', body }),
   deleteAdvert:        (id) => request(`/adverts/${id}`, { method: 'DELETE' }),
 
-  // Global search (H1)
+  // Global search — cmd-K palette / top-bar search button.
+  // Returns { properties, leads, owners, deals } with each bucket
+  // capped at 5 (server default) unless `take` is passed explicitly.
   globalSearch:        (q, take) => {
+    const qs = new URLSearchParams({ q: q ?? '' });
+    if (take !== undefined && take !== null) qs.set('take', String(take));
+    return request(`/search?${qs.toString()}`);
+  },
+  // Sprint 4 — shorter alias. Kept alongside `globalSearch` for existing
+  // call sites; new code can use whichever reads better in context.
+  search:              (q, take) => {
     const qs = new URLSearchParams({ q: q ?? '' });
     if (take !== undefined && take !== null) qs.set('take', String(take));
     return request(`/search?${qs.toString()}`);

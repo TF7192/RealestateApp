@@ -21,7 +21,9 @@ function expandTerm(term: string): string[] {
 }
 
 const q = z.object({
-  q:    z.string().min(1).max(120),
+  // Sprint 4 — empty q is valid and returns empty buckets so the
+  // cmd-K palette can mount & reset without firing a doomed request.
+  q:    z.string().max(120).optional().default(''),
   take: z.coerce.number().int().min(1).max(50).optional(),
 });
 
@@ -29,8 +31,21 @@ export const registerSearchRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const parsed = q.parse(req.query);
     const uid  = requireUser(req).id;
-    const term = parsed.q;
-    const take = parsed.take ?? 10;
+    const term = (parsed.q ?? '').trim();
+    // Sprint 4 default = 5 per bucket (spotlight-style palette). Callers
+    // who want more explicitly pass `take`. Max is still 50.
+    const take = parsed.take ?? 5;
+    // Empty query → empty buckets, no DB round-trips.
+    if (!term) {
+      return {
+        query: '',
+        total: 0,
+        properties: [],
+        leads: [],
+        owners: [],
+        deals: [],
+      };
+    }
     const terms = expandTerm(term);
     // For each field × each term, emit a `contains` clause.
     const anyOf = (fields: string[]) =>

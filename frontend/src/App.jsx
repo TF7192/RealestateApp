@@ -79,6 +79,7 @@ import Yad2ScanBanner from './components/Yad2ScanBanner';
 import MarketScanBanner from './components/MarketScanBanner';
 import { useScrollRestore } from './hooks/mobile';
 import { useDocumentTitle, useGlobalShortcuts } from './hooks/shortcuts';
+import { useGlobalSearch } from './hooks/useGlobalSearch';
 import { usePageviewTracking } from './hooks/analytics';
 import { identify, resetIdentity } from './lib/analytics';
 
@@ -125,7 +126,11 @@ function PostLoginRedirect() {
  */
 function AppRoutes() {
   const { user, loading, logout, refresh } = useAuth();
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Sprint 4 — useGlobalSearch owns the cmd-K palette lifecycle now:
+  // keyboard shortcut + `estia:open-palette` / `estia:close-palette`
+  // custom events (dispatched by the top-bar search button and the
+  // mobile header search icon).
+  const { open: paletteOpen, closePalette, togglePalette } = useGlobalSearch();
   const [helpOpen, setHelpOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -134,19 +139,9 @@ function AppRoutes() {
   useDocumentTitle();
   usePageviewTracking();
   useGlobalShortcuts({
-    onOpenPalette: () => setPaletteOpen((v) => !v),
+    onOpenPalette: togglePalette,
     onOpenHelp:    () => setHelpOpen(true),
   });
-
-  // S21 — mobile global search. The mobile header button dispatches an
-  // 'estia:open-palette' event from anywhere in the tree; we listen here
-  // and toggle the same palette state desktop's ⌘K uses. Decoupled so
-  // the Layout component doesn't need a reference to App's setter.
-  useEffect(() => {
-    const onOpen = () => setPaletteOpen(true);
-    window.addEventListener('estia:open-palette', onOpen);
-    return () => window.removeEventListener('estia:open-palette', onOpen);
-  }, []);
 
   // Tie the logged-in user to PostHog so session replay + funnels are
   // per-agent. On sign-out, reset so a new anonymous session starts.
@@ -356,7 +351,7 @@ function AppRoutes() {
           already has its own backdrop+transition. */}
       {paletteOpen && (
         <Suspense fallback={null}>
-          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+          <CommandPalette open={paletteOpen} onClose={closePalette} />
         </Suspense>
       )}
       <ShortcutsOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
