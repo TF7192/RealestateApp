@@ -293,6 +293,180 @@ async function main() {
     await prisma.deal.create({ data: { agentId, ...d } });
   }
   console.log(`✓ seeded ${deals.length} deals`);
+
+  // ─── Demo office + team (for client walkthroughs) ───────────────
+  //
+  // One OWNER (the manager) + three AGENTs all pointing at a single
+  // Office row, plus a spread of properties and signed / in-progress
+  // deals per agent so the /team scoreboard is populated and the
+  // Deals kanban has realistic volume. Everything upserts so re-
+  // running the seed is idempotent.
+  const OFFICE_NAME = 'Estia Demo Brokerage';
+  const managerEmail = 'office.demo@estia.app';
+  const managerPassword = 'EstiaDemo1!';
+
+  // Upsert the office (anchored on name so this stays idempotent).
+  const office = await prisma.office.upsert({
+    where: { id: 'demo-office-cuid-anchor' }, // unstable — we branch below
+    update: { name: OFFICE_NAME },
+    create: { name: OFFICE_NAME, phone: '03-555-0100', address: 'רוטשילד 12, תל אביב' },
+  }).catch(async () => {
+    const existing = await prisma.office.findFirst({ where: { name: OFFICE_NAME } });
+    if (existing) return existing;
+    return prisma.office.create({
+      data: { name: OFFICE_NAME, phone: '03-555-0100', address: 'רוטשילד 12, תל אביב' },
+    });
+  });
+
+  // Office manager — OWNER role, attached to the office.
+  const manager = await prisma.user.upsert({
+    where: { email: managerEmail },
+    update: { role: 'OWNER', officeId: office.id, isPremium: true },
+    create: {
+      email: managerEmail,
+      passwordHash: await argon2.hash(managerPassword),
+      role: 'OWNER',
+      officeId: office.id,
+      displayName: 'דנה לוי',
+      phone: '050-5550100',
+      isPremium: true,
+      avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&q=80',
+      agentProfile: {
+        create: {
+          agency: OFFICE_NAME,
+          title: 'מנהלת משרד',
+          license: '45678',
+          bio: 'מנהלת משרד ותיקה עם מעל עשור של ליווי סוכנים, פיתוח עסקי וסגירת עסקאות בתל אביב והמרכז.',
+        },
+      },
+    },
+  });
+  console.log(`✓ office manager ${managerEmail} / ${managerPassword}`);
+
+  // Three team agents. Each gets a distinct display name, avatar,
+  // license, and is attached to the same office.
+  const teamAgentsSeed = [
+    { email: 'sara.team@estia.app',  name: 'שרה דוד',   phone: '050-5550201', license: '51201', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&q=80' },
+    { email: 'amit.team@estia.app',  name: 'עמית כהן',  phone: '050-5550202', license: '51202', avatar: 'https://images.unsplash.com/photo-1531891437562-4301cf35b7e4?w=400&q=80' },
+    { email: 'maya.team@estia.app',  name: 'מאיה ברק',  phone: '050-5550203', license: '51203', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&q=80' },
+  ];
+  const teamAgents = [] as { id: string; name: string }[];
+  for (const t of teamAgentsSeed) {
+    const agentRow = await prisma.user.upsert({
+      where: { email: t.email },
+      update: { officeId: office.id, isPremium: false },
+      create: {
+        email: t.email,
+        passwordHash: await argon2.hash(managerPassword),
+        role: 'AGENT',
+        officeId: office.id,
+        displayName: t.name,
+        phone: t.phone,
+        isPremium: false,
+        avatarUrl: t.avatar,
+        agentProfile: {
+          create: {
+            agency: OFFICE_NAME,
+            title: 'סוכנ/ית נדל״ן',
+            license: t.license,
+            bio: 'חלק מצוות ' + OFFICE_NAME + '.',
+          },
+        },
+      },
+    });
+    teamAgents.push({ id: agentRow.id, name: t.name });
+  }
+
+  // Per-agent pipeline: a blend of signed deals (Q2-2026) + in-
+  // progress ones so the /team scoreboard + Deals kanban look busy.
+  // Signed totals (closedPrice / commission) drive the scoreboard's
+  // volume and commission columns.
+  const q2Start = new Date('2026-04-01');
+  const demoPipelines: Array<{
+    agentIdx: number;
+    rows: Array<{ street: string; city: string; status: 'SIGNED'|'NEGOTIATING'|'WAITING_MORTGAGE'|'PENDING_CONTRACT'; price: number; closed?: number; commission?: number; signedAt?: Date; category?: 'SALE'|'RENT' }>;
+  }> = [
+    {
+      agentIdx: 0, // שרה — top performer
+      rows: [
+        { street: 'רוטשילד 112', city: 'תל אביב',       status: 'SIGNED', price: 4_900_000, closed: 4_800_000, commission: 96_000,  signedAt: new Date('2026-04-03') },
+        { street: 'בן גוריון 85', city: 'תל אביב',      status: 'SIGNED', price: 6_300_000, closed: 6_150_000, commission: 123_000, signedAt: new Date('2026-04-11') },
+        { street: 'דיזנגוף 220',  city: 'תל אביב',      status: 'SIGNED', price: 3_450_000, closed: 3_400_000, commission: 68_000,  signedAt: new Date('2026-04-19') },
+        { street: 'אחד העם 9',    city: 'תל אביב',      status: 'NEGOTIATING',     price: 2_950_000 },
+        { street: 'הרצל 50',      city: 'רמת גן',      status: 'PENDING_CONTRACT', price: 4_200_000 },
+      ],
+    },
+    {
+      agentIdx: 1, // עמית — mid-pack
+      rows: [
+        { street: 'סוקולוב 45',   city: 'רמת גן',      status: 'SIGNED', price: 2_450_000, closed: 2_400_000, commission: 48_000, signedAt: new Date('2026-04-07') },
+        { street: 'ביאליק 20',    city: 'רמת גן',      status: 'SIGNED', price: 3_150_000, closed: 3_050_000, commission: 61_000, signedAt: new Date('2026-04-15') },
+        { street: 'ז׳בוטינסקי 8', city: 'גבעתיים',     status: 'WAITING_MORTGAGE', price: 3_800_000, commission: 76_000 },
+        { street: 'קפלן 14',      city: 'תל אביב',     status: 'NEGOTIATING',      price: 5_400_000 },
+      ],
+    },
+    {
+      agentIdx: 2, // מאיה — rentals-heavy
+      rows: [
+        { street: 'הירקון 280',   city: 'תל אביב',     status: 'SIGNED', price: 9_500,  closed: 9_200,  commission: 9_200, signedAt: new Date('2026-04-05'), category: 'RENT' },
+        { street: 'אבן גבירול 70',city: 'תל אביב',     status: 'SIGNED', price: 11_500, closed: 11_200, commission: 11_200, signedAt: new Date('2026-04-12'), category: 'RENT' },
+        { street: 'לה גרדיה 12',  city: 'תל אביב',     status: 'SIGNED', price: 2_100_000, closed: 2_050_000, commission: 41_000, signedAt: new Date('2026-04-20') },
+        { street: 'שינקין 30',    city: 'תל אביב',     status: 'NEGOTIATING', price: 8_500, category: 'RENT' },
+      ],
+    },
+  ];
+
+  // Wipe out stale demo deals + properties so the seed remains
+  // idempotent for the team agents. Keyed on the agent ids we just
+  // created, scoped so we never touch the יוסי כהן demo data.
+  const teamAgentIds = teamAgents.map((a) => a.id);
+  await prisma.deal.deleteMany({ where: { agentId: { in: teamAgentIds } } });
+  await prisma.property.deleteMany({ where: { agentId: { in: teamAgentIds } } });
+
+  for (const lane of demoPipelines) {
+    const agent = teamAgents[lane.agentIdx];
+    for (const r of lane.rows) {
+      // Mirror each deal with a matching property so /properties
+      // shows the team's inventory on any agent login.
+      await prisma.property.create({
+        data: {
+          agentId: agent.id,
+          street: r.street,
+          city: r.city,
+          assetClass: 'RESIDENTIAL',
+          category: r.category === 'RENT' ? 'RENT' : 'SALE',
+          type: r.category === 'RENT' ? 'דירה להשכרה' : 'דירה',
+          marketingPrice: r.price,
+          sqm: r.category === 'RENT' ? 80 : 110,
+          rooms: 4,
+          floor: 3,
+          totalFloors: 8,
+          status: r.status === 'SIGNED' ? 'SOLD' : 'ACTIVE',
+          notes: null,
+        },
+      });
+      await prisma.deal.create({
+        data: {
+          agentId: agent.id,
+          propertyStreet: r.street,
+          city: r.city,
+          assetClass: 'RESIDENTIAL',
+          category: r.category === 'RENT' ? 'RENT' : 'SALE',
+          status: r.status,
+          marketingPrice: r.price,
+          offer: Math.round(r.price * 0.97),
+          closedPrice: r.closed ?? null,
+          commission: r.commission ?? null,
+          buyerAgent: 'עצמי',
+          sellerAgent: 'עצמי',
+          lawyer: 'עו״ד ' + agent.name.split(' ')[0],
+          signedAt: r.signedAt ?? null,
+          updateDate: r.signedAt ?? q2Start,
+        },
+      });
+    }
+  }
+  console.log(`✓ demo office "${OFFICE_NAME}" with ${teamAgents.length} agents + pipelines`);
   console.log('🌱 done');
 }
 
