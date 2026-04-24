@@ -427,12 +427,16 @@ async function main() {
   await prisma.deal.deleteMany({ where: { agentId: { in: teamAgentIds } } });
   await prisma.property.deleteMany({ where: { agentId: { in: teamAgentIds } } });
 
+  // Collect each team agent's freshly-created properties by street so
+  // the transfer block below can target real property rows.
+  const teamPropertyIds: Record<string, string> = {};
+
   for (const lane of demoPipelines) {
     const agent = teamAgents[lane.agentIdx];
     for (const r of lane.rows) {
       // Mirror each deal with a matching property so /properties
       // shows the team's inventory on any agent login.
-      await prisma.property.create({
+      const createdProp = await prisma.property.create({
         data: {
           agentId: agent.id,
           owner: 'בעל פרטי',
@@ -451,6 +455,7 @@ async function main() {
           notes: null,
         },
       });
+      teamPropertyIds[`${agent.id}::${r.street}`] = createdProp.id;
       await prisma.deal.create({
         data: {
           agentId: agent.id,
@@ -473,6 +478,268 @@ async function main() {
     }
   }
   console.log(`✓ demo office "${OFFICE_NAME}" with ${teamAgents.length} agents + pipelines`);
+
+  // ─── Manager demo data (reminders / activity / transfers /
+  // invites / Yad2 scan history) ──────────────────────────────────
+  //
+  // Idempotent on re-run: wipe every manager-scoped row we're about
+  // to create before re-seeding, so running `db:seed` twice doesn't
+  // double-up the walkthrough data. Scoped strictly to the manager
+  // user id so the team agents' rows stay untouched.
+  await prisma.reminder.deleteMany({ where: { agentId: manager.id } });
+  await prisma.activityLog.deleteMany({
+    where: { agentId: { in: [manager.id, ...teamAgentIds] } },
+  });
+  await prisma.propertyTransfer.deleteMany({
+    where: {
+      OR: [{ fromAgentId: manager.id }, { toAgentId: manager.id }],
+    },
+  });
+  await prisma.officeInvite.deleteMany({
+    where: { officeId: office.id, acceptedAt: null },
+  });
+  await prisma.yad2ImportAttempt.deleteMany({ where: { agentId: manager.id } });
+
+  // Anchor "now" to the seed's runtime so dates stay relative on every
+  // re-seed. Offsets are in days; negative = past, positive = future.
+  const now = new Date();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const atOffset = (offsetDays: number, hour = 10, minute = 0) => {
+    const d = new Date(now.getTime() + offsetDays * dayMs);
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
+
+  // Fetch anchor entities so reminders / activity rows can deep-link
+  // into real rows the manager sees on her team-scoped views. Grab
+  // one of each team agent's deals + properties for variety.
+  const saraProp  = await prisma.property.findFirst({
+    where: { agentId: teamAgents[0].id, street: 'רוטשילד 112' },
+    select: { id: true, street: true, city: true },
+  });
+  const amitProp  = await prisma.property.findFirst({
+    where: { agentId: teamAgents[1].id, street: 'סוקולוב 45' },
+    select: { id: true, street: true, city: true },
+  });
+  const mayaProp  = await prisma.property.findFirst({
+    where: { agentId: teamAgents[2].id, street: 'לה גרדיה 12' },
+    select: { id: true, street: true, city: true },
+  });
+  const saraDeal  = await prisma.deal.findFirst({
+    where: { agentId: teamAgents[0].id, propertyStreet: 'רוטשילד 112' },
+    select: { id: true },
+  });
+  const amitDeal  = await prisma.deal.findFirst({
+    where: { agentId: teamAgents[1].id, propertyStreet: 'ז׳בוטינסקי 8' },
+    select: { id: true },
+  });
+
+  // 1. Reminders — 8 diverse rows mixed across past/today/week/next-week,
+  // attached to mixed entity types for realistic filter coverage.
+  const reminderRows: Array<{
+    title: string;
+    notes?: string | null;
+    dueAt: Date;
+    status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+    completedAt?: Date | null;
+    propertyId?: string | null;
+  }> = [
+    {
+      title: 'להתקשר לשרה דוד על העסקה ברוטשילד 112',
+      notes: 'לסכם עם הקונה את תנאי המשכנתא ולוח הזמנים לחתימה.',
+      dueAt: atOffset(-5, 11, 30),
+      status: 'COMPLETED',
+      completedAt: atOffset(-5, 12, 0),
+      propertyId: saraProp?.id ?? null,
+    },
+    {
+      title: 'לשלוח חוזה בלעדיות ללקוח על דיזנגוף 220',
+      notes: 'לצרף את טופס גילוי נאות + נספח עמלה.',
+      dueAt: atOffset(-3, 9, 0),
+      status: 'COMPLETED',
+      completedAt: atOffset(-3, 10, 15),
+    },
+    {
+      title: 'פגישת צוות שבועית — סקירת עסקאות פתוחות',
+      notes: 'להכין סיכום סטטוס לכל סוכן/ת ולהציג ב-Teams.',
+      dueAt: atOffset(0, 15, 0),
+      status: 'PENDING',
+    },
+    {
+      title: 'להתקשר לעו״ד רחל גפן על חוזה רוטשילד 112',
+      notes: 'לוודא נוסח סעיף ערבות בנקאית.',
+      dueAt: atOffset(0, 17, 30),
+      status: 'PENDING',
+      propertyId: saraProp?.id ?? null,
+    },
+    {
+      title: 'ביקורת שיווק — עמית כהן',
+      notes: 'לעבור יחד על 3 הפרסומים הפעילים ולעדכן תוכן.',
+      dueAt: atOffset(2, 10, 0),
+      status: 'PENDING',
+    },
+    {
+      title: 'פגישה עם לקוחה חדשה — דירה 4 חדרים בתל אביב',
+      notes: 'רחוב בן יהודה, להכין 3 הצעות מתאימות מראש.',
+      dueAt: atOffset(3, 12, 0),
+      status: 'PENDING',
+    },
+    {
+      title: 'לחדש מנוי Yad2 Pro — כל צוות המשרד',
+      notes: 'לבדוק כמה סוכנים פעילים ולתאם עם חשבונות.',
+      dueAt: atOffset(6, 9, 0),
+      status: 'PENDING',
+    },
+    {
+      title: 'סיכום רבעון Q2 — להכין דו״ח למנכ״ל',
+      notes: 'כולל סכום עמלות, מספר עסקאות, ופיפליין.',
+      dueAt: atOffset(9, 14, 0),
+      status: 'PENDING',
+    },
+  ];
+  for (const r of reminderRows) {
+    await prisma.reminder.create({
+      data: {
+        agentId: manager.id,
+        title: r.title,
+        notes: r.notes ?? null,
+        dueAt: r.dueAt,
+        status: r.status,
+        completedAt: r.completedAt ?? null,
+        propertyId: r.propertyId ?? null,
+      },
+    });
+  }
+
+  // 2. Activity log — ~15 manager events + a couple on the team agents
+  // so the team-view timeline has cross-agent context. Rows are written
+  // directly to ActivityLog (same path production's logActivity() uses,
+  // minus the try/catch which exists to protect user actions).
+  const activityRows: Array<{
+    agentId: string;
+    actorId: string;
+    verb: string;
+    entityType: string;
+    entityId?: string | null;
+    summary: string;
+    createdAt: Date;
+  }> = [
+    // Manager-scoped events — spans the last 14 days.
+    { agentId: manager.id, actorId: manager.id, verb: 'invited',  entityType: 'User',     summary: 'שלחה הזמנה לסוכנ/ית חדש/ה', createdAt: atOffset(-13, 9, 30) },
+    { agentId: manager.id, actorId: manager.id, verb: 'signed',   entityType: 'Contract', summary: 'חתימה על חוזה בלעדיות — רוטשילד 112', entityId: saraProp?.id ?? null, createdAt: atOffset(-12, 14, 0) },
+    { agentId: manager.id, actorId: manager.id, verb: 'updated',  entityType: 'Office',   summary: 'עדכנה את פרטי המשרד (כתובת + טלפון)', entityId: office.id, createdAt: atOffset(-11, 10, 15) },
+    { agentId: manager.id, actorId: manager.id, verb: 'created',  entityType: 'Reminder', summary: 'יצרה תזכורת — פגישת צוות שבועית', createdAt: atOffset(-10, 16, 0) },
+    { agentId: manager.id, actorId: manager.id, verb: 'shared',   entityType: 'Property', summary: 'שיתפה נכס דיזנגוף 220 עם מאיה ברק', entityId: saraProp?.id ?? null, createdAt: atOffset(-9, 11, 20) },
+    { agentId: manager.id, actorId: manager.id, verb: 'updated',  entityType: 'Deal',     summary: 'עדכנה סטטוס עסקה — ביאליק 20 → חתום', entityId: amitDeal?.id ?? null, createdAt: atOffset(-8, 13, 45) },
+    { agentId: manager.id, actorId: manager.id, verb: 'imported', entityType: 'Property', summary: 'ייבאה 4 נכסים מ-Yad2', createdAt: atOffset(-7, 9, 0) },
+    { agentId: manager.id, actorId: manager.id, verb: 'created',  entityType: 'Lead',     summary: 'הוסיפה ליד חדש — דירה בפרויקט חדש בת״א', createdAt: atOffset(-6, 15, 10) },
+    { agentId: manager.id, actorId: manager.id, verb: 'completed',entityType: 'Reminder', summary: 'סיימה תזכורת — שליחת חוזה דיזנגוף 220', createdAt: atOffset(-3, 10, 15) },
+    { agentId: manager.id, actorId: manager.id, verb: 'transferred', entityType: 'Property', summary: 'העבירה נכס אחד העם 9 לשרה דוד', entityId: saraProp?.id ?? null, createdAt: atOffset(-4, 12, 0) },
+    { agentId: manager.id, actorId: manager.id, verb: 'viewed',   entityType: 'Report',   summary: 'צפתה בדוח רבעוני Q2 2026', createdAt: atOffset(-2, 9, 40) },
+    { agentId: manager.id, actorId: manager.id, verb: 'created',  entityType: 'Reminder', summary: 'הוסיפה תזכורת — שיחה עם עו״ד רחל גפן', createdAt: atOffset(-1, 17, 0) },
+    { agentId: manager.id, actorId: manager.id, verb: 'updated',  entityType: 'Lead',     summary: 'עדכנה פרטי ליד — נעה אלון', createdAt: atOffset(-1, 11, 25) },
+    { agentId: manager.id, actorId: manager.id, verb: 'signed',   entityType: 'Contract', summary: 'חתימה דיגיטלית על חוזה תיווך — ביאליק 20', entityId: amitProp?.id ?? null, createdAt: atOffset(0, 8, 45) },
+    { agentId: manager.id, actorId: manager.id, verb: 'published',entityType: 'Advert',   summary: 'פרסמה מודעה חדשה ב-Yad2 ו-Facebook', entityId: mayaProp?.id ?? null, createdAt: atOffset(0, 10, 5) },
+    // Team-agent events the manager sees through the office scoreboard.
+    { agentId: teamAgents[0].id, actorId: teamAgents[0].id, verb: 'signed', entityType: 'Deal', summary: 'עסקה נחתמה — דיזנגוף 220 (3.4M)', entityId: saraProp?.id ?? null, createdAt: atOffset(-2, 16, 30) },
+    { agentId: teamAgents[1].id, actorId: teamAgents[1].id, verb: 'updated', entityType: 'Property', summary: 'עדכן מחיר שיווק — ז׳בוטינסקי 8', entityId: amitProp?.id ?? null, createdAt: atOffset(-1, 14, 10) },
+  ];
+  for (const a of activityRows) {
+    await prisma.activityLog.create({
+      data: {
+        agentId: a.agentId,
+        actorId: a.actorId,
+        verb: a.verb,
+        entityType: a.entityType,
+        entityId: a.entityId ?? null,
+        summary: a.summary,
+        createdAt: a.createdAt,
+      },
+    });
+  }
+
+  // 3. Property transfers — 3 rows that surface on the manager's
+  // /transfers page. Covers all three directions the UI exercises:
+  // pending-incoming (manager is target), accepted-outgoing (manager
+  // gave a lead property away), declined-incoming.
+  const transferSeeds: Array<{
+    propertyId: string;
+    fromAgentId: string;
+    toAgentId: string;
+    status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+    message: string;
+    daysAgo: number;
+  }> = [
+    {
+      propertyId: teamPropertyIds[`${teamAgents[0].id}::אחד העם 9`],
+      fromAgentId: teamAgents[0].id,
+      toAgentId: manager.id,
+      status: 'PENDING',
+      message: 'דנה, הלקוח שלי ביטל — את יכולה לקחת את זה?',
+      daysAgo: 1,
+    },
+    {
+      propertyId: teamPropertyIds[`${teamAgents[1].id}::קפלן 14`],
+      fromAgentId: manager.id,
+      toAgentId: teamAgents[1].id,
+      status: 'ACCEPTED',
+      message: 'עמית, מעבירה אליך — הלקוח גר ליד המשרד שלך.',
+      daysAgo: 5,
+    },
+    {
+      propertyId: teamPropertyIds[`${teamAgents[2].id}::שינקין 30`],
+      fromAgentId: manager.id,
+      toAgentId: teamAgents[2].id,
+      status: 'DECLINED',
+      message: 'מאיה, נכס להשכרה — מתאים לתיק שלך?',
+      daysAgo: 8,
+    },
+  ];
+  for (const t of transferSeeds) {
+    if (!t.propertyId) continue; // defensive — skip if the lookup missed
+    await prisma.propertyTransfer.create({
+      data: {
+        propertyId: t.propertyId,
+        fromAgentId: t.fromAgentId,
+        toAgentId: t.toAgentId,
+        toAgentEmail: null,
+        status: t.status,
+        message: t.message,
+        createdAt: atOffset(-t.daysAgo, 10, 0),
+        respondedAt: t.status === 'PENDING' ? null : atOffset(-t.daysAgo + 1, 11, 0),
+      },
+    });
+  }
+
+  // 4. Pending office invites — 2 unaccepted rows so the /office
+  // "pending invites" section renders with real entries.
+  const pendingInvites = [
+    { email: 'ronen.candidate@estia.app', daysAgo: 2 },
+    { email: 'liat.candidate@estia.app',  daysAgo: 4 },
+  ];
+  for (const inv of pendingInvites) {
+    await prisma.officeInvite.create({
+      data: {
+        officeId: office.id,
+        email: inv.email,
+        invitedById: manager.id,
+        createdAt: atOffset(-inv.daysAgo, 10, 0),
+      },
+    });
+  }
+
+  // 5. Yad2 scan history — 2 past import attempts in the quota table
+  // so /integrations/yad2 shows a populated "recent scans" chip row.
+  // Well outside the 60-minute rolling window so they don't consume
+  // the manager's current quota slots.
+  await prisma.yad2ImportAttempt.create({
+    data: { agentId: manager.id, attemptedAt: atOffset(-2, 9, 30) },
+  });
+  await prisma.yad2ImportAttempt.create({
+    data: { agentId: manager.id, attemptedAt: atOffset(-7, 14, 0) },
+  });
+
+  console.log(`✓ manager demo: ${reminderRows.length} reminders, ${activityRows.length} activity rows, ${transferSeeds.length} transfers, ${pendingInvites.length} invites, 2 yad2 scans`);
   console.log('🌱 done');
 }
 
