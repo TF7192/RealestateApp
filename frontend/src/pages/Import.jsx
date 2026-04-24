@@ -1,8 +1,23 @@
+// Excel / CSV import wizard — Cream & Gold inline-DT port matching
+// the claude.ai/design "Estia Refined Pages" bundle.
+//
+// Route: /import/leads and /import/properties. The page is a 4-step
+// wizard:
+//   1. העלאה        — drag-drop or click to browse an .xlsx/.csv.
+//   2. מיפוי עמודות  — auto-detected column → field pairs, user overrides.
+//   3. תצוגה מקדימה  — every parsed row with validation badge + checkbox.
+//   4. ייבוא         — async job polling with final summary.
+//
+// Client-side parsing (SheetJS) so the uploaded file never crosses the
+// wire — only the mapped row payload does. API contract preserved
+// verbatim: api.startImport / api.getImportJob / api.listImportMappings
+// / api.saveImportMapping.
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowRight, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2,
-  Building2, UserPlus, X as XIcon, Check, Sparkles,
+  X as XIcon, Check, Sparkles, FileUp, Wand2, Eye, Send, RefreshCw,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
@@ -11,22 +26,27 @@ import {
   detectColumns, headerSignature,
   FIELD_LABELS, LEAD_FIELDS, PROPERTY_FIELDS,
 } from '../lib/importDetect';
-import './Import.css';
+import { useViewportMobile } from '../hooks/mobile';
 
-// Excel / CSV import wizard.
-//
-// Route: /import/leads and /import/properties. The page is a 4-step
-// wizard in one screen (steps collapse/expand as the agent advances):
-//   1. Upload — drag-drop or click to browse an .xlsx/.csv.
-//   2. Mapping — auto-detected column→field pairs, user overrides.
-//   3. Preview — every parsed row with validation badge + checkbox.
-//   4. Progress — async job polling with final summary.
-//
-// Client-side parsing (SheetJS) so the uploaded file never crosses the
-// wire — only the mapped row payload does.
+// Cream & Gold design tokens — verbatim from the refined-pages spec.
+const DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff', ink: '#1e1a14', muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)', success: '#15803d', danger: '#b91c1c',
+};
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const FRIENDLY_TYPE = { LEAD: 'לידים', PROPERTY: 'נכסים' };
 const LIST_ROUTE    = { LEAD: '/customers', PROPERTY: '/properties' };
+
+const STEPS = [
+  { n: 1, label: 'העלאה',         Icon: FileUp },
+  { n: 2, label: 'מיפוי עמודות',  Icon: Wand2 },
+  { n: 3, label: 'תצוגה מקדימה',  Icon: Eye },
+  { n: 4, label: 'ייבוא',          Icon: Send },
+];
 
 export default function Import() {
   const { type } = useParams(); // 'leads' | 'properties'
@@ -34,6 +54,7 @@ export default function Import() {
   const allFields = entityType === 'LEAD' ? LEAD_FIELDS : PROPERTY_FIELDS;
   const toast = useToast();
   const navigate = useNavigate();
+  const isMobile = useViewportMobile(820);
 
   // Wizard state.
   const [step, setStep] = useState(1);
@@ -42,13 +63,13 @@ export default function Import() {
   const [rows, setRows] = useState([]);
   const [mapping, setMapping] = useState({}); // { header: field | null }
   const [sig, setSig] = useState('');
-  // Per-row select state keyed by row index. Initialize true for every row.
   const [picked, setPicked] = useState(new Set());
   const [skipDupes, setSkipDupes] = useState(true);
   const [defaultCity, setDefaultCity] = useState('');
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [err, setErr] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
 
   // ── Step 1: upload ────────────────────────────────────────────────
   const fileInputRef = useRef(null);
@@ -84,18 +105,24 @@ export default function Import() {
 
   const onDrop = (e) => {
     e.preventDefault();
+    setDragOver(false);
     const f = e.dataTransfer?.files?.[0];
     if (f) handleFile(f);
   };
 
-  // ── Step 2: mapping ───────────────────────────────────────────────
+  const reset = () => {
+    setStep(1); setFile(null); setHeaders([]); setRows([]);
+    setMapping({}); setPicked(new Set()); setJobId(null); setJobStatus(null);
+    setErr(null); setSig(''); setDefaultCity('');
+  };
+
+  // ── Step 2: mapping validation ───────────────────────────────────
   const requiredOK = useMemo(() => {
     const inverted = new Set(Object.values(mapping).filter(Boolean));
     if (entityType === 'LEAD') {
       const hasName = inverted.has('name') || inverted.has('firstName') || inverted.has('lastName');
       return hasName && inverted.has('phone');
     }
-    // PROPERTY
     const hasStreet = inverted.has('street');
     const hasCity   = inverted.has('city') || !!defaultCity.trim();
     return hasStreet && hasCity;
@@ -115,7 +142,7 @@ export default function Import() {
     return reasons;
   }, [mapping, entityType, defaultCity]);
 
-  // ── Step 3: preview rows ──────────────────────────────────────────
+  // ── Step 3: per-row preview + validation ─────────────────────────
   const previewRows = useMemo(() => {
     return rows.map((row, i) => {
       const get = (field) => {
@@ -134,25 +161,29 @@ export default function Import() {
           עיר: get('city') || defaultCity || '—',
           טווח: get('priceMax') || get('priceMin') || '—',
         } };
-      } else {
-        const street = get('street');
-        const city = get('city') || defaultCity;
-        const errRow =
-          !String(street || '').trim() ? 'רחוב חסר' :
-          !String(city || '').trim() ? 'עיר חסרה — הוסף עיר ברירת מחדל' : null;
-        return { i, valid: !errRow, err: errRow, summary: {
-          כתובת: [street, city].filter(Boolean).join(', ') || '—',
-          חדרים: get('rooms') || '—',
-          'מ״ר':  get('sqm') || '—',
-          מחיר:  get('marketingPrice') || '—',
-        } };
       }
+      const street = get('street');
+      const city = get('city') || defaultCity;
+      const errRow =
+        !String(street || '').trim() ? 'רחוב חסר' :
+        !String(city || '').trim() ? 'עיר חסרה — הוסף עיר ברירת מחדל' : null;
+      return { i, valid: !errRow, err: errRow, summary: {
+        כתובת: [street, city].filter(Boolean).join(', ') || '—',
+        חדרים: get('rooms') || '—',
+        'מ״ר':  get('sqm') || '—',
+        מחיר:  get('marketingPrice') || '—',
+      } };
     });
   }, [rows, mapping, entityType, defaultCity]);
 
-  const validPickedCount = useMemo(() => {
-    return previewRows.filter((r) => r.valid && picked.has(r.i)).length;
-  }, [previewRows, picked]);
+  const validPickedCount = useMemo(
+    () => previewRows.filter((r) => r.valid && picked.has(r.i)).length,
+    [previewRows, picked]
+  );
+  const invalidCount = useMemo(
+    () => previewRows.filter((r) => !r.valid).length,
+    [previewRows]
+  );
 
   // ── Step 4: submit ────────────────────────────────────────────────
   const start = async () => {
@@ -214,48 +245,143 @@ export default function Import() {
     toast.success(`יובאו ${jobStatus.created} · דולגו ${jobStatus.skipped} · נכשלו ${jobStatus.failed}`);
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Layout ────────────────────────────────────────────────────────
   return (
-    <div className="imp-page" dir="rtl">
-      <header className="imp-head">
-        <Link to={LIST_ROUTE[entityType]} className="imp-back" aria-label="חזור">
-          <ArrowRight size={18} />
-          חזור ל{FRIENDLY_TYPE[entityType]}
+    <div dir="rtl" style={{
+      ...FONT,
+      padding: isMobile ? '18px 14px 60px' : 28,
+      color: DT.ink, minHeight: '100%',
+      background: DT.cream,
+    }}>
+      <style>{`
+        @keyframes estia-imp-spin { to { transform: rotate(360deg); } }
+        @keyframes estia-imp-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.55; }
+        }
+        .estia-imp-select:focus {
+          outline: none;
+          border-color: ${DT.gold};
+          box-shadow: 0 0 0 3px rgba(180,139,76,0.18);
+        }
+        .estia-imp-input:focus {
+          outline: none;
+          border-color: ${DT.gold};
+          box-shadow: 0 0 0 3px rgba(180,139,76,0.18);
+        }
+        .estia-imp-back:hover { color: ${DT.goldDark}; }
+        .estia-imp-cta:hover:not(:disabled) {
+          filter: brightness(1.04);
+          box-shadow: 0 6px 14px rgba(180,139,76,0.36);
+        }
+        .estia-imp-ghost:hover { background: ${DT.cream3}; }
+        .estia-imp-row:hover { background: ${DT.cream4}; }
+      `}</style>
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <header style={{ marginBottom: isMobile ? 14 : 22 }}>
+        <Link
+          to="/import"
+          className="estia-imp-back"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            color: DT.muted, fontSize: 12.5, textDecoration: 'none',
+            marginBottom: 10, fontWeight: 600,
+          }}
+        >
+          <ArrowRight size={14} aria-hidden="true" />
+          <span>חזרה לדף הייבוא</span>
         </Link>
-        <div className="imp-title">
-          <h1>ייבוא {FRIENDLY_TYPE[entityType]} מ-Excel</h1>
-          <span className="imp-beta">Beta</span>
+
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          color: DT.goldDark, fontSize: 11, fontWeight: 800,
+          letterSpacing: 1, textTransform: 'uppercase',
+        }}>
+          <Upload size={12} aria-hidden="true" /> ESTIA · ייבוא
         </div>
-        <p className="imp-sub">
+        <div style={{
+          display: 'flex', alignItems: 'baseline', gap: 10,
+          flexWrap: 'wrap', marginTop: 4,
+        }}>
+          <h1 style={{
+            fontSize: isMobile ? 22 : 28, fontWeight: 800,
+            letterSpacing: -0.7, margin: 0,
+          }}>
+            ייבוא {FRIENDLY_TYPE[entityType]} מ-Excel
+          </h1>
+          <span style={{
+            fontSize: 10.5, fontWeight: 800, padding: '3px 9px',
+            borderRadius: 99, background: DT.goldSoft, color: DT.goldDark,
+            letterSpacing: 0.5, textTransform: 'uppercase',
+          }}>בטא</span>
+        </div>
+        <p style={{
+          margin: '6px 0 0', fontSize: isMobile ? 12.5 : 13.5,
+          color: DT.muted, lineHeight: 1.55, maxWidth: 660,
+        }}>
           העלה קובץ .xlsx או .csv — נזהה אוטומטית את העמודות, תוכל לאשר או לשנות,
           ולאחר מכן לייבא את השורות למערכת. אנחנו זוכרים את הבחירה שלך כך
           שפעם הבאה תעלה קובץ עם אותן עמודות — יופעל אוטומטית.
         </p>
       </header>
 
+      {/* ── 4-step stepper ──────────────────────────────────────── */}
+      <Stepper step={step} isMobile={isMobile} />
+
+      {/* ── Error envelope ──────────────────────────────────────── */}
       {err && (
-        <div className="imp-err">
-          <AlertCircle size={14} /> {err}
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          marginBottom: 14, padding: '10px 14px',
+          background: 'rgba(185,28,28,0.06)', color: DT.danger,
+          border: `1px solid rgba(185,28,28,0.22)`,
+          borderRadius: 10, fontSize: 13, fontWeight: 600,
+        }}>
+          <AlertCircle size={14} aria-hidden="true" /> {err}
         </div>
       )}
 
-      {/* ── STEP 1 ────────────────────────────────────────────────── */}
-      <section className={`imp-step ${step >= 1 ? 'imp-step-on' : ''}`}>
-        <header className="imp-step-head">
-          <span className="imp-step-num">1</span>
-          <h2>העלאת קובץ</h2>
-        </header>
+      {/* ── STEP 1 ──────────────────────────────────────────────── */}
+      <SectionCard
+        n={1}
+        Icon={FileUp}
+        title="העלאת קובץ"
+        active={step === 1}
+        complete={step > 1}
+        isMobile={isMobile}
+      >
         {step === 1 ? (
           <div
-            className="imp-drop"
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
             onDrop={onDrop}
             onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click();
+            }}
             role="button"
             tabIndex={0}
+            aria-label="העלה קובץ"
+            style={{
+              border: `2px dashed ${dragOver ? DT.gold : 'rgba(180,139,76,0.45)'}`,
+              borderRadius: 16,
+              padding: isMobile ? '32px 18px' : '44px 28px',
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 8,
+              background: dragOver ? 'rgba(180,139,76,0.10)' : DT.cream4,
+              cursor: 'pointer',
+              transition: 'background 0.14s, border-color 0.14s',
+              textAlign: 'center',
+            }}
           >
-            <FileSpreadsheet size={36} aria-hidden />
-            <strong>גרור לכאן קובץ .xlsx / .csv, או לחץ כדי לבחור</strong>
-            <span>עד 2,000 שורות לייבוא בודד</span>
+            <FileSpreadsheet size={isMobile ? 32 : 38} aria-hidden="true" style={{ color: DT.gold, marginBottom: 4 }} />
+            <strong style={{ fontSize: isMobile ? 14 : 15, fontWeight: 700, color: DT.ink }}>
+              גרור לכאן קובץ .xlsx / .csv, או לחץ כדי לבחור
+            </strong>
+            <span style={{ fontSize: 12, color: DT.muted }}>
+              עד 2,000 שורות לייבוא בודד
+            </span>
             <input
               ref={fileInputRef}
               type="file"
@@ -265,269 +391,724 @@ export default function Import() {
             />
           </div>
         ) : (
-          <div className="imp-step-summary">
-            <span><CheckCircle2 size={14} /> {file?.name}</span>
-            <span>{rows.length} שורות</span>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            fontSize: 13, color: DT.muted,
+          }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              color: DT.success, fontWeight: 700,
+            }}>
+              <CheckCircle2 size={14} aria-hidden="true" /> {file?.name}
+            </span>
+            <span>·</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {rows.length} שורות
+            </span>
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => { setStep(1); setFile(null); setHeaders([]); setRows([]); setMapping({}); setPicked(new Set()); setJobId(null); setJobStatus(null); }}
+              onClick={reset}
+              className="estia-imp-ghost"
+              style={ghostBtn(isMobile)}
             >
-              החלף קובץ
+              <RefreshCw size={12} aria-hidden="true" /> החלף קובץ
             </button>
           </div>
         )}
-      </section>
+      </SectionCard>
 
-      {/* ── STEP 2 ────────────────────────────────────────────────── */}
+      {/* ── STEP 2 ──────────────────────────────────────────────── */}
       {step >= 2 && (
-        <section className={`imp-step ${step === 2 ? 'imp-step-on' : ''}`}>
-          <header className="imp-step-head">
-            <span className="imp-step-num">2</span>
-            <h2>התאמת עמודות</h2>
-            <span className="imp-auto-hint"><Sparkles size={12} /> זיהוי אוטומטי — שנה לפי הצורך</span>
-          </header>
+        <SectionCard
+          n={2}
+          Icon={Wand2}
+          title="התאמת עמודות"
+          active={step === 2}
+          complete={step > 2}
+          isMobile={isMobile}
+          headerRight={
+            step === 2 ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 11.5, color: DT.goldDark, fontWeight: 700,
+              }}>
+                <Sparkles size={12} aria-hidden="true" /> זיהוי אוטומטי — שנה לפי הצורך
+              </span>
+            ) : null
+          }
+        >
           {step === 2 ? (
             <>
-              <div className="imp-map-table">
-                <div className="imp-map-row imp-map-head">
-                  <span>עמודה בקובץ</span>
-                  <span>מיפוי ל-Estia</span>
-                  <span>דוגמה מהשורה הראשונה</span>
-                </div>
-                {headers.map((h) => {
+              <div style={{
+                border: `1px solid ${DT.border}`, borderRadius: 12,
+                overflow: 'hidden', background: DT.white,
+              }}>
+                {!isMobile && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.2fr 1.2fr 1fr',
+                    gap: 12, padding: '10px 14px',
+                    background: DT.cream2, fontSize: 11,
+                    fontWeight: 800, color: DT.muted,
+                    textTransform: 'uppercase', letterSpacing: 0.5,
+                  }}>
+                    <span>עמודה בקובץ</span>
+                    <span>מיפוי ל-Estia</span>
+                    <span>דוגמה מהשורה הראשונה</span>
+                  </div>
+                )}
+                {headers.map((h, idx) => {
                   const firstVal = rows[0]?.[h];
                   const mapped = mapping[h] ?? null;
                   const auto = !!mapped;
                   return (
-                    <div className="imp-map-row" key={h}>
-                      <span className="imp-map-header">{h || <em>(ללא כותרת)</em>}</span>
-                      <select
-                        className="imp-map-select"
-                        value={mapped || ''}
-                        onChange={(e) => setMapping((m) => ({ ...m, [h]: e.target.value || null }))}
-                      >
-                        <option value="">דלג על עמודה זו</option>
-                        {allFields.map((f) => (
-                          <option key={f} value={f}>{FIELD_LABELS[f] || f}</option>
-                        ))}
-                      </select>
-                      <span className="imp-map-sample">
-                        {auto && <Sparkles size={12} className="imp-map-auto" aria-label="זוהה אוטומטית" />}
-                        {firstVal == null || firstVal === '' ? <em>—</em> : String(firstVal)}
-                      </span>
+                    <div
+                      key={h || `__h${idx}`}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1.2fr 1fr',
+                        gap: isMobile ? 6 : 12,
+                        padding: isMobile ? '12px 14px' : '11px 14px',
+                        alignItems: 'center', fontSize: 13,
+                        borderTop: idx === 0 ? 'none' : `1px solid ${DT.border}`,
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex', flexDirection: 'column', gap: 2,
+                      }}>
+                        {isMobile && (
+                          <span style={{
+                            fontSize: 10, color: DT.muted, fontWeight: 700,
+                            textTransform: 'uppercase', letterSpacing: 0.5,
+                          }}>עמודה בקובץ</span>
+                        )}
+                        <span style={{ fontWeight: 700, color: DT.ink }}>
+                          {h || <em style={{ color: DT.muted, fontWeight: 400 }}>(ללא כותרת)</em>}
+                        </span>
+                      </div>
+                      <div style={{
+                        display: 'flex', flexDirection: 'column', gap: 2,
+                      }}>
+                        {isMobile && (
+                          <span style={{
+                            fontSize: 10, color: DT.muted, fontWeight: 700,
+                            textTransform: 'uppercase', letterSpacing: 0.5,
+                          }}>מיפוי ל-Estia</span>
+                        )}
+                        <select
+                          className="estia-imp-select"
+                          value={mapped || ''}
+                          onChange={(e) => setMapping((m) => ({ ...m, [h]: e.target.value || null }))}
+                          style={{
+                            ...FONT,
+                            padding: '7px 10px',
+                            border: `1px solid ${DT.border}`,
+                            borderRadius: 8,
+                            background: DT.cream4,
+                            color: DT.ink, fontSize: 13,
+                            width: '100%',
+                          }}
+                        >
+                          <option value="">דלג על עמודה זו</option>
+                          {allFields.map((f) => (
+                            <option key={f} value={f}>{FIELD_LABELS[f] || f}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        color: DT.muted,
+                        overflow: 'hidden', textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {isMobile && (
+                          <span style={{
+                            fontSize: 10, color: DT.muted, fontWeight: 700,
+                            textTransform: 'uppercase', letterSpacing: 0.5,
+                            marginInlineEnd: 4,
+                          }}>דוגמה</span>
+                        )}
+                        {auto && (
+                          <Sparkles size={12} aria-label="זוהה אוטומטית" style={{ color: DT.gold, flexShrink: 0 }} />
+                        )}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {firstVal == null || firstVal === '' ? <em>—</em> : String(firstVal)}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
               </div>
 
               {entityType === 'PROPERTY' && (
-                <div className="imp-field">
-                  <label htmlFor="imp-default-city">עיר ברירת מחדל (אם אין בקובץ)</label>
+                <div style={{
+                  marginTop: 14,
+                  display: 'flex', flexDirection: 'column', gap: 6,
+                }}>
+                  <label
+                    htmlFor="estia-imp-default-city"
+                    style={{
+                      fontSize: 12, fontWeight: 700, color: DT.muted,
+                      textTransform: 'uppercase', letterSpacing: 0.5,
+                    }}
+                  >
+                    עיר ברירת מחדל (אם אין בקובץ)
+                  </label>
                   <input
-                    id="imp-default-city"
-                    className="form-input"
+                    id="estia-imp-default-city"
                     type="text"
                     placeholder="למשל: רמלה"
                     value={defaultCity}
                     onChange={(e) => setDefaultCity(e.target.value)}
+                    className="estia-imp-input"
+                    style={{
+                      ...FONT,
+                      padding: '9px 12px',
+                      border: `1px solid ${DT.border}`,
+                      borderRadius: 10,
+                      background: DT.white,
+                      color: DT.ink, fontSize: 13,
+                      width: isMobile ? '100%' : 280,
+                      textAlign: 'right',
+                    }}
                   />
                 </div>
               )}
 
-              <label className="imp-toggle">
+              <label style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                marginTop: 14, fontSize: 13, color: DT.ink, cursor: 'pointer',
+              }}>
                 <input
                   type="checkbox"
                   checked={skipDupes}
                   onChange={(e) => setSkipDupes(e.target.checked)}
+                  style={{ accentColor: DT.gold, width: 16, height: 16 }}
                 />
                 דלג על כפילויות (לפי {entityType === 'LEAD' ? 'טלפון' : 'רחוב + עיר'})
               </label>
 
               {missingReasons.length > 0 && (
-                <ul className="imp-missing">
-                  {missingReasons.map((r) => <li key={r}><AlertCircle size={12} /> {r}</li>)}
+                <ul style={{
+                  listStyle: 'none', padding: '10px 14px', margin: '14px 0 0',
+                  background: 'rgba(180,83,9,0.08)',
+                  border: '1px solid rgba(180,83,9,0.22)',
+                  borderRadius: 10, display: 'flex',
+                  flexDirection: 'column', gap: 6,
+                }}>
+                  {missingReasons.map((r) => (
+                    <li
+                      key={r}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        fontSize: 12.5, color: '#a04e09', fontWeight: 600,
+                      }}
+                    >
+                      <AlertCircle size={12} aria-hidden="true" /> {r}
+                    </li>
+                  ))}
                 </ul>
               )}
 
-              <div className="imp-step-actions">
+              <div style={stepActions(isMobile)}>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="estia-imp-cta"
                   disabled={!requiredOK}
                   onClick={() => setStep(3)}
+                  style={primaryBtn({ disabled: !requiredOK, isMobile })}
                 >
                   המשך לתצוגה מקדימה
                 </button>
               </div>
             </>
           ) : (
-            <div className="imp-step-summary">
-              <span><CheckCircle2 size={14} /> מיפוי מוכן</span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setStep(2)}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+              fontSize: 13, color: DT.muted,
+            }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                color: DT.success, fontWeight: 700,
+              }}>
+                <CheckCircle2 size={14} aria-hidden="true" /> מיפוי מוכן
+              </span>
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="estia-imp-ghost"
+                style={ghostBtn(isMobile)}
+              >
                 שנה מיפוי
               </button>
             </div>
           )}
-        </section>
+        </SectionCard>
       )}
 
-      {/* ── STEP 3 ────────────────────────────────────────────────── */}
+      {/* ── STEP 3 ──────────────────────────────────────────────── */}
       {step >= 3 && (
-        <section className={`imp-step ${step === 3 ? 'imp-step-on' : ''}`}>
-          <header className="imp-step-head">
-            <span className="imp-step-num">3</span>
-            <h2>תצוגה מקדימה</h2>
-            <span className="imp-preview-count">
-              {validPickedCount} מתוך {rows.length} נבחרו
-            </span>
-          </header>
-          {step === 3 ? (
+        <SectionCard
+          n={3}
+          Icon={Eye}
+          title="תצוגה מקדימה"
+          active={step === 3}
+          complete={step > 3}
+          isMobile={isMobile}
+          headerRight={
+            step === 3 ? (
+              <span style={{ fontSize: 12, color: DT.muted, fontWeight: 600 }}>
+                {validPickedCount} מתוך {rows.length} נבחרו
+                {invalidCount > 0 && (
+                  <span style={{ color: DT.danger, marginInlineStart: 6 }}>
+                    · {invalidCount} לא תקינות
+                  </span>
+                )}
+              </span>
+            ) : null
+          }
+        >
+          {step === 3 && (
             <>
-              <div className="imp-preview-actions">
+              <div style={{
+                display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap',
+              }}>
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
+                  className="estia-imp-ghost"
                   onClick={() => setPicked(new Set(previewRows.filter((r) => r.valid).map((r) => r.i)))}
+                  style={ghostBtn(isMobile)}
                 >
-                  <Check size={12} /> בחר הכול
+                  <Check size={12} aria-hidden="true" /> בחר הכול
                 </button>
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
+                  className="estia-imp-ghost"
                   onClick={() => setPicked(new Set())}
+                  style={ghostBtn(isMobile)}
                 >
-                  <XIcon size={12} /> נקה בחירה
+                  <XIcon size={12} aria-hidden="true" /> נקה בחירה
                 </button>
               </div>
 
-              <div className="imp-preview-table">
-                {previewRows.map((r) => (
-                  <label
-                    key={r.i}
-                    className={`imp-preview-row ${r.valid ? '' : 'imp-preview-row-invalid'} ${picked.has(r.i) ? 'imp-preview-row-sel' : ''}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={picked.has(r.i)}
-                      disabled={!r.valid}
-                      onChange={(e) => setPicked((p) => {
-                        const n = new Set(p);
-                        if (e.target.checked) n.add(r.i); else n.delete(r.i);
-                        return n;
-                      })}
-                    />
-                    <div className="imp-preview-cells">
-                      {Object.entries(r.summary).map(([k, v]) => (
-                        <div key={k} className="imp-preview-cell">
-                          <small>{k}</small>
-                          <strong>{v == null || v === '' ? '—' : String(v)}</strong>
-                        </div>
-                      ))}
-                    </div>
-                    <span className="imp-preview-badge">
-                      {r.valid
-                        ? <><CheckCircle2 size={13} /> תקין</>
-                        : <><AlertCircle size={13} /> {r.err}</>}
-                    </span>
-                  </label>
-                ))}
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 8,
+                maxHeight: isMobile ? 'none' : 540,
+                overflowY: isMobile ? 'visible' : 'auto',
+                paddingInlineEnd: isMobile ? 0 : 4,
+              }}>
+                {previewRows.map((r) => {
+                  const sel = picked.has(r.i);
+                  const invalid = !r.valid;
+                  return (
+                    <label
+                      key={r.i}
+                      className="estia-imp-row"
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? 'auto 1fr' : 'auto 1fr auto',
+                        gap: isMobile ? 10 : 14, alignItems: 'center',
+                        padding: isMobile ? '12px' : '12px 14px',
+                        border: `1px solid ${
+                          invalid ? 'rgba(185,28,28,0.22)' :
+                          sel ? DT.gold : DT.border
+                        }`,
+                        borderRadius: 12,
+                        background: invalid ? 'rgba(185,28,28,0.04)' :
+                                     sel ? 'rgba(180,139,76,0.06)' : DT.white,
+                        cursor: invalid ? 'not-allowed' : 'pointer',
+                        opacity: invalid ? 0.7 : 1,
+                        transition: 'background 0.14s, border-color 0.14s',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sel}
+                        disabled={invalid}
+                        onChange={(e) => setPicked((p) => {
+                          const n = new Set(p);
+                          if (e.target.checked) n.add(r.i); else n.delete(r.i);
+                          return n;
+                        })}
+                        style={{
+                          accentColor: DT.gold, width: 16, height: 16,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile
+                          ? 'repeat(2, minmax(0, 1fr))'
+                          : 'repeat(4, minmax(0, 1fr))',
+                        gap: isMobile ? 8 : 12, minWidth: 0,
+                      }}>
+                        {Object.entries(r.summary).map(([k, v]) => (
+                          <div key={k} style={{
+                            display: 'flex', flexDirection: 'column',
+                            gap: 2, minWidth: 0,
+                          }}>
+                            <small style={{
+                              fontSize: 10.5, color: DT.muted,
+                              letterSpacing: 0.4, fontWeight: 700,
+                              textTransform: 'uppercase',
+                            }}>{k}</small>
+                            <strong style={{
+                              fontSize: 13, color: DT.ink, fontWeight: 700,
+                              overflow: 'hidden', textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}>{v == null || v === '' ? '—' : String(v)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        fontSize: 11.5, fontWeight: 700,
+                        color: invalid ? DT.danger : DT.success,
+                        whiteSpace: 'nowrap',
+                        gridColumn: isMobile ? '1 / -1' : 'auto',
+                        justifySelf: isMobile ? 'flex-start' : 'auto',
+                      }}>
+                        {invalid
+                          ? <><AlertCircle size={13} aria-hidden="true" /> {r.err}</>
+                          : <><CheckCircle2 size={13} aria-hidden="true" /> תקין</>}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
 
-              <div className="imp-step-actions">
+              <div style={stepActions(isMobile)}>
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="estia-imp-ghost"
                   onClick={() => setStep(2)}
+                  style={ghostBtn(isMobile)}
                 >
                   חזור למיפוי
                 </button>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="estia-imp-cta"
                   onClick={start}
                   disabled={validPickedCount === 0}
+                  style={primaryBtn({ disabled: validPickedCount === 0, isMobile })}
                 >
                   ייבא {validPickedCount} שורות
                 </button>
               </div>
             </>
-          ) : null}
-        </section>
+          )}
+        </SectionCard>
       )}
 
-      {/* ── STEP 4 ────────────────────────────────────────────────── */}
+      {/* ── STEP 4 ──────────────────────────────────────────────── */}
       {step === 4 && (
-        <section className="imp-step imp-step-on imp-progress">
-          <header className="imp-step-head">
-            <span className="imp-step-num">4</span>
-            <h2>{done ? 'הייבוא הסתיים' : 'מייבא ברקע…'}</h2>
-          </header>
+        <SectionCard
+          n={4}
+          Icon={Send}
+          title={done ? 'הייבוא הסתיים' : 'מייבא ברקע…'}
+          active
+          isMobile={isMobile}
+        >
           {!done && jobStatus && (
-            <div className="imp-progress-bar-wrap">
-              <div className="imp-progress-bar">
-                <div
-                  className="imp-progress-fill"
-                  style={{ width: `${Math.round((jobStatus.processed / Math.max(1, jobStatus.total)) * 100)}%` }}
-                />
+            <div>
+              <div style={{
+                height: 12, background: DT.cream2,
+                borderRadius: 999, overflow: 'hidden',
+                border: `1px solid ${DT.border}`,
+              }}>
+                <div style={{
+                  height: '100%', width: `${Math.round((jobStatus.processed / Math.max(1, jobStatus.total)) * 100)}%`,
+                  background: `linear-gradient(135deg, ${DT.goldLight} 0%, ${DT.gold} 100%)`,
+                  transition: 'width 0.25s ease',
+                  borderRadius: 999,
+                }} />
               </div>
-              <p>
+              <p style={{
+                margin: '10px 0 0', fontSize: 13, color: DT.muted,
+                fontVariantNumeric: 'tabular-nums',
+              }}>
                 {jobStatus.processed} / {jobStatus.total} שורות · נוצרו {jobStatus.created} · דולגו {jobStatus.skipped} · נכשלו {jobStatus.failed}
               </p>
             </div>
           )}
           {!done && !jobStatus && (
-            <p className="imp-progress-waiting">
-              <Loader2 size={14} className="imp-spin" /> ממתין לנתונים…
+            <p style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              color: DT.muted, fontSize: 13, margin: 0,
+            }}>
+              <Loader2 size={14} aria-hidden="true" style={{ animation: 'estia-imp-spin 1s linear infinite' }} />
+              ממתין לנתונים…
             </p>
           )}
           {done && (
-            <div className="imp-done">
-              <div className="imp-done-stat">
-                <strong>{jobStatus.created}</strong>
-                <span>נוצרו</span>
+            <div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile
+                  ? 'repeat(3, minmax(0, 1fr))'
+                  : 'repeat(3, minmax(0, 1fr))',
+                gap: isMobile ? 8 : 14,
+              }}>
+                <DoneStat value={jobStatus.created} label="נוצרו" tone="success" />
+                <DoneStat value={jobStatus.skipped} label="דולגו (כפילויות)" tone="muted" />
+                <DoneStat value={jobStatus.failed} label="נכשלו" tone={jobStatus.failed > 0 ? 'danger' : 'muted'} />
               </div>
-              <div className="imp-done-stat">
-                <strong>{jobStatus.skipped}</strong>
-                <span>דולגו (כפילויות)</span>
-              </div>
-              <div className="imp-done-stat imp-done-stat-err">
-                <strong>{jobStatus.failed}</strong>
-                <span>נכשלו</span>
-              </div>
+
               {jobStatus.errors?.length > 0 && (
-                <details className="imp-done-errors">
-                  <summary>פירוט שגיאות</summary>
-                  <ul>
-                    {jobStatus.errors.slice(0, 50).map((e) => (
-                      <li key={e.rowIndex}>שורה {e.rowIndex + 2}: {e.reason}</li>
+                <details style={{
+                  marginTop: 14, padding: '12px 14px',
+                  background: DT.cream4, borderRadius: 10,
+                  border: `1px solid ${DT.border}`, fontSize: 12.5,
+                }}>
+                  <summary style={{
+                    cursor: 'pointer', color: DT.muted, fontWeight: 700,
+                    listStyle: 'revert',
+                  }}>
+                    פירוט שגיאות ({Math.min(20, jobStatus.errors.length)})
+                  </summary>
+                  <ul style={{ listStyle: 'none', padding: '8px 0 0', margin: 0 }}>
+                    {jobStatus.errors.slice(0, 20).map((e) => (
+                      <li
+                        key={e.rowIndex}
+                        style={{
+                          padding: '4px 0', color: DT.ink,
+                          borderTop: `1px solid ${DT.border}`,
+                        }}
+                      >
+                        שורה {e.rowIndex + 2}: {e.reason}
+                      </li>
                     ))}
                   </ul>
                 </details>
               )}
-              <div className="imp-step-actions">
+
+              <div style={stepActions(isMobile)}>
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  onClick={() => navigate(`${LIST_ROUTE[entityType]}?importBatch=${jobStatus.batchId}`)}
+                  className="estia-imp-ghost"
+                  onClick={reset}
+                  style={ghostBtn(isMobile)}
                 >
-                  {entityType === 'LEAD' ? 'צפה בלידים החדשים' : 'צפה בנכסים החדשים'}
+                  ייבוא נוסף
                 </button>
                 <button
                   type="button"
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    setStep(1); setFile(null); setHeaders([]); setRows([]);
-                    setMapping({}); setPicked(new Set()); setJobId(null); setJobStatus(null);
-                  }}
+                  className="estia-imp-cta"
+                  onClick={() => navigate(`${LIST_ROUTE[entityType]}?importBatch=${jobStatus.batchId}`)}
+                  style={primaryBtn({ isMobile })}
                 >
-                  ייבוא נוסף
+                  {entityType === 'LEAD' ? 'צפה בלידים החדשים' : 'צפה בנכסים החדשים'}
                 </button>
               </div>
             </div>
           )}
-        </section>
+        </SectionCard>
       )}
     </div>
   );
+}
+
+// ─── Sub-components ─────────────────────────────────────────────
+
+function Stepper({ step, isMobile }) {
+  return (
+    <nav
+      aria-label="שלבי הייבוא"
+      style={{
+        display: 'flex', alignItems: 'center',
+        gap: isMobile ? 6 : 10,
+        padding: isMobile ? '12px' : '14px 18px',
+        marginBottom: isMobile ? 14 : 18,
+        background: DT.white,
+        border: `1px solid ${DT.border}`,
+        borderRadius: 14,
+        overflowX: isMobile ? 'auto' : 'visible',
+      }}
+    >
+      {STEPS.map((s, idx) => {
+        const isActive   = step === s.n;
+        const isComplete = step > s.n;
+        const Icon = s.Icon;
+        return (
+          <div
+            key={s.n}
+            style={{
+              display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10,
+              flexShrink: 0,
+            }}
+          >
+            <div
+              aria-current={isActive ? 'step' : undefined}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: isMobile ? '4px 8px' : '6px 12px',
+                borderRadius: 99,
+                background: isActive
+                  ? `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`
+                  : isComplete
+                    ? DT.goldSoft
+                    : 'transparent',
+                color: isActive ? DT.ink
+                  : isComplete ? DT.goldDark
+                  : DT.muted,
+                border: isActive
+                  ? 'none'
+                  : `1px solid ${isComplete ? 'transparent' : DT.border}`,
+                fontWeight: 700,
+                fontSize: isMobile ? 11.5 : 12.5,
+                whiteSpace: 'nowrap',
+                boxShadow: isActive
+                  ? '0 4px 10px rgba(180,139,76,0.30)'
+                  : 'none',
+              }}
+            >
+              <span style={{
+                width: isMobile ? 18 : 20, height: isMobile ? 18 : 20,
+                borderRadius: '50%',
+                background: isActive ? DT.ink
+                  : isComplete ? DT.gold
+                  : DT.cream2,
+                color: isActive ? DT.cream
+                  : isComplete ? DT.white
+                  : DT.muted,
+                display: 'inline-flex', alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11, fontWeight: 800,
+              }}>
+                {isComplete ? <Check size={11} aria-hidden="true" /> : s.n}
+              </span>
+              <Icon size={12} aria-hidden="true" />
+              <span>{s.label}</span>
+            </div>
+            {idx < STEPS.length - 1 && (
+              <span
+                aria-hidden="true"
+                style={{
+                  width: isMobile ? 10 : 22, height: 1,
+                  background: step > s.n ? DT.gold : DT.border,
+                  flexShrink: 0,
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+function SectionCard({ n, Icon, title, active, complete, isMobile, headerRight, children }) {
+  return (
+    <section
+      style={{
+        background: DT.white,
+        border: `1px solid ${active ? DT.gold : DT.border}`,
+        borderRadius: 16,
+        padding: isMobile ? '16px 14px' : '20px 22px',
+        marginBlockEnd: 14,
+        boxShadow: active ? '0 6px 22px rgba(30,26,20,0.06)' : 'none',
+        transition: 'border-color 0.14s, box-shadow 0.14s',
+      }}
+    >
+      <header style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        marginBottom: 14, flexWrap: 'wrap',
+      }}>
+        <span
+          aria-hidden="true"
+          style={{
+            width: 28, height: 28, borderRadius: '50%',
+            background: complete
+              ? DT.gold
+              : active
+                ? `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`
+                : DT.cream2,
+            color: complete || active ? DT.white : DT.muted,
+            display: 'inline-flex', alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 13, fontWeight: 800,
+            boxShadow: active ? '0 4px 10px rgba(180,139,76,0.30)' : 'none',
+          }}
+        >
+          {complete ? <Check size={14} aria-hidden="true" /> : n}
+        </span>
+        <Icon size={16} aria-hidden="true" style={{ color: active ? DT.goldDark : DT.muted }} />
+        <h2 style={{
+          fontSize: isMobile ? 15 : 17, fontWeight: 800,
+          letterSpacing: -0.3, margin: 0, color: DT.ink,
+        }}>{title}</h2>
+        {headerRight && (
+          <span style={{ marginInlineStart: 'auto' }}>{headerRight}</span>
+        )}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function DoneStat({ value, label, tone }) {
+  const color = tone === 'success' ? DT.success
+              : tone === 'danger' ? DT.danger
+              : DT.ink;
+  return (
+    <div style={{
+      textAlign: 'center', padding: '20px 12px',
+      background: DT.cream4, borderRadius: 12,
+      border: `1px solid ${DT.border}`,
+    }}>
+      <strong style={{
+        display: 'block', fontSize: 30, fontWeight: 800,
+        color, fontVariantNumeric: 'tabular-nums',
+      }}>{value ?? 0}</strong>
+      <span style={{ fontSize: 12, color: DT.muted, fontWeight: 600 }}>{label}</span>
+    </div>
+  );
+}
+
+// ─── Inline button helpers ───────────────────────────────────────
+
+function primaryBtn({ disabled = false, isMobile = false } = {}) {
+  return {
+    ...FONT,
+    background: disabled
+      ? DT.cream3
+      : `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+    border: 'none',
+    color: disabled ? DT.muted : DT.ink,
+    padding: isMobile ? '10px 16px' : '10px 20px',
+    borderRadius: 10,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    fontSize: 13.5, fontWeight: 800,
+    display: 'inline-flex', gap: 6, alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: disabled ? 'none' : '0 4px 10px rgba(180,139,76,0.3)',
+    transition: 'filter 0.14s, box-shadow 0.14s',
+  };
+}
+
+function ghostBtn(isMobile = false) {
+  return {
+    ...FONT,
+    background: DT.cream2,
+    border: `1px solid ${DT.border}`,
+    color: DT.ink,
+    padding: isMobile ? '7px 12px' : '7px 14px',
+    borderRadius: 10, cursor: 'pointer',
+    fontSize: 12.5, fontWeight: 700,
+    display: 'inline-flex', gap: 6, alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background 0.14s',
+  };
+}
+
+function stepActions(isMobile) {
+  return {
+    display: 'flex',
+    gap: 10,
+    marginTop: 18,
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    flexDirection: isMobile ? 'column-reverse' : 'row',
+  };
 }
