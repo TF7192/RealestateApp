@@ -105,11 +105,40 @@ export default function MatchingList({
   );
 }
 
+// Hebrew labels for the backend's snake_case reason tokens. The
+// backend used to surface raw keys ("asset_class", "deal_type") —
+// fixed here so the reason list reads as plain Hebrew.
+const REASON_LABELS = {
+  asset_class: 'סוג נכס תואם',
+  deal_type:   'סוג עסקה תואם',
+  city:        'עיר תואמת',
+  price:       'תקציב תואם',
+  rooms:       'מספר חדרים תואם',
+};
+function reasonLabel(key) {
+  if (typeof key !== 'string') return null;
+  return REASON_LABELS[key] || key;
+}
+
 function MatchRow({ match, direction }) {
   const score = Math.round(Number(match.score || 0));
+  // Scores come back as 0..1 in some paths, 0..100 in others. Renormalise
+  // so the "%" chip never shows "1%" for a full match.
+  const scorePct = score > 0 && score <= 1
+    ? Math.round(Number(match.score) * 100)
+    : score;
   const reasons = Array.isArray(match.reasons) ? match.reasons : [];
   const entity = direction === 'lead' ? match.property : match.lead;
-  const name = entity?.name || entity?.title || entity?.address || displayText(null);
+  // For a property the useful display is "street, city" — the
+  // previous `name || title || address` fallback missed all three
+  // fields on Property so the row rendered an em-dash.
+  const name =
+    (direction === 'lead'
+      ? [entity?.street, entity?.city].filter(Boolean).join(', ')
+      : (entity?.name || entity?.displayName))
+    || entity?.title
+    || entity?.address
+    || displayText(null);
   const href = direction === 'lead'
     ? (entity?.id ? `/properties/${entity.id}` : null)
     : (entity?.id ? `/customers/${entity.id}` : null);
@@ -117,8 +146,8 @@ function MatchRow({ match, direction }) {
 
   const body = (
     <>
-      <span className={`ml-score ${scoreTone(score)}`}>
-        <strong>{score}</strong>
+      <span className={`ml-score ${scoreTone(scorePct)}`}>
+        <strong>{scorePct}</strong>
         <span className="ml-score-pct" aria-hidden>%</span>
       </span>
       <span className="ml-body">
@@ -135,7 +164,7 @@ function MatchRow({ match, direction }) {
         {reasons.length > 0 && (
           <ul className="ml-reasons">
             {reasons.map((r, i) => (
-              <li key={i}>{r}</li>
+              <li key={i}>{reasonLabel(r)}</li>
             ))}
           </ul>
         )}
