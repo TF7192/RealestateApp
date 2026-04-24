@@ -1115,17 +1115,20 @@ export default function Properties() {
 
       {loading && showPropsSkel ? (
         // Reserve the same vertical real-estate the populated grid
-        // typically takes, so the page doesn't reflow when properties
-        // arrive. Lighthouse flagged the empty-state → grid swap as
-        // the source of a 0.20 CLS on /properties.
-        <div className="empty-state" style={{ minHeight: 600 }}>
+        // takes, so the page doesn't reflow when properties arrive.
+        // Lighthouse flagged the empty-state → grid swap as the
+        // source of a 0.20 CLS on /properties. Mobile compact rows
+        // (~175 px each including the swipe rail + gap) total ~1400 px
+        // for the first 8 cards before infinite-scroll caps; desktop
+        // card grid (3-col 16/10 thumbs + meta) needs ~700 px.
+        <div className="empty-state" style={{ minHeight: isMobile ? 1400 : 700 }}>
           <Building2 size={48} />
           <h3>טוען נכסים…</h3>
         </div>
       ) : loading ? (
-        // Fast-load window: sized placeholder where the grid will appear
-        // so fast fetches swap straight to real data without a CLS jump.
-        <div aria-hidden="true" style={{ minHeight: 600 }} />
+        // Fast-load window: sized placeholder matched to the
+        // populated grid so fast fetches don't shift.
+        <div aria-hidden="true" style={{ minHeight: isMobile ? 1400 : 700 }} />
       ) : (viewMode === 'table' && !isMobile) ? (
         <DataTable
           ariaLabel="טבלת נכסים"
