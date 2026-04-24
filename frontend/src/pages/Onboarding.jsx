@@ -54,13 +54,23 @@ function validateLicense(raw) {
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { refresh, logout } = useAuth();
+  const { user, refresh, logout } = useAuth();
   const toast = useToast();
 
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({
-    license: '', title: 'solo', agency: '', city: '', phone: '',
-  });
+  // Pre-fill phone from the logged-in user record if it already
+  // exists (it does when the agent provided a phone during signup).
+  // Keeps the agent from having to type the same number twice.
+  const [form, setForm] = useState(() => ({
+    license: '', title: 'solo', agency: '',
+    city: '',
+    phone: user?.phone ? formatPhone(user.phone) : '',
+  }));
+  // Top up phone when the auth context loads after mount (first render
+  // before /me returned may have user=null).
+  useEffect(() => {
+    if (user?.phone && !form.phone) setForm((p) => ({ ...p, phone: formatPhone(user.phone) }));
+  }, [user?.phone]); // eslint-disable-line react-hooks/exhaustive-deps
   const [err, setErr] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [cityOptions, setCityOptions] = useState([]);
@@ -113,9 +123,17 @@ export default function Onboarding() {
         phone: form.phone.trim() || null,
         city: form.city.trim() || null,
       });
-      await refresh();
       toast.success('ברוך הבא');
-      navigate(destination, { replace: true });
+      // Force a real browser navigation to the chosen destination.
+      // Using react-router's navigate() races against the route-element
+      // `<Route path="/onboarding" element={<Navigate to="/dashboard" />}>`
+      // guard — after refresh() flips needsOnboarding=false, that guard
+      // would snap the URL to /dashboard before our navigate fired, so
+      // every card ended up on the dashboard regardless of choice.
+      // A hard navigation loads the destination directly + picks up a
+      // fresh /me response along the way.
+      window.location.assign(destination);
+      return;
     } catch (e) {
       const msg = e?.message || 'שמירה נכשלה';
       setErr(msg);
