@@ -47,6 +47,7 @@ import PropertyPhotoManager from '../components/PropertyPhotoManager';
 import PropertyVideoManager from '../components/PropertyVideoManager';
 import OwnerPicker from '../components/OwnerPicker';
 import WhatsAppSheet from '../components/WhatsAppSheet';
+import ShareDialog from '../components/ShareDialog';
 import TransferPropertyDialog from '../components/TransferPropertyDialog';
 import LeadPickerSheet from '../components/LeadPickerSheet';
 import StickyActionBar from '../components/StickyActionBar';
@@ -70,7 +71,6 @@ import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/
 import { isNative } from '../native/platform';
 import { track } from '../lib/analytics';
 import { telUrl, wazeUrl } from '../lib/waLink';
-import { shareSheet } from '../native/share';
 import { leadMatchesProperty } from './Properties';
 import { relativeDate } from '../lib/relativeDate';
 import {
@@ -313,6 +313,8 @@ export default function PropertyDetail() {
   const [managingVideos, setManagingVideos] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [waShare, setWaShare] = useState(null);
+  // Sprint 7 — universal Share dialog (property channel picker).
+  const [shareOpen, setShareOpen] = useState(false);
   const [templates, setTemplates] = useState(null);
   const [leads, setLeads] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -590,12 +592,11 @@ export default function PropertyDetail() {
     await openWhatsApp({ phone: lead?.phone, text });
   };
 
-  const handleShare = async () => {
-    await shareSheet({
-      title: property.street,
-      text: buildMessage(),
-      url: window.location.origin + '/p/' + property.id,
-    });
+  // Sprint 7 — the Share button now opens the universal ShareDialog
+  // (WhatsApp / SMS / email / copy / OS share). Quick single-tap OS
+  // share remains available via the "מערכת" channel inside the dialog.
+  const handleShare = () => {
+    setShareOpen(true);
   };
 
   const handleInstagramStory = async () => {
@@ -1893,6 +1894,14 @@ export default function PropertyDetail() {
           subtitle="ערוך את ההודעה — לחיצה על 'פתח בוואטסאפ' תעביר לבחירת נמען"
           message={waShare.text}
           onClose={() => setWaShare(null)}
+        />
+      )}
+
+      {shareOpen && (
+        <ShareDialog
+          kind="property"
+          entity={{ property, agent: user, templates }}
+          onClose={() => setShareOpen(false)}
         />
       )}
 

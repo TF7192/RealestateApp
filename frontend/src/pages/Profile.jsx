@@ -33,6 +33,7 @@ import { useAuth } from '../lib/auth';
 import { useToast } from '../lib/toast';
 import { inputPropsForName } from '../lib/inputProps';
 import { PhoneField } from '../components/SmartFields';
+import ShareDialog from '../components/ShareDialog';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -67,6 +68,8 @@ export default function Profile() {
   const [err, setErr] = useState(null);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Sprint 7 — universal Share dialog for the public catalog link.
+  const [shareOpen, setShareOpen] = useState(false);
 
   if (!user) return null;
 
@@ -277,12 +280,26 @@ export default function Profile() {
             <Building2 size={14} />
             תצוגה מקדימה
           </a>
-          <button type="button" onClick={copyCatalog} style={primaryBtn()}>
+          <button type="button" onClick={copyCatalog} style={secondaryBtn()}>
             {copied ? <Check size={14} /> : <Copy size={14} />}
             {copied ? 'הועתק' : 'העתק קישור'}
           </button>
+          {/* Sprint 7 — universal channel picker. Opens WhatsApp / SMS /
+           *  email / link-copy / OS share for the agent's public catalog. */}
+          <button type="button" onClick={() => setShareOpen(true)} style={primaryBtn()}>
+            <Share2 size={14} />
+            שתף קטלוג
+          </button>
         </div>
       </div>
+
+      {shareOpen && (
+        <ShareDialog
+          kind="catalog"
+          entity={{ url: catalogUrl, agentName: user.displayName }}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
 
       {/* Editable details — grid */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

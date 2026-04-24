@@ -9,12 +9,14 @@ import {
   Phone,
   MessageCircle,
   SlidersHorizontal,
+  Share2,
   X,
   Home,
   Briefcase,
 } from 'lucide-react';
 import api from '../lib/api';
 import VCardQr from '../components/VCardQr';
+import ShareDialog from '../components/ShareDialog';
 import './AgentPortal.css';
 
 function formatPrice(price) {
@@ -40,6 +42,8 @@ export default function AgentPortal() {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Sprint 7 — universal Share dialog for the agent card / public catalog.
+  const [shareOpen, setShareOpen] = useState(false);
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState(() => {
@@ -170,6 +174,16 @@ export default function AgentPortal() {
                   וואטסאפ
                 </a>
               )}
+              {/* Sprint 7 — share the agent card through any channel. */}
+              <button
+                type="button"
+                className="ap-contact-chip"
+                onClick={() => setShareOpen(true)}
+                aria-label="שתף כרטיס סוכן"
+              >
+                <Share2 size={14} />
+                שתף
+              </button>
             </div>
           )}
           {/* F5 — QR + vCard download so customers can save the agent
@@ -403,6 +417,19 @@ export default function AgentPortal() {
       <footer className="ap-footer">
         <span>מוצג על ידי Estia · מערכת לסוכני נדל״ן</span>
       </footer>
+
+      {shareOpen && (
+        <ShareDialog
+          kind="agent"
+          entity={{
+            agent,
+            url: agent?.slug
+              ? `${window.location.origin}/agents/${encodeURI(agent.slug)}`
+              : window.location.href,
+          }}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }

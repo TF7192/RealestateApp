@@ -14,10 +14,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowRight, FileText, Check, AlertCircle, ShieldCheck, Download, Clock,
+  ArrowRight, FileText, Check, AlertCircle, ShieldCheck, Download, Clock, Share2,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
+import ShareDialog from '../components/ShareDialog';
 
 // Cream & Gold design tokens — same palette the OwnerDetail port uses.
 const DT = {
@@ -63,6 +64,8 @@ export default function ContractDetail() {
   // re-fetches the now-signed PDF. URL-param only; the actual PDF
   // endpoint is Cache-Control: no-store so this is belt-and-braces.
   const [pdfNonce, setPdfNonce] = useState(0);
+  // Sprint 7 — universal Share dialog for the contract PDF link.
+  const [shareOpen, setShareOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,6 +154,15 @@ export default function ContractDetail() {
           <a href={pdfUrl} target="_blank" rel="noopener noreferrer" style={secondaryBtn()}>
             <Download size={14} /> הורד PDF
           </a>
+          {/* Sprint 7 — channel picker: WhatsApp / SMS / email / copy /
+           *  OS share. Uses the PDF URL as the shared link. */}
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            style={secondaryBtn()}
+          >
+            <Share2 size={14} /> שתף
+          </button>
         </div>
       </div>
 
@@ -331,6 +343,18 @@ export default function ContractDetail() {
           )}
         </section>
       </div>
+
+      {shareOpen && (
+        <ShareDialog
+          kind="contract"
+          entity={{
+            contract,
+            url: pdfUrl,
+            recipient: contract.signerName,
+          }}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }
