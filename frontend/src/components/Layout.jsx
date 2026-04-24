@@ -1,603 +1,456 @@
-import { NavLink, Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+// Layout — 1:1 port of the claude.ai/design bundle's DesktopShell
+// (estia-new-project/project/src/desktop/shell.jsx). Espresso
+// sidebar, gold accents, two sections (עבודה יומיומית / כלים),
+// Premium upgrade card, agent row at bottom, cream topbar with
+// search + ליד חדש + bell + WhatsApp.
+//
+// On narrow viewports (≤900 px) the sidebar becomes a slide-in
+// drawer opened by a hamburger in the topbar, and the existing
+// MobileTabBar renders at the bottom.
+//
+// Essential integrations carried over from the previous Layout:
+//   - <Outlet /> for routed children
+//   - <OfflineBanner /> / <Yad2ScanBanner /> / <MarketScanBanner />
+//   - <QuickCreateFab /> (mobile quick create)
+//   - <MobileTabBar />
+//   - CommandPalette trigger via `window.dispatchEvent('estia:open-palette')`
+//
+// Dropped (the design doesn't carry them): favorites strip,
+// breadcrumb back-button, collapsed sidebar state, MobileMoreSheet
+// (superseded by the design's "עוד" tab → /settings).
+
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  UserCircle,
-  Handshake,
-  Plus,
-  UserPlus,
-  X,
-  LogOut,
-  Sun,
-  Moon,
-  HelpCircle,
-  Share2,
-  Check,
-  PanelRightClose,
-  PanelRightOpen,
-  ArrowRight,
-  ArrowLeftRight,
-  FileText,
-  Shield,
-  Search,
-  MessageCircle,
-  Calculator,
-  Download as DownloadIcon,
-  Upload as UploadIcon,
-  BarChart2,
-  Activity as ActivityIcon,
-  Bell,
-  Tag,
-  Heart,
+  Home, Users, Building2, MessageSquare, Crown, CalendarDays, Sparkles,
+  BarChart2, Banknote, Upload, UsersRound, Settings,
+  Bell, Search, Plus, MessageCircle, LogOut, Menu, X,
 } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/auth';
-import { useTheme } from '../lib/theme';
-import api from '../lib/api';
-import MobileTabBar from './MobileTabBar';
-import MobileMoreSheet from './MobileMoreSheet';
 import { isPopoutWindow } from '../lib/popout';
+import OfflineBanner from './OfflineBanner';
+import Yad2ScanBanner from './Yad2ScanBanner';
+import MarketScanBanner from './MarketScanBanner';
 import QuickCreateFab from './QuickCreateFab';
-// VoiceCaptureFab removed — the feature isn't wired end-to-end yet
-// and the floating mic button confused users. Re-add when voice-to-
-// lead goes premium live.
-
-// Mirrors backend ADMIN_EMAILS default — anyone in this list sees the
-// admin chat link in the sidebar and the admin page loads for them.
-const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
+import MobileTabBar from './MobileTabBar';
 import haptics from '../lib/haptics';
-import './Layout.css';
 
-// Nav items reference labels by i18n key — resolved inside the component
-// where `t()` is available. Keys live in nav.json (menu.*, quick.*,
-// mobileMore.*, etc.).
-const navItems = [
-  // Route the sidebar "dashboard" entry to the explicit /dashboard
-  // alias, not "/". In Capacitor's WebView (and any setup where the
-  // server serves a static landing.html at /) a full reload after
-  // navigating to "/" drops the SPA and lands the agent on the
-  // marketing page. /dashboard is the SPA-only alias defined in
-  // App.jsx and never collides with the nginx landing fallback.
-  { path: '/dashboard', icon: LayoutDashboard, labelKey: 'menu.dashboard' },
-  { path: '/properties', icon: Building2, labelKey: 'menu.properties' },
-  { path: '/owners', icon: UserCircle, labelKey: 'menu.owners' },
-  { path: '/customers', icon: Users, labelKey: 'menu.customers' },
-  { path: '/deals', icon: Handshake, labelKey: 'menu.deals' },
-  { path: '/transfers', icon: ArrowLeftRight, labelKey: 'menu.transfers' },
-  { path: '/templates', icon: FileText, labelKey: 'menu.templates' },
-  { path: '/calculator', icon: Calculator, labelKey: 'menu.calculator' },
-  { path: '/integrations/yad2', icon: DownloadIcon, labelKey: 'menu.yad2Import' },
-  { path: '/import', icon: UploadIcon, labelKey: 'menu.excelImport' },
-];
-
-const quickActions = [
-  { path: '/properties/new', icon: Plus, labelKey: 'quick.newProperty' },
-  { path: '/customers/new', icon: UserPlus, labelKey: 'quick.newLead' },
-];
-
-// Sprint 4 reporting surfaces + Sprint 1 A2 tag-settings entry point.
-// Collected in a "כלי ניהול" group so the main nav isn't cluttered; Office
-// (Sprint 7 A1) is gated to role === 'OWNER' — rendered conditionally below.
-const MANAGEMENT_ITEMS = [
-  { path: '/reports',       icon: BarChart2,    labelKey: 'menu.reports' },
-  { path: '/activity',      icon: ActivityIcon, labelKey: 'menu.activity' },
-  { path: '/reminders',     icon: Bell,         labelKey: 'menu.reminders' },
-  { path: '/settings/tags', icon: Tag,          labelKey: 'menu.tagSettings' },
-];
-
-// Pages that should show a back arrow + contextual title instead of the logo.
-// `titleHintKey` is a fallback title (i18n key in nav.pageHints / menu);
-// dynamic titles come via the `estia:title` custom event.
-const BACK_TARGETS = [
-  { match: /^\/properties\/new$/,   titleHintKey: 'pageHints.newProperty',  back: '/properties' },
-  { match: /^\/properties\/[^/]+$/, titleHintKey: 'pageHints.propertyDetail', back: '/properties' },
-  { match: /^\/customers\/new$/,    titleHintKey: 'pageHints.newLead',      back: '/customers' },
-  { match: /^\/owners\/[^/]+$/,     titleHintKey: 'pageHints.ownerDetail',  back: '/owners' },
-  { match: /^\/profile$/,           titleHintKey: 'menu.profileMine',       back: -1 },
-];
-
-// Top-level section titles for the breadcrumb (P1-M1). Keyed by path so
-// the resolver inside the component can call t() per entry.
-const SECTION_TITLE_KEYS = {
-  '/': 'menu.dashboard',
-  '/dashboard': 'menu.dashboard',
-  '/properties': 'menu.properties',
-  '/owners': 'menu.owners',
-  '/customers': 'menu.customers',
-  '/deals': 'menu.deals',
-  '/transfers': 'menu.transfers',
-  '/templates': 'menu.templates',
-  '/profile': 'menu.profile',
+// ─── Tokens (shell.jsx / DT verbatim) ──────────────────────
+const DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14', ink2: '#3a3226',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
+  sidebarBg: '#544433',
+  sidebarInk: '#f5ecd8',
+  sidebarMuted: '#bfae91',
 };
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
-function pickBack(pathname) {
-  for (const target of BACK_TARGETS) if (target.match.test(pathname)) return target;
-  return null;
+const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
+
+const PRIMARY_NAV = [
+  { k: 'dashboard',   to: '/dashboard',          label: 'לוח בקרה',  Icon: Home },
+  { k: 'leads',       to: '/customers',          label: 'לידים',       Icon: Users },
+  { k: 'properties',  to: '/properties',         label: 'נכסים',       Icon: Building2 },
+  { k: 'owners',      to: '/owners',             label: 'בעלים',       Icon: Crown },
+  { k: 'deals',       to: '/deals',              label: 'עסקאות',      Icon: Banknote },
+  { k: 'calendar',    to: '/reminders',          label: 'יומן',        Icon: CalendarDays },
+  { k: 'ai',          to: '/integrations/yad2',  label: 'Estia AI',    Icon: Sparkles, premium: true },
+  { k: 'reports',     to: '/reports',            label: 'דוחות',       Icon: BarChart2 },
+  { k: 'inbox',       to: '/admin/chats',        label: 'הודעות',      Icon: MessageSquare, adminOnly: true },
+];
+const TOOL_NAV = [
+  { k: 'import',    to: '/import',    label: 'ייבוא אקסל', Icon: Upload },
+  { k: 'team',      to: '/office',    label: 'צוות',        Icon: UsersRound },
+  { k: 'settings',  to: '/settings',  label: 'הגדרות',      Icon: Settings },
+];
+
+// ─── Responsive hook ────────────────────────────────────────
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mq = window.matchMedia('(max-width: 900px)');
+    const h = () => setNarrow(mq.matches);
+    mq.addEventListener ? mq.addEventListener('change', h) : mq.addListener(h);
+    return () => {
+      mq.removeEventListener ? mq.removeEventListener('change', h) : mq.removeListener(h);
+    };
+  }, []);
+  return narrow;
 }
 
 export default function Layout({ onLogout }) {
-  const { t } = useTranslation('nav');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem('estia-sidebar-collapsed') === '1'; }
-    catch { return false; }
-  });
-  const [copiedShare, setCopiedShare] = useState(false);
-  const [dynamicTitle, setDynamicTitle] = useState('');
-  const [headerHidden, setHeaderHidden] = useState(false);
-  const [favorites, setFavorites] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { theme, toggle: toggleTheme } = useTheme();
+  const narrow = useIsNarrow();
+  const isAdmin = user && ADMIN_EMAILS.has(user.email);
 
-  const isOwner = user?.role === 'OWNER';
-
-  // Sprint 7 B4 — sidebar "המועדפים" strip.
-  // Hydrates each favorite's display label by cross-referencing the list
-  // endpoints (properties / leads / owners). Cached in component state;
-  // refetched on window focus so a favorite added in another tab shows
-  // up when the agent returns. Kept to 5 items max in the UI.
-  const loadFavorites = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const favRes = await api.listFavorites();
-      const favItems = (favRes?.items || []).slice(0, 5);
-      if (favItems.length === 0) { setFavorites([]); return; }
-      const [propsRes, leadsRes, ownersRes] = await Promise.all([
-        api.listProperties({ mine: '1' }).catch(() => ({ items: [] })),
-        api.listLeads().catch(() => ({ items: [] })),
-        api.listOwners().catch(() => ({ items: [] })),
-      ]);
-      const byId = {
-        PROPERTY: new Map((propsRes?.items || []).map((p) => [p.id, p])),
-        LEAD:     new Map((leadsRes?.items || []).map((l) => [l.id, l])),
-        OWNER:    new Map((ownersRes?.items || []).map((o) => [o.id, o])),
-      };
-      const hydrated = favItems
-        .map((fav) => {
-          const entity = byId[fav.entityType]?.get(fav.entityId);
-          if (!entity) return null;
-          if (fav.entityType === 'PROPERTY') {
-            const street = [entity.street, entity.number].filter(Boolean).join(' ').trim();
-            const label = [street || entity.address || t('fallbacks.property'), entity.city].filter(Boolean).join(', ');
-            return { key: `P-${fav.entityId}`, label, to: `/properties/${fav.entityId}` };
-          }
-          if (fav.entityType === 'LEAD') {
-            return { key: `L-${fav.entityId}`, label: entity.name || t('fallbacks.lead'), to: `/customers?selected=${fav.entityId}` };
-          }
-          if (fav.entityType === 'OWNER') {
-            return { key: `O-${fav.entityId}`, label: entity.name || t('fallbacks.owner'), to: `/owners/${fav.entityId}` };
-          }
-          return null;
-        })
-        .filter(Boolean);
-      setFavorites(hydrated);
-    } catch {
-      // Fail silently — favorites are a nice-to-have; 401 will bounce
-      // via the api client already.
-    }
-  }, [user?.id, t]);
-
-  useEffect(() => { loadFavorites(); }, [loadFavorites]);
+  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
   useEffect(() => {
-    const onFocus = () => loadFavorites();
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [loadFavorites]);
-
-  useEffect(() => {
-    try { localStorage.setItem('estia-sidebar-collapsed', collapsed ? '1' : '0'); }
-    catch { /* ignore */ }
-    document.documentElement.dataset.sidebar = collapsed ? 'collapsed' : 'expanded';
-  }, [collapsed]);
-
-  // Reset dynamic title when pathname changes; pages announce via event.
-  useEffect(() => { setDynamicTitle(''); }, [location.pathname]);
-
-  useEffect(() => {
-    const onTitle = (e) => setDynamicTitle(e.detail || '');
-    window.addEventListener('estia:title', onTitle);
-    return () => window.removeEventListener('estia:title', onTitle);
-  }, []);
-
-  // Close sidebar on ESC + on outside click
-  useEffect(() => {
-    if (!sidebarOpen) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') setSidebarOpen(false); };
+    if (!drawerOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setDrawerOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sidebarOpen]);
+  }, [drawerOpen]);
 
-  // Was: auto-hide mobile header on scroll-down, restore on scroll-up
-  // (P1-M15). On the native iPhone app this read as "the task bar
-  // moves when I scroll" — unexpected vs. real iOS apps, which keep
-  // the top bar pinned. Kept the headerHidden state for API stability
-  // but no longer bind it to scroll; the header stays visible always.
-  useEffect(() => {
-    setHeaderHidden(false);
-  }, [location.pathname]);
-
-  const isCustomerPage = location.pathname.startsWith('/p/');
-  if (isCustomerPage) return <Outlet />;
-
-  // B7 — when the current tab was opened as a popout (?popout=1), skip
-  // all app chrome and just render the page content. The class on
-  // <html> is available for any extra styling pages might want to add.
+  // Public share pages (/p/:id) skip the entire shell.
+  if (location.pathname.startsWith('/p/')) return <Outlet />;
+  // Popout windows render just the main content.
   if (isPopoutWindow()) {
     if (typeof document !== 'undefined') {
       document.documentElement.classList.add('is-popout');
     }
-    return (
-      <main className="main-content is-popout-main">
-        <Outlet />
-      </main>
-    );
+    return <main className="main-content is-popout-main"><Outlet /></main>;
   }
 
-  const handleShareCatalog = () => {
-    if (!user?.id) return;
-    const url = `${window.location.origin}/a/${user.id}`;
-    navigator.clipboard.writeText(url);
-    setCopiedShare(true);
-    setTimeout(() => setCopiedShare(false), 2500);
-  };
-
-  const back = pickBack(location.pathname);
-  const goBack = () => {
+  const openPalette = () => {
     haptics.tap();
-    if (back?.back === -1) navigate(-1);
-    else if (back?.back) navigate(back.back);
-    else navigate('/dashboard');
+    window.dispatchEvent(new Event('estia:open-palette'));
   };
 
-  // Build the header title: dynamic > hint > section > logo
-  const sectionKey = SECTION_TITLE_KEYS[location.pathname];
-  const pageTitle =
-    dynamicTitle ||
-    (back && back.titleHintKey ? t(back.titleHintKey) : '') ||
-    (sectionKey ? t(sectionKey) : '') ||
-    '';
+  const primary = PRIMARY_NAV.filter((it) => !it.adminOnly || isAdmin);
+  const agentName = user?.displayName || user?.email?.split('@')[0] || 'סוכן';
+  const agentInitial = (agentName || 'א').slice(0, 1);
+  const agentSub = user?.agentProfile?.agency || 'נדל״ן';
 
   return (
-    <div className="layout">
-      <div className="noise-overlay" />
+    <div dir="rtl" style={{
+      ...FONT, width: '100%', minHeight: '100vh', background: DT.cream,
+      display: 'flex', color: DT.ink,
+    }}>
+      <OfflineBanner />
+      <Yad2ScanBanner />
+      <MarketScanBanner />
 
-      {/* Mobile top bar — contextual title (breadcrumb), back arrow, burger */}
-      <header className={`mobile-header ${headerHidden ? 'mh-hidden' : ''}`}>
-        <div className="mh-side mh-leading">
-          {back && (
-            <button className="btn-ghost mh-back-btn" onClick={goBack} aria-label={t('aria.back')}>
-              <ArrowRight size={22} />
-            </button>
-          )}
-        </div>
-        {pageTitle ? (
-          <div className="mobile-logo mh-title-wrap">
-            <span className="mh-title">{pageTitle}</span>
-          </div>
-        ) : (
-          <Link to="/dashboard" className="mobile-logo" onClick={() => haptics.tap()}>
-            <span className="logo-icon">◆</span>
-            <span>Estia</span>
-          </Link>
-        )}
-        <div className="mh-side mh-trailing">
-          {/* S21: mobile global search — opens the same CommandPalette
-              the desktop ⌘K shortcut launches. Dispatched as a window
-              event so this Layout component doesn't need to share state
-              with App.jsx. Two-tap reach to any property/customer/owner
-              from anywhere in the app. */}
-          <button
-            className="btn-ghost mh-search-btn"
-            onClick={() => {
-              haptics.tap();
-              window.dispatchEvent(new Event('estia:open-palette'));
-            }}
-            aria-label={t('aria.search')}
-            type="button"
-          >
-            <Search size={20} />
-          </button>
-          {/* Task 1 · chat launcher inside the mobile header. The
-              standalone .chatw-btn (position:fixed top-right) used to
-              sit on top of the profile pill — same corner — clipping
-              the avatar visually and floating outside the header's
-              flex row. Hidden on mobile via ChatWidget.css; this
-              button dispatches the open event ChatWidget listens for.
-              Hidden for admins (they use /admin/chats). */}
-          {!ADMIN_EMAILS.has((user?.email || '').toLowerCase()) && (
-            <button
-              className="btn-ghost mh-chat-btn"
-              onClick={() => {
-                haptics.tap();
-                window.dispatchEvent(new Event('estia:open-chat'));
-              }}
-              aria-label={t('aria.chat')}
-              type="button"
-            >
-              <MessageCircle size={20} />
-            </button>
-          )}
-          <button
-            className="btn-ghost mh-profile-btn"
-            onClick={() => { haptics.tap(); setMoreOpen(true); }}
-            aria-label={t('aria.account')}
-          >
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt="" className="mh-avatar" />
-            ) : (
-              <span className="mh-avatar placeholder">{(user?.displayName || 'E').charAt(0)}</span>
-            )}
-          </button>
-        </div>
-      </header>
-
-      {sidebarOpen && (
-        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      {!narrow && (
+        <Sidebar
+          primary={primary} tools={TOOL_NAV}
+          location={location}
+          agentName={agentName} agentInitial={agentInitial} agentSub={agentSub}
+          onLogout={onLogout}
+        />
       )}
 
-      <aside className={`sidebar ${sidebarOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-        <div className="sidebar-header">
-          <Link to="/dashboard" className="logo">
-            <div className="logo-mark">
-              <span>◆</span>
-            </div>
-            <div className="logo-text">
-              <h1>Estia</h1>
-              <p>{t('sidebar.subtitle')}</p>
-            </div>
-          </Link>
-          {/* Search affordance pinned next to the logo — inline-end of
-              the Estia wordmark in RTL. Dispatches the same event the
-              mobile header uses, so the already-mounted CommandPalette
-              opens without Layout needing a direct reference. */}
+      {narrow && drawerOpen && (
+        <MobileDrawer
+          primary={primary} tools={TOOL_NAV}
+          location={location}
+          agentName={agentName} agentInitial={agentInitial} agentSub={agentSub}
+          onLogout={onLogout}
+          onClose={() => setDrawerOpen(false)}
+        />
+      )}
+
+      <div style={{
+        flex: 1, minWidth: 0,
+        display: 'flex', flexDirection: 'column',
+        paddingBottom: narrow ? 72 : 0, // room for the mobile tab bar
+      }}>
+        <Topbar
+          narrow={narrow}
+          onOpenDrawer={() => setDrawerOpen(true)}
+          onOpenPalette={openPalette}
+          onNewLead={() => navigate('/customers/new')}
+          onOpenReminders={() => navigate('/reminders')}
+        />
+        <main style={{ flex: 1, minWidth: 0, background: DT.cream }}>
+          <Outlet />
+        </main>
+      </div>
+
+      {narrow && <QuickCreateFab />}
+      {narrow && <MobileTabBar />}
+    </div>
+  );
+}
+
+// ═══ Sidebar (desktop) ═══════════════════════════════════════════
+function Sidebar(p) {
+  return (
+    <aside style={{
+      width: 240, flexShrink: 0, background: DT.sidebarBg, color: DT.sidebarInk,
+      display: 'flex', flexDirection: 'column', padding: '22px 0',
+      height: '100vh', position: 'sticky', top: 0,
+    }}>
+      <SidebarInner {...p} />
+    </aside>
+  );
+}
+
+// ═══ Sidebar (mobile drawer) ═════════════════════════════════════
+function MobileDrawer(p) {
+  return (
+    <div
+      role="presentation"
+      onClick={p.onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 80,
+        background: 'rgba(20,17,13,0.45)', backdropFilter: 'blur(2px)',
+        animation: 'estia-drawer-fade 160ms ease-out',
+      }}
+    >
+      <aside
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'fixed', top: 0, bottom: 0, insetInlineEnd: 0, zIndex: 81,
+          width: 260, background: DT.sidebarBg, color: DT.sidebarInk,
+          boxShadow: '-20px 0 60px rgba(20,17,13,0.4)',
+          display: 'flex', flexDirection: 'column', padding: '22px 0',
+          animation: 'estia-drawer-slide 220ms ease-out',
+        }}
+      >
+        <button
+          type="button"
+          onClick={p.onClose}
+          aria-label="סגור תפריט"
+          style={{
+            position: 'absolute', top: 14, insetInlineStart: 12,
+            background: 'transparent', border: 'none', color: DT.sidebarInk,
+            cursor: 'pointer', padding: 6, display: 'inline-flex',
+          }}
+        ><X size={18} /></button>
+        <SidebarInner {...p} />
+      </aside>
+      <style>{`
+        @keyframes estia-drawer-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes estia-drawer-slide {
+          from { transform: translateX(-100%); }
+          to   { transform: translateX(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function SidebarInner({ primary, tools, location, agentName, agentInitial, agentSub, onLogout }) {
+  const isActive = (to) => {
+    if (to === '/dashboard') return location.pathname === '/dashboard' || location.pathname === '/';
+    return location.pathname === to || location.pathname.startsWith(`${to}/`);
+  };
+  return (
+    <>
+      {/* Brand */}
+      <div style={{
+        padding: '0 22px 22px', display: 'flex', alignItems: 'center', gap: 10,
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <NavLink to="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flex: 1 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 9,
+            background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+            display: 'grid', placeItems: 'center', color: DT.ink,
+            fontWeight: 900, fontSize: 17, letterSpacing: -1,
+          }}>E</div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: -0.3 }}>Estia</div>
+            <div style={{ fontSize: 10, color: DT.sidebarMuted, fontWeight: 600 }}>נדל״ן AI</div>
+          </div>
+        </NavLink>
+      </div>
+
+      <nav style={{ flex: 1, padding: '14px 12px', overflow: 'auto' }}>
+        <SectionLabel>עבודה יומיומית</SectionLabel>
+        {primary.map((item) => (
+          <NavRow key={item.k} item={item} active={isActive(item.to)} />
+        ))}
+        <div style={{ height: 12 }} />
+        <SectionLabel>כלים</SectionLabel>
+        {tools.map((item) => (
+          <NavRow key={item.k} item={item} active={isActive(item.to)} tight />
+        ))}
+      </nav>
+
+      {/* Upgrade card */}
+      <div style={{ padding: '12px 14px' }}>
+        <div style={{
+          background: `linear-gradient(160deg, rgba(180,139,76,0.25), rgba(180,139,76,0.1))`,
+          border: '1px solid rgba(180,139,76,0.3)', borderRadius: 12, padding: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <Sparkles size={13} />
+            <div style={{ fontSize: 12, fontWeight: 800, color: DT.goldLight }}>Estia Premium</div>
+          </div>
+          <div style={{ fontSize: 10, color: DT.sidebarInk, opacity: 0.85, lineHeight: 1.5, marginBottom: 8 }}>
+            פתיחת AI, תיאורי נכסים אוטומטיים, סיכומי פגישות קוליים ועוד
+          </div>
+          <a
+            href="mailto:hello@estia.co.il?subject=שדרוג ל-Premium"
+            style={{
+              ...FONT, display: 'block', textAlign: 'center',
+              background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+              color: DT.ink, border: 'none', padding: '7px 10px', borderRadius: 7,
+              fontSize: 11, fontWeight: 800, textDecoration: 'none',
+            }}
+          >שדרג ל-Premium</a>
+        </div>
+      </div>
+
+      {/* Agent row */}
+      <div style={{
+        padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <NavLink to="/profile" style={{
+          width: 34, height: 34, borderRadius: 99, background: DT.gold, color: DT.ink,
+          display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13,
+          textDecoration: 'none', flexShrink: 0,
+        }}>{agentInitial}</NavLink>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 12, fontWeight: 700, color: '#fff',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{agentName}</div>
+          <div style={{
+            fontSize: 10, color: DT.sidebarMuted,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{agentSub}</div>
+        </div>
+        <button
+          type="button"
+          onClick={onLogout}
+          title="התנתקות"
+          aria-label="התנתקות"
+          style={{
+            background: 'transparent', border: 'none', color: DT.sidebarMuted,
+            cursor: 'pointer', padding: 4, display: 'inline-flex',
+          }}
+        ><LogOut size={16} /></button>
+      </div>
+    </>
+  );
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      fontSize: 10, color: DT.sidebarMuted, fontWeight: 700,
+      textTransform: 'uppercase', letterSpacing: 1,
+      padding: '6px 10px',
+    }}>{children}</div>
+  );
+}
+
+function NavRow({ item, active, tight }) {
+  const { Icon } = item;
+  return (
+    <NavLink to={item.to} style={{
+      ...FONT,
+      width: '100%', display: 'flex', alignItems: 'center', gap: 11,
+      padding: tight ? '9px 12px' : '10px 12px',
+      background: active ? 'rgba(180,139,76,0.18)' : 'transparent',
+      borderRadius: 9, color: active ? DT.goldLight : DT.sidebarInk,
+      fontSize: 13, fontWeight: active ? 700 : 500,
+      marginBottom: 1, position: 'relative', textDecoration: 'none',
+    }}>
+      {active && (
+        <span style={{
+          position: 'absolute', insetInlineEnd: 0, top: 8, bottom: 8,
+          width: 2.5, background: DT.gold, borderRadius: 99,
+        }} />
+      )}
+      <Icon size={tight ? 16 : 17} aria-hidden="true" />
+      <span style={{ flex: 1 }}>{item.label}</span>
+      {item.badge && (
+        <span style={{
+          background: DT.gold, color: DT.ink, fontSize: 10, fontWeight: 800,
+          padding: '2px 6px', borderRadius: 99, minWidth: 18, textAlign: 'center',
+        }}>{item.badge}</span>
+      )}
+      {item.premium && <Sparkles size={11} aria-hidden="true" />}
+    </NavLink>
+  );
+}
+
+// ═══ Topbar ══════════════════════════════════════════════════════
+function Topbar({ narrow, onOpenDrawer, onOpenPalette, onNewLead, onOpenReminders }) {
+  return (
+    <header style={{
+      flexShrink: 0, borderBottom: `1px solid ${DT.border}`,
+      padding: narrow ? '12px 16px' : '14px 28px',
+      display: 'flex', alignItems: 'center', gap: narrow ? 10 : 20,
+      background: DT.cream, position: 'sticky', top: 0, zIndex: 20,
+    }}>
+      {narrow && (
+        <button
+          type="button"
+          onClick={onOpenDrawer}
+          aria-label="תפריט"
+          style={{
+            background: DT.white, border: `1px solid ${DT.border}`,
+            width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
+            color: DT.ink, display: 'inline-grid', placeItems: 'center',
+          }}
+        ><Menu size={18} /></button>
+      )}
+      <button
+        type="button"
+        onClick={onOpenPalette}
+        style={{
+          ...FONT, flex: 1, maxWidth: narrow ? 'none' : 480, position: 'relative',
+          padding: '10px 40px 10px 14px',
+          border: `1px solid ${DT.border}`, borderRadius: 10,
+          background: DT.white, fontSize: 13, color: DT.muted,
+          cursor: 'pointer', textAlign: 'right',
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+          right: 14, color: DT.muted, pointerEvents: 'none',
+          display: 'inline-flex',
+        }}><Search size={15} /></span>
+        {narrow ? 'חיפוש…' : 'חיפוש לידים, נכסים, פגישות…  (⌘K)'}
+      </button>
+      <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        {!narrow && (
           <button
             type="button"
-            className="sidebar-search btn-ghost"
-            onClick={() => window.dispatchEvent(new CustomEvent('estia:open-palette'))}
-            aria-label={t('aria.search')}
-            title={t('aria.search')}
-          >
-            <Search size={18} />
-          </button>
-          <button
-            className="sidebar-close btn-ghost"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
+            onClick={onNewLead}
+            style={{
+              ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
+              padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
+              color: DT.ink, display: 'inline-flex', gap: 6, alignItems: 'center',
+              fontSize: 12, fontWeight: 700,
+            }}
+          ><Plus size={14} /> ליד חדש</button>
+        )}
         <button
-          className="sidebar-collapse-rail"
-          onClick={() => setCollapsed((c) => !c)}
-          title={collapsed ? t('aria.expandSidebar') : t('aria.collapseSidebar')}
-          aria-label={collapsed ? t('aria.expandSidebar') : t('aria.collapseSidebar')}
+          type="button"
+          onClick={onOpenReminders}
+          aria-label="התראות"
+          style={{
+            background: DT.white, border: `1px solid ${DT.border}`,
+            width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
+            color: DT.ink, display: 'grid', placeItems: 'center', position: 'relative',
+          }}
         >
-          {collapsed ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
+          <Bell size={15} />
+          <span style={{
+            position: 'absolute', top: 7, insetInlineStart: 9,
+            width: 7, height: 7, borderRadius: 99, background: DT.gold,
+            border: `2px solid ${DT.white}`,
+          }} />
         </button>
-
-        <nav className="sidebar-nav">
-          <div className="nav-section">
-            <span className="nav-section-label">{t('sections.main')}</span>
-            {navItems.map((item) => {
-              const label = t(item.labelKey);
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.path === '/'}
-                  data-label={label}
-                  // data-tour targets used by the OnboardingTour (T10).
-                  data-tour={
-                    item.path === '/properties' ? 'sidebar-properties' :
-                    item.path === '/owners'     ? 'sidebar-owners' :
-                    item.path === '/customers'  ? 'sidebar-customers' :
-                    item.path === '/templates'  ? 'sidebar-templates' :
-                    item.path === '/transfers'  ? 'sidebar-transfers' :
-                    undefined
-                  }
-                  className={({ isActive }) =>
-                    `nav-item ${isActive ? 'active' : ''}`
-                  }
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon size={20} />
-                  <span>{label}</span>
-                </NavLink>
-              );
-            })}
-          </div>
-
-          {/* Sprint 4 (reports, activity, reminders) + Sprint 1 A2 (tags)
-              + Sprint 7 A1 (office — OWNER only). Grouped so the main
-              nav isn't swamped with admin-ish surfaces. */}
-          <div className="nav-section">
-            <span className="nav-section-label">{t('sections.management')}</span>
-            {MANAGEMENT_ITEMS.map((item) => {
-              const label = t(item.labelKey);
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  data-label={label}
-                  className={({ isActive }) =>
-                    `nav-item ${isActive ? 'active' : ''}`
-                  }
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon size={20} />
-                  <span>{label}</span>
-                </NavLink>
-              );
-            })}
-            {isOwner && (
-              <NavLink
-                to="/office"
-                data-label={t('menu.office')}
-                className={({ isActive }) =>
-                  `nav-item ${isActive ? 'active' : ''}`
-                }
-                onClick={() => setSidebarOpen(false)}
-              >
-                <Building2 size={20} />
-                <span>{t('menu.office')}</span>
-              </NavLink>
-            )}
-          </div>
-
-          {/* Sprint 7 B4 + N-15 — sidebar favorites strip. ALWAYS rendered,
-              including when empty, so the affordance stays discoverable.
-              Max 5 items; empty state shows a muted hint instructing the
-              agent to add favorites for quick access. */}
-          <div className="nav-section nav-favorites">
-            <span className="nav-section-label">
-              <Heart size={12} style={{ marginInlineEnd: 4, verticalAlign: -1 }} />
-              {t('sections.favorites')}
-            </span>
-            {favorites.length === 0 ? (
-              <span
-                className="nav-favorites-empty"
-                data-testid="nav-favorites-empty"
-              >
-                הוסף מועדפים לגישה מהירה
-              </span>
-            ) : (
-              favorites.map((f) => (
-                <NavLink
-                  key={f.key}
-                  to={f.to}
-                  className={({ isActive }) =>
-                    `nav-item nav-favorite ${isActive ? 'active' : ''}`
-                  }
-                  onClick={() => setSidebarOpen(false)}
-                  title={f.label}
-                >
-                  <Heart size={14} />
-                  <span className="nav-favorite-label">{f.label}</span>
-                </NavLink>
-              ))
-            )}
-          </div>
-
-          <div className="nav-section">
-            <span className="nav-section-label">{t('sections.quickActions')}</span>
-            {quickActions.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) =>
-                  `nav-item nav-action ${isActive ? 'active' : ''}`
-                }
-                onClick={() => setSidebarOpen(false)}
-              >
-                <item.icon size={18} />
-                <span>{t(item.labelKey)}</span>
-              </NavLink>
-            ))}
-            <button
-              className="nav-item nav-action share-link-btn"
-              onClick={handleShareCatalog}
-              title={t('aria.shareCatalog')}
-            >
-              {copiedShare ? <Check size={18} /> : <Share2 size={18} />}
-              <span>{copiedShare ? t('share.copied') : t('share.action')}</span>
-            </button>
-            {ADMIN_EMAILS.has((user?.email || '').toLowerCase()) && (
-              <>
-                <NavLink
-                  to="/admin/chats"
-                  className={({ isActive }) =>
-                    `nav-item nav-action nav-item-admin ${isActive ? 'active' : ''}`
-                  }
-                  onClick={() => setSidebarOpen(false)}
-                  title={t('aria.adminChats')}
-                >
-                  <Shield size={18} />
-                  <span>{t('sidebar.adminChats')}</span>
-                </NavLink>
-                <NavLink
-                  to="/admin/users"
-                  className={({ isActive }) =>
-                    `nav-item nav-action nav-item-admin ${isActive ? 'active' : ''}`
-                  }
-                  onClick={() => setSidebarOpen(false)}
-                  title={t('aria.adminUsers')}
-                >
-                  <Shield size={18} />
-                  <span>{t('sidebar.adminUsers')}</span>
-                </NavLink>
-              </>
-            )}
-          </div>
-        </nav>
-
-        <div className="sidebar-footer">
-          <button
-            className="sidebar-theme-toggle"
-            onClick={toggleTheme}
-            title={theme === 'light' ? t('theme.toDark') : t('theme.toLight')}
-          >
-            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-            <span>{theme === 'light' ? t('theme.dark') : t('theme.light')}</span>
-          </button>
-          <NavLink to="/profile" className="agent-card agent-card-link" onClick={() => setSidebarOpen(false)}>
-            {user?.avatarUrl ? (
-              <img className="agent-avatar" src={user.avatarUrl} alt={user.displayName || t('fallbacks.agent')} />
-            ) : (
-              <div className="agent-avatar">
-                {(user?.displayName || 'E').charAt(0)}
-              </div>
-            )}
-            <div className="agent-info">
-              <span className="agent-name">{user?.displayName || t('fallbacks.agent')}</span>
-              <span className="agent-agency">
-                {user?.agentProfile?.agency || t('quick.addAgency')}
-              </span>
-            </div>
-          </NavLink>
-          {/* F-17.3 — Help / support link. mailto: opens the user's
-              email client with a prefilled subject; consistent with the
-              single-support-channel posture today. When we have a real
-              support URL (ticket system), swap the href — aria-label
-              + icon stay stable. */}
-          <a
-            className="sidebar-help"
-            href={`mailto:support@estia.app?subject=${encodeURIComponent(t('help.subject'))}`}
-            title={t('aria.supportContact')}
-          >
-            <HelpCircle size={16} />
-            <span>{t('menu.help')}</span>
-          </a>
-          <button className="sidebar-logout" onClick={onLogout}>
-            <LogOut size={16} />
-            {t('menu.logout')}
-          </button>
-        </div>
-      </aside>
-
-      <main className="main-content">
-        <Outlet />
-      </main>
-
-      {/* H2 — global floating quick-create FAB. Mounts for every authed
-          route; hides itself on pages that already own a sticky CTA. */}
-      <QuickCreateFab />
-      {/* Mobile chrome */}
-      <MobileTabBar />
-      <MobileMoreSheet
-        open={moreOpen}
-        onClose={() => setMoreOpen(false)}
-        onOpenPalette={() => {
-          // Fire a global event for CommandPalette; simple and decoupled
-          const ev = new CustomEvent('estia:open-palette');
-          window.dispatchEvent(ev);
-        }}
-      />
-    </div>
+        <a
+          href="https://wa.me/972501234567"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="WhatsApp"
+          style={{
+            background: DT.white, border: `1px solid ${DT.border}`,
+            width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
+            color: DT.ink, display: 'grid', placeItems: 'center', textDecoration: 'none',
+          }}
+        >
+          <MessageCircle size={15} />
+        </a>
+      </div>
+    </header>
   );
 }
