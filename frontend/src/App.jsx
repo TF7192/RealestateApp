@@ -53,6 +53,7 @@ const Reminders = lazy(() => import('./pages/Reminders'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Office = lazy(() => import('./pages/Office'));
+const Team = lazy(() => import('./pages/Team'));
 const TagSettings = lazy(() => import('./pages/TagSettings'));
 const Settings = lazy(() => import('./pages/Settings'));
 // G2 — OWNER-only admin for marketable-area groups, linked from /settings.
@@ -309,6 +310,7 @@ function AppRoutes() {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/office" element={<Office />} />
+            <Route path="/team" element={<Team />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/tags" element={<TagSettings />} />
             <Route path="/settings/neighborhoods" element={<NeighborhoodAdmin />} />

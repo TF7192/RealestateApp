@@ -354,6 +354,7 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/deals${qs ? `?${qs}` : ''}`);
   },
+  getDeal: (id) => request(`/deals/${id}`),
   createDeal: (body) => request('/deals', { method: 'POST', body }),
   updateDeal: (id, body) => request(`/deals/${id}`, { method: 'PATCH', body }),
 
@@ -527,6 +528,17 @@ export const api = {
   createOfficeInvite:  (body) => request('/office/invites', { method: 'POST', body }),
   listOfficeInvites:   () => request('/office/invites'),
   revokeOfficeInvite:  (id) => request(`/office/invites/${id}`, { method: 'DELETE' }),
+
+  // Sprint 6 — team scoreboard. Returns
+  // { agents: [{ agentId, displayName, avatarUrl, closedDeals,
+  //              totalVolume, avgRating, leadsOpen, propertiesActive }],
+  //   quarter }
+  // scoped to the caller's office. `quarter` is optional ("Qx-yyyy");
+  // server defaults to the current quarter when omitted.
+  teamScoreboard:      (quarter) => {
+    const qs = quarter ? `?${new URLSearchParams({ quarter }).toString()}` : '';
+    return request(`/team/scoreboard${qs}`);
+  },
 
   // Tags (A2)
   listTags:            () => request('/tags'),

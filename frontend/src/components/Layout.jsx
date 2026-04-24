@@ -79,6 +79,7 @@ const TOOL_NAV = [
   { k: 'import',    to: '/import',            label: 'ייבוא אקסל',    Icon: Upload },
   { k: 'calculator', to: '/calculator',       label: 'מחשבון',         Icon: Calculator },
   { k: 'templates',  to: '/templates',        label: 'תבניות',         Icon: FileText },
+  { k: 'team',       to: '/team',             label: 'הצוות שלי',      Icon: UsersRound },
   { k: 'office',     to: '/office',           label: 'משרד / צוות',    Icon: UsersRound },
   { k: 'tags',       to: '/settings/tags',    label: 'ניהול תגיות',    Icon: Tag },
   { k: 'settings',   to: '/settings',         label: 'הגדרות',         Icon: Settings },
