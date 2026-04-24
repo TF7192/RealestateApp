@@ -578,6 +578,10 @@ export const api = {
   // { agent, properties, leads, deals, totals } scoped to the
   // caller's office; 404 for an unknown id or cross-office access.
   teamAgent:           (agentId) => request(`/team/agents/${agentId}`),
+  // Sprint 10 — office-scoped widget aggregator powering the /team
+  // stats dashboard. One round-trip with every bucket the 14 widgets
+  // need; lone-agent callers get 404.
+  teamStats:           () => request('/team/stats'),
 
   // Tags (A2)
   listTags:            () => request('/tags'),

@@ -14,6 +14,7 @@ import {
   ChevronUp, ChevronDown, Users,
 } from 'lucide-react';
 import api from '../lib/api';
+import TeamStatsDashboard from '../components/TeamStatsDashboard';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -61,6 +62,7 @@ export default function Team() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState({ key: 'totalVolume', dir: 'desc' });
+  const [statsData, setStatsData] = useState(null);
 
   const quarterOptions = useMemo(() => recentQuarters(6), []);
 
@@ -86,6 +88,22 @@ export default function Team() {
     })();
     return () => { cancelled = true; };
   }, [quarter]);
+
+  // Stats payload — quarter-independent (snapshot of current state +
+  // YTD windows + 12-week sparkline). Fetched once per mount; suppress
+  // 404s since the scoreboard fetch already surfaces the no-office UI.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.teamStats();
+        if (!cancelled) setStatsData(data);
+      } catch {
+        if (!cancelled) setStatsData(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const sortedAgents = useMemo(() => {
     const copy = agents.slice();
@@ -318,6 +336,12 @@ export default function Team() {
           </div>
         )}
       </div>
+
+      {/* Stats dashboard — visible whenever the office has data. Hidden
+          for lone-agent / no-office state since /team/stats also 404s. */}
+      {!loading && error !== 'no-office' && statsData && (
+        <TeamStatsDashboard data={statsData} />
+      )}
     </div>
   );
 }

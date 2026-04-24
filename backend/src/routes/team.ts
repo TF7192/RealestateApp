@@ -245,4 +245,276 @@ export const registerTeamRoutes: FastifyPluginAsync = async (app) => {
     }, { closedCount: 0, volume: 0, commissions: 0 });
     return { agent, properties, leads, deals, totals };
   });
+
+  // GET /api/team/stats — Sprint 10 team-intel expansion.
+  //
+  // One round-trip aggregate that powers every widget on the customisable
+  // /team stats dashboard. Office-scoped (joins Property / Lead / Deal /
+  // PropertyView via agentId IN (office members)); lone-agent callers
+  // bounce with 404 just like /team/scoreboard.
+  //
+  // Most counts come from Prisma groupBy. Medians are computed in TS —
+  // Postgres has percentile_cont but Prisma doesn't expose it, and
+  // fetching marketingPrice for ≤ a few hundred properties per office
+  // is comfortably cheap. weeklySignedDeals walks the last 12 ISO weeks
+  // (Mon → Sun, UTC) so the sparkline anchors on a stable boundary even
+  // around year-end.
+  app.get('/stats', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { officeId: true },
+    });
+    if (!me?.officeId) {
+      return reply.code(404).send({ error: { message: 'אינך משויך למשרד' } });
+    }
+    const memberRows = await prisma.user.findMany({
+      where: { officeId: me.officeId },
+      select: { id: true },
+    });
+    const memberIds = memberRows.map((m) => m.id);
+
+    // Time anchors. ISO-week Monday for "this week" / "last week", and
+    // a 12-week window for the sparkline. Year-to-date for commissions.
+    const now = new Date();
+    const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+    const dayOfWeek = now.getUTCDay(); // 0 = Sun … 6 = Sat
+    const daysSinceMonday = (dayOfWeek + 6) % 7;
+    const thisWeekStart = new Date(Date.UTC(
+      now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceMonday,
+    ));
+    const lastWeekStart = new Date(thisWeekStart.getTime() - 7 * 24 * 3600 * 1000);
+    const twelveWeeksAgo = new Date(thisWeekStart.getTime() - 11 * 7 * 24 * 3600 * 1000);
+
+    // ── Properties: city counts, rooms, price bands, asset split, all rows ──
+    const properties = await prisma.property.findMany({
+      where: { agentId: { in: memberIds } },
+      select: {
+        city: true, marketingPrice: true, rooms: true, category: true,
+        assetClass: true, createdAt: true,
+      },
+    });
+
+    const cityCount = new Map<string, number>();
+    const roomBuckets = new Map<string, number>();
+    const priceBandCount = new Map<string, number>();
+    const saleByCity = new Map<string, number[]>();
+    const rentByCity = new Map<string, number[]>();
+    let residential = 0;
+    let commercial = 0;
+    let propertiesNewThisWeek = 0;
+    let propertiesNewLastWeek = 0;
+    const PRICE_BANDS: Array<[string, number, number]> = [
+      ['0-1M', 0, 1_000_000],
+      ['1-2M', 1_000_000, 2_000_000],
+      ['2-3M', 2_000_000, 3_000_000],
+      ['3-5M', 3_000_000, 5_000_000],
+      ['5-7M', 5_000_000, 7_000_000],
+      ['7-10M', 7_000_000, 10_000_000],
+      ['10M+', 10_000_000, Number.POSITIVE_INFINITY],
+    ];
+    for (const p of properties) {
+      const city = (p.city || '').trim();
+      if (city) cityCount.set(city, (cityCount.get(city) || 0) + 1);
+      const roomsKey = roomKeyOf(p.rooms);
+      roomBuckets.set(roomsKey, (roomBuckets.get(roomsKey) || 0) + 1);
+      const band = PRICE_BANDS.find(
+        ([, lo, hi]) => p.marketingPrice >= lo && p.marketingPrice < hi,
+      );
+      if (band) priceBandCount.set(band[0], (priceBandCount.get(band[0]) || 0) + 1);
+      if (p.assetClass === 'RESIDENTIAL') residential++;
+      else if (p.assetClass === 'COMMERCIAL') commercial++;
+      if (p.category === 'SALE' && city) {
+        const arr = saleByCity.get(city) || [];
+        arr.push(p.marketingPrice);
+        saleByCity.set(city, arr);
+      } else if (p.category === 'RENT' && city) {
+        const arr = rentByCity.get(city) || [];
+        arr.push(p.marketingPrice);
+        rentByCity.set(city, arr);
+      }
+      if (p.createdAt >= thisWeekStart) propertiesNewThisWeek++;
+      else if (p.createdAt >= lastWeekStart && p.createdAt < thisWeekStart) {
+        propertiesNewLastWeek++;
+      }
+    }
+
+    const propertiesByCity = Array.from(cityCount.entries())
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
+
+    // 1, 2, 3, 4, 5, 6+ — fixed shape so the bar chart axis is stable.
+    const ROOM_KEYS = ['1', '2', '3', '4', '5', '6+'];
+    const roomsDistribution = ROOM_KEYS.map((rooms) => ({
+      rooms, count: roomBuckets.get(rooms) || 0,
+    }));
+    const priceBands = PRICE_BANDS.map(([band]) => ({
+      band, count: priceBandCount.get(band) || 0,
+    }));
+    const medianSalePriceByCity = medianBuckets(saleByCity);
+    const medianRentPriceByCity = medianBuckets(rentByCity);
+
+    // ── Leads: temperature, source, conversion, weekly counts ──
+    const leads = await prisma.lead.findMany({
+      where: { agentId: { in: memberIds } },
+      select: { status: true, source: true, createdAt: true },
+    });
+    const leadTemperature = { HOT: 0, WARM: 0, COLD: 0, unspecified: 0 };
+    const sourceCount = new Map<string, number>();
+    let leadsNewThisWeek = 0;
+    let leadsNewLastWeek = 0;
+    for (const l of leads) {
+      if (l.status === 'HOT') leadTemperature.HOT++;
+      else if (l.status === 'WARM') leadTemperature.WARM++;
+      else if (l.status === 'COLD') leadTemperature.COLD++;
+      else leadTemperature.unspecified++;
+      // Empty / null source rolls up under "אחר" so the chart legend
+      // stays clean (Hebrew label instead of "" or "null").
+      const src = (l.source || '').trim() || 'אחר';
+      sourceCount.set(src, (sourceCount.get(src) || 0) + 1);
+      if (l.createdAt >= thisWeekStart) leadsNewThisWeek++;
+      else if (l.createdAt >= lastWeekStart && l.createdAt < thisWeekStart) {
+        leadsNewLastWeek++;
+      }
+    }
+    const leadSources = Array.from(sourceCount.entries())
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // ── Deals: weekly sparkline, YTD commissions, avg days to sign ──
+    const deals = await prisma.deal.findMany({
+      where: { agentId: { in: memberIds } },
+      select: {
+        status: true, signedAt: true, createdAt: true, updateDate: true,
+        commission: true, closedPrice: true,
+      },
+    });
+
+    // Pre-compute the 12-week buckets so empty weeks still render at 0.
+    const weeklySignedDeals: { weekStart: string; count: number; volume: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const weekStart = new Date(thisWeekStart.getTime() - i * 7 * 24 * 3600 * 1000);
+      weeklySignedDeals.push({
+        weekStart: weekStart.toISOString().slice(0, 10),
+        count: 0,
+        volume: 0,
+      });
+    }
+    let totalCommissionsYtd = 0;
+    const daysToSign: number[] = [];
+    for (const d of deals) {
+      const signed = d.signedAt;
+      const isClosed = d.status === 'SIGNED' || d.status === 'CLOSED';
+      if (isClosed && signed && signed >= startOfYear) {
+        totalCommissionsYtd += d.commission || 0;
+      }
+      if (isClosed && signed && signed >= twelveWeeksAgo) {
+        const dow = signed.getUTCDay();
+        const offset = (dow + 6) % 7;
+        const weekMonday = new Date(Date.UTC(
+          signed.getUTCFullYear(), signed.getUTCMonth(), signed.getUTCDate() - offset,
+        )).toISOString().slice(0, 10);
+        const bucket = weeklySignedDeals.find((w) => w.weekStart === weekMonday);
+        if (bucket) {
+          bucket.count++;
+          bucket.volume += d.closedPrice || 0;
+        }
+      }
+      if (isClosed && signed && d.createdAt) {
+        const ms = signed.getTime() - d.createdAt.getTime();
+        if (ms >= 0) daysToSign.push(ms / (24 * 3600 * 1000));
+      }
+    }
+    const avgDaysToSign = daysToSign.length
+      ? Math.round(daysToSign.reduce((s, n) => s + n, 0) / daysToSign.length)
+      : null;
+
+    // ── PropertyView referrers — top 5 hostnames ──
+    const recentViews = await prisma.propertyView.findMany({
+      where: {
+        property: { agentId: { in: memberIds } },
+        referrer: { not: null },
+      },
+      select: { referrer: true },
+      take: 5000, // cap so a viral property can't blow up the JSON
+    });
+    const hostCount = new Map<string, number>();
+    for (const v of recentViews) {
+      const ref = v.referrer;
+      if (!ref) continue;
+      try {
+        const host = new URL(ref).hostname;
+        if (host) hostCount.set(host, (hostCount.get(host) || 0) + 1);
+      } catch {
+        // Malformed referrer — skip rather than 500.
+      }
+    }
+    const topReferrers = Array.from(hostCount.entries())
+      .map(([host, count]) => ({ host, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // ── Inquiry → lead conversion ratio ──
+    // Office's total inquiries vs. total leads. Avoids divide-by-zero
+    // by returning 0 when there were no inquiries.
+    const [inquiryCount, leadCount] = await Promise.all([
+      prisma.propertyInquiry.count({
+        where: { property: { agentId: { in: memberIds } } },
+      }),
+      prisma.lead.count({ where: { agentId: { in: memberIds } } }),
+    ]);
+    const inquiryToLeadConvRate = inquiryCount > 0
+      ? Math.min(1, leadCount / inquiryCount)
+      : 0;
+
+    return {
+      propertiesByCity,
+      medianSalePriceByCity,
+      medianRentPriceByCity,
+      leadTemperature,
+      leadSources,
+      roomsDistribution,
+      priceBands,
+      weeklySignedDeals,
+      totalCommissionsYtd,
+      topReferrers,
+      inquiryToLeadConvRate,
+      avgDaysToSign,
+      assetClassSplit: { residential, commercial },
+      newThisWeek: { leads: leadsNewThisWeek, properties: propertiesNewThisWeek },
+      newLastWeek: { leads: leadsNewLastWeek, properties: propertiesNewLastWeek },
+    };
+  });
 };
+
+// Numeric room counts (Lead.rooms is a free-form string but
+// Property.rooms is Float?) → "1" / "2" / "3" / "4" / "5" / "6+"
+// bucket. Anything missing or below 1 falls into "1" so the histogram
+// keeps a single entry per row.
+function roomKeyOf(rooms: number | null | undefined): string {
+  if (rooms == null) return '1';
+  const rounded = Math.round(rooms);
+  if (rounded <= 1) return '1';
+  if (rounded >= 6) return '6+';
+  return String(rounded);
+}
+
+// Median per { city → number[] } map. Bucket only included when it
+// has count ≥ 2 — single-property cities aren't a real "median" and
+// would clutter the table. Even-length sets average the two middle
+// values, matching the standard statistical definition.
+function medianBuckets(byCity: Map<string, number[]>): Array<{ city: string; median: number; count: number }> {
+  const out: Array<{ city: string; median: number; count: number }> = [];
+  for (const [city, prices] of byCity.entries()) {
+    if (prices.length < 2) continue;
+    const sorted = prices.slice().sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 === 1
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+    out.push({ city, median, count: sorted.length });
+  }
+  out.sort((a, b) => b.count - a.count);
+  return out;
+}
