@@ -19,14 +19,18 @@
 // breadcrumb back-button, collapsed sidebar state, MobileMoreSheet
 // (superseded by the design's "עוד" tab → /settings).
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home, Users, Building2, MessageSquare, Crown, CalendarDays, Sparkles,
   BarChart2, Banknote, Upload, UsersRound, Settings,
   Bell, Search, Plus, MessageCircle, LogOut, Menu, X,
+  ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
+  Activity as ActivityIcon, Tag, Download as DownloadIcon, Heart,
+  Star,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
+import api from '../lib/api';
 import { isPopoutWindow } from '../lib/popout';
 import OfflineBanner from './OfflineBanner';
 import Yad2ScanBanner from './Yad2ScanBanner';
@@ -43,29 +47,39 @@ const DT = {
   muted: '#6b6356',
   gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
   border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
-  sidebarBg: '#544433',
+  // Sidebar palette — a touch brighter than the original #544433
+  // espresso so gold accents pop without the brown reading near-black.
+  sidebarBg: '#6b5841',
   sidebarInk: '#f5ecd8',
-  sidebarMuted: '#bfae91',
+  sidebarMuted: '#c9b99a',
 };
+
+const SIDEBAR_W = 216;  // a touch narrower than the bundle's 240
+const SIDEBAR_W_COLLAPSED = 68;
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
 
 const PRIMARY_NAV = [
-  { k: 'dashboard',   to: '/dashboard',          label: 'לוח בקרה',  Icon: Home },
-  { k: 'leads',       to: '/customers',          label: 'לידים',       Icon: Users },
-  { k: 'properties',  to: '/properties',         label: 'נכסים',       Icon: Building2 },
-  { k: 'owners',      to: '/owners',             label: 'בעלים',       Icon: Crown },
-  { k: 'deals',       to: '/deals',              label: 'עסקאות',      Icon: Banknote },
-  { k: 'calendar',    to: '/reminders',          label: 'יומן',        Icon: CalendarDays },
-  { k: 'ai',          to: '/integrations/yad2',  label: 'Estia AI',    Icon: Sparkles, premium: true },
-  { k: 'reports',     to: '/reports',            label: 'דוחות',       Icon: BarChart2 },
-  { k: 'inbox',       to: '/admin/chats',        label: 'הודעות',      Icon: MessageSquare, adminOnly: true },
+  { k: 'dashboard',   to: '/dashboard',  label: 'לוח בקרה', Icon: Home },
+  { k: 'leads',       to: '/customers',  label: 'לידים',      Icon: Users },
+  { k: 'properties',  to: '/properties', label: 'נכסים',      Icon: Building2 },
+  { k: 'owners',      to: '/owners',     label: 'בעלים',      Icon: Crown },
+  { k: 'deals',       to: '/deals',      label: 'עסקאות',     Icon: Banknote },
+  { k: 'calendar',    to: '/reminders',  label: 'יומן',       Icon: CalendarDays },
+  { k: 'transfers',   to: '/transfers',  label: 'העברות',     Icon: ArrowLeftRight },
+  { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
+  { k: 'activity',    to: '/activity',   label: 'פעילות',     Icon: ActivityIcon },
+  { k: 'inbox',       to: '/admin/chats', label: 'הודעות צ׳אט', Icon: MessageSquare, adminOnly: true },
 ];
 const TOOL_NAV = [
-  { k: 'import',    to: '/import',    label: 'ייבוא אקסל', Icon: Upload },
-  { k: 'team',      to: '/office',    label: 'צוות',        Icon: UsersRound },
-  { k: 'settings',  to: '/settings',  label: 'הגדרות',      Icon: Settings },
+  { k: 'yad2',      to: '/integrations/yad2', label: 'ייבוא מ-Yad2', Icon: DownloadIcon, premium: true },
+  { k: 'import',    to: '/import',            label: 'ייבוא אקסל',    Icon: Upload },
+  { k: 'calculator', to: '/calculator',       label: 'מחשבון',         Icon: Calculator },
+  { k: 'templates',  to: '/templates',        label: 'תבניות',         Icon: FileText },
+  { k: 'office',     to: '/office',           label: 'משרד / צוות',    Icon: UsersRound },
+  { k: 'tags',       to: '/settings/tags',    label: 'ניהול תגיות',    Icon: Tag },
+  { k: 'settings',   to: '/settings',         label: 'הגדרות',         Icon: Settings },
 ];
 
 // ─── Responsive hook ────────────────────────────────────────
@@ -85,20 +99,62 @@ function useIsNarrow() {
 }
 
 export default function Layout({ onLogout }) {
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('estia-sidebar-collapsed') === '1'; }
+    catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('estia-sidebar-collapsed', collapsed ? '1' : '0'); }
+    catch { /* ignore */ }
+  }, [collapsed]);
+
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const narrow = useIsNarrow();
   const isAdmin = user && ADMIN_EMAILS.has(user.email);
 
-  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
+  // ─── Favorites (restored from the previous layout) ─────────────
+  const [favorites, setFavorites] = useState([]);
   useEffect(() => {
-    if (!drawerOpen) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') setDrawerOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [drawerOpen]);
+    if (!user?.id) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const favRes = await api.listFavorites();
+        const favItems = (favRes?.items || []).slice(0, 5);
+        if (!favItems.length) { if (!cancelled) setFavorites([]); return; }
+        const [propsRes, leadsRes, ownersRes] = await Promise.all([
+          api.listProperties({ mine: '1' }).catch(() => ({ items: [] })),
+          api.listLeads().catch(() => ({ items: [] })),
+          api.listOwners().catch(() => ({ items: [] })),
+        ]);
+        const byId = {
+          PROPERTY: new Map((propsRes?.items || []).map((p) => [p.id, p])),
+          LEAD:     new Map((leadsRes?.items || []).map((l) => [l.id, l])),
+          OWNER:    new Map((ownersRes?.items || []).map((o) => [o.id, o])),
+        };
+        const hydrated = favItems.map((fav) => {
+          const entity = byId[fav.entityType]?.get(fav.entityId);
+          if (!entity) return null;
+          if (fav.entityType === 'PROPERTY') {
+            const street = [entity.street, entity.number].filter(Boolean).join(' ').trim();
+            const label = [street || entity.address || 'נכס', entity.city].filter(Boolean).join(', ');
+            return { key: `P-${fav.entityId}`, label, to: `/properties/${fav.entityId}` };
+          }
+          if (fav.entityType === 'LEAD') {
+            return { key: `L-${fav.entityId}`, label: entity.name || 'ליד', to: `/customers?selected=${fav.entityId}` };
+          }
+          if (fav.entityType === 'OWNER') {
+            return { key: `O-${fav.entityId}`, label: entity.name || 'בעלים', to: `/owners/${fav.entityId}` };
+          }
+          return null;
+        }).filter(Boolean);
+        if (!cancelled) setFavorites(hydrated);
+      } catch { /* favorites are best-effort */ }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // Public share pages (/p/:id) skip the entire shell.
   if (location.pathname.startsWith('/p/')) return <Outlet />;
@@ -131,22 +187,18 @@ export default function Layout({ onLogout }) {
 
       {!narrow && (
         <Sidebar
-          primary={primary} tools={TOOL_NAV}
+          primary={primary} tools={TOOL_NAV} favorites={favorites}
           location={location}
           agentName={agentName} agentInitial={agentInitial} agentSub={agentSub}
           onLogout={onLogout}
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed((v) => !v)}
         />
       )}
 
-      {narrow && drawerOpen && (
-        <MobileDrawer
-          primary={primary} tools={TOOL_NAV}
-          location={location}
-          agentName={agentName} agentInitial={agentInitial} agentSub={agentSub}
-          onLogout={onLogout}
-          onClose={() => setDrawerOpen(false)}
-        />
-      )}
+      {/* Mobile: no hamburger drawer. All navigation lives on the
+          bottom TabBar; the "עוד" tab opens a full-screen sheet with
+          the complete nav tree. Cleaner than two entry points. */}
 
       <div style={{
         flex: 1, minWidth: 0,
@@ -155,10 +207,9 @@ export default function Layout({ onLogout }) {
       }}>
         <Topbar
           narrow={narrow}
-          onOpenDrawer={() => setDrawerOpen(true)}
           onOpenPalette={openPalette}
           onNewLead={() => navigate('/customers/new')}
-          onOpenReminders={() => navigate('/reminders')}
+          user={user}
         />
         <main style={{ flex: 1, minWidth: 0, background: DT.cream }}>
           <Outlet />
@@ -166,135 +217,162 @@ export default function Layout({ onLogout }) {
       </div>
 
       {narrow && <QuickCreateFab />}
-      {narrow && <MobileTabBar />}
+      {narrow && (
+        <MobileTabBar
+          primary={primary}
+          tools={TOOL_NAV}
+          favorites={favorites}
+          onLogout={onLogout}
+          agentName={agentName}
+          agentInitial={agentInitial}
+          agentSub={agentSub}
+        />
+      )}
     </div>
   );
 }
 
 // ═══ Sidebar (desktop) ═══════════════════════════════════════════
 function Sidebar(p) {
+  const width = p.collapsed ? SIDEBAR_W_COLLAPSED : SIDEBAR_W;
   return (
     <aside style={{
-      width: 240, flexShrink: 0, background: DT.sidebarBg, color: DT.sidebarInk,
-      display: 'flex', flexDirection: 'column', padding: '22px 0',
+      width, flexShrink: 0, background: DT.sidebarBg, color: DT.sidebarInk,
+      display: 'flex', flexDirection: 'column', padding: '18px 0',
       height: '100vh', position: 'sticky', top: 0,
+      transition: 'width 200ms ease',
     }}>
       <SidebarInner {...p} />
+      <HiddenScrollbarStyles />
     </aside>
   );
 }
 
-// ═══ Sidebar (mobile drawer) ═════════════════════════════════════
-function MobileDrawer(p) {
+// Utility: inject a scoped style block that kills the scrollbar inside
+// the sidebar's nav while keeping it scrollable. Placed once here so
+// both the sticky sidebar and the mobile drawer inherit it.
+function HiddenScrollbarStyles() {
   return (
-    <div
-      role="presentation"
-      onClick={p.onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 80,
-        background: 'rgba(20,17,13,0.45)', backdropFilter: 'blur(2px)',
-        animation: 'estia-drawer-fade 160ms ease-out',
-      }}
-    >
-      <aside
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'fixed', top: 0, bottom: 0, insetInlineEnd: 0, zIndex: 81,
-          width: 260, background: DT.sidebarBg, color: DT.sidebarInk,
-          boxShadow: '-20px 0 60px rgba(20,17,13,0.4)',
-          display: 'flex', flexDirection: 'column', padding: '22px 0',
-          animation: 'estia-drawer-slide 220ms ease-out',
-        }}
-      >
-        <button
-          type="button"
-          onClick={p.onClose}
-          aria-label="סגור תפריט"
-          style={{
-            position: 'absolute', top: 14, insetInlineStart: 12,
-            background: 'transparent', border: 'none', color: DT.sidebarInk,
-            cursor: 'pointer', padding: 6, display: 'inline-flex',
-          }}
-        ><X size={18} /></button>
-        <SidebarInner {...p} />
-      </aside>
-      <style>{`
-        @keyframes estia-drawer-fade { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes estia-drawer-slide {
-          from { transform: translateX(-100%); }
-          to   { transform: translateX(0); }
-        }
-      `}</style>
-    </div>
+    <style>{`
+      .estia-sidebar-nav { scrollbar-width: none; -ms-overflow-style: none; }
+      .estia-sidebar-nav::-webkit-scrollbar { width: 0; height: 0; display: none; }
+    `}</style>
   );
 }
 
-function SidebarInner({ primary, tools, location, agentName, agentInitial, agentSub, onLogout }) {
+
+function SidebarInner({
+  primary, tools, favorites = [],
+  location, agentName, agentInitial, agentSub,
+  onLogout, collapsed = false, onToggleCollapse,
+}) {
   const isActive = (to) => {
     if (to === '/dashboard') return location.pathname === '/dashboard' || location.pathname === '/';
     return location.pathname === to || location.pathname.startsWith(`${to}/`);
   };
   return (
     <>
-      {/* Brand */}
+      {/* Brand + collapse toggle */}
       <div style={{
-        padding: '0 22px 22px', display: 'flex', alignItems: 'center', gap: 10,
+        padding: `0 ${collapsed ? 14 : 18}px 18px`,
+        display: 'flex', alignItems: 'center', gap: 10,
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
-        <NavLink to="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flex: 1 }}>
+        <NavLink to="/dashboard" style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          textDecoration: 'none', flex: 1, minWidth: 0,
+        }}>
           <div style={{
             width: 34, height: 34, borderRadius: 9,
             background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
             display: 'grid', placeItems: 'center', color: DT.ink,
-            fontWeight: 900, fontSize: 17, letterSpacing: -1,
+            fontWeight: 900, fontSize: 17, letterSpacing: -1, flexShrink: 0,
           }}>E</div>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: -0.3 }}>Estia</div>
-            <div style={{ fontSize: 10, color: DT.sidebarMuted, fontWeight: 600 }}>נדל״ן AI</div>
-          </div>
+          {!collapsed && (
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: -0.3 }}>Estia</div>
+              <div style={{ fontSize: 10, color: DT.sidebarMuted, fontWeight: 600 }}>נדל״ן AI</div>
+            </div>
+          )}
         </NavLink>
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+            title={collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+            style={{
+              background: 'transparent', border: 'none',
+              color: DT.sidebarMuted, cursor: 'pointer', padding: 6,
+              display: 'inline-flex', flexShrink: 0,
+            }}
+          >
+            {collapsed ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
+          </button>
+        )}
       </div>
 
-      <nav style={{ flex: 1, padding: '14px 12px', overflow: 'auto' }}>
-        <SectionLabel>עבודה יומיומית</SectionLabel>
+      <nav className="estia-sidebar-nav" style={{
+        flex: 1, padding: `12px ${collapsed ? 8 : 10}px`,
+        overflowY: 'auto', overflowX: 'hidden',
+      }}>
+        {!collapsed && <SectionLabel>עבודה יומיומית</SectionLabel>}
         {primary.map((item) => (
-          <NavRow key={item.k} item={item} active={isActive(item.to)} />
+          <NavRow key={item.k} item={item} active={isActive(item.to)} collapsed={collapsed} />
         ))}
-        <div style={{ height: 12 }} />
-        <SectionLabel>כלים</SectionLabel>
+        <div style={{ height: 10 }} />
+        {!collapsed && <SectionLabel>כלים</SectionLabel>}
         {tools.map((item) => (
-          <NavRow key={item.k} item={item} active={isActive(item.to)} tight />
+          <NavRow key={item.k} item={item} active={isActive(item.to)} collapsed={collapsed} tight />
         ))}
+        {favorites.length > 0 && (
+          <>
+            <div style={{ height: 10 }} />
+            {!collapsed && <SectionLabel>המועדפים</SectionLabel>}
+            {favorites.map((fav) => (
+              <NavRow
+                key={fav.key}
+                item={{ to: fav.to, label: fav.label, Icon: Heart }}
+                active={isActive(fav.to)}
+                collapsed={collapsed}
+                tight
+              />
+            ))}
+          </>
+        )}
       </nav>
 
-      {/* Upgrade card */}
-      <div style={{ padding: '12px 14px' }}>
-        <div style={{
-          background: `linear-gradient(160deg, rgba(180,139,76,0.25), rgba(180,139,76,0.1))`,
-          border: '1px solid rgba(180,139,76,0.3)', borderRadius: 12, padding: 12,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <Sparkles size={13} />
-            <div style={{ fontSize: 12, fontWeight: 800, color: DT.goldLight }}>Estia Premium</div>
+      {/* Upgrade card (hidden when collapsed to preserve width) */}
+      {!collapsed && (
+        <div style={{ padding: '10px 12px' }}>
+          <div style={{
+            background: `linear-gradient(160deg, rgba(180,139,76,0.28), rgba(180,139,76,0.12))`,
+            border: '1px solid rgba(180,139,76,0.32)', borderRadius: 12, padding: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <Sparkles size={13} />
+              <div style={{ fontSize: 12, fontWeight: 800, color: DT.goldLight }}>Estia Premium</div>
+            </div>
+            <div style={{ fontSize: 10, color: DT.sidebarInk, opacity: 0.85, lineHeight: 1.5, marginBottom: 8 }}>
+              פתיחת AI, תיאורי נכסים אוטומטיים, סיכומי פגישות קוליים ועוד
+            </div>
+            <a
+              href="mailto:hello@estia.co.il?subject=שדרוג ל-Premium"
+              style={{
+                ...FONT, display: 'block', textAlign: 'center',
+                background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+                color: DT.ink, border: 'none', padding: '7px 10px', borderRadius: 7,
+                fontSize: 11, fontWeight: 800, textDecoration: 'none',
+              }}
+            >שדרג ל-Premium</a>
           </div>
-          <div style={{ fontSize: 10, color: DT.sidebarInk, opacity: 0.85, lineHeight: 1.5, marginBottom: 8 }}>
-            פתיחת AI, תיאורי נכסים אוטומטיים, סיכומי פגישות קוליים ועוד
-          </div>
-          <a
-            href="mailto:hello@estia.co.il?subject=שדרוג ל-Premium"
-            style={{
-              ...FONT, display: 'block', textAlign: 'center',
-              background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
-              color: DT.ink, border: 'none', padding: '7px 10px', borderRadius: 7,
-              fontSize: 11, fontWeight: 800, textDecoration: 'none',
-            }}
-          >שדרג ל-Premium</a>
         </div>
-      </div>
+      )}
 
       {/* Agent row */}
       <div style={{
-        padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.06)',
+        padding: `10px ${collapsed ? 10 : 14}px 12px`,
+        borderTop: '1px solid rgba(255,255,255,0.06)',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
         <NavLink to="/profile" style={{
@@ -302,26 +380,30 @@ function SidebarInner({ primary, tools, location, agentName, agentInitial, agent
           display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13,
           textDecoration: 'none', flexShrink: 0,
         }}>{agentInitial}</NavLink>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 12, fontWeight: 700, color: '#fff',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>{agentName}</div>
-          <div style={{
-            fontSize: 10, color: DT.sidebarMuted,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>{agentSub}</div>
-        </div>
-        <button
-          type="button"
-          onClick={onLogout}
-          title="התנתקות"
-          aria-label="התנתקות"
-          style={{
-            background: 'transparent', border: 'none', color: DT.sidebarMuted,
-            cursor: 'pointer', padding: 4, display: 'inline-flex',
-          }}
-        ><LogOut size={16} /></button>
+        {!collapsed && (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: 12, fontWeight: 700, color: '#fff',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{agentName}</div>
+            <div style={{
+              fontSize: 10, color: DT.sidebarMuted,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{agentSub}</div>
+          </div>
+        )}
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={onLogout}
+            title="התנתקות"
+            aria-label="התנתקות"
+            style={{
+              background: 'transparent', border: 'none', color: DT.sidebarMuted,
+              cursor: 'pointer', padding: 4, display: 'inline-flex',
+            }}
+          ><LogOut size={16} /></button>
+        )}
       </div>
     </>
   );
@@ -337,18 +419,25 @@ function SectionLabel({ children }) {
   );
 }
 
-function NavRow({ item, active, tight }) {
+function NavRow({ item, active, tight, collapsed }) {
   const { Icon } = item;
   return (
-    <NavLink to={item.to} style={{
-      ...FONT,
-      width: '100%', display: 'flex', alignItems: 'center', gap: 11,
-      padding: tight ? '9px 12px' : '10px 12px',
-      background: active ? 'rgba(180,139,76,0.18)' : 'transparent',
-      borderRadius: 9, color: active ? DT.goldLight : DT.sidebarInk,
-      fontSize: 13, fontWeight: active ? 700 : 500,
-      marginBottom: 1, position: 'relative', textDecoration: 'none',
-    }}>
+    <NavLink
+      to={item.to}
+      title={collapsed ? item.label : undefined}
+      style={{
+        ...FONT,
+        width: '100%',
+        display: 'flex', alignItems: 'center',
+        gap: collapsed ? 0 : 11,
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        padding: collapsed ? '10px 0' : tight ? '9px 12px' : '10px 12px',
+        background: active ? 'rgba(180,139,76,0.18)' : 'transparent',
+        borderRadius: 9, color: active ? DT.goldLight : DT.sidebarInk,
+        fontSize: 13, fontWeight: active ? 700 : 500,
+        marginBottom: 2, position: 'relative', textDecoration: 'none',
+      }}
+    >
       {active && (
         <span style={{
           position: 'absolute', insetInlineEnd: 0, top: 8, bottom: 8,
@@ -356,20 +445,71 @@ function NavRow({ item, active, tight }) {
         }} />
       )}
       <Icon size={tight ? 16 : 17} aria-hidden="true" />
-      <span style={{ flex: 1 }}>{item.label}</span>
-      {item.badge && (
+      {!collapsed && <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>}
+      {!collapsed && item.badge && (
         <span style={{
           background: DT.gold, color: DT.ink, fontSize: 10, fontWeight: 800,
           padding: '2px 6px', borderRadius: 99, minWidth: 18, textAlign: 'center',
         }}>{item.badge}</span>
       )}
-      {item.premium && <Sparkles size={11} aria-hidden="true" />}
+      {!collapsed && item.premium && <Sparkles size={11} aria-hidden="true" />}
     </NavLink>
   );
 }
 
 // ═══ Topbar ══════════════════════════════════════════════════════
-function Topbar({ narrow, onOpenDrawer, onOpenPalette, onNewLead, onOpenReminders }) {
+function Topbar({ narrow, onOpenPalette, onNewLead, user }) {
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifs, setNotifs] = useState([]);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const notifAnchorRef = useRef(null);
+
+  useEffect(() => {
+    if (!notifOpen) return undefined;
+    const onDoc = (e) => {
+      if (notifAnchorRef.current && !notifAnchorRef.current.contains(e.target)) setNotifOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    const onKey = (e) => { if (e.key === 'Escape') setNotifOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [notifOpen]);
+
+  // Load notifications on first open. Uses /reminders list + /activity
+  // as a stand-in for a dedicated notifications endpoint — both return
+  // recent items the agent hasn't acted on yet.
+  const loadNotifs = async () => {
+    setLoadingNotifs(true);
+    try {
+      const [rem, act] = await Promise.all([
+        api.listReminders?.({ upcoming: '1' }).catch(() => null),
+        api.activityLog?.({ limit: 10 }).catch(() => null),
+      ]);
+      const reminderItems = (rem?.items || []).slice(0, 5).map((r) => ({
+        key: `r-${r.id}`, kind: 'reminder',
+        title: r.title || 'תזכורת', when: r.dueAt || r.createdAt,
+        to: '/reminders',
+      }));
+      const activityItems = (act?.items || []).slice(0, 5).map((a) => ({
+        key: `a-${a.id}`, kind: 'activity',
+        title: a.summary || `${a.verb} ${a.entityType}`, when: a.createdAt,
+        to: '/activity',
+      }));
+      setNotifs([...reminderItems, ...activityItems]);
+    } catch { setNotifs([]); }
+    finally { setLoadingNotifs(false); }
+  };
+
+  const toggleNotifs = () => {
+    setNotifOpen((v) => {
+      if (!v) loadNotifs();
+      return !v;
+    });
+  };
+
   return (
     <header style={{
       flexShrink: 0, borderBottom: `1px solid ${DT.border}`,
@@ -377,18 +517,6 @@ function Topbar({ narrow, onOpenDrawer, onOpenPalette, onNewLead, onOpenReminder
       display: 'flex', alignItems: 'center', gap: narrow ? 10 : 20,
       background: DT.cream, position: 'sticky', top: 0, zIndex: 20,
     }}>
-      {narrow && (
-        <button
-          type="button"
-          onClick={onOpenDrawer}
-          aria-label="תפריט"
-          style={{
-            background: DT.white, border: `1px solid ${DT.border}`,
-            width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
-            color: DT.ink, display: 'inline-grid', placeItems: 'center',
-          }}
-        ><Menu size={18} /></button>
-      )}
       <button
         type="button"
         onClick={onOpenPalette}
@@ -420,28 +548,37 @@ function Topbar({ narrow, onOpenDrawer, onOpenPalette, onNewLead, onOpenReminder
             }}
           ><Plus size={14} /> ליד חדש</button>
         )}
-        <button
-          type="button"
-          onClick={onOpenReminders}
-          aria-label="התראות"
-          style={{
-            background: DT.white, border: `1px solid ${DT.border}`,
-            width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
-            color: DT.ink, display: 'grid', placeItems: 'center', position: 'relative',
-          }}
-        >
-          <Bell size={15} />
-          <span style={{
-            position: 'absolute', top: 7, insetInlineStart: 9,
-            width: 7, height: 7, borderRadius: 99, background: DT.gold,
-            border: `2px solid ${DT.white}`,
-          }} />
-        </button>
+        <div ref={notifAnchorRef} style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={toggleNotifs}
+            aria-label="התראות"
+            aria-expanded={notifOpen}
+            style={{
+              background: DT.white, border: `1px solid ${DT.border}`,
+              width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
+              color: DT.ink, display: 'grid', placeItems: 'center', position: 'relative',
+            }}
+          >
+            <Bell size={15} />
+            {notifs.length > 0 && (
+              <span style={{
+                position: 'absolute', top: 7, insetInlineStart: 9,
+                width: 7, height: 7, borderRadius: 99, background: DT.gold,
+                border: `2px solid ${DT.white}`,
+              }} />
+            )}
+          </button>
+          {notifOpen && (
+            <NotificationsPopover items={notifs} loading={loadingNotifs} onClose={() => setNotifOpen(false)} />
+          )}
+        </div>
         <a
-          href="https://wa.me/972501234567"
+          href={`https://wa.me/972501234567?text=${encodeURIComponent(`שלום, אני ${user?.displayName || ''} — צריך/ה תמיכה ב-Estia.`)}`}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="WhatsApp"
+          aria-label="שיחה עם הצוות"
+          title="שיחה עם הצוות"
           style={{
             background: DT.white, border: `1px solid ${DT.border}`,
             width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
@@ -452,5 +589,55 @@ function Topbar({ narrow, onOpenDrawer, onOpenPalette, onNewLead, onOpenReminder
         </a>
       </div>
     </header>
+  );
+}
+
+function NotificationsPopover({ items, loading, onClose }) {
+  return (
+    <div style={{
+      position: 'absolute', top: 'calc(100% + 6px)', insetInlineStart: 0,
+      width: 340, maxWidth: 'calc(100vw - 24px)',
+      background: DT.white, border: `1px solid ${DT.border}`,
+      borderRadius: 12, boxShadow: '0 14px 34px rgba(30,26,20,0.14)',
+      overflow: 'hidden', zIndex: 30,
+    }}>
+      <div style={{
+        padding: '12px 14px', borderBottom: `1px solid ${DT.border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 800 }}>התראות</div>
+        <NavLink to="/reminders" onClick={onClose} style={{ fontSize: 11, color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>הכול ←</NavLink>
+      </div>
+      <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+        {loading && <div style={{ padding: 16, color: DT.muted, fontSize: 12 }}>טוען…</div>}
+        {!loading && items.length === 0 && (
+          <div style={{ padding: 16, color: DT.muted, fontSize: 12 }}>אין התראות חדשות</div>
+        )}
+        {!loading && items.map((it) => (
+          <NavLink key={it.key} to={it.to} onClick={onClose} style={{
+            display: 'flex', gap: 10, padding: '10px 14px',
+            borderBottom: `1px solid ${DT.border}`,
+            textDecoration: 'none', color: DT.ink,
+          }}>
+            <span style={{
+              width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+              background: DT.goldSoft, color: DT.gold, display: 'grid', placeItems: 'center',
+            }}>
+              {it.kind === 'reminder' ? <Bell size={14} /> : <ActivityIcon size={14} />}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {it.title}
+              </div>
+              {it.when && (
+                <div style={{ fontSize: 10, color: DT.muted }}>
+                  {new Date(it.when).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}
+                </div>
+              )}
+            </div>
+          </NavLink>
+        ))}
+      </div>
+    </div>
   );
 }

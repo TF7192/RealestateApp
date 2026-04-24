@@ -67,7 +67,7 @@ const OnboardingTour = lazy(() => import('./components/OnboardingTour'));
 // landing's CSS + hero weight; same for authed sessions.
 const Landing = lazy(() => import('./pages/landing/Landing'));
 const LegalPage = lazy(() => import('./pages/landing/LegalPage'));
-import ChatWidget from './components/ChatWidget';
+// ChatWidget removed (see Cream & Gold redesign) — topbar developer-chat button replaces it.
 import Yad2ScanBanner from './components/Yad2ScanBanner';
 import MarketScanBanner from './components/MarketScanBanner';
 import { useScrollRestore } from './hooks/mobile';
@@ -348,7 +348,8 @@ function AppRoutes() {
       <Suspense fallback={null}>
         <OnboardingTour />
       </Suspense>
-      <ChatWidget />
+      {/* ChatWidget removed per Cream & Gold redesign — the topbar's
+          developer-chat button replaces the floating bottom-left bubble. */}
       <Yad2ScanBanner />
       <MarketScanBanner />
     </>
