@@ -276,6 +276,17 @@ export const api = {
   createLeadMeeting: (leadId, body) => request(`/integrations/calendar/leads/${leadId}/meetings`, { method: 'POST', body }),
   updateLeadMeeting: (id, body)     => request(`/integrations/calendar/meetings/${id}`, { method: 'PATCH', body }),
   deleteLeadMeeting: (id)           => request(`/integrations/calendar/meetings/${id}`, { method: 'DELETE' }),
+
+  // Sprint 5 / AI — meeting voice summariser. Posts the recorded webm
+  // audio to the server; the server uploads to S3 and asks Anthropic
+  // for a structured summary (`{ summary, actionItems, nextSteps }`).
+  summarizeMeeting: (meetingId, audioFile) => {
+    const fd = new FormData();
+    // Field name `audio` matches the /api/ai/voice-lead convention so
+    // agents handling multipart on the backend stay consistent.
+    fd.append('audio', audioFile, audioFile?.name || 'meeting.webm');
+    return request(`/meetings/${meetingId}/summarize`, { method: 'POST', body: fd });
+  },
   toggleMarketingAction: (id, body) =>
     request(`/properties/${id}/marketing-actions`, { method: 'PUT', body }),
   uploadPropertyImage: (id, file) => {
@@ -573,6 +584,19 @@ export const api = {
   leadMatches:              (leadId) => request(`/leads/${leadId}/matches`),
   propertyMatchingCustomers: (propertyId) => request(`/properties/${propertyId}/matching-customers`),
 
+  // Sprint 5 — AI smart matcher. Unlike the deterministic /matches
+  // endpoints above (hard filter rules), these two ship the full anchor
+  // + inventory to Claude and return the top-5 with a 0-100 score + a
+  // short Hebrew reason per match. Slower (3-10s) and costs a couple
+  // cents per call; gated on ANTHROPIC_API_KEY (503 if unset).
+  // Response shape:
+  //   match-leads:      { matches: [{ lead:     { id, name, ... }, score, reason }] }
+  //   match-properties: { matches: [{ property: { id, city, ... }, score, reason }] }
+  aiMatchLeads:      (propertyId) =>
+    request(`/ai/match-leads?propertyId=${encodeURIComponent(propertyId)}`, { timeoutMs: 60_000, retries: 1 }),
+  aiMatchProperties: (leadId) =>
+    request(`/ai/match-properties?leadId=${encodeURIComponent(leadId)}`, { timeoutMs: 60_000, retries: 1 }),
+
   // Property assignees (J10)
   listPropertyAssignees:    (propertyId) => request(`/properties/${propertyId}/assignees`),
   addPropertyAssignee:      (propertyId, body) =>
@@ -707,6 +731,20 @@ export const api = {
       timeoutMs: 90_000,
     });
   },
+
+  // Sprint 5 — AI property-description generator. Backend calls Claude
+  // Opus 4.7 and returns { description, highlights: string[5] }. 503 if
+  // ANTHROPIC_API_KEY is missing in the deployment environment.
+  generatePropertyDescription: (propertyId) =>
+    request('/ai/describe-property', {
+      method: 'POST',
+      body: { propertyId },
+      // Anthropic inference can take 5-15s; default write timeout is
+      // already 60s — the explicit value here survives future tweaks to
+      // DEFAULT_TIMEOUT_WRITE_MS.
+      timeoutMs: 60_000,
+      retries: 1,
+    }),
 
   // Favorites (B4)
   listFavorites:       (entityType) => {

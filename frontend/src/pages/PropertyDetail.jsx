@@ -62,6 +62,7 @@ import AdvertsPanel from '../components/AdvertsPanel';
 import TagPicker from '../components/TagPicker';
 import RemindersPanel from '../components/RemindersPanel';
 import MatchingList from '../components/MatchingList';
+import AiMatchesDrawer from '../components/AiMatchesDrawer';
 import ActivityPanel from '../components/ActivityPanel';
 import PropertyAgreementsSection from '../components/PropertyAgreementsSection';
 import { useCopyFeedback, useViewportMobile } from '../hooks/mobile';
@@ -339,9 +340,17 @@ export default function PropertyDetail() {
   });
   // 1.5 — Prospect intake dialog open-state
   const [prospectOpen, setProspectOpen] = useState(false);
+  // Sprint 5 — "✨ התאמות חכמות" drawer open-state
+  const [aiMatchesOpen, setAiMatchesOpen] = useState(false);
   // OwnerPicker for swapping the linked Owner without leaving the page.
   const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
   const [ownerSaving, setOwnerSaving] = useState(false);
+  // Sprint 5 — AI description generator state. Holds the latest draft +
+  // highlights while the agent decides whether to save. Keeping it
+  // out-of-property means the agent can preview before committing to
+  // the notes field, and we don't flicker the read-only panel text.
+  const [aiDesc, setAiDesc] = useState(null); // { description, highlights } | null
+  const [aiBusy, setAiBusy] = useState(false);
 
   useEffect(() => {
     api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
@@ -360,6 +369,53 @@ export default function PropertyDetail() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  // Sprint 5 — Ask the backend to draft a marketing description. The
+  // endpoint calls Claude Opus 4.7 and returns {description, highlights}.
+  // We stash the draft in local state first so the agent can accept /
+  // reject before it overwrites `notes`. `useProp` guard prevents the
+  // call from firing before the property has loaded.
+  const handleGenerateDescription = async () => {
+    if (!property?.id || aiBusy) return;
+    setAiBusy(true);
+    try {
+      const res = await api.generatePropertyDescription(property.id);
+      setAiDesc({
+        description: res.description || '',
+        highlights: Array.isArray(res.highlights) ? res.highlights : [],
+      });
+      toast.success('תיאור נוצר בהצלחה');
+    } catch (e) {
+      toast.error(e?.message || 'יצירת התיאור נכשלה');
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  // Commit the draft into the `notes` field via the existing update
+  // endpoint. Keeps the source-of-truth write path identical to the
+  // manual "ערוך הערות" flow — same validation, same audit trail.
+  const handleSaveAiDescription = async () => {
+    if (!aiDesc?.description || !property?.id) return;
+    setAiBusy(true);
+    try {
+      // Bullet points get appended at the bottom of the freeform text
+      // so agents can copy/paste into Yad2 / Madlan without reformatting.
+      const bulletBlock = aiDesc.highlights.length
+        ? '\n\n' + aiDesc.highlights.map((h) => `• ${h}`).join('\n')
+        : '';
+      await api.updateProperty(property.id, {
+        notes: aiDesc.description + bulletBlock,
+      });
+      setAiDesc(null);
+      toast.success('התיאור נשמר');
+      await load();
+    } catch (e) {
+      toast.error(e?.message || 'שמירת התיאור נכשלה');
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   // Clipboard image paste: while on this page, pasted images upload.
   useEffect(() => {
@@ -1335,6 +1391,28 @@ export default function PropertyDetail() {
           )}
         >
           <p className="dc-empty">גלה לקוחות במאגר שהנכס תואם את הפרופיל שלהם</p>
+          {/* Sprint 5 — AI-backed smart matcher sits alongside the
+              deterministic list. Gold gradient button to distinguish it
+              from the deterministic "הצג" CTA above. */}
+          <button
+            type="button"
+            onClick={() => setAiMatchesOpen(true)}
+            aria-label="התאמות חכמות מ-AI"
+            style={{
+              marginTop: 10,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 10,
+              border: 'none',
+              background: `linear-gradient(180deg, ${_DT.goldLight}, ${_DT.gold})`,
+              color: _DT.ink,
+              fontSize: 12, fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 3px 8px rgba(180,139,76,0.25)',
+            }}
+          >
+            <Sparkles size={14} />
+            <span>✨ התאמות חכמות</span>
+          </button>
         </DashCard>
 
         {/* MLS parity — tags (A2) */}
@@ -1583,9 +1661,84 @@ export default function PropertyDetail() {
             ) : (
               <p className="dc-empty">לא הוזנו הערות.</p>
             )}
-            <button className="btn btn-primary" onClick={() => { setPanel(null); navigate(`/properties/${id}/edit`); }}>
-              <Edit3 size={14} />ערוך הערות ומאפיינים
-            </button>
+            {/* Sprint 5 — AI description generator. Draft preview block
+                appears only after a successful generate; the agent can
+                accept (writes to notes) or discard. */}
+            {aiDesc && (
+              <div
+                className="pd-panel-ai-draft"
+                style={{
+                  marginBlock: 16,
+                  padding: 16,
+                  borderRadius: 12,
+                  background: 'rgba(180,139,76,0.08)',
+                  border: '1px solid rgba(180,139,76,0.25)',
+                }}
+              >
+                <h5 style={{ margin: '0 0 8px', color: '#7a5c2c' }}>
+                  <Sparkles size={14} style={{ verticalAlign: 'middle' }} /> טיוטת תיאור מ-AI
+                </h5>
+                <textarea
+                  className="form-textarea"
+                  rows={6}
+                  dir="auto"
+                  value={aiDesc.description}
+                  onChange={(e) => setAiDesc((p) => ({ ...p, description: e.target.value }))}
+                  style={{ width: '100%', marginBottom: 8 }}
+                />
+                {aiDesc.highlights?.length > 0 && (
+                  <ul style={{ margin: '0 0 12px', paddingInlineStart: 20 }}>
+                    {aiDesc.highlights.map((h, i) => (
+                      <li key={i} style={{ color: '#1e1a14', marginBlock: 2 }}>{h}</li>
+                    ))}
+                  </ul>
+                )}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleSaveAiDescription}
+                    disabled={aiBusy || !aiDesc.description.trim()}
+                  >
+                    <Check size={14} /> שמור תיאור
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setAiDesc(null)}
+                    disabled={aiBusy}
+                  >
+                    בטל טיוטה
+                  </button>
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => { setPanel(null); navigate(`/properties/${id}/edit`); }}
+                disabled={aiBusy}
+              >
+                <Edit3 size={14} />ערוך הערות ומאפיינים
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleGenerateDescription}
+                disabled={aiBusy}
+                style={{
+                  background: '#b48b4c',
+                  color: '#ffffff',
+                  borderColor: '#7a5c2c',
+                }}
+                aria-label="יצירת תיאור שיווקי ב-AI"
+                title="יצירת תיאור שיווקי ב-AI"
+              >
+                <Sparkles size={14} />
+                {aiBusy ? 'מייצר…' : 'יצירת תיאור ב-AI'}
+              </button>
+            </div>
           </div>
         </PropertyPanelSheet>
       )}
@@ -1808,6 +1961,14 @@ export default function PropertyDetail() {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+
+      {/* Sprint 5 — AI-backed smart matcher drawer */}
+      {aiMatchesOpen && (
+        <AiMatchesDrawer
+          propertyId={property.id}
+          onClose={() => setAiMatchesOpen(false)}
+        />
       )}
 
       {/* Mobile: keep the sticky bottom action bar */}

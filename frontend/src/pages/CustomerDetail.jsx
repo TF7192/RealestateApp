@@ -23,8 +23,10 @@ import LeadMeetingDialog from '../components/LeadMeetingDialog';
 import TagPicker from '../components/TagPicker';
 import RemindersPanel from '../components/RemindersPanel';
 import MatchingList from '../components/MatchingList';
+import AiMatchesDrawer from '../components/AiMatchesDrawer';
 import CustomerEditDialog from '../components/CustomerEditDialog';
 import ActivityPanel from '../components/ActivityPanel';
+import MeetingSummarizerCard from '../components/MeetingSummarizerCard';
 import { leadMatchesProperty } from './Properties';
 import { primeContactBump } from '../hooks/mobile';
 import { formatPhone } from '../lib/phone';
@@ -63,6 +65,12 @@ export default function CustomerDetail() {
   const [matchCount, setMatchCount] = useState(0);
   const [meetingOpen, setMeetingOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  // Sprint 5 — "✨ התאמות חכמות" drawer open-state
+  const [aiMatchesOpen, setAiMatchesOpen] = useState(false);
+  // Sprint 5 / AI — summariser card hangs off the most-recent meeting
+  // for this lead. Reload with `loadLatestMeeting` after a summarize
+  // roundtrip so the UI reflects the persisted row.
+  const [latestMeeting, setLatestMeeting] = useState(null);
 
   const loadLead = useCallback(async () => {
     setLoading(true);
@@ -94,6 +102,22 @@ export default function CustomerDetail() {
   }, [id, t]);
 
   useEffect(() => { loadLead(); }, [loadLead]);
+
+  // Load the most-recent meeting for this lead so the summariser card
+  // has something to render against. listLeadMeetings returns desc-
+  // ordered rows; we take the first one (most recent by startsAt).
+  const loadLatestMeeting = useCallback(async () => {
+    if (!lead?.id) return;
+    try {
+      const res = await api.listLeadMeetings(lead.id);
+      const items = res?.items || [];
+      setLatestMeeting(items[0] || null);
+    } catch {
+      setLatestMeeting(null);
+    }
+  }, [lead?.id]);
+
+  useEffect(() => { loadLatestMeeting(); }, [loadLatestMeeting]);
 
   // Count matching properties for the gold pill in the header.
   useEffect(() => {
@@ -197,6 +221,28 @@ export default function CustomerDetail() {
           >
             <Calendar size={14} /> {t('detail.toolbar.scheduleMeeting')}
           </button>
+          {/* Sprint 5 — AI-backed smart matcher. Distinct gold-gradient
+              pill so it visually reads as "premium / magic" and doesn't
+              collide with the classic schedule/edit CTAs. */}
+          <button
+            type="button"
+            onClick={() => { haptics.tap(); setAiMatchesOpen(true); }}
+            style={{
+              ...FONT,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '7px 14px', borderRadius: 10,
+              border: 'none',
+              background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+              color: DT.ink,
+              fontSize: 12, fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 3px 8px rgba(180,139,76,0.25)',
+            }}
+            title="התאמות חכמות מ-AI"
+          >
+            <Sparkles size={14} />
+            <span>✨ התאמות חכמות</span>
+          </button>
           <button type="button" onClick={() => { haptics.tap(); setEditOpen(true); }} style={secondaryBtn()} title="ערוך פרטי לקוח">
             <Edit3 size={14} /> ערוך
           </button>
@@ -285,6 +331,12 @@ export default function CustomerDetail() {
           <section style={sectionCard()} aria-label="תזכורות">
             <RemindersPanel leadId={lead.id} />
           </section>
+          {latestMeeting && (
+            <MeetingSummarizerCard
+              meeting={latestMeeting}
+              onUpdated={(m) => setLatestMeeting(m)}
+            />
+          )}
           <section style={sectionCard()} aria-label="פעילות">
             <ActivityPanel entityType="Lead" entityId={lead.id} />
           </section>
@@ -296,7 +348,7 @@ export default function CustomerDetail() {
         <LeadMeetingDialog
           lead={lead}
           onClose={() => setMeetingOpen(false)}
-          onCreated={() => { /* could re-load meeting list here */ }}
+          onCreated={() => { loadLatestMeeting(); }}
         />
       )}
       {editOpen && (
@@ -308,6 +360,12 @@ export default function CustomerDetail() {
             toast.success(t('detail.saved'));
             try { await loadLead(); } catch { /* ignore */ }
           }}
+        />
+      )}
+      {aiMatchesOpen && (
+        <AiMatchesDrawer
+          leadId={lead.id}
+          onClose={() => setAiMatchesOpen(false)}
         />
       )}
     </div>
