@@ -147,6 +147,18 @@ export default function Dashboard() {
   const todayStr = new Intl.DateTimeFormat('he-IL', {
     weekday: 'long', day: 'numeric', month: 'long',
   }).format(new Date());
+  // Time-of-day greeting — local machine time, not server clock.
+  //   05:00-11:59 → בוקר טוב ☀️
+  //   12:00-16:59 → צהריים טובים 🌤️
+  //   17:00-20:59 → ערב טוב 🌇
+  //   21:00-04:59 → לילה טוב 🌙
+  const { greeting, greetingEmoji } = (() => {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 12)  return { greeting: 'בוקר טוב',    greetingEmoji: '☀️' };
+    if (h >= 12 && h < 17) return { greeting: 'צהריים טובים', greetingEmoji: '🌤️' };
+    if (h >= 17 && h < 21) return { greeting: 'ערב טוב',      greetingEmoji: '🌇' };
+    return                         { greeting: 'לילה טוב',    greetingEmoji: '🌙' };
+  })();
 
   const openPremium = () => setPremiumOpen(true);
 
@@ -173,7 +185,7 @@ export default function Dashboard() {
             margin: '4px 0 0',
             overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
-            בוקר טוב {firstName} ☀️
+            {greeting} {firstName} {greetingEmoji}
           </h1>
           <div style={{ fontSize: isMobile ? 12 : 14, color: DT.muted, marginTop: 4, lineHeight: 1.5 }}>
             יש לכם <strong style={{ color: DT.gold }}>{meetings.length} פגישות</strong> השבוע ·{' '}
