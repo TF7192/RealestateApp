@@ -386,6 +386,10 @@ export const api = {
     fd.append('file', file);
     return request(`/agreements/${id}/upload`, { method: 'POST', body: fd });
   },
+  // Download URL for the Agreement PDF. If a signed file is attached
+  // the endpoint redirects to its storage URL; otherwise it streams a
+  // server-rendered draft PDF. Browser hits this directly.
+  agreementPdfUrl: (id) => `${BASE}/agreements/${encodeURIComponent(id)}/pdf`,
 
   // Sprint 6 / ScreenContract — in-house digital contract e-sign.
   // EXCLUSIVITY / BROKERAGE / OFFER contracts rendered + signed via

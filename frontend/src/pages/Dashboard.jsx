@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Users, Calendar as CalendarIcon, Banknote, BarChart2,
-  Sparkles, X, Star,
+  Sparkles, X, Star, Activity as ActivityIcon,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -192,18 +192,36 @@ export default function Dashboard() {
             <strong style={{ color: DT.gold }}>{hotLeads.length} לידים חמים</strong> ממתינים למענה
           </div>
         </div>
-        <button
-          type="button"
-          onClick={openPremium}
-          style={{
-            ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
-            padding: isMobile ? '8px 11px' : '10px 14px', borderRadius: 10, cursor: 'pointer',
-            fontSize: isMobile ? 12 : 13, fontWeight: 700,
-            display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.ink,
-          }}
-        >
-          <Sparkles size={14} /> {isMobile ? 'Estia AI' : 'שאל את Estia AI'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* User ask 2026-04-25 — /activity moved out of the sidebar;
+              add the quick-access link here so agents still reach the
+              event stream in one click from the dashboard. */}
+          <Link
+            to="/activity"
+            title="יומן פעילות"
+            style={{
+              ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
+              padding: isMobile ? '8px 11px' : '10px 14px', borderRadius: 10,
+              fontSize: isMobile ? 12 : 13, fontWeight: 700,
+              display: 'inline-flex', gap: 6, alignItems: 'center',
+              color: DT.ink, textDecoration: 'none',
+            }}
+          >
+            <ActivityIcon size={14} /> {isMobile ? 'פעילות' : 'יומן פעילות'}
+          </Link>
+          <button
+            type="button"
+            onClick={openPremium}
+            style={{
+              ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
+              padding: isMobile ? '8px 11px' : '10px 14px', borderRadius: 10, cursor: 'pointer',
+              fontSize: isMobile ? 12 : 13, fontWeight: 700,
+              display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.ink,
+            }}
+          >
+            <Sparkles size={14} /> {isMobile ? 'Estia AI' : 'שאל את Estia AI'}
+          </button>
+        </div>
       </div>
 
       {/* KPI row — 2×2 grid on mobile so four chips fit without

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 // F-6.4 — focus trap for modals. Keeps Tab / Shift+Tab inside the
 // dialog, closes on Escape, restores focus to the element that had it
@@ -21,6 +21,17 @@ const FOCUSABLE = [
 ].join(', ');
 
 export function useFocusTrap(ref, { onEscape } = {}) {
+  // Callers pass `onEscape` as a fresh arrow function on every
+  // render (`{ onEscape: () => setOpen(false) }`). If we listed it
+  // in the effect's deps, the effect would teardown + re-run on
+  // every parent re-render — i.e. every keystroke in a chat
+  // textarea — and the teardown's `prevActive.focus()` call would
+  // yank focus right back out of the textarea, then `focusFirst()`
+  // would fire again and the caret would disappear. Stash the
+  // callback in a ref so the effect only depends on `ref`.
+  const onEscapeRef = useRef(onEscape);
+  useEffect(() => { onEscapeRef.current = onEscape; }, [onEscape]);
+
   useEffect(() => {
     const panel = ref?.current;
     if (!panel) return undefined;
@@ -41,9 +52,9 @@ export function useFocusTrap(ref, { onEscape } = {}) {
     const raf = requestAnimationFrame(focusFirst);
 
     const handleKey = (e) => {
-      if (e.key === 'Escape' && onEscape) {
+      if (e.key === 'Escape' && onEscapeRef.current) {
         e.stopPropagation();
-        onEscape();
+        onEscapeRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -72,7 +83,9 @@ export function useFocusTrap(ref, { onEscape } = {}) {
       // Restore focus to the trigger; important for screen reader context.
       try { prevActive?.focus({ preventScroll: true }); } catch { /* ignore */ }
     };
-  }, [ref, onEscape]);
+    // Intentionally omit onEscape from deps — see ref pattern above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ref]);
 }
 
 export default useFocusTrap;

@@ -166,6 +166,16 @@ function quotaExceededReply(reply: any, quota: QuotaSnapshot) {
 // retry, and (b) the cost is just one wasted quota slot. Jobs are
 // GC'd 30min after completion so the map can't grow unbounded.
 type Yad2JobKind = 'agency-preview' | 'agency-import';
+// Progress report surfaced via /jobs/:id so the frontend bar can show
+// the real stage instead of a client-side time estimate. `pct` is
+// monotonic 0..100 — the runner bumps it at the start of each stage
+// and again when the stage finishes.
+export interface Yad2JobProgress {
+  pct: number;          // 0..100
+  stage: string;        // Hebrew label, shown verbatim
+  page?: number;        // optional — current page within the stage
+  totalPages?: number;  // optional — if the scraper knows it
+}
 interface Yad2Job {
   id: string;
   kind: Yad2JobKind;
@@ -174,6 +184,7 @@ interface Yad2Job {
   startedAt: number;
   finishedAt?: number;
   result?: unknown;
+  progress?: Yad2JobProgress;
   // Hebrew-friendly error envelope — mirrors what the sync endpoints
   // used to return so the frontend can render it verbatim.
   error?: { message: string; code?: string; status?: number; quota?: QuotaSnapshot };
@@ -192,21 +203,39 @@ const jobGcTimer = setInterval(() => {
 }, 5 * 60 * 1000);
 jobGcTimer.unref?.();
 
-function startJob(kind: Yad2JobKind, agentId: string, run: () => Promise<unknown>): Yad2Job {
+// Reporter handed to the runner so it can emit progress as it
+// traverses sale → rent → commercial. Runner calls `report({ pct,
+// stage })` at each stage boundary; /jobs/:id surfaces the latest
+// snapshot verbatim.
+export type Yad2ProgressReport = (p: Yad2JobProgress) => void;
+
+function startJob(
+  kind: Yad2JobKind,
+  agentId: string,
+  run: (report: Yad2ProgressReport) => Promise<unknown>,
+): Yad2Job {
   const job: Yad2Job = {
     id: randomUUID(),
     kind,
     agentId,
     status: 'running',
     startedAt: Date.now(),
+    progress: { pct: 0, stage: 'מכין סריקה' },
   };
   jobs.set(job.id, job);
+  const report: Yad2ProgressReport = (p) => {
+    // Monotonic — a slow stage update after a faster one shouldn't
+    // regress the bar.
+    const prev = job.progress?.pct ?? 0;
+    job.progress = { ...p, pct: Math.max(prev, Math.min(100, p.pct)) };
+  };
   // Fire-and-forget — the client polls /jobs/:id for the outcome.
   Promise.resolve().then(async () => {
     try {
-      const out = await run();
+      const out = await run(report);
       job.result = out;
       job.status = 'done';
+      job.progress = { pct: 100, stage: 'הושלם' };
     } catch (err: any) {
       // Preserve any structured error envelope thrown by the runner so
       // the client still gets the right Hebrew message + quota chip.
@@ -354,9 +383,34 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     if (quotaBefore.remaining === 0) return quotaExceededReply(reply, quotaBefore);
     await recordYad2Attempt(u.id);
     const log = req.log;
-    const job = startJob('agency-preview', u.id, async () => {
+    const job = startJob('agency-preview', u.id, async (report) => {
       try {
-        return await runAgencyPreview(agencyId, u.id, log);
+        // Time-based fallback progress: the scraper itself doesn't
+        // yet stream per-page reports, so we tick the bar every 2 s
+        // across the expected stages until the scraper resolves.
+        // Real per-stage/page reporting can replace this later
+        // without any API change since the report() surface stays.
+        report({ pct: 5, stage: 'מתחבר ל-Yad2' });
+        const stages: Array<{ at: number; pct: number; stage: string }> = [
+          { at: 2_000,  pct: 15, stage: 'טוען דף סוכנות' },
+          { at: 8_000,  pct: 30, stage: 'סורק נכסים למכירה' },
+          { at: 25_000, pct: 55, stage: 'סורק נכסים להשכרה' },
+          { at: 45_000, pct: 75, stage: 'סורק נכסים מסחריים' },
+          { at: 75_000, pct: 90, stage: 'מאחד תוצאות' },
+          { at: 110_000, pct: 95, stage: 'כמעט סיימתי…' },
+        ];
+        const startedAt = Date.now();
+        const ticker = setInterval(() => {
+          const elapsed = Date.now() - startedAt;
+          let pick = stages[0];
+          for (const s of stages) if (elapsed >= s.at) pick = s;
+          report(pick);
+        }, 2_000);
+        try {
+          return await runAgencyPreview(agencyId, u.id, log);
+        } finally {
+          clearInterval(ticker);
+        }
       } catch (err: any) {
         if (err?.__yad2Envelope) throw err;
         log.warn({ err, agencyId }, 'yad2 agency crawl threw (async)');
@@ -467,8 +521,11 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
     const listings = parsed.data.listings;
     const log = req.log;
-    const job = startJob('agency-import', u.id, async () => {
-      return await runAgencyImport(listings, u.id, log);
+    const job = startJob('agency-import', u.id, async (report) => {
+      report({ pct: 10, stage: 'מאחסן תמונות' });
+      const result = await runAgencyImport(listings, u.id, log);
+      report({ pct: 95, stage: 'שומר במסד הנתונים' });
+      return result;
     });
     return reply.code(202).send({ jobId: job.id });
   });
@@ -481,10 +538,13 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     const job = jobs.get(id);
     if (!job) return reply.code(404).send({ error: { message: 'Job not found or expired' } });
     if (job.agentId !== u.id) return reply.code(403).send({ error: { message: 'Forbidden' } });
-    // The caller sees { status, result?, error? } — same envelope for
-    // both job kinds so the client can reuse one polling helper.
+    // The caller sees { status, result?, error?, progress? } — same
+    // envelope for both job kinds so the client can reuse one polling
+    // helper. `progress` is present while the job is running so the
+    // Yad2Import page can show a real bar instead of a client estimate.
     const body: any = { status: job.status, kind: job.kind, startedAt: job.startedAt };
     if (job.finishedAt) body.finishedAt = job.finishedAt;
+    if (job.progress) body.progress = job.progress;
     if (job.status === 'done')  body.result = job.result;
     if (job.status === 'error') body.error  = job.error;
     return body;

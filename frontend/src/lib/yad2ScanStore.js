@@ -47,6 +47,7 @@ let state = {
   result: null,
   error: null,
   quota: null,
+  progress: null, // { pct, stage } surfaced by /jobs/:id while running
 };
 
 const listeners = new Set();
@@ -224,6 +225,12 @@ async function pollJob(jobId) {
       throw new Error('הסריקה לוקחת זמן חריג — נסה/י שוב מאוחר יותר');
     }
     const snap = await api.yad2JobStatus(jobId);
+    // Propagate the server-reported progress onto the shared scan
+    // state so subscribed components (the Yad2Import page) can show
+    // a real bar instead of a client-side guess.
+    if (snap?.progress) {
+      setState({ progress: snap.progress });
+    }
     if (snap.status === 'done')  return snap.result;
     if (snap.status === 'error') {
       const env = snap.error || {};
@@ -278,6 +285,12 @@ export async function startImport(listings) {
 
 /** Wipe the cached scan — called when the agent starts fresh. */
 export function clearScan() {
+  // Bump the epoch so any pollJob loop still running against the
+  // previous scan sees myEpoch !== sessionEpoch on its next tick and
+  // bails out before writing state. Without this, the "בטל סריקה
+  // שנתקעה" button would visibly flip the UI to idle but the live
+  // poller would keep overwriting it back to 'running' a few ms later.
+  sessionEpoch += 1;
   inflight = null;
   setState({
     status: 'idle',
@@ -287,7 +300,13 @@ export function clearScan() {
     result: null,
     error: null,
   });
-  try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+  // Clear every sessionStorage artifact the store owns so a reload
+  // doesn't rehydrate the cancelled scan.
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(RUNNING_SCAN_KEY);
+    sessionStorage.removeItem(RUNNING_IMPORT_KEY);
+  } catch { /* ignore */ }
 }
 
 /** Update only the quota (e.g. after /quota GET). */

@@ -80,7 +80,8 @@ const PRIMARY_NAV = [
   { k: 'ai',          to: '/ai',         label: 'Estia AI',   Icon: Sparkles, badge: 'חדש' },
   { k: 'transfers',   to: '/transfers',  label: 'העברות',     Icon: ArrowLeftRight },
   { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
-  { k: 'activity',    to: '/activity',   label: 'פעילות',     Icon: ActivityIcon },
+  // 'פעילות' (/activity) — reachable from the Dashboard instead of the
+  // sidebar so the primary nav stays short.
   { k: 'documents',   to: '/documents',  label: 'מסמכים',     Icon: FolderOpen },
   // Sprint 7 — /inbox premium-gated WhatsApp Business Inbox
   // placeholder. The integration is deferred pending Meta Tech
@@ -183,7 +184,11 @@ export default function Layout({ onLogout }) {
             return { key: `P-${fav.entityId}`, label, to: `/properties/${fav.entityId}` };
           }
           if (fav.entityType === 'LEAD') {
-            return { key: `L-${fav.entityId}`, label: entity.name || 'ליד', to: `/customers?selected=${fav.entityId}` };
+            // Direct link to the lead detail — the previous
+            // /customers?selected=<id> query just opened the list and
+            // highlighted the row, which meant the sidebar favorite
+            // didn't actually drop you into the lead record.
+            return { key: `L-${fav.entityId}`, label: entity.name || 'ליד', to: `/customers/${fav.entityId}` };
           }
           if (fav.entityType === 'OWNER') {
             return { key: `O-${fav.entityId}`, label: entity.name || 'בעלים', to: `/owners/${fav.entityId}` };
@@ -395,11 +400,11 @@ function SidebarInner({
         {favorites.length > 0 && (
           <>
             <div style={{ height: 10 }} />
-            {!collapsed && <SectionLabel>המועדפים</SectionLabel>}
+            {!collapsed && <SectionLabel>מועדפים</SectionLabel>}
             {favorites.map((fav) => (
               <NavRow
                 key={fav.key}
-                item={{ to: fav.to, label: fav.label, Icon: Heart }}
+                item={{ to: fav.to, label: fav.label, Icon: Star }}
                 active={isActive(fav.to)}
                 collapsed={collapsed}
                 tight

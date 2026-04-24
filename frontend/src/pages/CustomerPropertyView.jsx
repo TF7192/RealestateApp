@@ -158,6 +158,20 @@ export default function CustomerPropertyView() {
     return () => { cancelled = true; };
   }, [id, agentSlug, propertySlug]);
 
+  // Fire-and-forget view tracker — dedup per tab-session via
+  // sessionStorage so a SPA re-render, hash change, or browser
+  // refresh doesn't count twice. Only fires on the
+  // /agents/:slug/:propertySlug route (slug pair present).
+  useEffect(() => {
+    if (!agentSlug || !propertySlug) return;
+    const key = `estia-viewed-${agentSlug}-${propertySlug}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch { /* storage disabled — still fire, DB-side dedup catches dupes */ }
+    api.trackPublicPropertyView?.(agentSlug, propertySlug).catch(() => { /* tracking errors never break the page */ });
+  }, [agentSlug, propertySlug]);
+
   usePropertyMeta(property, agent);
 
   // Keyboard navigation for the gallery lightbox

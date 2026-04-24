@@ -424,6 +424,21 @@ function PasteStep({
           הסריקה רצה ברקע — אפשר לעזוב את העמוד; תתקבל התראה כשהיא תסתיים.
         </div>
 
+        {/* Yad2 scans can run 60-180 s while Playwright walks each
+            category page. The backend doesn't stream progress yet, so
+            this is a client-side time-based estimate: a smooth
+            asymptotic fill that approaches (but never reaches) 95%
+            and a rotating Hebrew caption of the expected stages. It
+            snaps to 100% when the poller resolves. The agent sees
+            motion + knows roughly where things are. */}
+        {isRunning && scan.startedAt && (
+          <Yad2ScanProgress
+            startedAt={scan.startedAt}
+            url={scan.url}
+            progress={scan.progress}
+          />
+        )}
+
         {/* If a scan has been "running" for over 2 minutes, the job
             almost certainly died (server restart or a stalled Playwright
             page). Surface an explicit reset so the agent isn't stuck on
@@ -1078,4 +1093,86 @@ function relativeMinutes(ts) {
   if (mins === 0) return 'פחות מדקה';
   if (mins === 1) return 'דקה';
   return `${mins} דק׳`;
+}
+
+// Time-based progress surface for a live Yad2 scan. Backend doesn't
+// stream progress yet, so we fake it from the elapsed-time clock:
+//   0-5s    → 10 %  "מתחבר ל-Yad2"
+//   5-20s   → 30 %  "סורק מכירה"
+//   20-45s  → 55 %  "סורק השכרה"
+//   45-75s  → 75 %  "סורק מסחרי"
+//   75-120s → 90 %  "מאחד תוצאות"
+//   120s+   → 95 %  "כמעט סיימתי…"
+// The bar caps at 95 % — when the store flips to status='done' this
+// component unmounts and the 100 % is implicit. Elapsed timer + URL
+// hint next to the stage label so the agent sees concrete motion.
+function Yad2ScanProgress({ startedAt, url, progress }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, []);
+  const elapsed = Math.max(0, (now - (startedAt || now)) / 1000);
+  // Prefer the server-reported progress (streamed via /jobs/:id) —
+  // it reflects the real stage the scraper is on. Fall back to the
+  // time-based estimate if the backend hasn't pushed yet.
+  if (progress && typeof progress.pct === 'number') {
+    return <ScanBar label={progress.stage || 'מעבד…'} pct={progress.pct} elapsed={elapsed} url={url} />;
+  }
+  const stages = [
+    { s: 0,   pct: 10, label: 'מתחבר ל-Yad2' },
+    { s: 5,   pct: 30, label: 'סורק נכסים למכירה' },
+    { s: 20,  pct: 55, label: 'סורק נכסים להשכרה' },
+    { s: 45,  pct: 75, label: 'סורק נכסים מסחריים' },
+    { s: 75,  pct: 90, label: 'מאחד תוצאות' },
+    { s: 120, pct: 95, label: 'כמעט סיימתי…' },
+  ];
+  let stage = stages[0];
+  for (const s of stages) if (elapsed >= s.s) stage = s;
+  const idx = stages.indexOf(stage);
+  const next = stages[idx + 1];
+  const span = next ? (next.s - stage.s) : 1;
+  const within = next ? Math.min(1, Math.max(0, (elapsed - stage.s) / span)) : 0;
+  const pctRaw = stage.pct + within * (next ? next.pct - stage.pct : 0);
+  const pct = Math.min(95, Math.round(pctRaw * 10) / 10);
+  return <ScanBar label={stage.label} pct={pct} elapsed={elapsed} url={url} />;
+}
+
+function ScanBar({ label, pct, elapsed, url }) {
+  const seconds = Math.floor(elapsed);
+  const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const ss = String(seconds % 60).padStart(2, '0');
+  return (
+    <div style={{
+      marginTop: 6,
+      background: DT.white, border: `1px solid ${DT.border}`,
+      borderRadius: 10, padding: '10px 12px',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 10, marginBottom: 6,
+      }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: DT.ink }}>{label}</span>
+        <span style={{
+          fontSize: 11, color: DT.muted, fontVariantNumeric: 'tabular-nums',
+        }}>{mm}:{ss} · {Math.round(pct)}%</span>
+      </div>
+      <div style={{
+        background: DT.cream3, height: 6, borderRadius: 99, overflow: 'hidden',
+      }}>
+        <div style={{
+          width: `${pct}%`, height: '100%',
+          background: `linear-gradient(90deg, ${DT.goldLight}, ${DT.gold})`,
+          transition: 'width 600ms linear',
+        }} />
+      </div>
+      {url && (
+        <div style={{
+          fontSize: 10, color: DT.muted, marginTop: 6,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          direction: 'ltr',
+        }}>{url}</div>
+      )}
+    </div>
+  );
 }

@@ -192,29 +192,34 @@ function OverviewTab({ isMobile, navigate }) {
     return () => { cancelled = true; };
   }, []);
 
+  // Backend returns { funnel: { viewsLast30d, inquiriesLast30d,
+  // agreementsSigned }, topPerformers, byProperty }. The KPI tiles
+  // and per-property table read from those nested paths — the
+  // previous `data?.viewsLast30d` / `data?.properties` shape was
+  // flat and always evaluated to 0 / empty.
   const kpis = useMemo(() => ([
     {
       key: 'views',
       label: 'צפיות ב-30 יום',
-      value: data?.viewsLast30d ?? 0,
+      value: data?.funnel?.viewsLast30d ?? 0,
       Icon: Eye,
     },
     {
       key: 'inquiries',
       label: 'פניות ב-30 יום',
-      value: data?.inquiriesLast30d ?? 0,
+      value: data?.funnel?.inquiriesLast30d ?? 0,
       Icon: MessageCircle,
     },
     {
       key: 'agreements',
       label: 'הסכמים חתומים',
-      value: data?.agreementsSigned ?? 0,
+      value: data?.funnel?.agreementsSigned ?? 0,
       Icon: FileSignature,
     },
   ]), [data]);
 
   const topPerformers = (data?.topPerformers || []).slice(0, 3);
-  const rows = data?.properties || [];
+  const rows = data?.byProperty || data?.properties || [];
 
   if (error && !loading) {
     return (
