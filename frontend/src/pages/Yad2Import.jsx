@@ -423,6 +423,29 @@ function PasteStep({
           כל קטגוריה (מכירה / השכרה / מסחרי) נסרקת בנפרד, כולל כל העמודים.
           הסריקה רצה ברקע — אפשר לעזוב את העמוד; תתקבל התראה כשהיא תסתיים.
         </div>
+
+        {/* If a scan has been "running" for over 2 minutes, the job
+            almost certainly died (server restart or a stalled Playwright
+            page). Surface an explicit reset so the agent isn't stuck on
+            a perma-spinner. */}
+        {isRunning && scan.startedAt && (Date.now() - scan.startedAt) > 120_000 && (
+          <button
+            type="button"
+            onClick={() => { try { clearScan(); } catch { /* ignore */ } }}
+            style={{
+              ...FONT,
+              alignSelf: 'flex-start',
+              background: 'transparent',
+              border: `1px solid ${DT.border}`,
+              color: DT.ink,
+              padding: '6px 12px', borderRadius: 8,
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              marginTop: 4,
+            }}
+          >
+            בטל סריקה שנתקעה
+          </button>
+        )}
       </section>
     </div>
   );

@@ -427,29 +427,57 @@ function SidebarInner({
         </div>
       )}
 
-      {/* Agent row */}
+      {/* Agent row — the entire pill is a single link to /profile so
+          agents don't have to hunt for the 34×34 avatar target. A
+          subtle "הגדרות פרופיל" caption + a Settings gear icon make
+          the affordance unambiguous (previous design only had the
+          avatar wired). The logout button stays separate so a
+          distracted click doesn't sign the user out. */}
       <div style={{
         padding: `10px ${collapsed ? 10 : 14}px 12px`,
         borderTop: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', alignItems: 'center', gap: 10,
+        display: 'flex', alignItems: 'center', gap: 6,
       }}>
-        <NavLink to="/profile" style={{
-          width: 34, height: 34, borderRadius: 99, background: DT.gold, color: DT.ink,
-          display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13,
-          textDecoration: 'none', flexShrink: 0,
-        }}>{agentInitial}</NavLink>
-        {!collapsed && (
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: 12, fontWeight: 700, color: '#fff',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>{agentName}</div>
-            <div style={{
-              fontSize: 10, color: DT.sidebarMuted,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>{agentSub}</div>
-          </div>
-        )}
+        <NavLink
+          to="/profile"
+          title="הגדרות פרופיל"
+          aria-label="פתח הגדרות פרופיל"
+          style={({ isActive }) => ({
+            flex: 1, minWidth: 0,
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: collapsed ? 6 : '6px 10px 6px 6px',
+            borderRadius: 12,
+            background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
+            color: '#fff', textDecoration: 'none',
+            transition: 'background 0.15s',
+            border: '1px solid transparent',
+          })}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; }}
+        >
+          <span style={{
+            width: 34, height: 34, borderRadius: 99, background: DT.gold, color: DT.ink,
+            display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13,
+            flexShrink: 0,
+          }}>{agentInitial}</span>
+          {!collapsed && (
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{
+                display: 'block',
+                fontSize: 12, fontWeight: 700, color: '#fff',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{agentName}</span>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 10, color: DT.sidebarMuted, fontWeight: 600,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                maxWidth: '100%',
+              }}>
+                <Settings size={10} aria-hidden="true" /> הגדרות פרופיל
+              </span>
+            </span>
+          )}
+        </NavLink>
         {!collapsed && (
           <button
             type="button"
@@ -458,7 +486,7 @@ function SidebarInner({
             aria-label="התנתקות"
             style={{
               background: 'transparent', border: 'none', color: DT.sidebarMuted,
-              cursor: 'pointer', padding: 4, display: 'inline-flex',
+              cursor: 'pointer', padding: 4, display: 'inline-flex', flexShrink: 0,
             }}
           ><LogOut size={16} /></button>
         )}
