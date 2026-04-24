@@ -29,14 +29,14 @@
     "@capacitor/share": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
-    "i18next": "^26.0.6",
-    "lucide-react": "^1.8.0",
-    "posthog-js": "^1.369.3",
+    "i18next": "^26.0.7",
+    "lucide-react": "^1.11.0",
+    "posthog-js": "^1.371.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-i18next": "^17.0.4",
     "react-joyride": "^3.0.2",
-    "react-router-dom": "^7.14.1",
+    "react-router-dom": "^7.14.2",
     "xlsx": "^0.18.5"
   },
   "browserslist": [
@@ -56,9 +56,9 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.4",
-    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
-    "vite": "^8.0.4"
+    "vite": "^8.0.10"
   }
 }
