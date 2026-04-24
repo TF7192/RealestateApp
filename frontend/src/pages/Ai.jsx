@@ -120,14 +120,17 @@ export default function Ai() {
   return (
     <div dir="rtl" style={{
       ...FONT,
-      padding: 28, color: DT.ink,
-      // Fix the page to the available viewport so the chat card's own
-      // overflow can do the scrolling. Previously min-height:100%
-      // let long replies push the whole body scrollbar, which is
-      // disorienting while you're reading a growing list.
+      padding: 24, color: DT.ink,
+      // Constrain the whole surface to the viewport so the chat's
+      // own panel can handle the scroll, and cap max width so the
+      // conversation reads as a centered column instead of spanning
+      // the full page (was hard to follow on desktop widths).
       height: 'calc(100vh - 0px)',
       maxHeight: '100%',
-      display: 'flex', flexDirection: 'column', gap: 16,
+      maxWidth: 880,
+      marginInline: 'auto',
+      width: '100%',
+      display: 'flex', flexDirection: 'column', gap: 14,
       overflow: 'hidden',
     }}>
       {/* Header */}

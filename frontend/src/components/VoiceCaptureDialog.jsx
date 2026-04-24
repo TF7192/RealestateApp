@@ -334,13 +334,17 @@ export default function VoiceCaptureDialog({
 
       {/* Record strip — big centered mic button with the timer + status
           directly underneath. Previous layout put the button + timer in
-          the same row which read as cramped and unbalanced in RTL. */}
+          the same row which read as cramped and unbalanced in RTL.
+          The outer wrapper uses box-sizing: border-box so its padding
+          doesn't push the cream card past the modal's right edge. */}
       <div style={{
-        padding: inline ? '6px 0 0' : '18px 22px 0',
+        padding: inline ? '6px 0 0' : '14px 22px 0',
+        boxSizing: 'border-box', width: '100%',
       }}>
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           gap: 12, padding: '22px 18px',
+          boxSizing: 'border-box', width: '100%',
           background: DT.cream4,
           border: `1px solid ${DT.border}`, borderRadius: 16,
           position: 'relative',

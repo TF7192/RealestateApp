@@ -212,7 +212,8 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
                 className={`market-chip ${roomFilter === 'all' ? 'is-active' : ''}`}
                 onClick={() => setRoomFilter('all')}
               >
-                הכל ({allDeals.length})
+                <span>הכל</span>
+                <bdi style={{ marginInlineStart: 4, opacity: 0.75 }}>· {allDeals.length}</bdi>
               </button>
               {availableRooms.map((r) => {
                 const n = allDeals.filter((d) => Number(d.rooms) === r).length;
@@ -223,7 +224,10 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
                     className={`market-chip ${Number(roomFilter) === r ? 'is-active' : ''}`}
                     onClick={() => setRoomFilter(r)}
                   >
-                    {r} ({n})
+                    {/* Wrap in <bdi> so the LTR number pair "4 · 51"
+                        doesn't get re-ordered by the surrounding RTL
+                        paragraph into "51 · 4". */}
+                    <bdi>{r} חד׳ · {n}</bdi>
                   </button>
                 );
               })}
@@ -272,9 +276,9 @@ export default function MarketContextCard({ propertyId, propertyCategory, proper
                       <tr key={i}>
                         <td>{formatDealDate(d.dealDate)}</td>
                         <td>{d.street || '—'}</td>
-                        <td className="cell-num">{d.rooms ?? '—'}</td>
-                        <td className="cell-num">{d.sqm ?? '—'}</td>
-                        <td className="cell-num">{d.floor ?? '—'}</td>
+                        <td className="cell-num">{d.rooms ? d.rooms : '—'}</td>
+                        <td className="cell-num">{d.sqm ? d.sqm : '—'}</td>
+                        <td className="cell-num">{d.floor ? d.floor : '—'}</td>
                         <td className="cell-num"><strong>{d.price ? displayPrice(d.price) : '—'}</strong></td>
                         <td className="cell-num">{d.pricePerSqm ? `₪${Number(d.pricePerSqm).toLocaleString('he-IL')}` : '—'}</td>
                       </tr>
