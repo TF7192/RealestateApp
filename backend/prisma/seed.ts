@@ -93,14 +93,17 @@ async function main() {
   });
   console.log(`✓ customer ${customerEmail} / ${customerPassword}`);
 
-  // Demo properties
+  // Demo properties for the original יוסי כהן agent. Guarded so re-
+  // runs skip straight to the office-demo block below instead of
+  // returning early (the previous `return` would skip the demo-office
+  // seed on every subsequent run).
   const agentId = agent.id;
   const existingCount = await prisma.property.count({ where: { agentId } });
-  if (existingCount > 0) {
-    console.log('✓ properties already seeded');
-    await prisma.$disconnect();
-    return;
+  const shouldSeedSoloProperties = existingCount === 0;
+  if (!shouldSeedSoloProperties) {
+    console.log('✓ solo agent properties already seeded — skipping to office demo');
   }
+  if (shouldSeedSoloProperties) {
 
   const ACTION_KEYS = [
     'tabuExtract', 'photography', 'buildingPhoto', 'dronePhoto', 'virtualTour',
@@ -293,6 +296,7 @@ async function main() {
     await prisma.deal.create({ data: { agentId, ...d } });
   }
   console.log(`✓ seeded ${deals.length} deals`);
+  } // end `if (shouldSeedSoloProperties)`
 
   // ─── Demo office + team (for client walkthroughs) ───────────────
   //
