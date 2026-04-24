@@ -289,6 +289,14 @@ export const api = {
     return request(`/meetings${s ? `?${s}` : ''}`);
   },
 
+  // Sprint 4.1 — agent-scoped meeting create powering the /calendar
+  // "פגישה חדשה" CTA. Body: { title, startsAt, endsAt, leadId?,
+  // attendeeName?, attendeeEmail?, location?, notes?, syncToCalendar? }.
+  // Distinct from `createLeadMeeting` (lead-scoped under a specific
+  // leadId) — this one takes leadId as an optional body field so the
+  // same dialog can create lead-linked or free-text meetings.
+  createAgentMeeting: (body) => request('/meetings', { method: 'POST', body }),
+
   // 7.2 — Lead meetings
   listLeadMeetings:  (leadId)       => request(`/integrations/calendar/leads/${leadId}/meetings`),
   createLeadMeeting: (leadId, body) => request(`/integrations/calendar/leads/${leadId}/meetings`, { method: 'POST', body }),

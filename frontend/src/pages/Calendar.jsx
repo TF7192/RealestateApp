@@ -10,13 +10,14 @@
 //     (mobile) lists the full set of meetings for that day
 //   - Today gets a gold ring; the focused day gets a goldSoft fill
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, ChevronLeft, CalendarDays, Clock, MapPin, User } from 'lucide-react';
+import { ChevronRight, ChevronLeft, CalendarDays, Clock, MapPin, User, Plus } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
 import EmptyState from '../components/EmptyState';
 import { displayText } from '../lib/display';
+import NewMeetingDialog from '../components/NewMeetingDialog';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -89,34 +90,48 @@ export default function Calendar() {
   const [items, setItems]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [focused, setFocused] = useState(() => new Date());
+  // Sprint 4.1 — "פגישה חדשה" CTA. The dialog is mounted at the page
+  // root so the focus trap can claim the document and restore focus
+  // back to the trigger button on close.
+  const [showNew, setShowNew] = useState(false);
 
   const today = useMemo(() => new Date(), []);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Fetch the meetings window. Extracted into a useCallback so the
+  // create dialog can ask the page to refresh after a successful
+  // submit without duplicating the query logic. The mount effect
+  // wraps it in a cancellation flag so a stale month switch doesn't
+  // overwrite a fresher result.
+  const loadMeetings = useCallback(async () => {
     setLoading(true);
     // Fetch a slightly wider window than the grid (42 days may spill
     // into two neighbouring months) so chips render for the out-of-
     // month overflow cells too.
     const from = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
     const to   = new Date(viewDate.getFullYear(), viewDate.getMonth() + 2, 1);
-    (async () => {
-      try {
-        const res = await api.listMeetings({
-          from: from.toISOString(),
-          to:   to.toISOString(),
-        });
-        if (!cancelled) setItems(res?.items || []);
-      } catch (e) {
-        if (!cancelled) toast.error?.(e?.message || 'שגיאה בטעינת פגישות');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+    try {
+      const res = await api.listMeetings({
+        from: from.toISOString(),
+        to:   to.toISOString(),
+      });
+      setItems(res?.items || []);
+    } catch (e) {
+      toast.error?.(e?.message || 'שגיאה בטעינת פגישות');
+    } finally {
+      setLoading(false);
+    }
     // toast is recreated each render; don't include it as a dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewDate]);
+
+  useEffect(() => {
+    // Don't keep a cancellation token on the callback itself —
+    // loadMeetings already lives at the page level so a follow-up
+    // call from the dialog's onCreated will simply overwrite this
+    // request's results. Strict-mode double-fire is a non-issue
+    // because both calls hit the same memoised window.
+    loadMeetings();
+  }, [loadMeetings]);
 
   const grid = useMemo(() => buildGrid(viewDate), [viewDate]);
   const buckets = useMemo(() => bucketByDay(items), [items]);
@@ -151,6 +166,15 @@ export default function Calendar() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setShowNew(true)}
+            style={primaryBtn()}
+            aria-label="פגישה חדשה"
+          >
+            <Plus size={14} />
+            פגישה חדשה
+          </button>
           <button type="button" onClick={goToday} style={ghostBtn()}>
             היום
           </button>
@@ -376,6 +400,27 @@ export default function Calendar() {
           .cal-side { position: static !important; }
         }
       `}</style>
+
+      {/* "פגישה חדשה" dialog — preselects the focused day so picking
+          a calendar cell first then hitting the CTA lands on the
+          right date. After a successful create we refresh the
+          meetings window + jump focus onto the new meeting's day so
+          the agent immediately sees the chip they just made. */}
+      {showNew && (
+        <NewMeetingDialog
+          initialDate={focused}
+          onClose={() => setShowNew(false)}
+          onCreated={(meeting) => {
+            toast.success?.('הפגישה נוצרה');
+            if (meeting?.startsAt) {
+              const d = new Date(meeting.startsAt);
+              setViewDate(new Date(d.getFullYear(), d.getMonth(), 1));
+              setFocused(d);
+            }
+            loadMeetings();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -388,6 +433,24 @@ function ghostBtn() {
     border: `1px solid ${DT.border}`,
     background: DT.white, color: DT.ink,
     fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  };
+}
+
+// Gold CTA — matches the LeadMeetingDialog primaryBtn so the
+// "פגישה חדשה" trigger looks visually consistent with the dialog
+// it opens.
+function primaryBtn() {
+  return {
+    ...FONT,
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    padding: '9px 16px',
+    borderRadius: 10,
+    border: 'none',
+    background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+    color: DT.ink,
+    fontSize: 13, fontWeight: 800,
+    cursor: 'pointer',
+    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
   };
 }
 

@@ -43,7 +43,11 @@ function redirectUri(): string {
 
 // Refresh the access token if needed. Returns the fresh token string,
 // or null if no refresh token is saved (agent needs to reconnect).
-async function getFreshAccessToken(userId: string): Promise<string | null> {
+//
+// Exported so other route files (e.g. meetings.ts, which owns the
+// agent-scoped POST /api/meetings) can mirror the same auto-refresh
+// behaviour without duplicating the OAuth dance.
+export async function getFreshAccessToken(userId: string): Promise<string | null> {
   const u = await prisma.user.findUnique({ where: { id: userId } });
   if (!u?.googleRefreshToken) return null;
   // Margin — refresh if it expires within the next 2 minutes.
@@ -85,7 +89,7 @@ async function getFreshAccessToken(userId: string): Promise<string | null> {
   return j.access_token;
 }
 
-interface CalEventInput {
+export interface CalEventInput {
   title: string;
   notes?: string | null;
   location?: string | null;
@@ -95,7 +99,9 @@ interface CalEventInput {
   addMeetLink?: boolean;
 }
 
-async function createCalendarEvent(accessToken: string, input: CalEventInput): Promise<{ id: string; meetLink?: string } | null> {
+// Exported so meetings.ts (agent-scoped POST /api/meetings) can push a
+// new event upstream without duplicating the request body shape.
+export async function createCalendarEvent(accessToken: string, input: CalEventInput): Promise<{ id: string; meetLink?: string } | null> {
   const body: any = {
     summary: input.title,
     description: input.notes || undefined,

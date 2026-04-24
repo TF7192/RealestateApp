@@ -1,13 +1,20 @@
-// Sprint 4 / Calendar — flat meetings list endpoint.
+// Sprint 4 / Calendar — flat meetings list + agent-scoped create.
 //
-// POST / PATCH / DELETE already live on calendar.ts (nested under a
-// specific lead). The Calendar page needs a cross-lead view, so we
-// expose a minimal read-only LIST endpoint here:
+// PATCH / DELETE + the lead-scoped POST already live on calendar.ts
+// (nested under a specific lead). The Calendar page needs a cross-
+// lead view + a free-form "פגישה חדשה" CTA, so this file exposes:
 //
-//   GET /api/meetings?from=<ISO>&to=<ISO>  → { items: LeadMeeting[] }
+//   GET  /api/meetings?from=<ISO>&to=<ISO>  → { items: LeadMeeting[] }
+//   POST /api/meetings                      → { meeting: LeadMeeting }
 //
-// Scoped to the signed-in agent via JWT. Ordered ascending by startsAt
-// so the frontend can render a month grid without re-sorting.
+// Both are scoped to the signed-in agent via JWT. The POST accepts an
+// optional `leadId` so the agent can either link the meeting to an
+// existing lead or block out time without one (coffee with another
+// broker, internal prep, etc.). When `syncToCalendar` is true and the
+// agent has Google Calendar connected, the meeting also gets pushed
+// upstream and the resulting Google event id is stored on the row so
+// edits propagate via the existing PATCH/DELETE handlers in
+// calendar.ts.
 //
 // Sprint 5 / AI — meeting voice summariser (this file also owns the
 // POST /:id/summarize endpoint that takes a recorded voice note,
@@ -23,10 +30,29 @@ import { requireUser } from '../middleware/auth.js';
 import { requirePremium } from '../middleware/requirePremium.js';
 import { buildAnthropic } from '../lib/anthropic.js';
 import { putMeetingAudio } from '../lib/meetingAudio.js';
+import { getFreshAccessToken, createCalendarEvent } from './calendar.js';
 
 const querySchema = z.object({
   from: z.string().datetime().optional(),
   to:   z.string().datetime().optional(),
+});
+
+// Body shape for the agent-scoped POST /api/meetings endpoint. `leadId`
+// is optional — when omitted the meeting is agent-only (e.g. blocking
+// out personal time on the /calendar grid). `syncToCalendar` mirrors
+// the lead-scoped POST in calendar.ts so a single dialog can reuse the
+// same checkbox UX.
+const createSchema = z.object({
+  title: z.string().min(1).max(200),
+  notes: z.string().max(2000).optional(),
+  location: z.string().max(200).optional(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  leadId: z.string().min(1).optional(),
+  attendeeName: z.string().max(200).optional(),
+  attendeeEmail: z.string().email().optional().or(z.literal('')),
+  addMeetLink: z.boolean().optional(),
+  syncToCalendar: z.boolean().optional(),
 });
 
 // 30MB audio cap matches /api/ai/voice-lead — at 16kbps opus this is
@@ -89,6 +115,98 @@ export const registerMeetingRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     return { items };
+  });
+
+  // POST /api/meetings — create an agent-scoped meeting, optionally
+  // linked to a lead and optionally pushed to Google Calendar. Mirrors
+  // the lead-scoped POST in calendar.ts so the /calendar "פגישה חדשה"
+  // dialog has a single endpoint regardless of whether the agent picks
+  // a lead or types a free-text participant.
+  app.post('/', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const u = requireUser(req);
+    const parsed = createSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: { message: parsed.error.issues[0]?.message || 'Invalid input' },
+      });
+    }
+    const { syncToCalendar, addMeetLink, attendeeEmail, attendeeName, leadId, ...rest } = parsed.data;
+    const startsAt = new Date(rest.startsAt);
+    const endsAt   = new Date(rest.endsAt);
+
+    // Cross-agent guard — if a lead is passed, it must belong to the
+    // signed-in agent. 404 (not 403) so we don't leak the existence of
+    // other agents' leads.
+    let leadRow: { email: string | null } | null = null;
+    if (leadId) {
+      const lead = await prisma.lead.findUnique({
+        where: { id: leadId },
+        select: { id: true, agentId: true, email: true },
+      });
+      if (!lead || lead.agentId !== u.id) {
+        return reply.code(404).send({ error: { message: 'Not found' } });
+      }
+      leadRow = { email: lead.email };
+    }
+
+    // Push to Google Calendar FIRST when requested — same ordering as
+    // the lead-scoped POST so a Calendar failure surfaces a clear
+    // error instead of leaving an orphan local row.
+    let googleEventId: string | null = null;
+    let meetLink: string | null = null;
+    if (syncToCalendar) {
+      const token = await getFreshAccessToken(u.id);
+      if (!token) {
+        return reply.code(428).send({
+          error: { message: 'יש לחבר את Google Calendar תחילה', code: 'calendar_not_connected' },
+        });
+      }
+      // Compose the meeting title with the free-text attendee name
+      // when there's no lead — keeps the calendar event readable.
+      const eventTitle = !leadId && attendeeName
+        ? `${rest.title} · ${attendeeName}`
+        : rest.title;
+      const created = await createCalendarEvent(token, {
+        title: eventTitle,
+        notes: rest.notes,
+        location: rest.location,
+        startsAt,
+        endsAt,
+        attendeeEmail: attendeeEmail || leadRow?.email || null,
+        addMeetLink,
+      });
+      if (!created) {
+        return reply.code(502).send({ error: { message: 'יצירת אירוע ב-Google נכשלה' } });
+      }
+      googleEventId = created.id;
+      meetLink = created.meetLink || null;
+    }
+
+    // The free-text attendee name (when there's no lead) is appended
+    // to notes so it survives — LeadMeeting has no dedicated column
+    // for an unstructured participant string and adding one would
+    // mean another migration for a single string field.
+    const composedNotes = !leadId && attendeeName
+      ? [rest.notes, `משתתף: ${attendeeName}`].filter(Boolean).join('\n')
+      : rest.notes;
+
+    const meeting = await prisma.leadMeeting.create({
+      data: {
+        leadId: leadId || null,
+        agentId: u.id,
+        title: rest.title,
+        notes: composedNotes || null,
+        location: rest.location || null,
+        startsAt,
+        endsAt,
+        googleEventId,
+        meetLink,
+      },
+      include: {
+        lead: { select: { id: true, name: true, phone: true } },
+      },
+    });
+    return { meeting };
   });
 
   // POST /api/meetings/:id/summarize

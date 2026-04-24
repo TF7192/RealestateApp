@@ -1068,8 +1068,12 @@ model Prospect {
 // edits / deletes propagate.
 model LeadMeeting {
   id            String   @id @default(cuid())
-  leadId        String
-  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // Sprint 4.1 — leadId is nullable so the /calendar "פגישה חדשה" CTA
+  // can create agent-only events (no lead linked). The relation drops
+  // to SetNull on lead delete so removing a lead leaves the agent's
+  // meeting record alone rather than cascading it away.
+  leadId        String?
+  lead          Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
   agentId       String
   agent         User     @relation("AgentMeetings", fields: [agentId], references: [id], onDelete: Cascade)
   title         String
