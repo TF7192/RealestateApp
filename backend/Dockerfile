@@ -15,14 +15,18 @@ WORKDIR /app
 FROM base AS deps
 # Cache-bust arg — the deploy workflow passes a unique value (the
 # commit SHA) so the npm-ci layer below is never reused from a prior
-# build's GHA cache even when the lockfile is byte-identical. GHA
-# layer cache occasionally mis-correlates the RUN step when the
-# command string is unchanged; binding the step to a per-build ARG
-# sidesteps that.
+# build's GHA cache even when the lockfile is byte-identical.
 ARG DEPS_CACHEBUST=unset
 COPY package.json package-lock.json ./
+# Two-phase install: `npm ci` for the reproducible lockfile pass, then
+# a defensive `npm install` that re-checks the two voice-ingest deps
+# in case npm 11 + peerDependencies resolution drops them on linux
+# amd64 (seen twice in CI despite a clean sandbox install). The
+# --no-save keeps the resulting node_modules consistent with the
+# lockfile for everything else.
 RUN echo "deps cachebust: $DEPS_CACHEBUST" \
   && npm ci --no-audit --no-fund \
+  && npm install --no-audit --no-fund --no-save openai@6.34.0 @anthropic-ai/sdk@0.91.0 \
   && node -e "require.resolve('openai'); require.resolve('@anthropic-ai/sdk'); console.log('deps ok')"
 
 FROM base AS build
