@@ -16,6 +16,7 @@ import { registerPropertyRoutes } from './routes/properties.js';
 import { registerLeadRoutes } from './routes/leads.js';
 import { registerDealRoutes } from './routes/deals.js';
 import { registerAgreementRoutes } from './routes/agreements.js';
+import { registerContractRoutes } from './routes/contracts.js';
 import { registerLookupRoutes } from './routes/lookups.js';
 import { registerReportRoutes } from './routes/reports.js';
 import { registerMeRoutes } from './routes/me.js';
@@ -226,6 +227,7 @@ export async function build() {
   await app.register(registerLeadRoutes, { prefix: '/api/leads' });
   await app.register(registerDealRoutes, { prefix: '/api/deals' });
   await app.register(registerAgreementRoutes, { prefix: '/api/agreements' });
+  await app.register(registerContractRoutes, { prefix: '/api/contracts' });
   await app.register(registerLookupRoutes, { prefix: '/api/lookups' });
   await app.register(registerReportRoutes, { prefix: '/api/reports' });
   await app.register(registerAgentRoutes, { prefix: '/api/agents' });

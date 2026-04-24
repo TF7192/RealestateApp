@@ -377,6 +377,9 @@ model User {
   officeInvitesAccepted OfficeInvite[]    @relation("OfficeInvitesAccepted")
   // Sprint 4 — in-app notifications targeted at this user.
   notifications         Notification[]
+  // Sprint 6 — in-house digital contracts (exclusivity / brokerage /
+  // offer) authored by this agent.
+  contracts             Contract[]        @relation("AgentContracts")
 
   @@index([role])
   @@index([officeId])
@@ -589,6 +592,8 @@ model Property {
   reminders        Reminder[]
   assignees        PropertyAssignee[]
   adverts          Advert[]
+  // Sprint 6 — in-house digital contracts attached to this property.
+  contracts        Contract[]
 
   // Excel-import tag. Same purpose as Lead.importBatchId.
   importBatchId    String?
@@ -839,6 +844,8 @@ model Lead {
   // E-1 — reverse of Deal.buyer. A lead can be tied to multiple deals
   // across their history (repeat buyers / combined transactions).
   dealsAsBuyer    Deal[]              @relation("DealBuyer")
+  // Sprint 6 — in-house digital contracts tied to this lead.
+  contracts       Contract[]
 
   // Excel-import tag. Set on every Lead row created via the wizard so
   // an agent who realises the mapping was wrong can bulk-delete the
@@ -1444,4 +1451,51 @@ model Notification {
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, readAt])
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Sprint 6 — In-house digital contract e-sign flow. Supersedes the
+// third-party `Agreement` model path (which is still used for legacy
+// DocuSign-style "upload the signed PDF" captures). Contracts are
+// rendered + signed via the in-house pdfkit path reused from
+// prospect-pdf; no external vendor.
+//
+// `type` differentiates the three contract flavors an agent sends:
+//   EXCLUSIVITY — seller grants the agent an exclusive listing window
+//   BROKERAGE   — buyer/seller brokerage-services agreement
+//   OFFER       — buyer's price offer against a listing
+//
+// `body` is free-form Hebrew legal text the agent can customise per
+// contract (falls back to a sensible default in the route). Once
+// `signedAt` is set, the record is locked: further sign attempts 409.
+// `signatureName` is the typed-to-sign value from the v1 UI; canvas
+// drawing can be layered later without a migration.
+// ────────────────────────────────────────────────────────────────────
+model Contract {
+  id             String    @id @default(cuid())
+  agentId        String
+  agent          User      @relation("AgentContracts", fields: [agentId], references: [id], onDelete: Cascade)
+  propertyId     String?
+  property       Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  leadId         String?
+  lead           Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  type           String // 'EXCLUSIVITY' | 'BROKERAGE' | 'OFFER'
+  title          String
+  body           String // the contract text rendered into the PDF
+  signerName     String
+  signerPhone    String?
+  signerEmail    String?
+  // Sign-time fields: populated when the signer submits. `signatureHash`
+  // is a SHA-256 of (contractId + signerName + signedAt.toISOString())
+  // — printed on the signed-lock badge as tamper-evidence.
+  signedAt       DateTime?
+  signatureName  String? // the typed-to-sign text
+  signatureHash  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([agentId])
+  @@index([propertyId])
+  @@index([leadId])
+  @@index([type])
 }

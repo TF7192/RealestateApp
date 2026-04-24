@@ -62,6 +62,11 @@ const TagSettings = lazy(() => import('./pages/TagSettings'));
 const Settings = lazy(() => import('./pages/Settings'));
 // G2 — OWNER-only admin for marketable-area groups, linked from /settings.
 const NeighborhoodAdmin = lazy(() => import('./pages/NeighborhoodAdmin'));
+// Sprint 6 / ScreenContract — in-house digital contract e-sign (no
+// DocuSign). Lazy so the pdfkit-rendered preview iframe lands in its
+// own chunk.
+const Contracts = lazy(() => import('./pages/Contracts'));
+const ContractDetail = lazy(() => import('./pages/ContractDetail'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import { AuthProvider, useAuth } from './lib/auth';
 import ShortcutsOverlay from './components/ShortcutsOverlay';
@@ -321,6 +326,10 @@ function AppRoutes() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/tags" element={<TagSettings />} />
             <Route path="/settings/neighborhoods" element={<NeighborhoodAdmin />} />
+            {/* Sprint 6 / ScreenContract — in-house digital contract
+                e-sign flow. List + detail (preview + type-to-sign). */}
+            <Route path="/contracts" element={<Contracts />} />
+            <Route path="/contracts/:id" element={<ContractDetail />} />
             {/* Legacy + alias routes — redirect.
                 `/assets` is a reasonable English guess for "נכסים"
                 (literally "assets") — hitting the 404 felt like a bug

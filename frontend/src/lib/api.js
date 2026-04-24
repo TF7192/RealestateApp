@@ -369,6 +369,19 @@ export const api = {
     return request(`/agreements/${id}/upload`, { method: 'POST', body: fd });
   },
 
+  // Sprint 6 / ScreenContract — in-house digital contract e-sign.
+  // EXCLUSIVITY / BROKERAGE / OFFER contracts rendered + signed via
+  // the reused prospect-pdf path (pdfkit). No DocuSign / HelloSign.
+  listContracts: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/contracts${qs ? `?${qs}` : ''}`);
+  },
+  getContract: (id) => request(`/contracts/${id}`),
+  createContract: (body) => request('/contracts', { method: 'POST', body }),
+  signContract: (id, signatureName) =>
+    request(`/contracts/${id}/sign`, { method: 'POST', body: { signatureName } }),
+  contractPdfUrl: (id) => `${BASE}/contracts/${id}/pdf`,
+
   dashboard: () => request('/reports/dashboard'),
   propertyWeekly: (id) => request(`/reports/property/${id}/weekly`),
   resolveLocation: (q) =>
