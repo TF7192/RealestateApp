@@ -628,6 +628,21 @@ export const api = {
   cancelReminder:      (id) => request(`/reminders/${id}/cancel`, { method: 'POST' }),
   deleteReminder:      (id) => request(`/reminders/${id}`, { method: 'DELETE' }),
 
+  // Voice-ingest — POST recorded audio blob, server returns transcript
+  // + Haiku-extracted {kind, fields, confidence, missing, notes_he}.
+  // 90-second timeout; Whisper + Haiku together typically resolve in
+  // ~5-15s, but mobile uploads over 3G can burn 20s on the audio alone.
+  voiceIngest: async (blob, filename) => {
+    const ext = (blob.type?.split(';')[0].split('/')[1] || 'webm').toLowerCase();
+    const fd = new FormData();
+    fd.append('file', blob, filename || `recording.${ext}`);
+    return request('/voice/demo-ingest', {
+      method: 'POST',
+      body: fd,
+      timeoutMs: 90_000,
+    });
+  },
+
   // Sprint 10 — התאמות פומביות (cross-agent shared pool).
   listPublicMatches:    () => request('/public-matches'),
   publicMatchesCount:   () => request('/public-matches/count'),

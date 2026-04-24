@@ -14,7 +14,10 @@ import {
   UserCheck,
   RefreshCcw,
   Building2,
+  Mic,
+  Sparkles,
 } from 'lucide-react';
+import VoiceCaptureDialog from '../components/VoiceCaptureDialog';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
 import useBeforeUnload from '../hooks/useBeforeUnload';
@@ -47,6 +50,50 @@ import './NewProperty.css';
 const HEATING_TYPES = Object.keys(HEATING_TYPE_LABELS);
 
 const DRAFT_KEY = 'estia-draft:new-property';
+const VOICE_PREFILL_KEY = 'estia-voice-prefill';
+
+// Map the Haiku extraction shape onto the NewProperty form schema. The
+// extractor emits flat, nullable keys — we only copy whatever it saw
+// and leave the rest untouched.
+function applyVoicePrefillProperty(setForm, fields) {
+  if (!fields || typeof fields !== 'object') return;
+  setForm((prev) => {
+    const next = { ...prev };
+    if (fields.type) next.type = fields.type;
+    if (fields.street) next.street = fields.street;
+    if (fields.city) next.city = fields.city;
+    if (fields.neighborhood) next.neighborhood = fields.neighborhood;
+    if (fields.rooms != null && fields.rooms !== '') next.rooms = String(fields.rooms);
+    if (fields.floor != null && fields.floor !== '') {
+      const n = Number(fields.floor);
+      if (Number.isFinite(n)) next.floor = n;
+    }
+    if (fields.totalFloors != null && fields.totalFloors !== '') {
+      const n = Number(fields.totalFloors);
+      if (Number.isFinite(n)) next.totalFloors = n;
+    }
+    if (fields.sqm != null && fields.sqm !== '') {
+      const n = Number(fields.sqm);
+      if (Number.isFinite(n)) next.sqm = n;
+    }
+    if (fields.marketingPrice != null && fields.marketingPrice !== '') {
+      const n = Number(fields.marketingPrice);
+      if (Number.isFinite(n)) next.marketingPrice = n;
+    }
+    if (fields.owner) next.owner = fields.owner;
+    if (fields.ownerPhone) next.ownerPhone = fields.ownerPhone;
+    if (fields.ownerEmail !== undefined) next.ownerEmail = fields.ownerEmail || '';
+    if (fields.elevator === true || fields.elevator === false) next.elevator = fields.elevator;
+    if (typeof fields.parking === 'string' && fields.parking.length) {
+      next.parking = true;
+      next.parkingType = fields.parking;
+    } else if (fields.parking === true) {
+      next.parking = true;
+    }
+    if (fields.notes) next.notes = fields.notes;
+    return next;
+  });
+}
 
 // 1.6 — Human-readable duration for the exclusivity window. Israeli
 // brokerage law caps residential exclusivity at 6 months by default,
@@ -357,6 +404,7 @@ export default function NewProperty() {
   const [existingMeta, setExistingMeta] = useState(null); // { street, city, imageCount }
 
   const [form, setForm] = useState(INITIAL_FORM);
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   // F-5.5 + F-14 — dirty-form guard. Only arms in create mode and
   // disarms after successful save so closing the tab post-save doesn't
@@ -388,8 +436,20 @@ export default function NewProperty() {
     if (inner && inner.form && (inner.form.street || inner.form.city || inner.form.owner)) {
       setDraftBanner({ ...inner, savedAt: draft.savedAt });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit]);
+    // Voice-ingest cross-page handoff — mirror of the NewLead side.
+    try {
+      const raw = sessionStorage.getItem(VOICE_PREFILL_KEY);
+      if (raw) {
+        sessionStorage.removeItem(VOICE_PREFILL_KEY);
+        const payload = JSON.parse(raw);
+        if (payload?.kind === 'property' && payload.fields) {
+          applyVoicePrefillProperty(setForm, payload.fields);
+          toast?.success?.('הטופס מולא מההקלטה');
+        }
+      }
+    } catch { /* ignore malformed payloads */ }
+
+  }, [isEdit, toast]);
 
   // ── Edit mode: hydrate form from the persisted property ────────────
   useEffect(() => {
@@ -795,7 +855,7 @@ export default function NewProperty() {
       // Upload photos sequentially
       for (const p of photoFiles) {
         try {
-          // eslint-disable-next-line no-await-in-loop
+           
           await api.uploadPropertyImage(propertyId, p.file);
         } catch { /* continue on per-file failure */ }
       }
@@ -898,8 +958,37 @@ export default function NewProperty() {
           <h2 style={NP_STY.headerTitle}>{headerTitle}</h2>
           <p style={NP_STY.headerSub}>{headerSub}</p>
         </div>
-        {/* Voice shortcut removed with VoiceCaptureButton (see imports). */}
+        {!isEdit && (
+          <button
+            type="button"
+            onClick={() => setVoiceOpen(true)}
+            aria-label="הקלטה חכמה — מילוי הטופס מהדיבור"
+            style={{
+              fontFamily: 'Assistant, Heebo, -apple-system, sans-serif',
+              background: 'linear-gradient(180deg, #d9b774, #b48b4c)',
+              color: '#1e1a14', border: 'none',
+              padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
+              fontSize: 13, fontWeight: 800,
+              display: 'inline-flex', gap: 6, alignItems: 'center',
+              boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
+              flexShrink: 0,
+            }}
+          >
+            <Sparkles size={14} /> <Mic size={14} /> הקלטה חכמה
+          </button>
+        )}
       </div>
+
+      <VoiceCaptureDialog
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        preferKind="property"
+        onUse={({ kind, fields }) => {
+          if (kind !== 'property') return;
+          applyVoicePrefillProperty(setForm, fields);
+          toast?.success?.('הטופס מולא מההקלטה');
+        }}
+      />
 
       {draftBanner && !isEdit && (
         <div className="draft-banner animate-in" role="status" style={NP_STY.draftBanner}>

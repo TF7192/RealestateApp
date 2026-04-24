@@ -9,8 +9,9 @@ import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Save, Clipboard, X, Check, Loader2,
   UserCircle, Search, Home, SlidersHorizontal, StickyNote, Shield,
-  AlertCircle, Building2,
+  AlertCircle, Building2, Mic, Sparkles,
 } from 'lucide-react';
+import VoiceCaptureDialog from '../components/VoiceCaptureDialog';
 import api from '../lib/api';
 import { cityNames, streetNames } from '../data/mockData';
 import { useToast } from '../lib/toast';
@@ -47,6 +48,44 @@ const DT = {
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const DRAFT_KEY = 'estia-draft:new-lead';
+const VOICE_PREFILL_KEY = 'estia-voice-prefill';
+
+// Translate the shape Haiku returns into the NewLead form shape. The
+// extractor emits flat keys (`rooms`, `budget`, `lookingFor`) — we fan
+// them out to the form's richer schema (roomsMin/roomsMax, priceMin/
+// priceMax, interestType etc.) without clobbering existing values.
+function applyVoicePrefillLead(setForm, fields) {
+  if (!fields || typeof fields !== 'object') return;
+  setForm((prev) => {
+    const next = { ...prev };
+    if (fields.name) next.name = fields.name;
+    if (fields.phone) next.phone = fields.phone;
+    if (fields.email !== undefined) next.email = fields.email || '';
+    if (fields.city) next.city = fields.city;
+    if (fields.street) next.street = fields.street;
+    if (fields.sector) next.sector = fields.sector;
+    if (fields.source) next.source = fields.source;
+    if (fields.notes) next.notes = fields.notes;
+    if (fields.lookingFor) {
+      const lf = String(fields.lookingFor).toLowerCase();
+      next.lookingFor = lf === 'rent' ? 'rent' : 'buy';
+    }
+    if (fields.rooms != null && fields.rooms !== '') {
+      const n = Number(fields.rooms);
+      if (Number.isFinite(n)) {
+        next.roomsMin = String(n);
+        next.roomsMax = String(n);
+      }
+    }
+    if (fields.budget != null && Number.isFinite(Number(fields.budget))) {
+      const n = Number(fields.budget);
+      // Use ±15% as a sensible range when only a single number was given.
+      next.priceMin = Math.round(n * 0.85);
+      next.priceMax = Math.round(n * 1.15);
+    }
+    return next;
+  });
+}
 
 // K2 — purposes is a multi-select. Order matches Nadlan One's UI.
 const PURPOSE_OPTIONS = Object.keys(CUSTOMER_PURPOSE_LABELS);
@@ -122,6 +161,7 @@ export default function NewLead() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [draftBanner, setDraftBanner] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   // F-14 — once we successfully save, disarm the beforeunload prompt so
   // closing the tab after a save doesn't pop "יש שינויים שלא נשמרו".
   const savedRef = useRef(false);
@@ -146,7 +186,21 @@ export default function NewLead() {
     if (inner && (inner.name || inner.phone || inner.city)) {
       setDraftBanner({ ...inner, __savedAt: draft.savedAt });
     }
-  }, []);
+    // Voice-ingest cross-page handoff: if the user recorded on /properties/new
+    // and the extractor identified a lead, the dialog stashed the payload in
+    // sessionStorage and navigated here. Drain + apply it once.
+    try {
+      const raw = sessionStorage.getItem(VOICE_PREFILL_KEY);
+      if (raw) {
+        sessionStorage.removeItem(VOICE_PREFILL_KEY);
+        const payload = JSON.parse(raw);
+        if (payload?.kind === 'lead' && payload.fields) {
+          applyVoicePrefillLead(setForm, payload.fields);
+          toast?.success?.('הטופס מולא מההקלטה');
+        }
+      }
+    } catch { /* ignore malformed payloads */ }
+  }, [toast]);
 
   const restoreDraft = () => {
     if (draftBanner) {
@@ -341,7 +395,35 @@ export default function NewLead() {
             {t('new.subtitle')}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setVoiceOpen(true)}
+          aria-label="הקלטה חכמה — מילוי הטופס מהדיבור"
+          style={{
+            ...FONT,
+            background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+            border: 'none', color: DT.ink,
+            padding: '10px 16px', borderRadius: 10,
+            cursor: 'pointer', fontSize: 13, fontWeight: 800,
+            display: 'inline-flex', gap: 6, alignItems: 'center',
+            boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
+            flexShrink: 0,
+          }}
+        >
+          <Sparkles size={14} /> <Mic size={14} /> הקלטה חכמה
+        </button>
       </div>
+
+      <VoiceCaptureDialog
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        preferKind="lead"
+        onUse={({ kind, fields }) => {
+          if (kind !== 'lead') return;
+          applyVoicePrefillLead(setForm, fields);
+          toast?.success?.('הטופס מולא מההקלטה');
+        }}
+      />
 
       {/* Draft restore banner */}
       {draftBanner && (
