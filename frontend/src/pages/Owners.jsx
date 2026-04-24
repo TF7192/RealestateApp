@@ -80,6 +80,9 @@ export default function Owners() {
     try {
       if (nextActive) await api.addFavorite({ entityType: 'OWNER', entityId: ownerId });
       else            await api.removeFavorite('OWNER', ownerId);
+      // Notify the sidebar so its מועדפים list refreshes without a
+      // page reload. Layout.jsx debounces a re-fetch on this event.
+      window.dispatchEvent(new Event('estia:favorites-changed'));
     } catch (e) {
       setFavoriteIds((cur) => {
         const copy = new Set(cur);

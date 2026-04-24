@@ -512,6 +512,9 @@ export default function Properties() {
       } else {
         await api.removeFavorite('PROPERTY', propertyId);
       }
+      // Notify the sidebar so its מועדפים list refreshes without a
+      // page reload. Layout.jsx debounces a re-fetch on this event.
+      window.dispatchEvent(new Event('estia:favorites-changed'));
     } catch (e) {
       setFavoriteIds((cur) => {
         const copy = new Set(cur);

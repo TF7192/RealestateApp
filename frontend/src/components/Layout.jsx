@@ -19,7 +19,7 @@
 // breadcrumb back-button, collapsed sidebar state, MobileMoreSheet
 // (superseded by the design's "עוד" tab → /settings).
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home, Users, Building2, MessageSquare, Crown, CalendarDays, BellRing, Sparkles,
@@ -156,50 +156,80 @@ export default function Layout({ onLogout }) {
   const isAdmin = user && ADMIN_EMAILS.has(user.email);
 
   // ─── Favorites (restored from the previous layout) ─────────────
+  // The list is also re-fetched on the global `estia:favorites-changed`
+  // event so toggling a star anywhere updates the sidebar without a
+  // page reload. The fetch body is factored into a stable callback so
+  // both the mount effect and the event listener can call it.
   const [favorites, setFavorites] = useState([]);
+  const favCancelRef = useRef(null);
+  const loadFavorites = useCallback(async () => {
+    if (!user?.id) return;
+    // Cancel an in-flight load so a fast burst of toggles doesn't
+    // interleave responses out of order.
+    const token = { cancelled: false };
+    if (favCancelRef.current) favCancelRef.current.cancelled = true;
+    favCancelRef.current = token;
+    try {
+      const favRes = await api.listFavorites();
+      const favItems = (favRes?.items || []).slice(0, 5);
+      if (!favItems.length) { if (!token.cancelled) setFavorites([]); return; }
+      const [propsRes, leadsRes, ownersRes] = await Promise.all([
+        api.listProperties({ mine: '1' }).catch(() => ({ items: [] })),
+        api.listLeads().catch(() => ({ items: [] })),
+        api.listOwners().catch(() => ({ items: [] })),
+      ]);
+      const byId = {
+        PROPERTY: new Map((propsRes?.items || []).map((p) => [p.id, p])),
+        LEAD:     new Map((leadsRes?.items || []).map((l) => [l.id, l])),
+        OWNER:    new Map((ownersRes?.items || []).map((o) => [o.id, o])),
+      };
+      const hydrated = favItems.map((fav) => {
+        const entity = byId[fav.entityType]?.get(fav.entityId);
+        if (!entity) return null;
+        if (fav.entityType === 'PROPERTY') {
+          const street = [entity.street, entity.number].filter(Boolean).join(' ').trim();
+          const label = [street || entity.address || 'נכס', entity.city].filter(Boolean).join(', ');
+          return { key: `P-${fav.entityId}`, label, to: `/properties/${fav.entityId}` };
+        }
+        if (fav.entityType === 'LEAD') {
+          // Direct link to the lead detail — the previous
+          // /customers?selected=<id> query just opened the list and
+          // highlighted the row, which meant the sidebar favorite
+          // didn't actually drop you into the lead record.
+          return { key: `L-${fav.entityId}`, label: entity.name || 'ליד', to: `/customers/${fav.entityId}` };
+        }
+        if (fav.entityType === 'OWNER') {
+          return { key: `O-${fav.entityId}`, label: entity.name || 'בעלים', to: `/owners/${fav.entityId}` };
+        }
+        return null;
+      }).filter(Boolean);
+      if (!token.cancelled) setFavorites(hydrated);
+    } catch { /* favorites are best-effort */ }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadFavorites();
+    return () => {
+      if (favCancelRef.current) favCancelRef.current.cancelled = true;
+    };
+  }, [loadFavorites]);
+
+  // Live refresh — every star-toggle site dispatches
+  // `estia:favorites-changed` after a successful API write. We debounce
+  // the re-fetch by 150 ms so a burst of toggles collapses to one call.
   useEffect(() => {
     if (!user?.id) return undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        const favRes = await api.listFavorites();
-        const favItems = (favRes?.items || []).slice(0, 5);
-        if (!favItems.length) { if (!cancelled) setFavorites([]); return; }
-        const [propsRes, leadsRes, ownersRes] = await Promise.all([
-          api.listProperties({ mine: '1' }).catch(() => ({ items: [] })),
-          api.listLeads().catch(() => ({ items: [] })),
-          api.listOwners().catch(() => ({ items: [] })),
-        ]);
-        const byId = {
-          PROPERTY: new Map((propsRes?.items || []).map((p) => [p.id, p])),
-          LEAD:     new Map((leadsRes?.items || []).map((l) => [l.id, l])),
-          OWNER:    new Map((ownersRes?.items || []).map((o) => [o.id, o])),
-        };
-        const hydrated = favItems.map((fav) => {
-          const entity = byId[fav.entityType]?.get(fav.entityId);
-          if (!entity) return null;
-          if (fav.entityType === 'PROPERTY') {
-            const street = [entity.street, entity.number].filter(Boolean).join(' ').trim();
-            const label = [street || entity.address || 'נכס', entity.city].filter(Boolean).join(', ');
-            return { key: `P-${fav.entityId}`, label, to: `/properties/${fav.entityId}` };
-          }
-          if (fav.entityType === 'LEAD') {
-            // Direct link to the lead detail — the previous
-            // /customers?selected=<id> query just opened the list and
-            // highlighted the row, which meant the sidebar favorite
-            // didn't actually drop you into the lead record.
-            return { key: `L-${fav.entityId}`, label: entity.name || 'ליד', to: `/customers/${fav.entityId}` };
-          }
-          if (fav.entityType === 'OWNER') {
-            return { key: `O-${fav.entityId}`, label: entity.name || 'בעלים', to: `/owners/${fav.entityId}` };
-          }
-          return null;
-        }).filter(Boolean);
-        if (!cancelled) setFavorites(hydrated);
-      } catch { /* favorites are best-effort */ }
-    })();
-    return () => { cancelled = true; };
-  }, [user?.id]);
+    let timer = null;
+    const onChanged = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; loadFavorites(); }, 150);
+    };
+    window.addEventListener('estia:favorites-changed', onChanged);
+    return () => {
+      window.removeEventListener('estia:favorites-changed', onChanged);
+      if (timer) clearTimeout(timer);
+    };
+  }, [user?.id, loadFavorites]);
 
   // Public share pages (/p/:id) skip the entire shell.
   if (location.pathname.startsWith('/p/')) return <Outlet />;
@@ -397,20 +427,47 @@ function SidebarInner({
         {tools.map((item) => (
           <NavRow key={item.k} item={item} active={isActive(item.to)} collapsed={collapsed} tight />
         ))}
-        {favorites.length > 0 && (
-          <>
-            <div style={{ height: 10 }} />
-            {!collapsed && <SectionLabel>מועדפים</SectionLabel>}
-            {favorites.map((fav) => (
-              <NavRow
-                key={fav.key}
-                item={{ to: fav.to, label: fav.label, Icon: Star }}
-                active={isActive(fav.to)}
-                collapsed={collapsed}
-                tight
-              />
-            ))}
-          </>
+        {/* מועדפים — the section header always renders so agents see
+            the affordance even before they've starred anything. When
+            the list is empty we surface a small cream-toned hint
+            (expanded rail) or a ghosted Star tile (72-px collapsed
+            rail) so the dead-space stays informative. */}
+        <div style={{ height: 10 }} />
+        {!collapsed && <SectionLabel>מועדפים</SectionLabel>}
+        {favorites.length > 0 && favorites.map((fav) => (
+          <NavRow
+            key={fav.key}
+            item={{ to: fav.to, label: fav.label, Icon: Star }}
+            active={isActive(fav.to)}
+            collapsed={collapsed}
+            tight
+          />
+        ))}
+        {favorites.length === 0 && (
+          collapsed ? (
+            <div
+              aria-hidden="true"
+              title="מועדפים"
+              style={{
+                display: 'grid', placeItems: 'center',
+                padding: '10px 0', borderRadius: 9,
+                color: DT.sidebarMuted, opacity: 0.5,
+              }}
+            >
+              <Star size={16} aria-hidden="true" />
+            </div>
+          ) : (
+            <div
+              style={{
+                ...FONT,
+                padding: '4px 12px 6px',
+                fontSize: 11, lineHeight: 1.5,
+                color: DT.sidebarMuted, opacity: 0.85,
+              }}
+            >
+              סמנו ⭐ בלידים, נכסים ובעלים לגישה מהירה.
+            </div>
+          )
         )}
       </nav>
 
