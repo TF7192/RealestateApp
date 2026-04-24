@@ -31,6 +31,11 @@ import Profile from './pages/Profile';
 // history timeline). Both land in the main bundle since they're tiny.
 import AgentCard from './pages/AgentCard';
 import LeadHistory from './pages/LeadHistory';
+// Sprint 7 — /inbox premium-gated placeholder. The WhatsApp Business
+// integration is deferred until Meta approves Estia as a Tech
+// Provider; the page gives the sidebar entry a real route to point
+// at and funnels early-access interest to /contact.
+import Inbox from './pages/Inbox';
 import Onboarding from './pages/Onboarding';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -376,6 +381,11 @@ function AppRoutes() {
                 (WhatsApp / email / contact form). Static JSON registry,
                 no Intercom. */}
             <Route path="/help" element={<Help />} />
+            {/* Sprint 7 — /inbox premium-gated WhatsApp Business Inbox
+                placeholder. Real integration is deferred pending Meta
+                Tech Provider approval; the page advertises the feature
+                and points early-access CTAs at /contact. */}
+            <Route path="/inbox" element={<Inbox />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/tags" element={<TagSettings />} />
             <Route path="/settings/neighborhoods" element={<NeighborhoodAdmin />} />

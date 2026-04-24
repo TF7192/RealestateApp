@@ -73,7 +73,13 @@ const PRIMARY_NAV = [
   { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
   { k: 'activity',    to: '/activity',   label: 'פעילות',     Icon: ActivityIcon },
   { k: 'documents',   to: '/documents',  label: 'מסמכים',     Icon: FolderOpen },
-  { k: 'inbox',       to: '/admin/chats', label: 'הודעות צ׳אט', Icon: MessageSquare, adminOnly: true },
+  // Sprint 7 — /inbox premium-gated WhatsApp Business Inbox
+  // placeholder. The integration is deferred pending Meta Tech
+  // Provider approval; the row previously carried a fake badge="3"
+  // from the claude-design bundle which is swapped for a "בקרוב"
+  // pill now that the route is real but the feature isn't.
+  { k: 'inbox',       to: '/inbox',      label: 'תיבת WhatsApp', Icon: MessageSquare, comingSoon: true },
+  { k: 'admin-chats', to: '/admin/chats', label: 'הודעות צ׳אט', Icon: MessageSquare, adminOnly: true },
 ];
 const TOOL_NAV = [
   { k: 'yad2',      to: '/integrations/yad2', label: 'ייבוא מ-Yad2', Icon: DownloadIcon, premium: true },
@@ -501,6 +507,18 @@ function NavRow({ item, active, tight, collapsed }) {
           background: DT.gold, color: DT.ink, fontSize: 10, fontWeight: 800,
           padding: '2px 6px', borderRadius: 99, minWidth: 18, textAlign: 'center',
         }}>{item.badge}</span>
+      )}
+      {/* Sprint 7 — muted "בקרוב" pill for premium-gated placeholder
+          routes like /inbox. Distinct from the gold count badge so
+          agents don't read it as "3 unread messages". */}
+      {!collapsed && item.comingSoon && (
+        <span style={{
+          background: 'rgba(180,139,76,0.18)',
+          color: DT.goldLight,
+          fontSize: 9, fontWeight: 800,
+          padding: '2px 7px', borderRadius: 99,
+          letterSpacing: 0.2, whiteSpace: 'nowrap',
+        }}>בקרוב</span>
       )}
       {!collapsed && item.premium && <Sparkles size={11} aria-hidden="true" />}
     </NavLink>
