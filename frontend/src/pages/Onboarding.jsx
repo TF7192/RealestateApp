@@ -14,6 +14,7 @@ import {
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useToast } from '../lib/toast';
+import LogoMark from '../components/LogoMark';
 
 const T = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -173,6 +174,10 @@ export default function Onboarding() {
             }}>
             {step === 0 ? <LogOut size={18} /> : <ArrowLeft size={18} />}
           </button>
+          {/* Sprint 8 brand sweep — onboarding sits on the cream page
+              background so the ink-tile variant with the gold ◆ is
+              the contrast-correct mark. */}
+          <LogoMark size={30} tone="ink" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.2 }}>הרשמה חינם</div>
             <div style={{ fontSize: 11, color: T.muted, marginTop: 1 }}>שלב {step + 1} מתוך {TOTAL_STEPS}</div>

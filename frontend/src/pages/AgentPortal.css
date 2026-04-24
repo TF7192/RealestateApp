@@ -50,6 +50,23 @@
   padding: 48px 24px 36px;
 }
 
+/* Sprint 8 — brand row above the agent card. Tight, editorial; the
+   <LogoMark /> supplies the tile so we only style the wordmark here. */
+.ap-brand-row {
+  max-width: 1120px;
+  margin: 0 auto 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ap-brand-word {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
 .ap-hero-inner {
   max-width: 1120px;
   margin: 0 auto;

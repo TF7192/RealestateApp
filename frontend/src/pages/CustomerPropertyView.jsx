@@ -29,6 +29,7 @@ import {
 import api from '../lib/api';
 import { formatFloor, formatFloorOutOf } from '../lib/formatFloor';
 import WhatsAppIcon from '../components/WhatsAppIcon';
+import LogoMark from '../components/LogoMark';
 import './CustomerPropertyView.css';
 
 // ── Money & shape helpers ─────────────────────────────────────────────
@@ -317,8 +318,10 @@ export default function CustomerPropertyView() {
               <span>הנכסים של {agentName}</span>
             </Link>
           ) : <span aria-hidden />}
+          {/* Sprint 8 brand sweep — glass/cream header → ink tile with
+              the gold ◆ reads cleanly against the translucent bar. */}
           <div className="cpv-brand">
-            <span className="cpv-brand-mark">◆</span>
+            <LogoMark size={22} tone="ink" />
             <span className="cpv-brand-name">Estia</span>
           </div>
           <button className="cpv-icon-btn" onClick={handleShare} aria-label="שתף את הנכס">

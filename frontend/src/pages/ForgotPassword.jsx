@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import api from '../lib/api';
+import LogoMark from '../components/LogoMark';
 
 const DT = {
   cream: '#f7f3ec', cream4: '#fbf7f0',
@@ -60,12 +61,8 @@ export default function ForgotPassword() {
         boxShadow: '0 30px 80px rgba(30,26,20,0.08)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
-            display: 'grid', placeItems: 'center', color: DT.ink,
-            fontWeight: 900, fontSize: 17,
-          }}>E</div>
+          {/* Sprint 8 brand sweep — auth card is cream, tone="ink". */}
+          <LogoMark size={36} tone="ink" />
           <div style={{ fontSize: 22, fontWeight: 800 }}>Estia</div>
         </div>
 

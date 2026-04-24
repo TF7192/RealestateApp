@@ -37,6 +37,7 @@ import Yad2ScanBanner from './Yad2ScanBanner';
 import MarketScanBanner from './MarketScanBanner';
 import QuickCreateFab from './QuickCreateFab';
 import MobileTabBar from './MobileTabBar';
+import LogoMark from './LogoMark';
 import haptics from '../lib/haptics';
 
 // ─── Tokens (shell.jsx / DT verbatim) ──────────────────────
@@ -354,17 +355,9 @@ function SidebarInner({
           display: 'flex', alignItems: 'center', gap: 10,
           textDecoration: 'none', flex: 1, minWidth: 0,
         }}>
-          {/* Sprint 8 brand sweep — diamond glyph matches the favicon
-              + the claude-design bundle's LogoMark. Kept as a CSS
-              tile so it recolors per surface (sidebar = dark panel so
-              we use the gold gradient for contrast). */}
-          <div style={{
-            width: 34, height: 34, borderRadius: 9,
-            background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
-            display: 'grid', placeItems: 'center', color: DT.ink,
-            fontWeight: 900, fontSize: 18, letterSpacing: -1, flexShrink: 0,
-            boxShadow: '0 4px 16px rgba(180,139,76,0.35), inset 0 1px 0 rgba(255,255,255,0.3)',
-          }}>◆</div>
+          {/* Sprint 8 brand sweep — shared <LogoMark>. Sidebar surface
+              is the espresso panel so we use tone="gold" for contrast. */}
+          <LogoMark size={34} tone="gold" />
           {!collapsed && (
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: -0.3 }}>Estia</div>

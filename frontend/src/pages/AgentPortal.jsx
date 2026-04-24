@@ -17,6 +17,7 @@ import {
 import api from '../lib/api';
 import VCardQr from '../components/VCardQr';
 import ShareDialog from '../components/ShareDialog';
+import LogoMark from '../components/LogoMark';
 import './AgentPortal.css';
 
 function formatPrice(price) {
@@ -146,6 +147,13 @@ export default function AgentPortal() {
     <div className="agent-portal">
       {/* Hero header */}
       <header className="ap-hero">
+        {/* Sprint 8 brand sweep — the hero sits on the cream/bg-primary
+            surface so the ink tile with a gold ◆ reads as the Estia
+            mark without competing with the agent's headshot. */}
+        <div className="ap-brand-row" aria-label="Estia">
+          <LogoMark size={30} tone="ink" />
+          <span className="ap-brand-word">Estia</span>
+        </div>
         <div className="ap-hero-inner">
           <div className="ap-agent-card">
             {agent.avatarUrl ? (

@@ -109,17 +109,13 @@
 .cpv-brand {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: var(--text-primary);
   justify-self: center;
   pointer-events: none;
 }
-.cpv-brand-mark {
-  font-size: 18px;
-  color: var(--gold);
-  font-weight: 900;
-  line-height: 1;
-}
+/* Sprint 8 — the ◆ tile now comes from <LogoMark>; only the wordmark
+   is styled here. */
 .cpv-brand-name {
   font-family: var(--font-display);
   font-weight: 800;

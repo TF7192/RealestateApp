@@ -15,6 +15,7 @@ import { useAuth } from '../lib/auth';
 import { isNative, isIOS } from '../native/platform';
 import { Browser } from '@capacitor/browser';
 import api from '../lib/api';
+import LogoMark from '../components/LogoMark';
 
 // ─── Tokens lifted verbatim from the bundle (DT / T — merged) ──
 const DT = {
@@ -175,11 +176,9 @@ function DesktopLogin(p) {
         <div style={{ position: 'absolute', top: -60, left: -60, width: 240, height: 240, borderRadius: 99, background: DT.goldSoft, filter: 'blur(40px)' }} />
         <div style={{ position: 'absolute', bottom: -40, right: -40, width: 200, height: 200, borderRadius: 99, background: 'rgba(217,183,116,0.15)', filter: 'blur(30px)' }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
-            display: 'grid', placeItems: 'center', color: DT.ink, fontWeight: 900, fontSize: 22,
-          }}>E</div>
+          {/* Brand panel is the dark ink/goldDark gradient → gold tile
+              with ink ◆ reads as the product mark, not another letter. */}
+          <LogoMark size={44} tone="gold" />
           <div style={{ fontSize: 22, fontWeight: 800 }}>Estia</div>
         </div>
         <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 440 }}>
@@ -307,11 +306,9 @@ function MobileLogin(p) {
       display: 'flex', flexDirection: 'column', padding: '22px 22px 22px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-        <div style={{
-          width: 34, height: 34, borderRadius: 10,
-          background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
-          display: 'grid', placeItems: 'center', color: DT.ink, fontWeight: 900, fontSize: 17,
-        }}>E</div>
+        {/* Mobile login sits on the cream background → ink tile with
+            a gold ◆ gives the needed contrast. */}
+        <LogoMark size={34} tone="ink" />
         <div style={{ fontSize: 21, fontWeight: 800 }}>Estia</div>
       </div>
       <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.8, lineHeight: 1.12, margin: '0 0 6px' }}>
