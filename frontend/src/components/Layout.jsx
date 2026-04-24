@@ -47,18 +47,16 @@ const DT = {
   muted: '#6b6356',
   gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
   border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
-  // Sidebar palette — warm taupe brown that keeps the editorial B&G
-  // pairing but reads brighter than the previous espresso, so the gold
-  // accents and labels both pop cleanly.
-  sidebarBg: '#806752',
-  sidebarInk: '#f7eedc',
-  sidebarMuted: '#d6c5a4',
+  // Sidebar palette — espresso #544433 from the claude-design bundle
+  // verbatim. Gold accents are calibrated against this dark brown.
+  sidebarBg: '#544433',
+  sidebarInk: '#f5ecd8',
+  sidebarMuted: '#bfae91',
 };
 
-// Sidebar sits at the pre-redesign width so the main content area
-// doesn't feel cramped on a 1440 workspace.
-const SIDEBAR_W = 200;
-const SIDEBAR_W_COLLAPSED = 64;
+// Bundle's DesktopShell width — 240 expanded, 72 collapsed rail.
+const SIDEBAR_W = 240;
+const SIDEBAR_W_COLLAPSED = 72;
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
@@ -650,11 +648,12 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
 function NotificationsPopover({ items, loading, onClose }) {
   return (
     <div style={{
-      // Anchor to the bell's RIGHT edge (in RTL this is the viewport-
-      // side; the popover extends leftward into the page). Using plain
-      // `right: 0` is direction-agnostic and reliable — the previous
-      // `insetInlineStart: 0` pushed the popover offscreen.
-      position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+      // Anchor to the bell's LEFT edge so the popover flows rightward
+      // into the viewport. The action cluster is `marginInlineStart:
+      // auto` which in RTL sits on the viewport's LEFT — so `right: 0`
+      // pushed the 340-wide popover off that left edge. `left: 0` lets
+      // it extend toward the middle of the page where there's room.
+      position: 'absolute', top: 'calc(100% + 6px)', left: 0,
       width: 340, maxWidth: 'calc(100vw - 24px)',
       background: DT.white, border: `1px solid ${DT.border}`,
       borderRadius: 12, boxShadow: '0 14px 34px rgba(30,26,20,0.14)',

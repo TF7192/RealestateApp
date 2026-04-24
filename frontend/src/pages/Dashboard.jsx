@@ -1,891 +1,493 @@
-import { useEffect, useRef, useState } from 'react';
+// Dashboard — port of the claude.ai/design bundle's DDashboard
+// (estia-new-project/project/src/desktop/screens-1.jsx).
+// Visual match is the goal; data comes from the real API where
+// available. AI-specific actions open a "Premium only" modal instead
+// of firing — the feature is gated behind the upgrade path.
+
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import {
-  Building2,
-  Store,
-  Target,
-  Handshake,
-  TrendingUp,
-  ArrowUpLeft,
-  Plus,
-  UserPlus,
-  Flame,
-  MessageCircle,
-  FileText,
-  Clock3,
-  UserCircle,
-  Sun,
-  PhoneCall,
-  Sparkles,
-  Calendar as CalendarIcon,
-  Calculator as CalcIcon,
+  Users, Calendar as CalendarIcon, Banknote, BarChart2,
+  Sparkles, X, Star,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { useToast } from '../lib/toast';
-import ShareCatalogDialog from '../components/ShareCatalogDialog';
-import PullRefresh from '../components/PullRefresh';
-import DeltaBadge from '../components/DeltaBadge';
-import { Segmented } from '../components/SmartFields';
-import { relativeDate } from '../lib/relativeDate';
-import { shareSheet } from '../native/share';
-import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
-import useDashboardDeltas from '../hooks/useDashboardDeltas';
-import { pageCache } from '../lib/pageCache';
-import haptics from '../lib/haptics';
-import './Dashboard.css';
 
-// Period keys for DeltaBadge labels + the Segmented options. The actual
-// Hebrew / English strings live in dashboard.json (period.*, periodLong.*)
-// and are resolved inside the component where t() is available.
-const PERIOD_KEYS = ['week', 'month', 'quarter'];
+// ─── Tokens lifted from the bundle's shell.jsx ──────────────
+const DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14', ink2: '#3a3226',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
+  hot: '#b91c1c', warm: '#b45309', cold: '#475569',
+  success: '#15803d',
+};
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
-function formatPrice(price, rentPerSuffix) {
-  if (!price) return '₪0';
-  if (price < 10000) return `₪${price.toLocaleString('he-IL')}${rentPerSuffix}`;
-  return `₪${price.toLocaleString('he-IL')}`;
-}
+// AI priorities — this card is the premium demo surface, every row
+// opens the Premium modal on click.
+const AI_PRIORITIES = [
+  { p: 1, t: 'תתקשרו לדנה כהן · לא עניתם כבר 4 שעות',        sub: 'ליד חם · תקציב ₪3.2M · שלחה 2 הודעות',         tag: 'hot',  action: 'התקשר עכשיו' },
+  { p: 2, t: 'שלחו ל-מיכל אבן את הפנטהאוז בהרצליה',           sub: 'AI התאמה 88% · מחכה להצעה',                       tag: 'gold', action: 'שלח הצעה' },
+  { p: 3, t: 'תיאום צפייה · רון ברקוביץ',                      sub: 'ראה 4 דירות, מתלבט — הצעת פגישה מחר',             tag: 'warm', action: 'תאם פגישה' },
+  { p: 4, t: 'עדכנו מחיר נכס ז׳בוטינסקי 108',                  sub: 'ירד מ-142 ל-89 צפיות השבוע — מומלץ להוריד ₪50K', tag: 'ink',  action: 'ערוך' },
+  { p: 5, t: 'שלחו חוזה בלעדיות למשפ׳ כוכבי',                  sub: 'נחתם בסיכום השבועי · ממתין להעלאה',                tag: 'success', action: 'פתח חוזה' },
+];
 
 export default function Dashboard() {
-  const { t } = useTranslation('dashboard');
-  // Seed from cache so a return trip paints stats instantly. If no
-  // cache exists (first visit) we fall back to loading = true.
-  const _cached = pageCache.get('dashboard');
-  const [data, setData] = useState(_cached || null);
-  const [loading, setLoading] = useState(!_cached);
-  // B2 — rolling-delta window. Default "week" matches Nadlan One's
-  // out-of-the-box dashboard. All three windows are fetched once on
-  // mount (see useDashboardDeltas) so switching is instant.
-  const [period, setPeriod] = useState('week');
-  const deltas = useDashboardDeltas(period);
-
-  const load = async () => {
-    try {
-      const [summary, props, leads, owners] = await Promise.all([
-        api.dashboard(),
-        api.listProperties({ mine: '1' }),
-        api.listLeads(),
-        api.listOwners().catch(() => ({ items: [] })),
-      ]);
-      const next = {
-        summary,
-        properties: props.items || [],
-        leads: leads.items || [],
-        owners: owners.items || [],
-      };
-      setData(next);
-      pageCache.set('dashboard', next);
-      // Seed per-page caches too so hopping to /properties /customers
-      // /owners right after the Dashboard loads paints them instantly.
-      pageCache.set('properties', next.properties);
-      pageCache.set('customers',  next.leads);
-      pageCache.set('owners',     next.owners);
-    } catch {
-      setData((d) => d || { summary: null, properties: [], leads: [], owners: [] });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await load();
-      if (cancelled) return;
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const showSkel = useDelayedFlag(loading, 220);
-  if (loading && showSkel) {
-    return (
-      <PullRefresh onRefresh={load}>
-        <div className="dashboard">
-          <WelcomeSection />
-          <div className="stats-grid">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="stat-card skel" style={{ height: 72 }} />
-            ))}
-          </div>
-        </div>
-      </PullRefresh>
-    );
-  }
-  if (loading) {
-    // Below the skeleton threshold: show just the welcome so the page
-    // chrome is present but no empty stat cards flash before the real
-    // numbers arrive.
-    return (
-      <PullRefresh onRefresh={load}>
-        <div className="dashboard">
-          <WelcomeSection />
-        </div>
-      </PullRefresh>
-    );
-  }
-
-  const summary = data?.summary || {};
-  const properties = data?.properties || [];
-  const leads = data?.leads || [];
-  const owners = data?.owners || [];
-  // F-21 — when data came from the page cache we're probably refetching
-  // fresher numbers in the background; mark the tiles with a shimmer
-  // so an agent doesn't mistake "0 hot leads (stale)" for "genuinely 0".
-  const isRefreshing = loading;
-
-  // Real counts, never mock
-  const res = summary.properties?.residential || { total: 0, sale: 0, rent: 0 };
-  const com = summary.properties?.commercial  || { total: 0, sale: 0, rent: 0 };
-  const leadStats = summary.leads || { total: 0, hot: 0, warm: 0, cold: 0 };
-  const dealStats = summary.deals || { total: 0, active: 0, signed: 0, totalCommission: 0 };
-  const ownersTotal = owners.length;
-  const ownersActive = owners.filter((o) => (o.propertyCount || 0) > 0).length;
-
-  // Note: hot-leads-list and marketing-progress card were removed in
-  // favor of the richer 3-card grid (PipelineHealthCard, ActionQueueCard,
-  // ConversionFunnelCard). See lower in the file.
-
-  const stats = [
-    {
-      icon: Building2,
-      label: t('stats.residentialActive'),
-      value: res.total,
-      sub: t('stats.saleRentFormat', { sale: res.sale, rent: res.rent }),
-      color: 'var(--gold)',
-      bg: 'var(--gold-glow)',
-      to: '/properties?assetClass=residential',
-      deltaKey: 'properties',
-    },
-    {
-      icon: Store,
-      label: t('stats.commercialActive'),
-      value: com.total,
-      sub: t('stats.saleRentFormat', { sale: com.sale, rent: com.rent }),
-      color: 'var(--warning)',
-      bg: 'var(--warning-bg)',
-      to: '/properties?assetClass=commercial',
-      deltaKey: 'properties',
-    },
-    {
-      icon: Target,
-      label: t('stats.hotLeads'),
-      value: leadStats.hot,
-      sub: t('stats.leadsTotalFormat', { count: leadStats.total }),
-      color: 'var(--danger)',
-      bg: 'var(--danger-bg)',
-      to: '/customers?filter=hot',
-      deltaKey: 'customers',
-    },
-    {
-      icon: Handshake,
-      label: t('stats.dealsActive'),
-      value: dealStats.active,
-      sub: t('stats.dealsClosedFormat', { count: dealStats.signed }),
-      color: 'var(--success)',
-      bg: 'var(--success-bg)',
-      to: '/deals',
-      deltaKey: 'deals',
-    },
-    {
-      icon: TrendingUp,
-      label: t('stats.commissions'),
-      value: formatPrice(dealStats.totalCommission, t('rentPer')),
-      sub: t('stats.commissionsSub'),
-      color: 'var(--info)',
-      bg: 'var(--info-bg)',
-      to: '/deals?tab=signed',
-      // Commission-total doesn't map cleanly to a count delta, so we
-      // intentionally don't show a pill here.
-      deltaKey: null,
-    },
-    {
-      icon: UserCircle,
-      label: t('stats.owners'),
-      value: ownersTotal,
-      sub: t('stats.ownersActiveFormat', { count: ownersActive }),
-      color: 'var(--gold)',
-      bg: 'var(--gold-glow)',
-      to: '/owners',
-      // No report endpoint for owners deltas yet.
-      deltaKey: null,
-    },
-  ];
-
-  const hasAnyContent = properties.length > 0 || leads.length > 0;
-
-  // ── Marketing / follow-up signals ──────────────────────────────
-  const now = Date.now();
-  const staleThresholdDays = 30;
-  const staleLeads = leads.filter((l) => {
-    if (!l.lastContact) return false;
-    const diffDays = (now - new Date(l.lastContact).getTime()) / (1000 * 60 * 60 * 24);
-    return diffDays >= staleThresholdDays && l.status !== 'COLD';
-  });
-
-  const periodOptions = PERIOD_KEYS.map((key) => ({ value: key, label: t(`period.${key}`) }));
-
-  return (
-    <PullRefresh onRefresh={load}>
-      <div className="dashboard">
-        <WelcomeSection />
-
-        <TodayStrip leads={leads} properties={properties} />
-
-        <div className="kpi-period-row">
-          <span className="kpi-period-label">{t('periodLabel')}</span>
-          <Segmented
-            value={period}
-            onChange={setPeriod}
-            options={periodOptions}
-            ariaLabel={t('periodAria')}
-          />
-        </div>
-
-        <KpiScroller
-          stats={stats}
-          refreshing={isRefreshing}
-          deltaBucket={deltas[period]}
-          periodLabel={t(`periodLong.${period}`)}
-        />
-
-        {staleLeads.length > 0 && (
-        <div className="dash-signals animate-in animate-in-delay-2">
-          {staleLeads.length > 0 && (() => {
-            const oldest = staleLeads
-              .map((l) => new Date(l.lastContact).getTime())
-              .sort((a, b) => a - b)[0];
-            const rel = relativeDate(oldest);
-            return (
-              <Link
-                to="/customers?filter=inactive30"
-                className="sig-card sig-muted"
-                onClick={() => haptics.tap()}
-              >
-                <Clock3 size={18} />
-                <div>
-                  <strong>{t('staleLeads.title', { count: staleLeads.length, days: staleThresholdDays })}</strong>
-                  <small>
-                    {t('staleLeads.oldest')}<span className={`rel-${rel.severity}`}>{rel.label}</span>
-                  </small>
-                </div>
-              </Link>
-            );
-          })()}
-          <Link
-            to="/templates"
-            className="sig-card sig-gold"
-            onClick={() => haptics.tap()}
-          >
-            <FileText size={18} />
-            <div>
-              <strong>{t('templates.title')}</strong>
-              <small>{t('templates.description')}</small>
-            </div>
-          </Link>
-        </div>
-      )}
-
-      {!hasAnyContent ? (
-        <div className="dashboard-empty animate-in animate-in-delay-2">
-          <div className="de-illustration">🏡</div>
-          <h3>{t('empty.welcomeTitle')}</h3>
-          <p>{t('empty.welcomeBody')}</p>
-          <div className="de-actions">
-            <Link to="/properties/new" className="btn btn-primary btn-lg">
-              <Plus size={16} /> {t('ctas.newProperty')}
-            </Link>
-            <Link to="/customers/new" className="btn btn-secondary btn-lg">
-              <UserPlus size={16} /> {t('ctas.newLead')}
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="dashboard-grid dashboard-grid-rich">
-          <PipelineHealthCard leads={leads} dealStats={dealStats} />
-          <ActionQueueCard
-            leads={leads}
-            properties={properties}
-            staleThresholdDays={staleThresholdDays}
-          />
-          {/* D-2 — meetings for today + next 7 days (cap 5), with a
-              link to the full reminders/meetings view. */}
-          <MeetingsCard />
-          {/* D-1 — משפך המרה card removed. The conversion numbers it
-              showed (leads → hot → active → signed) repeated data
-              already surfaced across the KPI scroller above, and the
-              funnel's "signed deals" row was misleading for agents
-              still closing their first deal. Card + its CSS deleted
-              together so the grid reflows cleanly to the remaining
-              cards. */}
-        </div>
-      )}
-      </div>
-    </PullRefresh>
-  );
-}
-
-function KpiScroller({ stats, refreshing = false, deltaBucket = null, periodLabel = '' }) {
-  const trackRef = useRef(null);
-  const [activeIdx, setActiveIdx] = useState(0);
-
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return undefined;
-    const onScroll = () => {
-      const cards = track.querySelectorAll('.stat-card');
-      if (!cards.length) return;
-      const center = track.scrollLeft + track.clientWidth / 2;
-      let best = 0;
-      let bestDist = Infinity;
-      cards.forEach((el, i) => {
-        const cardCenter = el.offsetLeft + el.offsetWidth / 2;
-        const d = Math.abs(cardCenter - center);
-        if (d < bestDist) { bestDist = d; best = i; }
-      });
-      setActiveIdx(best);
-    };
-    track.addEventListener('scroll', onScroll, { passive: true });
-    return () => track.removeEventListener('scroll', onScroll);
-  }, []);
-
-  return (
-    <>
-      <div className="stats-grid" ref={trackRef}>
-        {stats.map((stat, i) => {
-          // Per-KPI delta — null means either the bucket failed to load
-          // or this stat doesn't map to a report endpoint (owners,
-          // commission total). In both cases we just skip the pill so
-          // the tile still shows its total.
-          const deltaValue = stat.deltaKey && deltaBucket
-            ? deltaBucket[stat.deltaKey]
-            : null;
-          const showDelta = stat.deltaKey && Number.isFinite(Number(deltaValue));
-          return (
-            <Link
-              key={stat.label}
-              to={stat.to}
-              className={`stat-card animate-in animate-in-delay-${Math.min(i + 1, 5)}`}
-              onClick={() => haptics.tap()}
-            >
-              <div className="stat-icon" style={{ background: stat.bg, color: stat.color }}>
-                <stat.icon size={22} />
-              </div>
-              <div className="stat-info">
-                <span className="stat-value-row">
-                  <span className={`stat-value ${refreshing ? 'stat-value-refreshing' : ''}`}>{stat.value}</span>
-                  {showDelta && (
-                    <DeltaBadge value={Number(deltaValue)} label={periodLabel} />
-                  )}
-                </span>
-                <span className="stat-label">{stat.label}</span>
-                <span className="stat-sub">{stat.sub}</span>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-      <div className="stats-dots" aria-hidden="true">
-        {stats.map((_, i) => (
-          <span
-            key={i}
-            className={`stats-dot ${i === activeIdx ? 'active' : ''}`}
-          />
-        ))}
-      </div>
-    </>
-  );
-}
-
-// S12 · TodayStrip — the "morning-coffee" summary that answers
-// "what do I need to do today?" in one glance. Deliberately calm: no
-// counts-in-red, no exclamation marks, no call-to-action verbs. Each
-// item is a one-tap link into the filtered page so the agent can act
-// without reading long copy.
-//
-// Only renders tiles that have content — the strip disappears entirely
-// on a quiet day rather than showing "0 things to do!" cheerleader copy.
-function TodayStrip({ leads = [], properties = [] }) {
-  const { t } = useTranslation('dashboard');
-  const now = Date.now();
-  const DAY = 86400000;
-
-  // Stale leads (HOT/WARM only, ≥10 days) — same threshold as the
-  // customer-list pill (S11) so the numbers line up.
-  const staleLeads = leads.filter((l) => {
-    if (!l.lastContact) return false;
-    if (l.status === 'COLD') return false;
-    return (now - new Date(l.lastContact).getTime()) / DAY >= 10;
-  });
-
-  // Hot leads untouched for even a day. "Hot" means the agent said so —
-  // letting a hot lead sit overnight is the expensive miss.
-  const hotSilent = leads.filter((l) => {
-    if (l.status !== 'HOT') return false;
-    if (!l.lastContact) return true;
-    return (now - new Date(l.lastContact).getTime()) / DAY >= 1;
-  });
-
-  // Properties with no marketing actions ticked yet — likely new intakes
-  // where the agent hasn't started promotion.
-  const unmarketed = properties.filter((p) => {
-    const acts = Object.values(p.marketingActions || {});
-    if (!acts.length) return true;
-    return acts.every((v) => !v);
-  });
-
-  const tiles = [];
-  if (hotSilent.length > 0) {
-    tiles.push({
-      key: 'hot',
-      to: '/customers?filter=hot',
-      icon: PhoneCall,
-      title: t('today.hotSilent.title', { count: hotSilent.length }),
-      sub: t('today.hotSilent.sub'),
-      tone: 'danger',
-    });
-  }
-  if (staleLeads.length > 0) {
-    tiles.push({
-      key: 'stale',
-      to: '/customers?filter=inactive10',
-      icon: Clock3,
-      title: t('today.stale.title', { count: staleLeads.length }),
-      sub: t('today.stale.sub'),
-      tone: 'warn',
-    });
-  }
-  if (unmarketed.length > 0) {
-    tiles.push({
-      key: 'promo',
-      to: '/properties?filter=unmarketed',
-      icon: Sparkles,
-      title: t('today.unmarketed.title', { count: unmarketed.length }),
-      sub: t('today.unmarketed.sub'),
-      tone: 'gold',
-    });
-  }
-
-  // UX review F-4.2 — on a quiet day, keep the strip visible with a
-  // positive empty state. Collapsing silently breaks the agent's
-  // morning scan rhythm — they think the widget broke.
-  if (tiles.length === 0) {
-    return (
-      <section className="today-strip animate-in animate-in-delay-1" aria-label={t('today.aria')}>
-        <header className="today-strip-head">
-          <Sun size={14} aria-hidden="true" />
-          <h3>{t('today.heading')}</h3>
-        </header>
-        <div className="today-strip-rail">
-          <div className="today-tile today-tile-ok" aria-live="polite">
-            <span className="today-tile-icon"><Sparkles size={16} /></span>
-            <span className="today-tile-meta">
-              <strong>{t('today.allClearTitle')}</strong>
-              <small>{t('today.allClearSub')}</small>
-            </span>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="today-strip animate-in animate-in-delay-1" aria-label={t('today.aria')}>
-      <header className="today-strip-head">
-        <Sun size={14} aria-hidden="true" />
-        <h3>{t('today.heading')}</h3>
-      </header>
-      <div className="today-strip-rail">
-        {tiles.map((t) => {
-          const Icon = t.icon;
-          return (
-            <Link
-              key={t.key}
-              to={t.to}
-              className={`today-tile today-tile-${t.tone}`}
-              onClick={() => haptics.tap()}
-            >
-              <span className="today-tile-icon"><Icon size={16} /></span>
-              <span className="today-tile-meta">
-                <strong>{t.title}</strong>
-                <small>{t.sub}</small>
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function WelcomeSection() {
-  const { t } = useTranslation('dashboard');
   const { user } = useAuth();
-  const [shareOpen, setShareOpen] = useState(false);
-  const isMobile = useViewportMobile();
-
-  const displayName = user?.displayName || t('fallbacks.agent');
-  const firstName = displayName.split(' ')[0];
-  const catalogUrl = user?.slug
-    ? `${window.location.origin}/agents/${encodeURI(user.slug)}`
-    : (user?.id ? `${window.location.origin}/a/${user.id}` : null);
-
-  const handleShare = async () => {
-    haptics.tap();
-    if (!catalogUrl) return;
-    if (isMobile) {
-      const text = [
-        t('share.greetingLine', { name: displayName || t('fallbacks.yourAgent') }),
-        t('share.introLine'),
-      ].join('\n');
-      const ok = await shareSheet({
-        title: t('share.title'),
-        text,
-        url: catalogUrl,
-      });
-      // If native/webshare worked (or clipboard fallback did), we're done.
-      if (ok) return;
-    }
-    // Fallback: open the preview dialog (desktop or share sheet unavailable)
-    setShareOpen(true);
-  };
-
-  return (
-    <>
-      <div className="welcome-section animate-in">
-        <div className="welcome-content">
-          <h2>{t('greeting', { firstName })}</h2>
-          <p>{t('subtitle')}</p>
-        </div>
-        <div className="welcome-actions">
-          <button
-            className="btn btn-secondary btn-lg"
-            onClick={handleShare}
-            disabled={!catalogUrl}
-            title={t('sharePreview')}
-          >
-            <MessageCircle size={18} />
-            {t('ctas.share')}
-          </button>
-          <Link to="/properties/new" className="btn btn-ghost btn-lg">
-            <Plus size={18} />
-            {t('ctas.newProperty')}
-          </Link>
-          <Link to="/customers/new" className="btn btn-ghost btn-lg">
-            <UserPlus size={18} />
-            {t('ctas.newLead')}
-          </Link>
-          {/* Used constantly during pricing conversations — surface
-              right next to the create-shortcuts so it's a one-tap
-              reach from the dashboard. Yad2 import is a one-time
-              setup tool, not on this row; reachable via more-sheet. */}
-          <Link to="/calculator" className="btn btn-ghost btn-lg">
-            <CalcIcon size={18} />
-            {t('ctas.calculator')}
-          </Link>
-        </div>
-      </div>
-      {shareOpen && catalogUrl && (
-        <ShareCatalogDialog
-          catalogUrl={catalogUrl}
-          agentName={displayName}
-          onClose={() => setShareOpen(false)}
-        />
-      )}
-    </>
-  );
-}
-
-// ── Pipeline Health ──────────────────────────────────────────────
-// Distribution of leads across HOT / WARM / COLD as a horizontal
-// stacked bar. Each segment is a clickable Link that opens the
-// customers list pre-filtered to that status. Below the bar: 3 mini
-// stat tiles + the total pipeline value (sum of lead.budget).
-function PipelineHealthCard({ leads = [] }) {
-  const buckets = leads.reduce(
-    (acc, l) => {
-      const k = l.status === 'HOT' ? 'hot' : l.status === 'WARM' ? 'warm' : 'cold';
-      acc[k] += 1;
-      acc.budget += Number(l.budget) || 0;
-      return acc;
-    },
-    { hot: 0, warm: 0, cold: 0, budget: 0 },
-  );
-  const total = buckets.hot + buckets.warm + buckets.cold;
-  const pct = (n) => (total ? (n / total) * 100 : 0);
-  const fmtBudget = (n) => {
-    // Zero is a real, informative value for a brand-new agent with no
-    // budget data yet. Print "0 ₪" instead of the em-dash so the card
-    // reads like a number, not a placeholder.
-    if (!n) return '0 ₪';
-    if (n >= 1_000_000) return `₪${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `₪${Math.round(n / 1_000)}K`;
-    return `₪${n.toLocaleString('he-IL')}`;
-  };
-
-  return (
-    <div className="card dashboard-card dash-pipeline animate-in animate-in-delay-3">
-      <div className="card-header">
-        <h3>מצב הלידים</h3>
-        <span className="badge badge-gold">{total} סה״כ</span>
-      </div>
-      <div className="dash-pipeline-bar" role="img" aria-label={`${buckets.hot} חמים, ${buckets.warm} פושרים, ${buckets.cold} קרים`}>
-        {total === 0 && <div className="dash-pipeline-empty">—</div>}
-        {/* Segments sized via `flex` (grow-basis) instead of raw `width`
-            so the percentages always sum to exactly the container
-            width. With plain `width: X%` inside a flex row the browser
-            was leaving a cream sliver on one edge whenever a single
-            bucket was non-zero — the child's flex-basis defaulted to
-            `auto` (content width) and the width % became advisory. */}
-        {buckets.hot > 0 && (
-          <Link to="/customers?filter=hot" className="dpb-seg dpb-hot" style={{ flex: `${pct(buckets.hot)} ${pct(buckets.hot)} 0%` }} title={`${buckets.hot} לידים חמים`}>
-            <span>{buckets.hot}</span>
-          </Link>
-        )}
-        {buckets.warm > 0 && (
-          <Link to="/customers?filter=warm" className="dpb-seg dpb-warm" style={{ flex: `${pct(buckets.warm)} ${pct(buckets.warm)} 0%` }} title={`${buckets.warm} פושרים`}>
-            <span>{buckets.warm}</span>
-          </Link>
-        )}
-        {buckets.cold > 0 && (
-          <Link to="/customers?filter=cold" className="dpb-seg dpb-cold" style={{ flex: `${pct(buckets.cold)} ${pct(buckets.cold)} 0%` }} title={`${buckets.cold} קרים`}>
-            <span>{buckets.cold}</span>
-          </Link>
-        )}
-      </div>
-      <div className="dash-pipeline-legend">
-        <Link to="/customers?filter=hot" className="dpl-item">
-          <span className="dpl-dot dpl-hot" /> חמים <strong>{buckets.hot}</strong>
-        </Link>
-        <Link to="/customers?filter=warm" className="dpl-item">
-          <span className="dpl-dot dpl-warm" /> פושרים <strong>{buckets.warm}</strong>
-        </Link>
-        <Link to="/customers?filter=cold" className="dpl-item">
-          <span className="dpl-dot dpl-cold" /> קרים <strong>{buckets.cold}</strong>
-        </Link>
-      </div>
-      <div className="dash-pipeline-budget">
-        <span>שווי צנרת לידים</span>
-        <strong>{fmtBudget(buckets.budget)}</strong>
-      </div>
-    </div>
-  );
-}
-
-// ── Action Queue ─────────────────────────────────────────────────
-// Mixed list of properties and leads needing the agent's attention,
-// sorted by urgency. Surfaces:
-//   - Properties with marketing < 30%
-//   - Leads with no contact in the last `staleThresholdDays` days
-//   - Properties with no marketing actions completed at all
-// Capped at 6 rows; click takes the agent straight to the detail page.
-function ActionQueueCard({ leads = [], properties = [], staleThresholdDays = 30 }) {
-  const now = Date.now();
-  const items = [];
-
-  // Stale leads — needs follow-up
-  for (const l of leads) {
-    if (l.status === 'COLD') continue;
-    if (!l.lastContact) continue;
-    const days = (now - new Date(l.lastContact).getTime()) / 86400000;
-    if (days >= staleThresholdDays) {
-      items.push({
-        kind: 'stale-lead',
-        id: l.id,
-        score: days,
-        title: l.name,
-        hint: `ללא מגע כבר ${Math.floor(days)} ימים`,
-        to: `/customers?selected=${l.id}`,
-        Icon: Clock3,
-        tone: 'warn',
-      });
-    }
-  }
-
-  // Properties with low marketing %
-  for (const p of properties) {
-    const acts = Object.values(p.marketingActions || {});
-    if (acts.length === 0) continue;
-    const done = acts.filter(Boolean).length;
-    const pct = Math.round((done / acts.length) * 100);
-    if (pct < 30) {
-      items.push({
-        kind: 'low-marketing',
-        id: p.id,
-        score: 100 - pct,
-        title: `${p.street}, ${p.city}`,
-        hint: `שיווק ${pct}% — נדרש דחיפה`,
-        to: `/properties/${p.id}?panel=marketing`,
-        Icon: Sparkles,
-        tone: 'info',
-      });
-    }
-  }
-
-  items.sort((a, b) => b.score - a.score);
-  // Cap at 2 rows so the card stays short enough to sit on the same
-  // row as מצב הלידים + פגישות השבוע at 3-col breakpoint without
-  // towering over the others. The "צפה בהכול" link below still
-  // surfaces the full backlog in one tap.
-  const visible = items.slice(0, 2);
-
-  return (
-    <div className="card dashboard-card dash-action-queue animate-in animate-in-delay-4">
-      <div className="card-header">
-        <h3>תור פעולות</h3>
-        <span className="badge badge-gold">{items.length}</span>
-      </div>
-      {visible.length === 0 ? (
-        <div className="de-inline">
-          הכל מסודר ✦ אין פעולות דחופות
-        </div>
-      ) : (
-        <div className="dash-aq-list">
-          {visible.map((it) => (
-            <Link
-              key={`${it.kind}-${it.id}`}
-              to={it.to}
-              className={`dash-aq-row dash-aq-${it.tone}`}
-              onClick={() => haptics.tap()}
-            >
-              <span className="dash-aq-icon" aria-hidden="true"><it.Icon size={16} /></span>
-              <div className="dash-aq-info">
-                <strong>{it.title}</strong>
-                <span>{it.hint}</span>
-              </div>
-              <ArrowUpLeft size={14} aria-hidden="true" />
-            </Link>
-          ))}
-        </div>
-      )}
-      {items.length > visible.length && (
-        <Link
-          to="/activity"
-          className="dash-aq-more dash-aq-more-link"
-          onClick={() => haptics.tap()}
-        >
-          צפה בהכול ({items.length})
-        </Link>
-      )}
-    </div>
-  );
-}
-
-// ── Meetings (D-2) ───────────────────────────────────────────────
-// "פגישות השבוע" — reminders with a dueAt inside the [today, today+7d]
-// window. Capped at 5 rows. A link at the bottom opens /reminders for
-// the full list. Uses the shared toast on load-failure so the card
-// can't swallow errors silently.
-function MeetingsCard() {
-  const toast = useToast();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [leads, setLeads] = useState([]);
+  const [properties, setProperties] = useState([]);
+  const [deals, setDeals] = useState([]);
+  const [meetings, setMeetings] = useState([]);
+  const [premiumOpen, setPremiumOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // Pull open reminders only; filter by dueAt on the client so
-        // we don't need a new backend query shape.
-        const res = await api.listReminders({ status: 'PENDING' });
+        const [lRes, pRes, dRes, mRes] = await Promise.all([
+          api.listLeads?.().catch(() => null),
+          api.listProperties?.({ mine: '1' }).catch(() => null),
+          api.listDeals?.().catch(() => null),
+          (api.listReminders?.({ upcoming: '1' }) || Promise.resolve(null)).catch(() => null),
+        ]);
         if (cancelled) return;
-        // Window: start of today through end of day (today + 7).
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
-        const endOfWeek = new Date(startOfToday);
-        endOfWeek.setDate(endOfWeek.getDate() + 8); // 7 full days ahead
-        const filtered = (res?.items || []).filter((r) => {
-          if (!r.dueAt) return false;
-          const ts = new Date(r.dueAt).getTime();
-          return ts >= startOfToday.getTime() && ts < endOfWeek.getTime();
-        });
-        filtered.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
-        setItems(filtered);
-      } catch {
-        if (cancelled) return;
-        toast.error('שגיאה בטעינת פגישות');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+        setLeads(lRes?.items || []);
+        setProperties(pRes?.items || []);
+        setDeals(dRes?.items || []);
+        setMeetings(mRes?.items || []);
+      } catch { /* leave empty */ }
     })();
     return () => { cancelled = true; };
-    // toast identity is stable via context; re-running on re-render
-    // would double-fetch. Intentionally mount-only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const visible = items.slice(0, 5);
+  const hotLeads = useMemo(
+    () => leads.filter((l) => (l.status || '').toUpperCase() === 'HOT').slice(0, 4),
+    [leads],
+  );
+  const kpis = useMemo(() => [
+    { l: 'לידים פעילים',   v: leads.length,      i: Users },
+    { l: 'פגישות השבוע',   v: meetings.length,    i: CalendarIcon },
+    { l: 'עסקאות פתוחות', v: deals.length,        i: Banknote },
+    { l: 'נכסים פעילים',   v: properties.length,  i: BarChart2 },
+  ], [leads.length, meetings.length, deals.length, properties.length]);
+
+  const firstName = (user?.displayName || user?.email?.split('@')[0] || 'אדם').split(' ')[0];
+  const todayStr = new Intl.DateTimeFormat('he-IL', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  }).format(new Date());
+
+  const openPremium = () => setPremiumOpen(true);
 
   return (
-    <div className="card dashboard-card dash-meetings animate-in animate-in-delay-5">
-      <div className="card-header">
-        <h3>פגישות השבוע</h3>
-        <span className="badge badge-gold">{items.length}</span>
-      </div>
-      {loading ? (
-        <div className="dash-meetings-skel">
-          <div className="skel skel-line w-70" style={{ margin: '8px 0' }} />
-          <div className="skel skel-line w-50" style={{ margin: '8px 0' }} />
-          <div className="skel skel-line w-60" style={{ margin: '8px 0' }} />
+    <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
+      {/* Greeting */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+        gap: 16, marginBottom: 20, flexWrap: 'wrap',
+      }}>
+        <div>
+          <div style={{ fontSize: 12, color: DT.muted, fontWeight: 600 }}>{todayStr}</div>
+          <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, margin: '4px 0 0' }}>
+            בוקר טוב {firstName} ☀️
+          </h1>
+          <div style={{ fontSize: 14, color: DT.muted, marginTop: 4 }}>
+            יש לכם <strong style={{ color: DT.gold }}>{meetings.length} פגישות</strong> השבוע ·{' '}
+            <strong style={{ color: DT.gold }}>{hotLeads.length} לידים חמים</strong> ממתינים למענה
+          </div>
         </div>
-      ) : visible.length === 0 ? (
-        <div className="dash-meetings-empty">אין פגישות השבוע</div>
-      ) : (
-        <div className="dash-meetings-list">
-          {visible.map((m) => (
-            <Link
-              key={m.id}
-              to="/reminders"
-              className="dash-meetings-row"
-              onClick={() => haptics.tap()}
-            >
-              <span className="dash-meetings-icon" aria-hidden="true">
-                <CalendarIcon size={16} />
-              </span>
-              <div className="dash-meetings-info">
-                <strong>{m.title || 'פגישה'}</strong>
-                <span>{formatMeetingWhen(m.dueAt)}</span>
+        <button
+          type="button"
+          onClick={openPremium}
+          style={{
+            ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
+            padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
+            fontSize: 13, fontWeight: 700,
+            display: 'inline-flex', gap: 7, alignItems: 'center', color: DT.ink,
+          }}
+        >
+          <Sparkles size={14} /> שאל את Estia AI
+        </button>
+      </div>
+
+      {/* KPI row */}
+      <div style={{
+        display: 'grid', gap: 14, marginBottom: 20,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+      }}>
+        {kpis.map((k, i) => (
+          <DCard key={i}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ fontSize: 12, color: DT.muted, fontWeight: 600 }}>{k.l}</div>
+              <span style={{
+                color: DT.gold, background: DT.goldSoft,
+                width: 32, height: 32, borderRadius: 8,
+                display: 'grid', placeItems: 'center',
+              }}><k.i size={15} /></span>
+            </div>
+            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, marginTop: 8 }}>{k.v}</div>
+          </DCard>
+        ))}
+      </div>
+
+      {/* Main grid: AI priorities + today's schedule */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)',
+        gap: 14, marginBottom: 14,
+      }}>
+        <DCard>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: 14, gap: 8, flexWrap: 'wrap',
+          }}>
+            <div>
+              <div style={{
+                fontSize: 10, color: DT.goldDark, fontWeight: 700, letterSpacing: 1,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}>
+                <Sparkles size={11} /> ESTIA AI · סדר עדיפויות היום
+                <span style={{
+                  marginInlineStart: 6,
+                  background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+                  color: DT.ink, padding: '1px 6px', borderRadius: 99,
+                  fontSize: 9, letterSpacing: 0.4,
+                }}>PREMIUM</span>
               </div>
-              <ArrowUpLeft size={14} aria-hidden="true" />
+              <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2 }}>
+                5 פעולות שיזיזו אתכם קדימה היום
+              </div>
+            </div>
+          </div>
+          {AI_PRIORITIES.map((r, i) => (
+            <div key={i} style={{
+              display: 'flex', gap: 14, alignItems: 'center',
+              padding: '12px 0',
+              borderBottom: i === AI_PRIORITIES.length - 1 ? 'none' : `1px solid ${DT.border}`,
+            }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 8, background: DT.cream3,
+                color: DT.muted, display: 'grid', placeItems: 'center',
+                fontWeight: 800, fontSize: 13, flexShrink: 0,
+              }}>{r.p}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {r.t}
+                  {r.tag === 'hot'  && <Chip tone="hot">דחוף</Chip>}
+                  {r.tag === 'gold' && <Chip tone="gold">AI</Chip>}
+                </div>
+                <div style={{ fontSize: 11, color: DT.muted, marginTop: 1 }}>{r.sub}</div>
+              </div>
+              <button
+                type="button"
+                onClick={openPremium}
+                style={{
+                  ...FONT,
+                  background: i === 0
+                    ? `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`
+                    : DT.white,
+                  border: i === 0 ? 'none' : `1px solid ${DT.borderStrong}`,
+                  padding: '7px 12px', borderRadius: 8,
+                  fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', color: DT.ink, whiteSpace: 'nowrap',
+                }}
+              >{r.action}</button>
+            </div>
+          ))}
+        </DCard>
+
+        <DCard>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 800 }}>
+              היום · {meetings.length || 0} פגישות
+            </div>
+            <Link to="/reminders" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+              יומן מלא
+            </Link>
+          </div>
+          {meetings.length === 0 && (
+            <div style={{ fontSize: 13, color: DT.muted, padding: '12px 0' }}>
+              אין פגישות מתוזמנות להיום — הוסיפו תזכורת כדי לראות אותה כאן.
+            </div>
+          )}
+          {meetings.slice(0, 4).map((m, i) => {
+            const when = m.dueAt ? new Date(m.dueAt) : null;
+            const time = when
+              ? when.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+              : '—';
+            const isNext = i === 0;
+            return (
+              <div key={m.id || i} style={{
+                display: 'flex', gap: 10, padding: '10px 0',
+                borderBottom: i === Math.min(3, meetings.length - 1) ? 'none' : `1px solid ${DT.border}`,
+                position: 'relative',
+              }}>
+                {isNext && (
+                  <div style={{
+                    position: 'absolute', insetInlineEnd: -18, top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: DT.gold, color: DT.ink, fontSize: 9, fontWeight: 800,
+                    padding: '2px 6px', borderRadius: 99,
+                  }}>הבא</div>
+                )}
+                <div style={{ width: 54, textAlign: 'center' }}>
+                  <div style={{
+                    fontSize: 15, fontWeight: 800, color: DT.goldDark,
+                    letterSpacing: -0.3,
+                  }}>{time}</div>
+                </div>
+                <div style={{
+                  width: 2, background: isNext ? DT.gold : DT.border,
+                  borderRadius: 99, flexShrink: 0,
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 700,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>{m.title || 'פגישה'}</div>
+                  {m.description && (
+                    <div style={{
+                      fontSize: 11, color: DT.muted,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{m.description}</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </DCard>
+      </div>
+
+      {/* Bottom grid: pipeline + hot leads */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+        gap: 14,
+      }}>
+        <DCard>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 800 }}>צינור עסקאות</div>
+            <Link to="/deals" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+              לכל העסקאות
+            </Link>
+          </div>
+          <Pipeline deals={deals} />
+        </DCard>
+
+        <DCard>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 800 }}>לידים חמים</div>
+            <Link to="/customers" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+              הכול
+            </Link>
+          </div>
+          {hotLeads.length === 0 && (
+            <div style={{ fontSize: 13, color: DT.muted, padding: '12px 0' }}>
+              אין לידים חמים כרגע. הוסיפו לידים בעמוד <Link to="/customers" style={{ color: DT.gold }}>לידים</Link>.
+            </div>
+          )}
+          {hotLeads.map((l) => (
+            <Link
+              key={l.id}
+              to={`/customers/${l.id}`}
+              style={{
+                display: 'flex', gap: 10, alignItems: 'center',
+                padding: '9px 0', borderBottom: `1px solid ${DT.border}`,
+                textDecoration: 'none', color: DT.ink,
+              }}
+            >
+              <Avatar name={l.name} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 13, fontWeight: 700,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>{l.name}</div>
+                <div style={{ fontSize: 11, color: DT.muted }}>
+                  {[l.city, l.priceRangeLabel].filter(Boolean).join(' · ') || 'ליד חם'}
+                </div>
+              </div>
+              {l.budget && (
+                <div style={{ fontSize: 11, color: DT.gold, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  ₪{Math.round(l.budget / 1000)}K
+                </div>
+              )}
             </Link>
           ))}
-        </div>
-      )}
-      {/* "צפה בכל הפגישות" — always rendered alongside data so an agent
-          can jump to the full list even when just 1–2 items are here. */}
-      <Link
-        to="/reminders"
-        className="dash-meetings-more"
-        onClick={() => haptics.tap()}
-      >
-        צפה בכל הפגישות
-      </Link>
+        </DCard>
+      </div>
+
+      {premiumOpen && <PremiumModal onClose={() => setPremiumOpen(false)} />}
     </div>
   );
 }
 
-// Formats a meeting's dueAt as "היום · 10:30" / "מחר · 14:00" /
-// "יום ג׳ · 09:00". Keeps the display calm — no seconds, no year.
-function formatMeetingWhen(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dayAfter = new Date(today);
-  dayAfter.setDate(dayAfter.getDate() + 2);
-  const time = d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-  if (d >= today && d < tomorrow) return `היום · ${time}`;
-  if (d >= tomorrow && d < dayAfter) return `מחר · ${time}`;
-  const weekday = d.toLocaleDateString('he-IL', { weekday: 'short' });
-  return `${weekday} · ${time}`;
+// ─── Sub-components ─────────────────────────────────────────
+function DCard({ children, style = {}, pad = 18 }) {
+  return (
+    <div style={{
+      background: DT.white, border: `1px solid ${DT.border}`,
+      borderRadius: 14, padding: pad, ...style,
+    }}>{children}</div>
+  );
 }
 
-// D-1 — ConversionFunnelCard removed. Left this anchor for git-blame
-// readers: the component used to live here and drew a four-step
-// funnel (leads → hot → active → signed). The data duplicated the KPI
-// scroller and the "signed deals" row was demotivating for agents
-// still closing their first deal.
+function Avatar({ name, size = 36 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: 99,
+      background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+      color: DT.ink, display: 'grid', placeItems: 'center',
+      fontWeight: 800, fontSize: size * 0.4, flexShrink: 0,
+    }}>{name ? name.charAt(0) : '?'}</div>
+  );
+}
+
+function Chip({ children, tone = 'ink' }) {
+  const map = {
+    hot: [DT.hot, 'rgba(185,28,28,0.12)'],
+    warm: [DT.warm, 'rgba(180,83,9,0.12)'],
+    cold: [DT.cold, 'rgba(71,85,105,0.12)'],
+    gold: [DT.goldDark, DT.goldSoft],
+    success: [DT.success, 'rgba(21,128,61,0.12)'],
+    ink: [DT.ink, DT.cream3],
+  };
+  const [c, bg] = map[tone] || map.ink;
+  return (
+    <span style={{
+      color: c, background: bg, borderRadius: 99, fontWeight: 700,
+      padding: '2px 8px', fontSize: 10,
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+    }}>{children}</span>
+  );
+}
+
+function Pipeline({ deals }) {
+  const stages = [
+    { key: 'NEW',         l: 'יצירת קשר', pct: 15 },
+    { key: 'VIEWING',     l: 'צפייה',     pct: 35 },
+    { key: 'OFFER',       l: 'הצעה',      pct: 65 },
+    { key: 'NEGOTIATION', l: 'מו״מ',      pct: 85 },
+    { key: 'CONTRACT',    l: 'חוזה',      pct: 95 },
+  ];
+  const rows = stages.map((s) => {
+    const matching = deals.filter((d) => (d.stage || d.status || '').toUpperCase() === s.key);
+    const sum = matching.reduce((acc, d) => acc + (d.dealValue || d.price || 0), 0);
+    return { ...s, n: matching.length, v: sum > 0 ? `₪${Math.round(sum / 1000)}K` : '—' };
+  });
+  return (
+    <>
+      {rows.map((s, i) => (
+        <div key={s.key} style={{ marginBottom: i === rows.length - 1 ? 0 : 10 }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4,
+          }}>
+            <span style={{ fontWeight: 600 }}>{s.l} · {s.n}</span>
+            <span style={{ color: DT.gold, fontWeight: 700 }}>{s.v}</span>
+          </div>
+          <div style={{ background: DT.cream3, height: 8, borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{
+              width: `${s.pct}%`, height: '100%',
+              background: `linear-gradient(90deg, ${DT.goldLight}, ${DT.gold})`,
+            }} />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ─── Premium-only popup ─────────────────────────────────────
+function PremiumModal({ onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        background: 'rgba(20,17,13,0.55)', backdropFilter: 'blur(2px)',
+        display: 'grid', placeItems: 'center', padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          ...FONT, background: DT.cream, color: DT.ink,
+          borderRadius: 18, maxWidth: 420, width: '100%',
+          boxShadow: '0 30px 80px rgba(20,17,13,0.28)',
+          border: `2px solid ${DT.gold}`, position: 'relative',
+          padding: '28px 26px 22px',
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="סגור"
+          style={{
+            position: 'absolute', top: 12, insetInlineStart: 12,
+            background: 'transparent', border: 'none', color: DT.muted,
+            cursor: 'pointer', padding: 6, display: 'inline-flex',
+          }}
+        ><X size={16} /></button>
+        <div style={{
+          width: 48, height: 48, borderRadius: 14,
+          background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+          color: DT.ink, display: 'grid', placeItems: 'center',
+          marginBottom: 12,
+        }}><Star size={22} /></div>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontSize: 11, fontWeight: 800, color: DT.goldDark,
+          letterSpacing: 1, marginBottom: 6,
+        }}>
+          <Sparkles size={12} /> ESTIA AI · PREMIUM
+        </div>
+        <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.6, margin: '0 0 8px' }}>
+          זמין במסלול Premium
+        </h2>
+        <p style={{ fontSize: 14, color: DT.muted, lineHeight: 1.7, margin: '0 0 18px' }}>
+          כל פעולות ה-AI — סדר עדיפויות חכם, תיאורי נכסים, התאמת לידים,
+          וסיכומי פגישות — כלולות במסלול Premium. שדרוג בחצי דקה, ביטול בכל רגע.
+        </p>
+        <a
+          href="mailto:hello@estia.co.il?subject=שדרוג ל-Estia Premium"
+          style={{
+            ...FONT, display: 'block', textAlign: 'center',
+            background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+            color: DT.ink, padding: '13px 18px', borderRadius: 12,
+            fontSize: 14, fontWeight: 800, textDecoration: 'none',
+            boxShadow: '0 8px 20px rgba(180,139,76,0.28), inset 0 1px 0 rgba(255,255,255,0.35)',
+          }}
+        >שדרג ל-Premium</a>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            ...FONT, width: '100%',
+            background: 'transparent', border: 'none',
+            color: DT.muted, fontSize: 13, fontWeight: 600,
+            padding: '10px', marginTop: 8, cursor: 'pointer',
+          }}
+        >אולי מאוחר יותר</button>
+      </div>
+    </div>
+  );
+}
