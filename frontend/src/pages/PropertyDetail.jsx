@@ -6,6 +6,7 @@ import {
   Building2,
   Phone,
   CheckCircle2,
+  Check,
   Circle,
   ExternalLink,
   X,
@@ -334,6 +335,39 @@ export default function PropertyDetail() {
     ? `${window.location.origin}/agents/${encodeURI(user.slug)}/${encodeURI(property.slug)}`
     : `${window.location.origin}/p/${property.id}`;
 
+  // Per-asset landing page URL. Same slug pair, different frontend
+  // route — serves a photo-first "brochure" (no price / details) that
+  // drives inquiries through the public form. Falls back to the
+  // internal id if slugs haven't been minted yet.
+  const landingLink = property.slug && user?.slug
+    ? `${window.location.origin}/l/${encodeURI(user.slug)}/${encodeURI(property.slug)}`
+    : null;
+  const [landingCopied, setLandingCopied] = useState(false);
+  const copyLandingLink = async () => {
+    let url = landingLink;
+    if (!url) {
+      // No slugs yet — hit the lookup endpoint to mint + return them.
+      try {
+        const res = await api.lookupPropertySlug(property.id);
+        if (res?.agentSlug && res?.propertySlug) {
+          url = `${window.location.origin}/l/${encodeURI(res.agentSlug)}/${encodeURI(res.propertySlug)}`;
+        }
+      } catch { /* fall through */ }
+    }
+    if (!url) {
+      toast?.error?.('לא ניתן להפיק קישור כרגע');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setLandingCopied(true);
+      toast?.success?.('קישור דף הנחיתה הועתק');
+      setTimeout(() => setLandingCopied(false), 1800);
+    } catch {
+      window.prompt('העתק את הקישור:', url);
+    }
+  };
+
   const buildMessage = () => {
     const kind = tplPickKind(property, 'client');
     const tpl = templates?.find((t) => t.kind === kind);
@@ -602,6 +636,14 @@ export default function PropertyDetail() {
           <button className="btn btn-secondary btn-sm" onClick={handleShare}>
             <Share2 size={14} />
             <span>שתף</span>
+          </button>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={copyLandingLink}
+            title="קישור לדף נחיתה פרימיום — תמונות, טופס, ללא פרטים"
+          >
+            {landingCopied ? <Check size={14} aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
+            <span>{landingCopied ? 'הקישור הועתק' : 'דף נחיתה'}</span>
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => setProspectOpen(true)}>
             <UserPlus size={14} />

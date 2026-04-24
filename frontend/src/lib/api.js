@@ -439,6 +439,14 @@ export const api = {
   // so the dashboard can build a marketable URL. Auth-free.
   lookupPropertySlug: (id) =>
     request(`/public/lookup/property/${encodeURIComponent(id)}`),
+  // Per-asset landing-page inquiry form. Public, no auth — called by
+  // the /l/:agentSlug/:propertySlug landing page when a prospect
+  // submits the contact form. Stored as a PropertyInquiry row.
+  submitPropertyInquiry: (agentSlug, propertySlug, body) =>
+    request(
+      `/public/agents/${encodeURIComponent(agentSlug)}/properties/${encodeURIComponent(propertySlug)}/inquiry`,
+      { method: 'POST', body },
+    ),
 
   // Owners
   listOwners:        () => request('/owners'),

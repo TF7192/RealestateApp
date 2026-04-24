@@ -21,6 +21,7 @@ import OwnerDetail from './pages/OwnerDetail';
 import Deals from './pages/Deals';
 import Login from './pages/Login';
 import AgentPortal from './pages/AgentPortal';
+import PropertyLandingPage from './pages/PropertyLandingPage';
 import CustomerPropertyView from './pages/CustomerPropertyView';
 import ProspectSign from './pages/ProspectSign';
 import NotFound from './pages/NotFound';
@@ -208,6 +209,12 @@ function AppRoutes() {
           {/* SEO-friendly public routes */}
           <Route path="/agents/:agentSlug" element={<AgentPortal />} />
           <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
+          {/* Per-asset premium landing page — the shareable, minimal
+              marketing-brochure surface (hero + photos + contact form).
+              /agents/:slug/:slug is the full catalog listing with
+              address / price / details; this is the curated variant
+              the agent shares to drive inquiries. */}
+          <Route path="/l/:agentSlug/:propertySlug" element={<PropertyLandingPage />} />
           {/* Public prospect sign page (1.5) — no login required. */}
           <Route path="/public/p/:token" element={<ProspectSign />} />
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
@@ -317,6 +324,7 @@ function AppRoutes() {
           {/* SEO-friendly public routes */}
           <Route path="/agents/:agentSlug" element={<AgentPortal />} />
           <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
+          <Route path="/l/:agentSlug/:propertySlug" element={<PropertyLandingPage />} />
           {/* Public prospect-sign page — also mounted here so an agent
               who clicks the generated "צור קישור" URL while signed in
               reaches the kiosk page instead of a 404. ProspectSign is
