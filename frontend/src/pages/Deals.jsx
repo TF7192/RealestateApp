@@ -7,7 +7,7 @@
 // edit modals stay wired to /api/deals POST + PATCH.
 
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   CheckCircle, Clock, AlertCircle, Edit3, X, Plus,
 } from 'lucide-react';
@@ -69,6 +69,7 @@ function statusAccent(status) {
 
 export default function Deals() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('active');
@@ -76,6 +77,11 @@ export default function Deals() {
   const [assetFilter, setAssetFilter] = useState('all');
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+
+  // Sprint 6 — row / card click drills into the standalone /deals/:id
+  // page. The inline DealEditModal is still summoned from the kanban
+  // column "עריכה" button and the "סמן כנחתם" shortcut for quick-edits.
+  const openDetail = (d) => navigate(`/deals/${d.id}`);
 
   const load = async () => {
     const res = await api.listDeals();
@@ -188,12 +194,14 @@ export default function Deals() {
       ) : tab === 'active' ? (
         <DealsKanban
           deals={filtered.filter((d) => d.status !== 'SIGNED')}
+          onOpen={openDetail}
           onEdit={(d) => setEditing({ deal: d, mode: 'edit' })}
           onSign={(d) => setEditing({ deal: d, mode: 'sign' })}
         />
       ) : (
         <DealsCards
           deals={filtered}
+          onOpen={openDetail}
           onEdit={(d) => setEditing({ deal: d, mode: 'edit' })}
         />
       )}
@@ -252,7 +260,7 @@ function PillRow({ value, onChange, items }) {
   );
 }
 
-function DealsKanban({ deals, onEdit, onSign }) {
+function DealsKanban({ deals, onEdit, onSign, onOpen }) {
   const columns = [
     { key: 'NEGOTIATING',      label: 'משא ומתן' },
     { key: 'WAITING_MORTGAGE', label: 'אישור משכנתא' },
@@ -295,7 +303,7 @@ function DealsKanban({ deals, onEdit, onSign }) {
             </header>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {colDeals.map((d) => (
-                <KanbanCard key={d.id} deal={d} onEdit={onEdit} onSign={onSign} />
+                <KanbanCard key={d.id} deal={d} onOpen={onOpen} onEdit={onEdit} onSign={onSign} />
               ))}
               {colDeals.length === 0 && (
                 <div style={{
@@ -311,14 +319,24 @@ function DealsKanban({ deals, onEdit, onSign }) {
   );
 }
 
-function KanbanCard({ deal, onEdit, onSign }) {
+function KanbanCard({ deal, onOpen, onEdit, onSign }) {
+  // Click the body of the card to drill into /deals/:id, but stop
+  // propagation on the two action buttons so quick-edit / quick-sign
+  // can still operate without a page nav.
   return (
-    <div style={{
-      background: DT.white, border: `1px solid ${DT.border}`,
-      borderRadius: 12, padding: 12,
-      display: 'flex', flexDirection: 'column', gap: 8,
-      boxShadow: '0 1px 3px rgba(30,26,20,0.04)',
-    }}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen?.(deal)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.(deal); } }}
+      style={{
+        background: DT.white, border: `1px solid ${DT.border}`,
+        borderRadius: 12, padding: 12,
+        display: 'flex', flexDirection: 'column', gap: 8,
+        boxShadow: '0 1px 3px rgba(30,26,20,0.04)',
+        cursor: 'pointer',
+      }}
+    >
       <div style={{ fontWeight: 800, fontSize: 14 }}>
         {deal.propertyStreet}, {deal.city}
       </div>
@@ -337,14 +355,22 @@ function KanbanCard({ deal, onEdit, onSign }) {
         )}
       </div>
       <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-        <button type="button" onClick={() => onEdit(deal)} style={ghostBtn()}>עריכה</button>
-        <button type="button" onClick={() => onSign(deal)} style={primaryBtn({ small: true })}>סמן כנחתם</button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onEdit(deal); }}
+          style={ghostBtn()}
+        >עריכה</button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onSign(deal); }}
+          style={primaryBtn({ small: true })}
+        >סמן כנחתם</button>
       </div>
     </div>
   );
 }
 
-function DealsCards({ deals, onEdit }) {
+function DealsCards({ deals, onEdit, onOpen }) {
   if (deals.length === 0) {
     return (
       <div style={{
@@ -363,12 +389,20 @@ function DealsCards({ deals, onEdit }) {
         const accent = statusAccent(d.status);
         const rel = relativeDate(d.updateDate);
         return (
-          <div key={d.id} style={{
-            background: DT.white, border: `1px solid ${DT.border}`,
-            borderRadius: 14, padding: 16,
-            display: 'flex', flexDirection: 'column', gap: 10,
-            boxShadow: '0 1px 3px rgba(30,26,20,0.04)',
-          }}>
+          <div
+            key={d.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpen?.(d)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.(d); } }}
+            style={{
+              background: DT.white, border: `1px solid ${DT.border}`,
+              borderRadius: 14, padding: 16,
+              display: 'flex', flexDirection: 'column', gap: 10,
+              boxShadow: '0 1px 3px rgba(30,26,20,0.04)',
+              cursor: 'pointer',
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontWeight: 800, fontSize: 15 }}>
@@ -403,7 +437,11 @@ function DealsCards({ deals, onEdit }) {
               )}
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-              <button type="button" onClick={() => onEdit(d)} style={ghostBtn()}>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEdit(d); }}
+                style={ghostBtn()}
+              >
                 <Edit3 size={12} /> עריכה
               </button>
             </div>
@@ -461,7 +499,11 @@ function ghostBtn() {
 // render as a cream-card modal in light mode. Rewriting the modal
 // chrome would not be visually different, so the inline-style port
 // stops at the page shell above.
-function DealEditModal({ deal, mode, onClose, onSaved }) {
+//
+// Exported so /deals/:id (DealDetail) can reuse the same dialog for
+// the "עריכה" button on the standalone page — keeps one copy of the
+// form validation + submit logic.
+export function DealEditModal({ deal, mode, onClose, onSaved }) {
   const [form, setForm] = useState({
     status: mode === 'sign' ? 'SIGNED' : deal.status,
     marketingPrice: deal.marketingPrice ?? '',

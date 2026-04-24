@@ -19,6 +19,7 @@ import CustomerDetail from './pages/CustomerDetail';
 import Owners from './pages/Owners';
 import OwnerDetail from './pages/OwnerDetail';
 import Deals from './pages/Deals';
+import DealDetail from './pages/DealDetail';
 import Login from './pages/Login';
 import AgentPortal from './pages/AgentPortal';
 import PropertyLandingPage from './pages/PropertyLandingPage';
@@ -325,6 +326,7 @@ function AppRoutes() {
             <Route path="/assets" element={<Navigate to="/properties" replace />} />
             <Route path="/assets/:id" element={<Navigate to="/properties" replace />} />
             <Route path="/deals" element={<Deals />} />
+            <Route path="/deals/:id" element={<DealDetail />} />
             {/* D-6 — an already-authenticated user landing on /login
                 should bounce to the `from` URL they were originally
                 trying to reach (set by UnauthRedirect), or to the

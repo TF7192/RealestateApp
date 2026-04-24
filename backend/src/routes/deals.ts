@@ -56,6 +56,31 @@ export const registerDealRoutes: FastifyPluginAsync = async (app) => {
     return { items };
   });
 
+  // Sprint 6 — detail fetch for the standalone /deals/:id page. Agent-
+  // scoped (a deal belongs to one agent, cross-agent reads are 404).
+  // Includes the structured buyer/seller slices so the page can link
+  // through to /customers/:id and /owners/:id without a second round-
+  // trip, plus a minimal property slice for the header card.
+  app.get('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const deal = await prisma.deal.findFirst({
+      where: { id, agentId: uid },
+      include: {
+        buyer:  { select: { id: true, name: true, phone: true, email: true } },
+        seller: { select: { id: true, name: true, phone: true, email: true } },
+        property: {
+          select: {
+            id: true, street: true, city: true, rooms: true, sqm: true,
+            floor: true, totalFloors: true, type: true,
+          },
+        },
+      },
+    });
+    if (!deal) return reply.code(404).send({ error: { message: 'Deal not found' } });
+    return { deal };
+  });
+
   app.post('/', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const body = dealInput.parse(req.body);
     const uid = requireUser(req).id;
