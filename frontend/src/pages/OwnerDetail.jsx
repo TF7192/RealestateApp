@@ -1,35 +1,39 @@
+// Owner detail — port of the claude.ai/design bundle with inline
+// Cream & Gold styles. Split-panel: left = identity + edit form,
+// right = properties list. Multi-phone editor stays on its own
+// component (OwnerPhonesPanel) because the UX is rich enough to
+// warrant its own file.
+//
+// No fixtures — GET /api/owners/:id is the only source.
+
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowRight,
-  Phone,
-  Mail,
-  MessageSquare,
-  Trash2,
-  Save,
-  AlertCircle,
-  Building2,
-  UserCircle,
-  Printer,
-  Maximize2,
+  ArrowRight, Phone, Mail, MessageCircle, MessageSquare, Trash2,
+  Save, AlertCircle, Building2, UserCircle, Printer, Maximize2,
 } from 'lucide-react';
 import { popoutCurrentRoute } from '../lib/popout';
 import { printPage } from '../lib/print';
 import api from '../lib/api';
-import WhatsAppIcon from '../components/WhatsAppIcon';
 import ConfirmDialog from '../components/ConfirmDialog';
-import StickyActionBar from '../components/StickyActionBar';
 import { PhoneField, SelectField } from '../components/SmartFields';
 import OwnerPhonesPanel from '../components/OwnerPhonesPanel';
 import { inputPropsForName, inputPropsForEmail, inputPropsForNotes } from '../lib/inputProps';
 import { useToast } from '../lib/toast';
-import { useViewportMobile } from '../hooks/mobile';
-import { telUrl, waUrl } from '../lib/waLink';
 import { formatPhone } from '../lib/phone';
-import { openWhatsApp } from '../native/share';
 import { relativeDate } from '../lib/relativeDate';
-import haptics from '../lib/haptics';
-import './OwnerDetail.css';
+
+const DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14', ink2: '#3a3226',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
+  success: '#15803d', danger: '#b91c1c',
+};
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const RELATIONSHIP_OPTIONS = [
   'בעל יחיד',
@@ -51,7 +55,6 @@ export default function OwnerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const isMobile = useViewportMobile(820);
   const [owner, setOwner] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -95,170 +98,138 @@ export default function OwnerDetail() {
 
   if (loading) {
     return (
-      <div className="owner-detail-page app-wide-cap">
-        <div className="od-skel">טוען…</div>
+      <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.muted, fontSize: 14 }}>
+        טוען…
       </div>
     );
   }
-
   if (error || !owner) {
     return (
-      <div className="owner-detail-page app-wide-cap">
-        <div className="od-error">
-          <AlertCircle size={20} />
-          <span>{error || 'בעל הנכס לא נמצא'}</span>
-          <Link to="/owners" className="btn btn-secondary btn-sm">חזור לבעלי נכסים</Link>
+      <div dir="rtl" style={{
+        ...FONT, padding: 28,
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12,
+        color: DT.ink,
+      }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: 'rgba(185,28,28,0.08)', color: DT.danger,
+          padding: '10px 14px', borderRadius: 10, fontSize: 13,
+        }}>
+          <AlertCircle size={16} /> {error || 'בעל הנכס לא נמצא'}
         </div>
+        <Link to="/owners" style={ghostBtn()}>
+          <ArrowRight size={14} /> חזור לבעלי נכסים
+        </Link>
       </div>
     );
   }
 
   const properties = owner.properties || [];
-  const initial = (owner.name || '?').charAt(0);
   const createdRel = owner.createdAt ? relativeDate(owner.createdAt) : null;
 
   return (
-    <div className={`owner-detail-page app-wide-cap ${isMobile ? 'od-mobile has-sticky-bar' : ''}`}>
-      {/* Desktop-only breadcrumb toolbar */}
-      <div className="od-toolbar od-toolbar-desktop">
-        <div className="od-crumb">
-          <Link to="/owners" className="od-crumb-link">
-            <ArrowRight size={16} />
-            בעלי נכסים
-          </Link>
-          <span className="od-crumb-sep">/</span>
-          <strong className="od-crumb-name">{owner.name}</strong>
-          <span className="od-status">
-            <Building2 size={12} />
-            {owner.propertyCount ?? properties.length} נכסים
-          </span>
-        </div>
-        <div className="od-toolbar-actions">
+    <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
+      {/* Top toolbar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 12, flexWrap: 'wrap', marginBottom: 18,
+      }}>
+        <Link to="/owners" style={{
+          ...FONT,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          color: DT.muted, textDecoration: 'none', fontSize: 13, fontWeight: 700,
+        }}>
+          <ArrowRight size={16} />
+          בעלי נכסים
+        </Link>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {owner.phone && (
             <>
-              <a href={telUrl(owner.phone)} className="btn btn-secondary btn-sm" title={formatPhone(owner.phone)}>
-                <Phone size={14} />
-                התקשר
+              <a href={`tel:${owner.phone}`} style={secondaryBtn()} title={formatPhone(owner.phone)}>
+                <Phone size={14} /> התקשר
+              </a>
+              <a href={`sms:${owner.phone}`} style={secondaryBtn()} title="SMS">
+                <MessageSquare size={14} /> SMS
               </a>
               <a
-                href={`sms:${owner.phone}`}
-                className="btn btn-secondary btn-sm"
-                title="SMS"
+                href={`https://wa.me/${owner.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`שלום ${owner.name}`)}`}
+                target="_blank" rel="noopener noreferrer"
+                style={secondaryBtn()} title="שלח בוואטסאפ"
               >
-                <MessageSquare size={14} />
-                SMS
-              </a>
-              {/* O-9 — WhatsApp links must open in a new tab so the agent
-                  doesn't lose the Estia session. An <a target="_blank">
-                  survives Capacitor WebView navigation (wa.me is
-                  recognized by the URL-handler bridge) and lets the web
-                  browser open a fresh tab instead of replacing the
-                  current one. */}
-              <a
-                href={waUrl(owner.phone, `שלום ${owner.name}`)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-secondary btn-sm"
-                title="שלח בוואטסאפ"
-                onClick={() => haptics.tap()}
-              >
-                <WhatsAppIcon size={14} className="wa-green" />
-                שלח בוואטסאפ
+                <MessageCircle size={14} /> וואטסאפ
               </a>
             </>
           )}
           {owner.email && (
-            <a href={`mailto:${owner.email}`} className="btn btn-secondary btn-sm" title={owner.email}>
-              <Mail size={14} />
-              אימייל
+            <a href={`mailto:${owner.email}`} style={secondaryBtn()} title={owner.email}>
+              <Mail size={14} /> אימייל
             </a>
           )}
-          <button className="btn btn-ghost btn-sm" onClick={() => printPage()} title="הדפס">
+          <button type="button" style={ghostBtn()} onClick={() => printPage()} title="הדפס">
             <Printer size={14} />
-            הדפס
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => popoutCurrentRoute()} title="פתח בחלון חדש">
+          <button type="button" style={ghostBtn()} onClick={() => popoutCurrentRoute()} title="פתח בחלון">
             <Maximize2 size={14} />
-            פתח בחלון חדש
           </button>
-          <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
-            <Trash2 size={14} />
-            מחק
+          <button type="button" style={dangerBtn()} onClick={() => setConfirmDelete(true)}>
+            <Trash2 size={14} /> מחק
           </button>
         </div>
       </div>
 
-      {/* Mobile-only compact header card */}
-      {isMobile && (
-        <div className="od-mobile-header">
-          <div className="od-mh-avatar" aria-hidden="true">{initial}</div>
-          <div className="od-mh-body">
-            <strong className="od-mh-name">{owner.name}</strong>
-            <span className="od-mh-sub">
-              <Building2 size={11} />
-              {owner.propertyCount ?? properties.length} נכסים
-              {createdRel && <span className="od-mh-dot">·</span>}
-              {createdRel && <span className="od-mh-created">נוסף {createdRel.label}</span>}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="od-mh-del"
-            onClick={() => setConfirmDelete(true)}
-            aria-label="מחק בעל נכס"
-          >
-            <Trash2 size={14} />
-          </button>
+      {/* Header card */}
+      <div style={{
+        background: DT.white, border: `1px solid ${DT.border}`,
+        borderRadius: 14, padding: 20, marginBottom: 16,
+        display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 99,
+          background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+          color: DT.ink, display: 'grid', placeItems: 'center',
+          fontWeight: 800, fontSize: 26, flexShrink: 0,
+        }}>
+          {(owner.name || '?').charAt(0)}
         </div>
-      )}
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: 0 }}>
+            {owner.name}
+          </h1>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 10,
+            fontSize: 13, color: DT.muted, marginTop: 6, flexWrap: 'wrap',
+          }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: DT.goldSoft, color: DT.goldDark,
+              padding: '3px 10px', borderRadius: 99, fontWeight: 700, fontSize: 11,
+            }}>
+              <Building2 size={12} />
+              {owner.propertyCount ?? properties.length} נכסים
+            </span>
+            {owner.phone && <span>· {formatPhone(owner.phone)}</span>}
+            {owner.email && <span>· {owner.email}</span>}
+            {createdRel && <span>· נוסף {createdRel.label}</span>}
+          </div>
+        </div>
+      </div>
 
-      <div className="od-grid">
-        <OwnerEditForm owner={owner} onSaved={onSaved} toast={toast} isMobile={isMobile} />
+      {/* Grid: edit form + properties panel */}
+      <div style={{
+        display: 'grid', gap: 16,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+      }}>
+        <OwnerEditForm owner={owner} onSaved={onSaved} toast={toast} />
         <OwnerPropertiesPanel properties={properties} />
       </div>
 
-      {/* J8 — multi-phone editor. The legacy owner.phone column is the
-          denormalized primary shown in the toolbar above for back-compat;
-          this panel layers additional numbers (secondary / spouse / work
-          / fax) on top via the OwnerPhone child table. */}
-      <div className="od-phones-section">
+      {/* Multi-phone editor */}
+      <div style={{
+        background: DT.white, border: `1px solid ${DT.border}`,
+        borderRadius: 14, padding: 20, marginTop: 16,
+      }}>
         <OwnerPhonesPanel ownerId={owner.id} />
       </div>
-
-      {/* Sticky bottom action bar — mobile only */}
-      {isMobile && owner.phone && (
-        <StickyActionBar className="sab-icons" visible>
-          <a
-            href={telUrl(owner.phone)}
-            className="btn btn-secondary"
-            aria-label={`התקשר ל${owner.name}`}
-            onClick={() => haptics.tap()}
-          >
-            <Phone size={18} />
-            <span>התקשר</span>
-          </a>
-          <a
-            href={waUrl(owner.phone, `שלום ${owner.name}`)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-primary"
-            onClick={() => haptics.tap()}
-            aria-label={`וואטסאפ ל${owner.name}`}
-          >
-            <WhatsAppIcon size={18} />
-            <span>שלח בוואטסאפ</span>
-          </a>
-          <a
-            href={`sms:${owner.phone}`}
-            className="btn btn-secondary"
-            aria-label={`SMS ל${owner.name}`}
-            onClick={() => haptics.tap()}
-          >
-            <MessageSquare size={18} />
-            <span>SMS</span>
-          </a>
-        </StickyActionBar>
-      )}
 
       {confirmDelete && (
         <ConfirmDialog
@@ -284,7 +255,6 @@ function OwnerEditForm({ owner, onSaved, toast }) {
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-
   const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   const save = async () => {
@@ -313,114 +283,185 @@ function OwnerEditForm({ owner, onSaved, toast }) {
   };
 
   return (
-    <div className="od-form-col">
-      <div className="od-section">
-        <h3 className="od-section-title">
-          <UserCircle size={16} />
-          פרטי בעל הנכס
-        </h3>
-        {err && (
-          <div className="od-form-error">
-            <AlertCircle size={14} />
-            {err}
-          </div>
-        )}
-
-        <div className="od-form-grid">
-          <div className="form-group">
-            <label className="form-label">שם מלא</label>
-            <input
-              {...inputPropsForName()}
-              className="form-input"
-              value={form.name}
-              onChange={(e) => update('name', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">טלפון</label>
-            <PhoneField value={form.phone} onChange={(v) => update('phone', v)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">אימייל</label>
-            <input
-              {...inputPropsForEmail()}
-              className="form-input"
-              value={form.email}
-              onChange={(e) => update('email', e.target.value)}
-              placeholder="name@example.com"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">סוג בעלות</label>
-            <SelectField
-              value={form.relationship}
-              onChange={(v) => update('relationship', v)}
-              placeholder="בחר…"
-              options={RELATIONSHIP_OPTIONS}
-            />
-          </div>
-          <div className="form-group form-group-wide">
-            <label className="form-label">הערות</label>
-            <textarea
-              {...inputPropsForNotes()}
-              className="form-textarea"
-              rows={4}
-              value={form.notes}
-              onChange={(e) => update('notes', e.target.value)}
-              placeholder="פרטים נוספים על בעל הנכס…"
-            />
-          </div>
+    <section style={sectionCard()} aria-label="פרטי בעל הנכס">
+      <h3 style={sectionTitle()}>
+        <UserCircle size={16} /> פרטי בעל הנכס
+      </h3>
+      {err && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          background: 'rgba(185,28,28,0.08)', color: DT.danger,
+          padding: '6px 10px', borderRadius: 8, fontSize: 12, marginBottom: 10,
+        }}>
+          <AlertCircle size={12} /> {err}
         </div>
-
-        <div className="od-form-actions">
-          <button className="btn btn-primary" onClick={save} disabled={busy}>
-            <Save size={16} />
-            {busy ? 'שומר…' : 'שמור שינויים'}
-          </button>
-        </div>
+      )}
+      <div style={{
+        display: 'grid', gap: 12,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+      }}>
+        <Field label="שם מלא">
+          <input
+            {...inputPropsForName()}
+            className="form-input"
+            value={form.name}
+            onChange={(e) => update('name', e.target.value)}
+          />
+        </Field>
+        <Field label="טלפון">
+          <PhoneField value={form.phone} onChange={(v) => update('phone', v)} />
+        </Field>
+        <Field label="אימייל">
+          <input
+            {...inputPropsForEmail()}
+            className="form-input"
+            value={form.email}
+            onChange={(e) => update('email', e.target.value)}
+            placeholder="name@example.com"
+          />
+        </Field>
+        <Field label="סוג בעלות">
+          <SelectField
+            value={form.relationship}
+            onChange={(v) => update('relationship', v)}
+            placeholder="בחר…"
+            options={RELATIONSHIP_OPTIONS}
+          />
+        </Field>
+        <Field label="הערות" wide>
+          <textarea
+            {...inputPropsForNotes()}
+            className="form-textarea"
+            rows={4}
+            value={form.notes}
+            onChange={(e) => update('notes', e.target.value)}
+            placeholder="פרטים נוספים על בעל הנכס…"
+          />
+        </Field>
       </div>
-    </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+        <button type="button" onClick={save} disabled={busy} style={primaryBtn()}>
+          <Save size={14} />
+          {busy ? 'שומר…' : 'שמור שינויים'}
+        </button>
+      </div>
+    </section>
   );
 }
 
 function OwnerPropertiesPanel({ properties }) {
   return (
-    <div className="od-properties-col">
-      <div className="od-section od-properties-section">
-        <h3 className="od-section-title">
-          <Building2 size={16} />
-          נכסים בבעלות ({properties.length})
-        </h3>
+    <section style={sectionCard()} aria-label="נכסים בבעלות">
+      <h3 style={sectionTitle()}>
+        <Building2 size={16} /> נכסים בבעלות ({properties.length})
+      </h3>
+      {properties.length === 0 ? (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start',
+          color: DT.muted, fontSize: 13, padding: '14px 0',
+        }}>
+          <p style={{ margin: 0 }}>עוד אין נכסים בבעלות זה — צרף נכס מתוך עמוד הקליטה.</p>
+          <Link to="/properties/new" style={ghostBtn()}>
+            קליטת נכס
+          </Link>
+        </div>
+      ) : (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {properties.map((p) => (
+            <li key={p.id}>
+              <Link
+                to={`/properties/${p.id}`}
+                style={{
+                  display: 'flex', flexDirection: 'column', gap: 4,
+                  padding: '10px 12px', borderRadius: 10,
+                  border: `1px solid ${DT.border}`,
+                  background: DT.cream4, textDecoration: 'none', color: DT.ink,
+                  transition: 'background 0.15s',
+                }}
+              >
+                <span style={{ fontWeight: 800, fontSize: 13 }}>
+                  {[p.street, p.city].filter(Boolean).join(', ') || 'נכס ללא כתובת'}
+                </span>
+                <span style={{ fontSize: 12, color: DT.muted }}>
+                  {[p.type, p.rooms ? `${p.rooms} חד׳` : null, p.sqm ? `${p.sqm} מ״ר` : null]
+                    .filter(Boolean).join(' · ')}
+                </span>
+                {p.marketingPrice ? (
+                  <span style={{ fontSize: 13, fontWeight: 800, color: DT.goldDark }}>
+                    {formatPrice(p.marketingPrice)}
+                  </span>
+                ) : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
-        {properties.length === 0 ? (
-          <div className="od-properties-empty">
-            <p>עוד אין נכסים בבעלות זה — צרף נכס מתוך עמוד הקליטה.</p>
-            <Link to="/properties/new" className="btn btn-secondary btn-sm">
-              קליטת נכס
-            </Link>
-          </div>
-        ) : (
-          <ul className="od-properties-list">
-            {properties.map((p) => (
-              <li key={p.id} className="od-property-item">
-                <Link to={`/properties/${p.id}`} className="od-property-link">
-                  <span className="od-property-title">
-                    {[p.street, p.city].filter(Boolean).join(', ') || 'נכס ללא כתובת'}
-                  </span>
-                  <span className="od-property-meta">
-                    {[p.type, p.rooms ? `${p.rooms} חד׳` : null, p.sqm ? `${p.sqm} מ״ר` : null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                  {p.marketingPrice ? (
-                    <span className="od-property-price">{formatPrice(p.marketingPrice)}</span>
-                  ) : null}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+function Field({ label, wide, children }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 4,
+      gridColumn: wide ? '1 / -1' : 'auto',
+    }}>
+      <label style={{ fontSize: 11, fontWeight: 700, color: DT.muted, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+        {label}
+      </label>
+      {children}
     </div>
   );
+}
+
+function sectionCard() {
+  return {
+    background: DT.white, border: `1px solid ${DT.border}`,
+    borderRadius: 14, padding: 20,
+  };
+}
+function sectionTitle() {
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    fontSize: 14, fontWeight: 800, margin: '0 0 14px', color: DT.ink,
+    letterSpacing: -0.2,
+  };
+}
+function primaryBtn() {
+  return {
+    ...FONT,
+    background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+    border: 'none', color: DT.ink,
+    padding: '9px 16px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 13, fontWeight: 800,
+    display: 'inline-flex', gap: 6, alignItems: 'center',
+    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    textDecoration: 'none',
+  };
+}
+function secondaryBtn() {
+  return {
+    ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
+    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    display: 'inline-flex', gap: 5, alignItems: 'center', color: DT.ink,
+    textDecoration: 'none',
+  };
+}
+function ghostBtn() {
+  return {
+    ...FONT, background: 'transparent', border: `1px solid ${DT.border}`,
+    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    display: 'inline-flex', gap: 5, alignItems: 'center', color: DT.ink,
+    textDecoration: 'none',
+  };
+}
+function dangerBtn() {
+  return {
+    ...FONT, background: 'rgba(185,28,28,0.08)', border: `1px solid rgba(185,28,28,0.2)`,
+    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    display: 'inline-flex', gap: 5, alignItems: 'center', color: DT.danger,
+  };
 }
