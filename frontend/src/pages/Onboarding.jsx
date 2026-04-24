@@ -360,7 +360,7 @@ export default function Onboarding() {
               <ArrowLeft size={15} aria-hidden="true" />
             </PrimaryBtn>
           ) : (
-            <PrimaryBtn onClick={finish} disabled={submitting}>
+            <PrimaryBtn onClick={() => finish()} disabled={submitting}>
               {submitting ? 'שומר…' : 'סיימתי — בואו נתחיל'}
               <ArrowLeft size={15} aria-hidden="true" />
             </PrimaryBtn>
