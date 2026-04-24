@@ -27,7 +27,7 @@ import {
   Bell, Search, Plus, MessageCircle, LogOut, Menu, X,
   ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
   Activity as ActivityIcon, Tag, Download as DownloadIcon, Heart,
-  Star, FolderOpen, MapPin,
+  Star, FolderOpen, HelpCircle, IdCard,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
@@ -69,7 +69,6 @@ const PRIMARY_NAV = [
   { k: 'deals',       to: '/deals',      label: 'עסקאות',     Icon: Banknote },
   { k: 'calendar',    to: '/reminders',  label: 'יומן',       Icon: CalendarDays },
   { k: 'calendar-month', to: '/calendar', label: 'לוח שנה',    Icon: CalendarDays },
-  { k: 'map',         to: '/map',        label: 'מפה',         Icon: MapPin },
   { k: 'transfers',   to: '/transfers',  label: 'העברות',     Icon: ArrowLeftRight },
   { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
   { k: 'activity',    to: '/activity',   label: 'פעילות',     Icon: ActivityIcon },
@@ -81,10 +80,15 @@ const TOOL_NAV = [
   { k: 'import',    to: '/import',            label: 'ייבוא אקסל',    Icon: Upload },
   { k: 'calculator', to: '/calculator',       label: 'מחשבון',         Icon: Calculator },
   { k: 'templates',  to: '/templates',        label: 'תבניות',         Icon: FileText },
+  // Sprint 7 — the agent's own business-card page (/agent-card).
+  { k: 'agent-card', to: '/agent-card',       label: 'הכרטיס שלי',     Icon: IdCard },
   { k: 'team',       to: '/team',             label: 'הצוות שלי',      Icon: UsersRound },
   { k: 'office',     to: '/office',           label: 'משרד / צוות',    Icon: UsersRound },
   { k: 'tags',       to: '/settings/tags',    label: 'ניהול תגיות',    Icon: Tag },
   { k: 'settings',   to: '/settings',         label: 'הגדרות',         Icon: Settings },
+  // Sprint 7 — in-app help surface. Lives in the tools rail so it's
+  // always one click away, with a matching ? icon in the topbar.
+  { k: 'help',       to: '/help',             label: 'עזרה',           Icon: HelpCircle },
 ];
 
 // Pick the single most-specific nav route that matches the current
@@ -669,6 +673,23 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
         >
           <MessageCircle size={15} />
         </button>
+        {/* Sprint 7 — direct link to /help (FAQ + support channels).
+            Placed next to the chat launcher so the "I need help"
+            affordance is always visible without hunting through the
+            sidebar tools. */}
+        <NavLink
+          to="/help"
+          aria-label="עזרה ותמיכה"
+          title="עזרה ותמיכה"
+          style={{
+            background: DT.white, border: `1px solid ${DT.border}`,
+            width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
+            color: DT.ink, display: 'grid', placeItems: 'center',
+            textDecoration: 'none',
+          }}
+        >
+          <HelpCircle size={15} />
+        </NavLink>
       </div>
     </header>
   );

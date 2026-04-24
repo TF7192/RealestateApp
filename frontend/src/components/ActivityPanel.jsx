@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { History, Loader2, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { History, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import api from '../lib/api';
 import EmptyState from './EmptyState';
 import { relativeTime, absoluteTime } from '../lib/time';
@@ -81,24 +82,40 @@ export default function ActivityPanel({
           description="עדכונים אוטומטיים יופיעו כאן ככל שהלקוח מתקדם."
         />
       ) : (
-        <ul className="ap-list">
-          {items.map((ev) => (
-            <li key={ev.id} className="ap-item">
-              <div className="ap-dot" aria-hidden />
-              <div className="ap-body">
-                <div className="ap-line">
-                  {ev.actorName && <span className="ap-actor">{ev.actorName}</span>}
-                  <span className="ap-action">{ev.summary || ev.action || ev.kind}</span>
+        <>
+          <ul className="ap-list">
+            {items.map((ev) => (
+              <li key={ev.id} className="ap-item">
+                <div className="ap-dot" aria-hidden />
+                <div className="ap-body">
+                  <div className="ap-line">
+                    {ev.actorName && <span className="ap-actor">{ev.actorName}</span>}
+                    <span className="ap-action">{ev.summary || ev.action || ev.kind}</span>
+                  </div>
+                  {ev.createdAt && (
+                    <time className="ap-time" dateTime={ev.createdAt} title={absoluteTime(ev.createdAt)}>
+                      {relativeTime(ev.createdAt)}
+                    </time>
+                  )}
                 </div>
-                {ev.createdAt && (
-                  <time className="ap-time" dateTime={ev.createdAt} title={absoluteTime(ev.createdAt)}>
-                    {relativeTime(ev.createdAt)}
-                  </time>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+          {/* Sprint 7 — full-page timeline for leads. Only render the
+              deep-link when we're actually scoped to a lead; the panel
+              is generic (also used on PropertyDetail etc.) so the link
+              would be a dead-end on other surfaces. */}
+          {entityType === 'Lead' && entityId && (
+            <div className="ap-footer">
+              <Link to={`/customers/${entityId}/history`} className="ap-more">
+                היסטוריה מלאה
+                {/* RTL: an arrow that reads "→" visually at the end of
+                    the line uses the left-pointing glyph. */}
+                <ArrowLeft size={12} aria-hidden="true" />
+              </Link>
+            </div>
+          )}
+        </>
       )}
     </section>
   );

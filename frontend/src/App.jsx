@@ -27,6 +27,10 @@ import CustomerPropertyView from './pages/CustomerPropertyView';
 import ProspectSign from './pages/ProspectSign';
 import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
+// Sprint 7 — two small new pages (agent business-card + full per-lead
+// history timeline). Both land in the main bundle since they're tiny.
+import AgentCard from './pages/AgentCard';
+import LeadHistory from './pages/LeadHistory';
 import Onboarding from './pages/Onboarding';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -69,6 +73,10 @@ const Office = lazy(() => import('./pages/Office'));
 const Team = lazy(() => import('./pages/Team'));
 const TagSettings = lazy(() => import('./pages/TagSettings'));
 const Settings = lazy(() => import('./pages/Settings'));
+// Sprint 7 — in-app FAQ + support-channel hub (/help). Lazy so the
+// static JSON registry + DT card styling don't weigh down the main
+// bundle for agents who never open the help page.
+const Help = lazy(() => import('./pages/Help'));
 // G2 — OWNER-only admin for marketable-area groups, linked from /settings.
 const NeighborhoodAdmin = lazy(() => import('./pages/NeighborhoodAdmin'));
 // Sprint 6 / ScreenContract — in-house digital contract e-sign (no
@@ -320,7 +328,11 @@ function AppRoutes() {
             <Route path="/customers" element={<Customers />} />
             <Route path="/customers/new" element={<NewLead />} />
             <Route path="/customers/:id" element={<CustomerDetail />} />
+            {/* Sprint 7 — full-page event stream for a single lead. */}
+            <Route path="/customers/:id/history" element={<LeadHistory />} />
             <Route path="/profile" element={<Profile />} />
+            {/* Sprint 7 — the agent's business-card surface. */}
+            <Route path="/agent-card" element={<AgentCard />} />
             {/* A-4 — already-onboarded agents who navigate here manually
                 get bounced back to the dashboard; the active guard
                 above catches the "not onboarded yet" case. */}
@@ -352,6 +364,10 @@ function AppRoutes() {
             <Route path="/map" element={<MapPage />} />
             <Route path="/office" element={<Office />} />
             <Route path="/team" element={<Team />} />
+            {/* Sprint 7 — /help renders the in-app FAQ + support channels
+                (WhatsApp / email / contact form). Static JSON registry,
+                no Intercom. */}
+            <Route path="/help" element={<Help />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/tags" element={<TagSettings />} />
             <Route path="/settings/neighborhoods" element={<NeighborhoodAdmin />} />

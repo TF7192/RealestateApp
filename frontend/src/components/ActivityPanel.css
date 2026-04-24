@@ -73,3 +73,26 @@
 .ap-actor { font-weight: 600; margin-inline-end: 4px; }
 .ap-action { color: var(--text-secondary); }
 .ap-time { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* Sprint 7 — deep-link to the full-page lead history. Keeps the panel
+   compact by offering an escape hatch when the agent wants the whole
+   story instead of the last few rows. */
+.ap-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-start;
+}
+.ap-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gold);
+  text-decoration: none;
+}
+.ap-more:hover {
+  text-decoration: underline;
+}
