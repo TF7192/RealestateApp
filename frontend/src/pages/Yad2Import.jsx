@@ -1,24 +1,42 @@
+// Yad2Import — sprint-8.x port of the claude.ai/design "Estia Refined
+// Pages" bundle (2026-04-24). Backend unchanged: same /agency/preview
+// + /agency/import + /quota + /jobs/:id surface driving the three
+// steps (paste → review → done). Re-laid-out with inline DT styles to
+// match the Cream & Gold palette used across Dashboard / Team /
+// Properties — no external CSS, no new dependencies.
+//
+// Scan lifecycle still lives in yad2ScanStore so the agent can navigate
+// away mid-scan and get notified on completion; returning mid-review
+// still shows the last scan's results until they explicitly start a
+// new one.
+
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Download, ArrowRight, AlertCircle, Check, Loader2, Building2, Store, Home as HomeIcon, ExternalLink, Clock, Lock, RefreshCw } from 'lucide-react';
+import {
+  Download, ArrowRight, AlertCircle, Check, Loader2,
+  Building2, Store, Home as HomeIcon, ExternalLink, Clock, Lock,
+  RefreshCw, Sparkles, Link2,
+} from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../lib/toast';
 import { formatFloor } from '../lib/formatFloor';
-import { getScanState, subscribeScan, startScan, clearScan, setScanQuota, startImport } from '../lib/yad2ScanStore';
-import './Yad2Import.css';
+import {
+  getScanState, subscribeScan, startScan, clearScan, setScanQuota, startImport,
+} from '../lib/yad2ScanStore';
+import { useViewportMobile } from '../hooks/mobile';
 
-// Yad2 agency-wide importer. Paste an agency URL like:
-//   https://www.yad2.co.il/realestate/agency/7098700/forsale
-// The backend walks /forsale, /rent, /commercial × all pages, parses
-// __NEXT_DATA__ for each, returns a flat list grouped per section. This
-// screen lets the agent pick which to import — the import call then
-// downloads each cover image to /uploads/properties/.../yad2-cover.jpg
-// and creates a Property row.
-//
-// Scan lifecycle lives in yad2ScanStore (module-level) so:
-//   - the agent can navigate away mid-scan and get notified on completion
-//   - returning to this page still shows the last scan's results until
-//     they explicitly start a new one
+// ─── DT tokens (lifted from the bundle's shell.jsx) ──────────
+const DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14', ink2: '#3a3226',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
+  success: '#15803d', danger: '#b91c1c',
+};
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const SECTION_LABEL = { forsale: 'מכירה', rent: 'השכרה', commercial: 'מסחרי' };
 const SECTION_ICON  = { forsale: HomeIcon, rent: Building2, commercial: Store };
@@ -26,6 +44,7 @@ const SECTION_ICON  = { forsale: HomeIcon, rent: Building2, commercial: Store };
 export default function Yad2Import() {
   const navigate = useNavigate();
   const toast = useToast();
+  const isMobile = useViewportMobile(820);
   const [scan, setScan] = useState(getScanState());
   useEffect(() => subscribeScan(setScan), []);
 
@@ -33,11 +52,11 @@ export default function Yad2Import() {
   const [step, setStep] = useState(scan.result ? 'review' : 'paste');
   const [busyImport, setBusyImport] = useState(false);
   const [importErr, setImportErr] = useState(null);
-  const [result, setResult] = useState(null); // import outcome (done step)
+  const [result, setResult] = useState(null);
   const [picked, setPicked] = useState(new Set());
   const initPickedRef = useRef(false);
 
-  // Derived: pull the scan result into the shape the review UI expects.
+  // Derived shape for the review UI.
   const extracted       = scan.result?.listings ?? [];
   const agency          = scan.result?.agency ?? null;
   const sections        = scan.result?.sections ?? [];
@@ -45,8 +64,8 @@ export default function Yad2Import() {
   const alreadyImported = scan.result?.alreadyImported ?? {};
   const quota           = scan.quota ?? null;
 
-  // Initialize `picked` once per distinct scan result so the agent's
-  // manual de-selects are preserved if they leave & come back mid-review.
+  // Initialize `picked` once per distinct scan result so manual
+  // de-selects are preserved on leave & return mid-review.
   useEffect(() => {
     if (!scan.result) return;
     if (initPickedRef.current) return;
@@ -59,17 +78,15 @@ export default function Yad2Import() {
     setStep('review');
   }, [scan.result]);
 
-  // Fetch the quota fresh on mount so the chip is accurate even when
-  // the store has a stale quota from an older scan.
+  // Fresh quota on mount so the chip is accurate even when the store
+  // has a stale quota from an older scan.
   useEffect(() => {
     api.yad2Quota().then(setScanQuota).catch(() => {});
   }, []);
 
   // Y-4 — once the import succeeds, reset the scan store + URL input so
   // the agent can't immediately re-import the same agency by clicking
-  // "סרוק" again. The "done" step renders a fresh "ייבא סוכנות נוספת"
-  // CTA that brings them back to paste; this hook makes sure the
-  // underlying state they'd return to is actually clean.
+  // "סרוק" again.
   useEffect(() => {
     if (step !== 'done') return;
     clearScan();
@@ -78,8 +95,8 @@ export default function Yad2Import() {
     setUrl('');
   }, [step]);
 
-  // Group listings by section so the review screen reads as
-  // "מכירה (12), השכרה (5), מסחרי (2)" — clearer than a flat list.
+  // Group by section so the review screen reads as
+  // "מכירה (12), השכרה (5), מסחרי (2)".
   const grouped = useMemo(() => {
     const out = { forsale: [], rent: [], commercial: [] };
     for (const l of extracted) {
@@ -110,10 +127,8 @@ export default function Yad2Import() {
     if (!url.trim()) return;
     if (quota && quota.remaining === 0) return;
     initPickedRef.current = false;
-    // F-24 — do NOT reset step to 'paste' here. The component already
-    // renders the paste step; explicitly setting it caused a brief flash
-    // of URL-cleared state on some renders. The URL input stays visible
-    // below the running-scan banner so the agent sees what's in flight.
+    // F-24 — do NOT reset step to 'paste' here; the component already
+    // renders the paste step and re-setting causes a flash.
     startScan(url.trim()).catch(() => { /* handled via store */ });
     toast.info?.('הסריקה החלה — תוכל/י להמשיך לעבוד. תקבל/י התראה בסיום.');
   };
@@ -125,10 +140,6 @@ export default function Yad2Import() {
     setStep('paste');
     setResult(null);
     setImportErr(null);
-    // Y-4 — clear the URL input too. Without this the agent returns to
-    // the paste step with the previous URL still populated and a fresh
-    // "סרוק" click would re-import the same agency. Force them to
-    // paste a new link deliberately.
     setUrl('');
   };
 
@@ -137,9 +148,6 @@ export default function Yad2Import() {
     setBusyImport(true);
     try {
       const toImport = extracted.filter((l) => picked.has(l.sourceId));
-      // Async job flow — backend returns { jobId } immediately and
-      // startImport polls for completion. Dodges the Cloudflare 100s
-      // cap for large image-rehost batches.
       const res = await startImport(toImport);
       setResult(res);
       setStep('done');
@@ -154,277 +162,791 @@ export default function Yad2Import() {
   const isRunning = scan.status === 'running';
   const err = importErr || (scan.status === 'error' ? scan.error : null);
 
+  const pad = isMobile ? '18px 14px 28px' : 28;
+
   return (
-    <div className="y2-page" dir="rtl">
-      <header className="y2-head">
-        <Link to="/properties" className="y2-back" aria-label="חזרה לנכסים">
-          <ArrowRight size={18} />
-          חזור לנכסים
-        </Link>
-        <div className="y2-title">
-          <h1>ייבוא נכסים מ-Yad2</h1>
-          <span className="y2-beta">Beta</span>
-        </div>
-        <p className="y2-sub">
-          הדבק את הקישור לדף הסוכנות שלך ב-Yad2 — נסרוק אוטומטית את כל הנכסים שלך
-          (מכירה, השכרה ומסחרי) על פני כל העמודים, ונוריד את התמונות ל-Estia.
-        </p>
-      </header>
-
-      {err && (
-        <div className="y2-err">
-          <AlertCircle size={14} /> {err}
-        </div>
-      )}
-
-      {step === 'paste' && (
-        <section className="y2-card">
-          <QuotaChip quota={quota} />
-
-          {/* Cached-result card — when the agent returns mid-session we
-              keep the last scan visible so they can jump back into review
-              without re-scanning. */}
-          {scan.status === 'done' && scan.result && (
-            <div className="y2-cached">
-              <div className="y2-cached-body">
-                <strong>סריקה אחרונה שמורה</strong>
-                <span>
-                  {scan.result.listings?.length ?? 0} נכסים · {agency?.name || 'סוכנות'} ·{' '}
-                  לפני {relativeMinutes(scan.finishedAt)}
-                </span>
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={() => setStep('review')}>
-                המשך לבחירה
-              </button>
-            </div>
-          )}
-
-          <label className="y2-label" htmlFor="y2-url">קישור לדף הסוכנות שלך ב-Yad2</label>
-          <input
-            id="y2-url"
-            type="url"
-            className="y2-input"
-            inputMode="url"
-            enterKeyHint="go"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            autoComplete="off"
-            placeholder="https://www.yad2.co.il/realestate/agency/7098700/forsale"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && url.trim() && !isRunning && !(quota && quota.remaining === 0)) beginScan();
+    <div dir="rtl" style={{ ...FONT, padding: pad, color: DT.ink, minHeight: '100%' }}>
+      <div style={{ maxWidth: 860, margin: '0 auto' }}>
+        {/* ── Header ── */}
+        <div style={{ marginBottom: isMobile ? 14 : 20 }}>
+          <Link
+            to="/properties"
+            aria-label="חזרה לנכסים"
+            style={{
+              ...FONT, display: 'inline-flex', alignItems: 'center', gap: 6,
+              color: DT.muted, textDecoration: 'none', fontSize: 12, fontWeight: 600,
+              marginBottom: 8,
             }}
-          />
-          <button
-            className="btn btn-primary"
-            disabled={!url.trim() || isRunning || (quota && quota.remaining === 0)}
-            onClick={beginScan}
           >
-            {isRunning ? <Loader2 size={14} className="y2-spin" /> : <Download size={14} />}
-            {isRunning
-              ? 'סורק ברקע — ניתן להמשיך לעבוד'
-              : (quota && quota.remaining === 0
-                  ? 'הגעת למכסה השעתית'
-                  : 'סרוק את כל הנכסים')}
-          </button>
-          <p className="y2-hint">
-            כל אחת משלושת הקטגוריות (מכירה / השכרה / מסחרי) נסרקת בנפרד, כולל כל העמודים בכל קטגוריה.
-            הסריקה רצה ברקע — אפשר לעזוב את העמוד; תתקבל התראה כשהיא תסתיים.
-          </p>
-        </section>
-      )}
+            <ArrowRight size={14} />
+            חזור לנכסים
+          </Link>
 
-      {step === 'review' && scan.result && (
-        <section className="y2-card">
-          <header className="y2-review-head">
-            <div>
-              <strong>{extracted.length} נכסים נמצאו</strong>
-              {agency?.name && <span className="y2-agency">· {agency.name}</span>}
-            </div>
-            <div className="y2-review-meta">
-              <span className="y2-review-meta-new">
-                {picked.size} <small>חדשים לייבוא</small>
-              </span>
-              {Object.keys(alreadyImported).length > 0 && (
-                <span className="y2-review-meta-imported">
-                  {Object.keys(alreadyImported).length} <small>כבר במערכת</small>
+          <div style={{
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+            gap: 12, flexWrap: 'wrap',
+          }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 10,
+                flexWrap: 'wrap',
+              }}>
+                <h1 style={{
+                  fontSize: isMobile ? 22 : 28,
+                  fontWeight: 800,
+                  letterSpacing: isMobile ? -0.5 : -0.7,
+                  margin: 0,
+                }}>
+                  ייבוא נכסים מ-Yad2
+                </h1>
+                <span style={{
+                  background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+                  color: DT.ink,
+                  padding: '3px 10px',
+                  borderRadius: 99,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: 0.5,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  boxShadow: '0 2px 6px rgba(180,139,76,0.25)',
+                }}>
+                  <Sparkles size={11} aria-hidden="true" /> BETA
                 </span>
-              )}
-            </div>
-            {truncated && (
-              <div className="y2-trunc">הוצגו עד 100 נכסים — הסוכנות עשויה להכיל עוד.</div>
-            )}
-          </header>
-
-          {sections.length > 0 && (
-            <ul className="y2-section-summary">
-              {sections.map((s) => {
-                const Icon = SECTION_ICON[s.section] || HomeIcon;
-                return (
-                  <li key={s.section}>
-                    <Icon size={12} />
-                    <strong>{SECTION_LABEL[s.section]}</strong>
-                    <span>{s.totalListings} מתוך {s.totalPages || '?'} עמודים</span>
-                    {s.error && <em>· {s.error}</em>}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          {Object.entries(grouped).map(([section, list]) => {
-            if (!list || list.length === 0) return null;
-            const Icon = SECTION_ICON[section] || HomeIcon;
-            const allOn = list.every((l) => picked.has(l.sourceId));
-            return (
-              <div key={section} className="y2-group">
-                <header className="y2-group-head">
-                  <button
-                    type="button"
-                    className="y2-group-toggle"
-                    onClick={() => togglePickSection(section)}
-                    title={allOn ? 'בטל את הבחירה בקטגוריה' : 'בחר את כל הקטגוריה'}
-                  >
-                    <input type="checkbox" checked={allOn} readOnly />
-                    <Icon size={14} />
-                    <strong>{SECTION_LABEL[section]}</strong>
-                    <span>({list.length})</span>
-                  </button>
-                </header>
-                <ul className="y2-list">
-                  {list.map((l) => {
-                    const chosen = picked.has(l.sourceId);
-                    const importedPropertyId = alreadyImported[l.sourceId];
-                    const isImported = !!importedPropertyId;
-                    if (isImported) {
-                      return (
-                        <li key={l.sourceId} className="y2-item y2-item-imported">
-                          <Link to={`/properties/${importedPropertyId}`} className="y2-item-imported-row">
-                            {l.coverImage && (
-                              <div className="y2-thumb-wrap">
-                                <img className="y2-thumb" src={l.coverImage} alt="" loading="lazy" decoding="async" />
-                              </div>
-                            )}
-                            <div className="y2-item-meta">
-                              <strong>
-                                {l.title || `${l.street || ''}${l.city ? `, ${l.city}` : ''}`.trim() || 'נכס מ-Yad2'}
-                              </strong>
-                              <span>
-                                {[
-                                  l.type,
-                                  l.rooms ? `${l.rooms} חד׳` : null,
-                                  l.sqm ? `${l.sqm} מ״ר` : null,
-                                  l.price ? `₪${Number(l.price).toLocaleString('he-IL')}` : null,
-                                ].filter(Boolean).join(' · ')}
-                              </span>
-                              <span className="y2-imported-pill">
-                                <Check size={11} /> כבר במערכת — פתח כרטיס
-                                <ExternalLink size={11} />
-                              </span>
-                            </div>
-                          </Link>
-                        </li>
-                      );
-                    }
-                    return (
-                      <li key={l.sourceId} className={`y2-item ${chosen ? 'on' : ''}`}>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={chosen}
-                            onChange={() => togglePick(l.sourceId)}
-                          />
-                          {l.coverImage && (
-                            <div className="y2-thumb-wrap">
-                              <img className="y2-thumb" src={l.coverImage} alt="" loading="lazy" decoding="async" />
-                              {(l.images?.length || 0) > 1 && (
-                                <span className="y2-thumb-count">{l.images.length} תמונות</span>
-                              )}
-                            </div>
-                          )}
-                          <div className="y2-item-meta">
-                            <strong>
-                              {l.title || `${l.street || ''}${l.city ? `, ${l.city}` : ''}`.trim() || 'נכס מ-Yad2'}
-                            </strong>
-                            <span>
-                              {[
-                                l.type,
-                                l.rooms ? `${l.rooms} חד׳` : null,
-                                l.sqm ? `${l.sqm} מ״ר` : null,
-                                l.floor != null ? `קומה ${formatFloor(l.floor)}` : null,
-                                l.price ? `₪${Number(l.price).toLocaleString('he-IL')}` : null,
-                              ].filter(Boolean).join(' · ')}
-                            </span>
-                            {l.tags?.length > 0 && (
-                              <small className="y2-tags">{l.tags.slice(0, 4).join(' · ')}</small>
-                            )}
-                          </div>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
               </div>
-            );
-          })}
-
-          <div className="y2-review-actions">
-            <button
-              className="btn btn-primary"
-              disabled={picked.size === 0 || busyImport}
-              onClick={importPicked}
-            >
-              {busyImport ? <Loader2 size={14} className="y2-spin" /> : <Check size={14} />}
-              {busyImport ? 'מייבא ומוריד תמונות…' : `ייבא ${picked.size} נכסים`}
-            </button>
-            <button className="btn btn-secondary" onClick={resetAndRescan}>
-              <RefreshCw size={13} />
-              סריקה חדשה
-            </button>
+              <div style={{
+                fontSize: isMobile ? 12.5 : 13.5,
+                color: DT.muted,
+                marginTop: 6,
+                lineHeight: 1.6,
+                maxWidth: 640,
+              }}>
+                הדבק קישור לדף הסוכנות שלך ב-Yad2 — נסרוק אוטומטית את כל הנכסים
+                (מכירה · השכרה · מסחרי), ונוריד את התמונות ל-Estia.
+              </div>
+            </div>
           </div>
-        </section>
-      )}
+        </div>
 
-      {step === 'done' && result && (
-        <section className="y2-card y2-done">
-          <Check size={28} />
-          <h2>הייבוא הסתיים</h2>
-          <ul className="y2-summary">
-            <li>נוספו: <strong>{result.created.length}</strong></li>
-            {result.skipped.length > 0 && (
-              <li>דולגו (כבר מיובאים): <strong>{result.skipped.length}</strong></li>
-            )}
-            {result.failed.length > 0 && (
-              <li className="y2-failed">נכשלו: <strong>{result.failed.length}</strong></li>
-            )}
-          </ul>
-          <div className="y2-done-actions">
-            <button className="btn btn-primary" onClick={() => navigate('/properties')}>הצג את הנכסים</button>
-            <button className="btn btn-secondary" onClick={resetAndRescan}>
-              ייבא סוכנות נוספת
-            </button>
+        {err && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 14px', borderRadius: 10,
+            background: 'rgba(185,28,28,0.08)',
+            border: `1px solid rgba(185,28,28,0.22)`,
+            color: DT.danger, fontSize: 13, fontWeight: 600,
+            marginBottom: 14,
+          }}>
+            <AlertCircle size={14} /> {err}
           </div>
-        </section>
-      )}
+        )}
+
+        {step === 'paste' && (
+          <PasteStep
+            isMobile={isMobile}
+            quota={quota}
+            scan={scan}
+            agency={agency}
+            url={url}
+            setUrl={setUrl}
+            isRunning={isRunning}
+            beginScan={beginScan}
+            onContinue={() => setStep('review')}
+          />
+        )}
+
+        {step === 'review' && scan.result && (
+          <ReviewStep
+            isMobile={isMobile}
+            extracted={extracted}
+            agency={agency}
+            sections={sections}
+            truncated={truncated}
+            alreadyImported={alreadyImported}
+            grouped={grouped}
+            picked={picked}
+            togglePick={togglePick}
+            togglePickSection={togglePickSection}
+            busyImport={busyImport}
+            importPicked={importPicked}
+            resetAndRescan={resetAndRescan}
+          />
+        )}
+
+        {step === 'done' && result && (
+          <DoneStep
+            isMobile={isMobile}
+            result={result}
+            onGoProperties={() => navigate('/properties')}
+            onResetAndRescan={resetAndRescan}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
-function relativeMinutes(ts) {
-  if (!ts) return 'רגע';
-  const mins = Math.max(0, Math.round((Date.now() - ts) / 60_000));
-  if (mins === 0) return 'פחות מדקה';
-  if (mins === 1) return 'דקה';
-  return `${mins} דק׳`;
+// ─── Paste step ──────────────────────────────────────────────
+function PasteStep({
+  isMobile, quota, scan, agency, url, setUrl, isRunning, beginScan, onContinue,
+}) {
+  const canScan = url.trim() && !isRunning && !(quota && quota.remaining === 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <QuotaChip quota={quota} isMobile={isMobile} />
+
+      {/* Cached-result card — mid-session return */}
+      {scan.status === 'done' && scan.result && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 14px',
+          borderRadius: 12,
+          border: `1px dashed ${DT.gold}`,
+          background: DT.goldSoft,
+        }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 8,
+            background: DT.white, display: 'grid', placeItems: 'center',
+            color: DT.gold, flexShrink: 0,
+          }}>
+            <RefreshCw size={15} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: DT.ink }}>
+              סריקה אחרונה שמורה
+            </div>
+            <div style={{ fontSize: 12, color: DT.muted, marginTop: 2 }}>
+              {scan.result.listings?.length ?? 0} נכסים · {agency?.name || 'סוכנות'} ·{' '}
+              לפני {relativeMinutes(scan.finishedAt)}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onContinue}
+            style={primaryBtn({ small: true })}
+          >
+            המשך לבחירה
+          </button>
+        </div>
+      )}
+
+      {/* Main paste card */}
+      <section style={{
+        background: DT.white,
+        border: `1px solid ${DT.border}`,
+        borderRadius: 14,
+        padding: isMobile ? 16 : 22,
+        display: 'flex', flexDirection: 'column', gap: 12,
+      }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          fontSize: 11, color: DT.goldDark, fontWeight: 800, letterSpacing: 1,
+        }}>
+          <Link2 size={11} aria-hidden="true" />
+          שלב 1 · קישור לסוכנות
+        </div>
+
+        <label
+          htmlFor="y2-url"
+          style={{ fontSize: 13, fontWeight: 700, color: DT.ink2, margin: 0 }}
+        >
+          הדביקו את כתובת דף הסוכנות שלכם ב-Yad2
+        </label>
+
+        <input
+          id="y2-url"
+          type="url"
+          inputMode="url"
+          enterKeyHint="go"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="https://www.yad2.co.il/realestate/agency/7098700/forsale"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && canScan) beginScan(); }}
+          style={{
+            ...FONT,
+            width: '100%',
+            padding: '14px 16px',
+            border: `1px solid ${DT.borderStrong}`,
+            borderRadius: 12,
+            background: DT.cream4,
+            fontSize: 16, // iOS zoom guard
+            color: DT.ink,
+            outline: 'none',
+            direction: 'ltr',
+            textAlign: 'start',
+            boxSizing: 'border-box',
+            transition: 'border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = DT.gold;
+            e.target.style.background = DT.white;
+            e.target.style.boxShadow = `0 0 0 3px ${DT.goldSoft}`;
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = DT.borderStrong;
+            e.target.style.background = DT.cream4;
+            e.target.style.boxShadow = 'none';
+          }}
+        />
+
+        <button
+          type="button"
+          disabled={!canScan}
+          onClick={beginScan}
+          style={{
+            ...primaryBtn(),
+            minHeight: isMobile ? 52 : 46,
+            fontSize: isMobile ? 15 : 14,
+            justifyContent: 'center',
+            opacity: canScan ? 1 : 0.55,
+            cursor: canScan ? 'pointer' : 'not-allowed',
+          }}
+        >
+          {isRunning
+            ? <Loader2 size={15} style={spin} />
+            : <Download size={15} />}
+          {isRunning
+            ? 'סורק ברקע — ניתן להמשיך לעבוד'
+            : (quota && quota.remaining === 0
+                ? 'הגעת למכסה השעתית'
+                : 'סרוק את כל הנכסים')}
+        </button>
+
+        <div style={{
+          fontSize: 12, color: DT.muted, lineHeight: 1.6,
+          margin: 0, paddingTop: 2,
+        }}>
+          כל קטגוריה (מכירה / השכרה / מסחרי) נסרקת בנפרד, כולל כל העמודים.
+          הסריקה רצה ברקע — אפשר לעזוב את העמוד; תתקבל התראה כשהיא תסתיים.
+        </div>
+      </section>
+    </div>
+  );
 }
 
-// Quota chip — sits above the URL input. Two visual states:
-//   - has slots: gold pill, "X/3 ייבואים נותרו השעה הקרובה"
-//   - exhausted: muted card, live countdown to the moment the oldest
-//     attempt expires out of the window
-function QuotaChip({ quota }) {
+// ─── Review step ─────────────────────────────────────────────
+function ReviewStep({
+  isMobile, extracted, agency, sections, truncated, alreadyImported,
+  grouped, picked, togglePick, togglePickSection,
+  busyImport, importPicked, resetAndRescan,
+}) {
+  const importedCount = Object.keys(alreadyImported).length;
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 14,
+      paddingBottom: isMobile ? 96 : 0,
+    }}>
+      {/* Review header card */}
+      <section style={{
+        background: DT.white,
+        border: `1px solid ${DT.border}`,
+        borderRadius: 14,
+        padding: isMobile ? 16 : 20,
+      }}>
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 12,
+          alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontSize: isMobile ? 18 : 22, fontWeight: 800,
+              letterSpacing: -0.5, color: DT.ink,
+            }}>
+              {extracted.length} נכסים נמצאו
+              {agency?.name && (
+                <span style={{
+                  color: DT.muted, fontWeight: 600, fontSize: isMobile ? 13 : 15,
+                  marginInlineStart: 8,
+                }}>· {agency.name}</span>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'baseline', gap: 4,
+              padding: '5px 12px', borderRadius: 99,
+              background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+              color: DT.ink,
+              fontSize: 14, fontWeight: 800,
+              fontVariantNumeric: 'tabular-nums',
+              boxShadow: '0 2px 6px rgba(180,139,76,0.25)',
+            }}>
+              {picked.size}
+              <span style={{ fontSize: 11, fontWeight: 600 }}>חדשים לייבוא</span>
+            </span>
+            {importedCount > 0 && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'baseline', gap: 4,
+                padding: '5px 12px', borderRadius: 99,
+                background: DT.cream2, color: DT.ink2,
+                border: `1px solid ${DT.border}`,
+                fontSize: 14, fontWeight: 800,
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                {importedCount}
+                <span style={{ fontSize: 11, fontWeight: 600 }}>כבר במערכת</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {truncated && (
+          <div style={{
+            marginTop: 10,
+            fontSize: 12, color: DT.goldDark,
+            background: DT.goldSoft,
+            padding: '6px 10px', borderRadius: 8,
+          }}>
+            הוצגו עד 100 נכסים — הסוכנות עשויה להכיל עוד.
+          </div>
+        )}
+
+        {sections.length > 0 && (
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12,
+          }}>
+            {sections.map((s) => {
+              const Icon = SECTION_ICON[s.section] || HomeIcon;
+              return (
+                <span
+                  key={s.section}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '5px 12px', borderRadius: 99,
+                    background: DT.cream4,
+                    border: `1px solid ${DT.border}`,
+                    fontSize: 12, color: DT.muted, fontWeight: 600,
+                  }}
+                >
+                  <Icon size={12} style={{ color: DT.gold }} aria-hidden="true" />
+                  <strong style={{ color: DT.ink, fontWeight: 700 }}>
+                    {SECTION_LABEL[s.section]}
+                  </strong>
+                  <span>{s.totalListings} / {s.totalPages || '?'} עמ׳</span>
+                  {s.error && (
+                    <em style={{ color: DT.danger, fontStyle: 'normal' }}>
+                      · {s.error}
+                    </em>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Listing groups */}
+      {Object.entries(grouped).map(([section, list]) => {
+        if (!list || list.length === 0) return null;
+        const Icon = SECTION_ICON[section] || HomeIcon;
+        const allOn = list.every((l) => picked.has(l.sourceId));
+        return (
+          <section
+            key={section}
+            style={{
+              background: DT.white,
+              border: `1px solid ${DT.border}`,
+              borderRadius: 14,
+              padding: isMobile ? 14 : 18,
+              display: 'flex', flexDirection: 'column', gap: 10,
+            }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              paddingBottom: 10, borderBottom: `1px dashed ${DT.border}`,
+            }}>
+              <button
+                type="button"
+                onClick={() => togglePickSection(section)}
+                title={allOn ? 'בטל את הבחירה בקטגוריה' : 'בחר את כל הקטגוריה'}
+                style={{
+                  ...FONT,
+                  display: 'inline-flex', alignItems: 'center', gap: 10,
+                  background: 'transparent', border: 'none', padding: 0,
+                  cursor: 'pointer', color: DT.ink,
+                }}
+              >
+                <span style={{
+                  width: 22, height: 22, borderRadius: 6,
+                  background: allOn ? DT.gold : DT.white,
+                  border: `1.5px solid ${allOn ? DT.gold : DT.borderStrong}`,
+                  display: 'grid', placeItems: 'center', flexShrink: 0,
+                  transition: 'background 0.15s ease, border-color 0.15s ease',
+                }}>
+                  {allOn && <Check size={13} color={DT.white} strokeWidth={3} />}
+                </span>
+                <span style={{
+                  color: DT.gold, display: 'inline-flex', alignItems: 'center',
+                }}>
+                  <Icon size={16} aria-hidden="true" />
+                </span>
+                <strong style={{ fontSize: 15, fontWeight: 800 }}>
+                  {SECTION_LABEL[section]}
+                </strong>
+                <span style={{ color: DT.muted, fontSize: 12.5, fontWeight: 600 }}>
+                  ({list.length})
+                </span>
+              </button>
+            </div>
+
+            <ul style={{
+              listStyle: 'none', margin: 0, padding: 0,
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              {list.map((l) => {
+                const chosen = picked.has(l.sourceId);
+                const importedPropertyId = alreadyImported[l.sourceId];
+                const isImported = !!importedPropertyId;
+                if (isImported) {
+                  return (
+                    <ListingRowImported
+                      key={l.sourceId}
+                      listing={l}
+                      propertyId={importedPropertyId}
+                      isMobile={isMobile}
+                    />
+                  );
+                }
+                return (
+                  <ListingRow
+                    key={l.sourceId}
+                    listing={l}
+                    chosen={chosen}
+                    onToggle={() => togglePick(l.sourceId)}
+                    isMobile={isMobile}
+                  />
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
+
+      {/* Action bar — sticky on mobile, inline on desktop */}
+      <ReviewActions
+        isMobile={isMobile}
+        picked={picked}
+        busyImport={busyImport}
+        importPicked={importPicked}
+        resetAndRescan={resetAndRescan}
+      />
+    </div>
+  );
+}
+
+function ListingRow({ listing: l, chosen, onToggle, isMobile }) {
+  const thumb = isMobile ? 80 : 72;
+  const title =
+    l.title ||
+    `${l.street || ''}${l.city ? `, ${l.city}` : ''}`.trim() ||
+    'נכס מ-Yad2';
+  const meta = [
+    l.type,
+    l.rooms ? `${l.rooms} חד׳` : null,
+    l.sqm ? `${l.sqm} מ״ר` : null,
+    l.floor != null ? `קומה ${formatFloor(l.floor)}` : null,
+    l.price ? `₪${Number(l.price).toLocaleString('he-IL')}` : null,
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <li style={{
+      border: `1px solid ${chosen ? DT.gold : DT.border}`,
+      borderRadius: 12,
+      background: chosen ? DT.goldSoft : DT.cream4,
+      transition: 'border-color 0.15s ease, background 0.15s ease',
+    }}>
+      <label style={{
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+        padding: isMobile ? 12 : 12,
+        cursor: 'pointer',
+      }}>
+        <span style={{
+          width: 22, height: 22, borderRadius: 6,
+          background: chosen ? DT.gold : DT.white,
+          border: `1.5px solid ${chosen ? DT.gold : DT.borderStrong}`,
+          display: 'grid', placeItems: 'center', flexShrink: 0,
+          marginTop: 4,
+          transition: 'background 0.15s ease, border-color 0.15s ease',
+        }}>
+          {chosen && <Check size={13} color={DT.white} strokeWidth={3} />}
+          <input
+            type="checkbox"
+            checked={chosen}
+            onChange={onToggle}
+            style={{
+              position: 'absolute', opacity: 0,
+              width: 0, height: 0, pointerEvents: 'none',
+            }}
+          />
+        </span>
+
+        {l.coverImage && (
+          <div style={{
+            position: 'relative',
+            width: thumb, height: thumb,
+            flexShrink: 0,
+            borderRadius: 10,
+            overflow: 'hidden',
+            background: DT.cream3,
+          }}>
+            <img
+              src={l.coverImage}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              style={{
+                width: '100%', height: '100%',
+                objectFit: 'cover', display: 'block',
+              }}
+            />
+            {(l.images?.length || 0) > 1 && (
+              <span style={{
+                position: 'absolute', bottom: 4, insetInlineEnd: 4,
+                padding: '2px 7px',
+                background: 'rgba(30,26,20,0.75)',
+                color: DT.white,
+                fontSize: 10, fontWeight: 700,
+                borderRadius: 99,
+                pointerEvents: 'none',
+              }}>{l.images.length} תמונות</span>
+            )}
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 3,
+          minWidth: 0, flex: 1,
+        }}>
+          <strong style={{
+            fontSize: isMobile ? 14.5 : 14, color: DT.ink, fontWeight: 700,
+            lineHeight: 1.3,
+          }}>{title}</strong>
+          <span style={{
+            fontSize: 12.5, color: DT.ink2, lineHeight: 1.5,
+          }}>{meta || '—'}</span>
+          {l.tags?.length > 0 && (
+            <span style={{
+              fontSize: 11, color: DT.gold, marginTop: 2, fontWeight: 600,
+            }}>{l.tags.slice(0, 4).join(' · ')}</span>
+          )}
+        </div>
+      </label>
+    </li>
+  );
+}
+
+function ListingRowImported({ listing: l, propertyId, isMobile }) {
+  const thumb = isMobile ? 80 : 72;
+  const title =
+    l.title ||
+    `${l.street || ''}${l.city ? `, ${l.city}` : ''}`.trim() ||
+    'נכס מ-Yad2';
+  const meta = [
+    l.type,
+    l.rooms ? `${l.rooms} חד׳` : null,
+    l.sqm ? `${l.sqm} מ״ר` : null,
+    l.price ? `₪${Number(l.price).toLocaleString('he-IL')}` : null,
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <li style={{
+      border: `1px dashed ${DT.gold}`,
+      borderRadius: 12,
+      background: DT.goldSoft,
+      opacity: 0.92,
+    }}>
+      <Link
+        to={`/properties/${propertyId}`}
+        style={{
+          display: 'flex', alignItems: 'flex-start', gap: 12,
+          padding: 12, textDecoration: 'none', color: 'inherit',
+        }}
+      >
+        {l.coverImage && (
+          <div style={{
+            width: thumb, height: thumb, flexShrink: 0,
+            borderRadius: 10, overflow: 'hidden',
+            background: DT.cream3, filter: 'saturate(0.7)',
+          }}>
+            <img
+              src={l.coverImage}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </div>
+        )}
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 4,
+          minWidth: 0, flex: 1,
+        }}>
+          <strong style={{
+            fontSize: isMobile ? 14.5 : 14, color: DT.ink, fontWeight: 700,
+            lineHeight: 1.3,
+          }}>{title}</strong>
+          <span style={{
+            fontSize: 12.5, color: DT.ink2, lineHeight: 1.5,
+          }}>{meta || '—'}</span>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            width: 'max-content',
+            padding: '3px 10px',
+            marginTop: 4,
+            borderRadius: 99,
+            background: DT.gold,
+            color: DT.white,
+            fontSize: 11,
+            fontWeight: 700,
+          }}>
+            <Check size={11} /> כבר במערכת — פתח כרטיס
+            <ExternalLink size={11} />
+          </span>
+        </div>
+      </Link>
+    </li>
+  );
+}
+
+function ReviewActions({ isMobile, picked, busyImport, importPicked, resetAndRescan }) {
+  const canImport = picked.size > 0 && !busyImport;
+  const content = (
+    <>
+      <button
+        type="button"
+        disabled={!canImport}
+        onClick={importPicked}
+        style={{
+          ...primaryBtn(),
+          minHeight: isMobile ? 50 : 44,
+          fontSize: isMobile ? 15 : 14,
+          flex: isMobile ? 1 : 'unset',
+          justifyContent: 'center',
+          opacity: canImport ? 1 : 0.55,
+          cursor: canImport ? 'pointer' : 'not-allowed',
+        }}
+      >
+        {busyImport
+          ? <Loader2 size={15} style={spin} />
+          : <Check size={15} />}
+        {busyImport ? 'מייבא ומוריד תמונות…' : `ייבא ${picked.size} נכסים`}
+      </button>
+      <button
+        type="button"
+        onClick={resetAndRescan}
+        style={{
+          ...ghostBtn(),
+          minHeight: isMobile ? 50 : 44,
+          paddingInline: 18,
+        }}
+      >
+        <RefreshCw size={13} />
+        סריקה חדשה
+      </button>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <div style={{
+        position: 'fixed', insetInline: 0, bottom: 0, zIndex: 100,
+        padding: `12px 16px calc(12px + env(safe-area-inset-bottom) + 64px)`,
+        background: `linear-gradient(180deg, transparent 0%, ${DT.cream} 28%)`,
+        display: 'flex', gap: 10, pointerEvents: 'none',
+      }}>
+        <div style={{
+          display: 'flex', gap: 10, width: '100%', pointerEvents: 'auto',
+        }}>{content}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      display: 'inline-flex', gap: 10, marginTop: 4,
+    }}>{content}</div>
+  );
+}
+
+// ─── Done step ───────────────────────────────────────────────
+function DoneStep({ isMobile, result, onGoProperties, onResetAndRescan }) {
+  return (
+    <section style={{
+      background: DT.white,
+      border: `1px solid ${DT.border}`,
+      borderRadius: 14,
+      padding: isMobile ? '28px 18px' : '40px 28px',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', textAlign: 'center',
+      gap: 14,
+    }}>
+      <div style={{
+        width: 64, height: 64, borderRadius: 99,
+        background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+        color: DT.white, display: 'grid', placeItems: 'center',
+        boxShadow: '0 8px 20px rgba(180,139,76,0.35)',
+      }}>
+        <Check size={30} strokeWidth={3} />
+      </div>
+
+      <h2 style={{
+        fontSize: isMobile ? 20 : 24, fontWeight: 800,
+        letterSpacing: -0.5, margin: 0, color: DT.ink,
+      }}>
+        הייבוא הסתיים
+      </h2>
+
+      <ul style={{
+        listStyle: 'none', padding: 0, margin: 0,
+        display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center',
+        fontSize: 13.5, color: DT.muted,
+      }}>
+        <li>
+          נוספו:{' '}
+          <strong style={{ color: DT.success, fontWeight: 800 }}>
+            {result.created.length}
+          </strong>
+        </li>
+        {result.skipped.length > 0 && (
+          <li>
+            דולגו (כבר מיובאים):{' '}
+            <strong style={{ color: DT.ink, fontWeight: 800 }}>
+              {result.skipped.length}
+            </strong>
+          </li>
+        )}
+        {result.failed.length > 0 && (
+          <li>
+            נכשלו:{' '}
+            <strong style={{ color: DT.danger, fontWeight: 800 }}>
+              {result.failed.length}
+            </strong>
+          </li>
+        )}
+      </ul>
+
+      <div style={{
+        display: 'inline-flex', gap: 10, marginTop: 6, flexWrap: 'wrap',
+        justifyContent: 'center',
+      }}>
+        <button type="button" onClick={onGoProperties} style={primaryBtn()}>
+          הצג את הנכסים
+        </button>
+        <button type="button" onClick={onResetAndRescan} style={ghostBtn()}>
+          ייבא סוכנות נוספת
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ─── Quota chip ──────────────────────────────────────────────
+function QuotaChip({ quota, isMobile }) {
   const [, setTick] = useState(0);
   useEffect(() => {
     if (!quota || quota.remaining > 0) return undefined;
@@ -438,27 +960,99 @@ function QuotaChip({ quota }) {
     ? Math.max(0, Math.ceil((new Date(quota.resetAt).getTime() - Date.now()) / 60_000))
     : 0;
 
+  const bg     = exhausted ? 'rgba(185,28,28,0.08)' : DT.goldSoft;
+  const border = exhausted ? 'rgba(185,28,28,0.22)' : 'rgba(180,139,76,0.28)';
+  const iconColor = exhausted ? DT.danger : DT.gold;
+  const strongColor = exhausted ? DT.danger : DT.ink;
+
   return (
-    <div className={`y2-quota ${exhausted ? 'y2-quota-stop' : ''}`}>
-      {exhausted ? (
-        <>
-          <Lock size={14} />
-          <div>
-            <strong>הגעת למכסה השעתית</strong>
-            <span>הסלוט הבא יתפנה בעוד {minutesLeft} דק׳</span>
-          </div>
-        </>
-      ) : (
-        <>
-          <Clock size={14} />
-          <div>
-            <strong>
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 12,
+      padding: isMobile ? '10px 12px' : '12px 14px',
+      borderRadius: 12,
+      background: bg,
+      border: `1px solid ${border}`,
+    }}>
+      <span style={{
+        width: 30, height: 30, borderRadius: 8,
+        background: DT.white, color: iconColor,
+        display: 'grid', placeItems: 'center', flexShrink: 0,
+      }}>
+        {exhausted ? <Lock size={14} /> : <Clock size={14} />}
+      </span>
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0,
+      }}>
+        {exhausted ? (
+          <>
+            <strong style={{ fontSize: 13.5, color: strongColor, fontWeight: 800 }}>
+              הגעת למכסה השעתית
+            </strong>
+            <span style={{ fontSize: 12, color: DT.muted }}>
+              הסלוט הבא יתפנה בעוד {minutesLeft} דק׳
+            </span>
+          </>
+        ) : (
+          <>
+            <strong style={{
+              fontSize: 13.5, color: strongColor, fontWeight: 800,
+              fontVariantNumeric: 'tabular-nums',
+            }}>
               {quota.remaining} / {quota.limit} ייבואים נותרו
             </strong>
-            <span>המכסה מתאפסת על בסיס שעה גולשת — שלוש סריקות לכל שעה.</span>
-          </div>
-        </>
-      )}
+            <span style={{ fontSize: 12, color: DT.muted, lineHeight: 1.5 }}>
+              המכסה מתאפסת על בסיס שעה גולשת — שלוש סריקות לכל שעה.
+            </span>
+          </>
+        )}
+      </div>
     </div>
   );
+}
+
+// ─── Shared atoms ────────────────────────────────────────────
+function primaryBtn({ small = false } = {}) {
+  return {
+    ...FONT,
+    background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+    border: 'none', color: DT.ink,
+    padding: small ? '8px 14px' : '10px 16px',
+    borderRadius: 10, cursor: 'pointer',
+    fontSize: small ? 12.5 : 13, fontWeight: 800,
+    display: 'inline-flex', gap: 6, alignItems: 'center',
+    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    textDecoration: 'none', whiteSpace: 'nowrap',
+  };
+}
+
+function ghostBtn() {
+  return {
+    ...FONT,
+    background: DT.white,
+    border: `1px solid ${DT.border}`,
+    padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 13, fontWeight: 700,
+    display: 'inline-flex', gap: 6, alignItems: 'center',
+    color: DT.ink, textDecoration: 'none', whiteSpace: 'nowrap',
+  };
+}
+
+const spin = {
+  animation: 'y2Spin 0.8s linear infinite',
+};
+
+// Inject the keyframes once — inline styles can't express @keyframes.
+if (typeof document !== 'undefined' && !document.getElementById('y2-spin-kf')) {
+  const s = document.createElement('style');
+  s.id = 'y2-spin-kf';
+  s.textContent = '@keyframes y2Spin { to { transform: rotate(360deg); } }';
+  document.head.appendChild(s);
+}
+
+function relativeMinutes(ts) {
+  if (!ts) return 'רגע';
+  const mins = Math.max(0, Math.round((Date.now() - ts) / 60_000));
+  if (mins === 0) return 'פחות מדקה';
+  if (mins === 1) return 'דקה';
+  return `${mins} דק׳`;
 }
