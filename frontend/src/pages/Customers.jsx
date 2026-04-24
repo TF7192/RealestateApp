@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatPhone } from '../lib/phone';
+import { useViewportMobile } from '../hooks/mobile';
+import LeadFiltersSheet from '../components/LeadFiltersSheet';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -36,11 +38,39 @@ const FILTERS = [
 
 export default function Customers() {
   const navigate = useNavigate();
+  const isMobile = useViewportMobile();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  // `filter` is the status bucket — drives the desktop pill row AND
+  // mirrors `filters.status` inside the mobile sheet. The mobile sheet
+  // also pushes `filters.lookingFor/interestType/city/minBudget/
+  // maxBudget/minRooms/maxRooms` into `advanced` (below), which the
+  // memoized filter stage reads alongside `filter`.
   const [filter, setFilter] = useState('all');
+  const [advanced, setAdvanced] = useState({
+    lookingFor: '', interestType: '', city: '',
+    minBudget: null, maxBudget: null, minRooms: null, maxRooms: null,
+  });
   const [q, setQ] = useState('');
   const [hoverId, setHoverId] = useState(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [cityList, setCityList] = useState([]);
+
+  // Lazy-load the city lookup once the sheet is about to open. Cheap
+  // payload (~a few KB), cached by api.js's GET-level HTTP cache.
+  useEffect(() => {
+    if (!sheetOpen || cityList.length) return undefined;
+    let cancelled = false;
+    Promise.resolve()
+      .then(() => api.cities?.())
+      .then((r) => {
+        if (cancelled || !r) return;
+        const arr = Array.isArray(r) ? r : (r?.items || r?.cities || []);
+        setCityList(arr.map((c) => (typeof c === 'string' ? c : (c?.name || c?.city))).filter(Boolean));
+      })
+      .catch(() => { /* soft-fail: datalist just renders empty */ });
+    return () => { cancelled = true; };
+  }, [sheetOpen, cityList.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +101,7 @@ export default function Customers() {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
+    const cityQ = (advanced.city || '').trim();
     return leads.filter((l) => {
       if (qq) {
         const haystack = `${l.name || ''} ${l.phone || ''} ${l.city || ''} ${l.email || ''}`.toLowerCase();
@@ -84,14 +115,40 @@ export default function Customers() {
         const lastContact = l.lastContact ? new Date(l.lastContact).getTime() : 0;
         if (lastContact && Date.now() - lastContact <= 24 * 60 * 60 * 1000) return false;
       }
+      // Sheet-only dimensions. Each one is "unset" until the sheet
+      // applies a truthy value, so a desktop-only session behaves
+      // exactly as before.
+      if (advanced.lookingFor && (l.lookingFor || '').toUpperCase() !== advanced.lookingFor) return false;
+      if (advanced.interestType && (l.interestType || '').toUpperCase() !== advanced.interestType) return false;
+      if (cityQ && !(l.city || '').includes(cityQ)) return false;
+      if (advanced.minBudget != null && Number(l.budget || 0) < advanced.minBudget) return false;
+      if (advanced.maxBudget != null && l.budget && Number(l.budget) > advanced.maxBudget) return false;
+      if (advanced.minRooms != null && Number(l.rooms || 0) < advanced.minRooms) return false;
+      if (advanced.maxRooms != null && l.rooms && Number(l.rooms) > advanced.maxRooms) return false;
       return true;
     });
-  }, [leads, filter, q]);
+  }, [leads, filter, q, advanced]);
 
   const pillCount = (k) => {
     if (k === 'all')  return leads.length;
     return counts[k] || 0;
   };
+
+  // Count of active non-default filter dimensions (status !== all counts
+  // as one). Surfaced in the mobile chip so the agent knows the list
+  // is narrowed without opening the sheet.
+  const activeCount = useMemo(() => {
+    let n = 0;
+    if (filter && filter !== 'all') n++;
+    if (advanced.lookingFor)   n++;
+    if (advanced.interestType) n++;
+    if ((advanced.city || '').trim()) n++;
+    if (advanced.minBudget != null) n++;
+    if (advanced.maxBudget != null) n++;
+    if (advanced.minRooms  != null) n++;
+    if (advanced.maxRooms  != null) n++;
+    return n;
+  }, [filter, advanced]);
 
   return (
     <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
@@ -126,29 +183,56 @@ export default function Customers() {
         </div>
       </div>
 
-      {/* Filter pills + search */}
+      {/* Filter pills + search. On mobile (<820px) the pill row collapses
+          into a single "סינון" chip that opens the LeadFiltersSheet —
+          the desktop experience is unchanged. */}
       <div style={{
         display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center',
         flexWrap: 'wrap',
       }}>
-        {FILTERS.map((f) => {
-          const on = filter === f.k;
-          return (
-            <button
-              key={f.k}
-              type="button"
-              onClick={() => setFilter(f.k)}
-              style={{
-                ...FONT,
-                background: on ? DT.ink : DT.white,
-                color: on ? DT.cream : DT.ink,
-                border: `1px solid ${on ? DT.ink : DT.border}`,
-                padding: '7px 12px', borderRadius: 99,
-                fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              }}
-            >{f.label} · {pillCount(f.k)}</button>
-          );
-        })}
+        {isMobile ? (
+          <button
+            type="button"
+            onClick={() => setSheetOpen(true)}
+            aria-label="סינון לידים"
+            style={{
+              ...FONT,
+              background: DT.white, color: DT.ink,
+              border: `1px solid ${DT.border}`,
+              padding: '10px 14px', borderRadius: 99,
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <Filter size={14} /> סינון
+            {activeCount > 0 && (
+              <span style={{
+                background: DT.ink, color: DT.cream,
+                borderRadius: 99, padding: '1px 7px',
+                fontSize: 11, fontWeight: 800,
+              }}>{activeCount}</span>
+            )}
+          </button>
+        ) : (
+          FILTERS.map((f) => {
+            const on = filter === f.k;
+            return (
+              <button
+                key={f.k}
+                type="button"
+                onClick={() => setFilter(f.k)}
+                style={{
+                  ...FONT,
+                  background: on ? DT.ink : DT.white,
+                  color: on ? DT.cream : DT.ink,
+                  border: `1px solid ${on ? DT.ink : DT.border}`,
+                  padding: '7px 12px', borderRadius: 99,
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}
+              >{f.label} · {pillCount(f.k)}</button>
+            );
+          })
+        )}
         <div style={{
           marginInlineStart: 'auto', position: 'relative',
           display: 'inline-flex', alignItems: 'center',
@@ -172,6 +256,29 @@ export default function Customers() {
           />
         </div>
       </div>
+
+      {/* Mobile filter sheet. Mounted regardless of isMobile so closing
+          the sheet while the viewport crosses a breakpoint mid-session
+          doesn't strand a ghost overlay. */}
+      <LeadFiltersSheet
+        open={sheetOpen}
+        values={{ status: filter, ...advanced }}
+        cities={cityList}
+        onApply={(next) => {
+          const { status, ...rest } = next || {};
+          setFilter(status || 'all');
+          setAdvanced({
+            lookingFor: rest.lookingFor || '',
+            interestType: rest.interestType || '',
+            city: rest.city || '',
+            minBudget: rest.minBudget ?? null,
+            maxBudget: rest.maxBudget ?? null,
+            minRooms: rest.minRooms ?? null,
+            maxRooms: rest.maxRooms ?? null,
+          });
+        }}
+        onClose={() => setSheetOpen(false)}
+      />
 
       {/* Table */}
       <div style={{
