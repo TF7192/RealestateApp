@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useViewportMobile } from '../hooks/mobile';
 
 // ─── Tokens lifted from the bundle's shell.jsx ──────────────
 const DT = {
@@ -100,6 +101,7 @@ function computeAiPriorities({ leads, properties, deals, meetings }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const isMobile = useViewportMobile(820);
   const [leads, setLeads] = useState([]);
   const [properties, setProperties] = useState([]);
   const [deals, setDeals] = useState([]);
@@ -149,18 +151,31 @@ export default function Dashboard() {
   const openPremium = () => setPremiumOpen(true);
 
   return (
-    <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
+    <div dir="rtl" style={{
+      ...FONT,
+      // Mobile pass: the design's desktop padding + 30-px greeting +
+      // 190-px min KPI column all overflow on iPhone SE-class widths.
+      // Shrink just the mobile branch; desktop is untouched.
+      padding: isMobile ? '18px 14px 28px' : 28,
+      color: DT.ink, minHeight: '100%',
+    }}>
       {/* Greeting */}
       <div style={{
         display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
-        gap: 16, marginBottom: 20, flexWrap: 'wrap',
+        gap: 12, marginBottom: isMobile ? 16 : 20, flexWrap: 'wrap',
       }}>
-        <div>
-          <div style={{ fontSize: 12, color: DT.muted, fontWeight: 600 }}>{todayStr}</div>
-          <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, margin: '4px 0 0' }}>
+        <div style={{ minWidth: 0, flex: isMobile ? 1 : 'unset' }}>
+          <div style={{ fontSize: isMobile ? 11 : 12, color: DT.muted, fontWeight: 600 }}>{todayStr}</div>
+          <h1 style={{
+            fontSize: isMobile ? 22 : 30,
+            fontWeight: 800,
+            letterSpacing: isMobile ? -0.5 : -0.8,
+            margin: '4px 0 0',
+            overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
             בוקר טוב {firstName} ☀️
           </h1>
-          <div style={{ fontSize: 14, color: DT.muted, marginTop: 4 }}>
+          <div style={{ fontSize: isMobile ? 12 : 14, color: DT.muted, marginTop: 4, lineHeight: 1.5 }}>
             יש לכם <strong style={{ color: DT.gold }}>{meetings.length} פגישות</strong> השבוע ·{' '}
             <strong style={{ color: DT.gold }}>{hotLeads.length} לידים חמים</strong> ממתינים למענה
           </div>
@@ -170,31 +185,40 @@ export default function Dashboard() {
           onClick={openPremium}
           style={{
             ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
-            padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
-            fontSize: 13, fontWeight: 700,
-            display: 'inline-flex', gap: 7, alignItems: 'center', color: DT.ink,
+            padding: isMobile ? '8px 11px' : '10px 14px', borderRadius: 10, cursor: 'pointer',
+            fontSize: isMobile ? 12 : 13, fontWeight: 700,
+            display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.ink,
           }}
         >
-          <Sparkles size={14} /> שאל את Estia AI
+          <Sparkles size={14} /> {isMobile ? 'Estia AI' : 'שאל את Estia AI'}
         </button>
       </div>
 
-      {/* KPI row */}
+      {/* KPI row — 2×2 grid on mobile so four chips fit without
+          horizontal scroll; min-column is 140 there vs 190 on desktop. */}
       <div style={{
-        display: 'grid', gap: 14, marginBottom: 20,
-        gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+        display: 'grid', gap: isMobile ? 10 : 14, marginBottom: isMobile ? 16 : 20,
+        gridTemplateColumns: isMobile
+          ? 'repeat(2, minmax(0, 1fr))'
+          : 'repeat(auto-fit, minmax(190px, 1fr))',
       }}>
         {kpis.map((k, i) => (
-          <DCard key={i}>
+          <DCard key={i} compact={isMobile}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ fontSize: 12, color: DT.muted, fontWeight: 600 }}>{k.l}</div>
+              <div style={{
+                fontSize: isMobile ? 11 : 12, color: DT.muted, fontWeight: 600,
+                lineHeight: 1.35, minWidth: 0,
+              }}>{k.l}</div>
               <span style={{
                 color: DT.gold, background: DT.goldSoft,
-                width: 32, height: 32, borderRadius: 8,
-                display: 'grid', placeItems: 'center',
-              }}><k.i size={15} /></span>
+                width: isMobile ? 26 : 32, height: isMobile ? 26 : 32, borderRadius: 8,
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}><k.i size={isMobile ? 13 : 15} /></span>
             </div>
-            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, marginTop: 8 }}>{k.v}</div>
+            <div style={{
+              fontSize: isMobile ? 22 : 30, fontWeight: 800,
+              letterSpacing: isMobile ? -0.5 : -0.8, marginTop: isMobile ? 4 : 8,
+            }}>{k.v}</div>
           </DCard>
         ))}
       </div>
@@ -408,11 +432,11 @@ export default function Dashboard() {
 }
 
 // ─── Sub-components ─────────────────────────────────────────
-function DCard({ children, style = {}, pad = 18 }) {
+function DCard({ children, style = {}, pad = 18, compact = false }) {
   return (
     <div style={{
       background: DT.white, border: `1px solid ${DT.border}`,
-      borderRadius: 14, padding: pad, ...style,
+      borderRadius: 14, padding: compact ? 12 : pad, ...style,
     }}>{children}</div>
   );
 }

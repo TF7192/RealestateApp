@@ -616,6 +616,11 @@
 .property-card-compact {
   border-radius: 14px;
   overflow: hidden;
+  /* Mobile — make the whole card the tap target. Cards no longer
+     require tapping the thumbnail/title region specifically; any
+     empty gutter inside the card routes to the detail page via the
+     stretched `.pc-compact-link::after`. */
+  position: relative;
 }
 
 .property-card-compact:hover {
@@ -640,6 +645,21 @@
   min-width: 0;
   text-decoration: none;
   color: inherit;
+}
+
+/* Stretched hit-area: the anchor's ::after pseudo covers the full
+   card so any tap in the card (not on the favorite-star or swipe
+   affordances, which use higher z-index) navigates to the detail
+   page. */
+.pc-compact-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.pc-compact-inner > :not(.pc-compact-link) {
+  position: relative;
+  z-index: 2;
 }
 
 .pc-compact-thumb {
