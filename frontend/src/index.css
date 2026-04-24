@@ -936,3 +936,14 @@ html, body {
   }
   .sidebar { height: 100dvh; }
 }
+
+/* Sprint 10 — route-content fade-in. Used on <main> via the
+   `animation:` inline shorthand so each navigation shows a subtle
+   lift rather than an instant swap. Respects reduced-motion. */
+@keyframes estia-page-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  main { animation: none !important; }
+}

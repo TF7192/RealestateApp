@@ -33,6 +33,7 @@ import { useAuth } from '../lib/auth';
 import api from '../lib/api';
 import { isPopoutWindow } from '../lib/popout';
 import OfflineBanner from './OfflineBanner';
+import RouteProgressBar from './RouteProgressBar';
 import Yad2ScanBanner from './Yad2ScanBanner';
 import MarketScanBanner from './MarketScanBanner';
 import QuickCreateFab from './QuickCreateFab';
@@ -291,9 +292,20 @@ export default function Layout({ onLogout }) {
           onOpenChat={() => window.dispatchEvent(new Event('estia:open-chat'))}
           user={user}
         />
-        <main style={{ flex: 1, minWidth: 0, background: DT.cream }}>
+        {/* Route-content fade-in: keying on pathname triggers a fresh
+            mount of the inner wrapper on each navigation, and the
+            `estia-page-fade` keyframes run once per mount. Cream-&-
+            gold-subtle — 180ms opacity + 4px lift, no layout shift. */}
+        <main
+          key={location.pathname}
+          style={{
+            flex: 1, minWidth: 0, background: DT.cream,
+            animation: 'estia-page-fade 220ms ease-out both',
+          }}
+        >
           <Outlet />
         </main>
+        <RouteProgressBar />
       </div>
 
       {narrow && <QuickCreateFab />}

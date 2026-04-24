@@ -121,8 +121,14 @@ export default function Ai() {
     <div dir="rtl" style={{
       ...FONT,
       padding: 28, color: DT.ink,
-      minHeight: '100%',
+      // Fix the page to the available viewport so the chat card's own
+      // overflow can do the scrolling. Previously min-height:100%
+      // let long replies push the whole body scrollbar, which is
+      // disorienting while you're reading a growing list.
+      height: 'calc(100vh - 0px)',
+      maxHeight: '100%',
       display: 'flex', flexDirection: 'column', gap: 16,
+      overflow: 'hidden',
     }}>
       {/* Header */}
       <header style={{
@@ -146,12 +152,16 @@ export default function Ai() {
         </div>
       </header>
 
-      {/* Chat area */}
+      {/* Chat area — flex child with its own scrollable message list,
+          so the whole page never scrolls past the composer. minHeight:0
+          is the critical bit: without it, a flex child refuses to
+          shrink below its content size and the overflow on the inner
+          list never kicks in. */}
       <div style={{
         background: DT.white, border: `1px solid ${DT.border}`,
         borderRadius: 16, overflow: 'hidden',
         display: 'flex', flexDirection: 'column',
-        minHeight: 420, flex: 1,
+        flex: 1, minHeight: 0,
       }}>
         <div
           ref={listRef}
@@ -278,59 +288,155 @@ function renderInline(text, keyPrefix) {
   return out;
 }
 
+// Detect a GitHub-Flavored-Markdown pipe table. The first line is the
+// header row; the second line is the separator (pipes + dashes); the
+// rest are body rows. We tolerate the optional leading/trailing pipe.
+function parseTableBlock(block) {
+  const lines = block.split(/\n/).filter(Boolean);
+  if (lines.length < 2) return null;
+  const sep = lines[1].trim();
+  if (!/^\|?[\s:\-|]+\|?$/.test(sep) || !sep.includes('-')) return null;
+  const split = (line) => line.replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+  const header = split(lines[0]);
+  const body = lines.slice(2).map(split);
+  // Drop rows whose column count doesn't line up (defensive — some
+  // models emit stray pipes inside cells).
+  const clean = body.filter((r) => r.length === header.length);
+  if (header.length < 2) return null;
+  return { header, body: clean };
+}
+
+function renderTable(table, key) {
+  return (
+    <div key={key} style={{ overflowX: 'auto', margin: '6px 0' }}>
+      <table style={{
+        width: '100%', borderCollapse: 'collapse', fontSize: 13,
+        background: '#ffffff', border: '1px solid rgba(30,26,20,0.08)',
+        borderRadius: 10, overflow: 'hidden',
+      }}>
+        <thead>
+          <tr>
+            {table.header.map((h, hi) => (
+              <th key={hi} style={{
+                padding: '8px 10px',
+                background: 'rgba(180,139,76,0.12)',
+                color: '#1e1a14', fontWeight: 800,
+                fontSize: 12,
+                textAlign: 'right',
+                borderBottom: '1px solid rgba(30,26,20,0.08)',
+              }}>{renderInline(h, `${key}-h-${hi}`)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.body.map((row, ri) => (
+            <tr key={ri} style={{
+              background: ri % 2 === 0 ? '#ffffff' : '#fbf7f0',
+            }}>
+              {row.map((cell, ci) => (
+                <td key={ci} style={{
+                  padding: '7px 10px',
+                  borderTop: '1px solid rgba(30,26,20,0.06)',
+                  color: '#1e1a14',
+                  fontWeight: ci === 0 ? 600 : 500,
+                }}>{renderInline(cell, `${key}-${ri}-${ci}`)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function renderMarkdown(raw) {
   // Block-level: split on blank lines, then decide per-block.
   const blocks = String(raw || '').split(/\n{2,}/);
   const nodes = [];
   blocks.forEach((block, bi) => {
     const key = `b-${bi}`;
-    // Heading: ### / ## / #
-    const h = block.match(/^(#{1,3})\s+(.*)$/);
-    if (h) {
-      const level = h[1].length; // 1..3
-      const Tag = level === 1 ? 'h3' : level === 2 ? 'h4' : 'h5';
-      const fontSize = level === 1 ? 17 : level === 2 ? 15 : 14;
-      nodes.push(
-        <Tag key={key} style={{ fontWeight: 800, fontSize, margin: '8px 0 4px', color: '#1e1a14' }}>
-          {renderInline(h[2].trim(), key)}
-        </Tag>
-      );
-      return;
-    }
-    // Bullet / numbered list: every line in the block starts with -, *, or a number.
-    const lines = block.split(/\n/).filter(Boolean);
-    const isBullet = lines.every((l) => /^(\s*[-*]\s+|\s*\d+[.)]\s+)/.test(l));
-    if (isBullet && lines.length > 0) {
-      const numbered = /^\s*\d+[.)]/.test(lines[0]);
-      const Tag = numbered ? 'ol' : 'ul';
-      nodes.push(
-        <Tag key={key} style={{ margin: '4px 0', paddingInlineStart: 22 }}>
-          {lines.map((l, li) => {
-            const txt = l.replace(/^(\s*[-*]\s+|\s*\d+[.)]\s+)/, '');
-            return (
-              <li key={`${key}-${li}`} style={{ margin: '2px 0', lineHeight: 1.6 }}>
-                {renderInline(txt, `${key}-${li}`)}
-              </li>
-            );
-          })}
-        </Tag>
-      );
-      return;
-    }
-    // Plain paragraph — preserve hard newlines inside with <br>.
-    const plainLines = block.split(/\n/);
-    nodes.push(
-      <p key={key} style={{ margin: '4px 0', lineHeight: 1.65 }}>
-        {plainLines.map((l, li) => (
-          <span key={`${key}-${li}`}>
-            {renderInline(l, `${key}-${li}`)}
-            {li < plainLines.length - 1 ? <br /> : null}
-          </span>
-        ))}
-      </p>
-    );
+    // Table first — otherwise the pipes fall through to inline and
+    // render as literal characters.
+    const table = parseTableBlock(block);
+    if (table) { nodes.push(renderTable(table, key)); return; }
+    // Fall through to existing per-block branches.
+    renderBlockNonTable(block, key, nodes);
   });
   return nodes;
+}
+
+function renderBlockNonTable(block, key, nodes) {
+  // Blockquote — every line begins with "> " or ">" (trims leading
+  // whitespace on the way in). Render as a gold left-rule card so
+  // templated messages (e.g. a WhatsApp draft) stand out from the
+  // surrounding chat prose.
+  const qLines = block.split(/\n/);
+  if (qLines.length > 0 && qLines.every((l) => /^\s*>/.test(l))) {
+    const inner = qLines.map((l) => l.replace(/^\s*>\s?/, '')).join('\n');
+    const innerLines = inner.split(/\n/);
+    nodes.push(
+      <blockquote key={key} style={{
+        margin: '6px 0', padding: '10px 14px',
+        background: '#fbf7f0',
+        borderInlineStart: '3px solid #b48b4c',
+        borderRadius: 8,
+        color: '#1e1a14', lineHeight: 1.7,
+      }}>
+        {innerLines.map((l, li) => (
+          <span key={`${key}-q-${li}`}>
+            {renderInline(l, `${key}-q-${li}`)}
+            {li < innerLines.length - 1 ? <br /> : null}
+          </span>
+        ))}
+      </blockquote>
+    );
+    return;
+  }
+  // Heading: ### / ## / #
+  const h = block.match(/^(#{1,3})\s+(.*)$/);
+  if (h) {
+    const level = h[1].length; // 1..3
+    const Tag = level === 1 ? 'h3' : level === 2 ? 'h4' : 'h5';
+    const fontSize = level === 1 ? 17 : level === 2 ? 15 : 14;
+    nodes.push(
+      <Tag key={key} style={{ fontWeight: 800, fontSize, margin: '8px 0 4px', color: '#1e1a14' }}>
+        {renderInline(h[2].trim(), key)}
+      </Tag>
+    );
+    return;
+  }
+  // Bullet / numbered list: every line in the block starts with -, *, or a number.
+  const lines = block.split(/\n/).filter(Boolean);
+  const isBullet = lines.every((l) => /^(\s*[-*]\s+|\s*\d+[.)]\s+)/.test(l));
+  if (isBullet && lines.length > 0) {
+    const numbered = /^\s*\d+[.)]/.test(lines[0]);
+    const Tag = numbered ? 'ol' : 'ul';
+    nodes.push(
+      <Tag key={key} style={{ margin: '4px 0', paddingInlineStart: 22 }}>
+        {lines.map((l, li) => {
+          const txt = l.replace(/^(\s*[-*]\s+|\s*\d+[.)]\s+)/, '');
+          return (
+            <li key={`${key}-${li}`} style={{ margin: '2px 0', lineHeight: 1.6 }}>
+              {renderInline(txt, `${key}-${li}`)}
+            </li>
+          );
+        })}
+      </Tag>
+    );
+    return;
+  }
+  // Plain paragraph — preserve hard newlines inside with <br>.
+  const plainLines = block.split(/\n/);
+  nodes.push(
+    <p key={key} style={{ margin: '4px 0', lineHeight: 1.65 }}>
+      {plainLines.map((l, li) => (
+        <span key={`${key}-${li}`}>
+          {renderInline(l, `${key}-${li}`)}
+          {li < plainLines.length - 1 ? <br /> : null}
+        </span>
+      ))}
+    </p>
+  );
 }
 
 function Bubble({ role, content, loading }) {
