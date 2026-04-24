@@ -162,7 +162,10 @@ function DesktopLogin(p) {
         </div>
         <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 440 }}>
           <div style={{ fontSize: 12, color: DT.goldLight, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>נדל״ן · AI · בעברית</div>
-          <h1 style={{ fontSize: 48, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1.1, marginTop: 14 }}>
+          <h1 style={{
+            fontSize: 48, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1.1,
+            marginTop: 14, color: DT.cream,
+          }}>
             הזמן שלך<br />
             <span style={{
               background: `linear-gradient(135deg, ${DT.goldLight}, ${DT.gold})`,
