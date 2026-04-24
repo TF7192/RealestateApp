@@ -44,12 +44,14 @@ import { registerTeamRoutes } from './routes/team.js';
 import { registerTagRoutes } from './routes/tags.js';
 import { registerReminderRoutes } from './routes/reminders.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
+import { registerPublicMatchRoutes } from './routes/public-matches.js';
 import { registerLeadSearchProfileRoutes } from './routes/leadSearchProfiles.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { registerActivityRoutes } from './routes/activity.js';
 import { registerAdvertRoutes } from './routes/adverts.js';
 import { registerDocumentRoutes } from './routes/documents.js';
 import { registerAiRoutes } from './routes/ai.js';
+import { registerVoiceIngestRoutes } from './routes/voice-ingest.js';
 import { registerContactRoutes } from './routes/contact.js';
 import {
   registerNeighborhoodRoutes,
@@ -264,12 +266,16 @@ export async function build() {
   await app.register(registerTagRoutes, { prefix: '/api/tags' });
   await app.register(registerReminderRoutes, { prefix: '/api/reminders' });
   await app.register(registerNotificationRoutes, { prefix: '/api/notifications' });
+  await app.register(registerPublicMatchRoutes, { prefix: '/api/public-matches' });
   await app.register(registerLeadSearchProfileRoutes, { prefix: '/api' });
   await app.register(registerSearchRoutes, { prefix: '/api/search' });
   await app.register(registerActivityRoutes, { prefix: '/api/activity' });
   await app.register(registerAdvertRoutes, { prefix: '/api' });
   await app.register(registerDocumentRoutes, { prefix: '/api' });
   await app.register(registerAiRoutes, { prefix: '/api/ai' });
+  // Voice-ingest POC — agent records 2 min of audio, backend returns
+  // Whisper transcript + Haiku-extracted structured JSON.
+  await app.register(registerVoiceIngestRoutes, { prefix: '/api/voice' });
   // Sprint 5.1 — public contact form endpoint (no auth; in-memory IP
   // rate limit lives inside the route itself).
   await app.register(registerContactRoutes, { prefix: '/api/contact' });

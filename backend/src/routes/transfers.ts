@@ -15,11 +15,15 @@ export const registerTransferRoutes: FastifyPluginAsync = async (app) => {
     const { email } = req.query as { email?: string };
     if (!email) return { agent: null };
     const norm = email.trim().toLowerCase();
-    const agent = await prisma.user.findUnique({
-      where: { email: norm },
+    // Case-insensitive lookup handles legacy rows stored with mixed
+    // case (signup historically preserved the email as typed).
+    const agent = await prisma.user.findFirst({
+      where: { email: { equals: norm, mode: 'insensitive' } },
       include: { agentProfile: true },
     });
-    if (!agent || agent.role !== 'AGENT') return { agent: null };
+    // Accept AGENT and OWNER (an OWNER of one office can be added to
+    // another). CUSTOMER stays blocked.
+    if (!agent || agent.role === 'CUSTOMER') return { agent: null };
     if (agent.id === requireUser(req).id) return { agent: null, self: true };
     return {
       agent: {

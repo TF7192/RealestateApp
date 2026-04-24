@@ -51,24 +51,28 @@ function relativeDue(iso) {
   const now = new Date();
   const diffMs  = due.getTime() - now.getTime();
   const diffMin = Math.round(diffMs / (60 * 1000));
-  const diffHr  = Math.round(diffMs / (60 * 60 * 1000));
   const diffDay = Math.round(diffMs / (24 * 60 * 60 * 1000));
   const timeLabel = due.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
   const sameDay = due.toDateString() === now.toDateString();
-  if (sameDay) {
-    if (Math.abs(diffMin) < 60) {
-      if (diffMin === 0)  return { text: 'עכשיו', tone: 'urgent' };
-      if (diffMin > 0)    return { text: `בעוד ${diffMin} דק׳`, tone: 'urgent' };
-      return { text: `באיחור ${-diffMin} דק׳`, tone: 'overdue' };
-    }
-    return { text: `היום ${timeLabel}`, tone: diffMs >= 0 ? 'soon' : 'overdue' };
+  // Within-60-min bucket wins regardless of calendar day — a reminder
+  // that crossed midnight 10 min ago still reads as "באיחור 10 דק׳"
+  // rather than falling into the diffDay=0/!sameDay gap below.
+  if (Math.abs(diffMin) < 60) {
+    if (diffMin === 0) return { text: 'עכשיו', tone: 'urgent' };
+    if (diffMin > 0)   return { text: `בעוד ${diffMin} דק׳`, tone: 'urgent' };
+    return { text: `באיחור ${-diffMin} דק׳`, tone: 'overdue' };
   }
+  if (sameDay)        return { text: `היום ${timeLabel}`, tone: diffMs >= 0 ? 'soon' : 'overdue' };
   if (diffDay === 1)  return { text: `מחר ${timeLabel}`, tone: 'soon' };
   if (diffDay === -1) return { text: `אתמול ${timeLabel}`, tone: 'overdue' };
   if (diffDay > 1)    return { text: `בעוד ${diffDay} ימים · ${timeLabel}`, tone: 'future' };
   if (diffDay < -1)   return { text: `באיחור ${-diffDay} ימים`, tone: 'overdue' };
-  // Same-day fallback when > 1 h away
-  return { text: `${timeLabel} · ${Math.abs(diffHr)} ש׳`, tone: 'future' };
+  // diffDay === 0 but calendar date differs (rare near-midnight case
+  // beyond the 60-min bucket above). Sign of diffMs decides so an
+  // overdue reminder never reads as 'future'.
+  return diffMs >= 0
+    ? { text: `מחר ${timeLabel}`, tone: 'soon' }
+    : { text: `אתמול ${timeLabel}`, tone: 'overdue' };
 }
 
 // Convert YYYY-MM-DDTHH:mm (datetime-local) -> ISO. The backend requires

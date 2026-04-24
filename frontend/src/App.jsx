@@ -67,6 +67,8 @@ const Import = lazy(() => import('./pages/Import'));
 // Landing page the sidebar links to — picks leads vs properties and
 // drops the agent into the wizard above.
 const ImportPicker = lazy(() => import('./pages/ImportPicker'));
+// Voice-ingest POC — record audio → Whisper + Haiku → structured JSON.
+const VoiceDemo = lazy(() => import('./pages/VoiceDemo'));
 // MLS parity — Sprint 1/4/5 new pages. Lazy so each lands in its own
 // chunk and the Dashboard-first-paint budget doesn't regress.
 const Reports = lazy(() => import('./pages/Reports'));
@@ -81,6 +83,7 @@ const Documents = lazy(() => import('./pages/Documents'));
 // landing-page inquiries / agreements). Lazy so the KPI + sparkline
 // rendering doesn't weigh down first paint for agents who never open it.
 const Marketing = lazy(() => import('./pages/Marketing'));
+const PublicMatches = lazy(() => import('./pages/PublicMatches'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 // Sprint 7 — Leaflet map of the agent's properties. Lazy so the
 // ~150KB leaflet + react-leaflet chunk doesn't weigh down first paint
@@ -371,10 +374,13 @@ function AppRoutes() {
             <Route path="/integrations/yad2" element={<Yad2Import />} />
             <Route path="/import" element={<ImportPicker />} />
             <Route path="/import/:type" element={<Import />} />
+            {/* Voice-ingest POC — no DB writes, renders extracted JSON. */}
+            <Route path="/voice-demo" element={<VoiceDemo />} />
             {/* MLS parity — Sprint 4/5/1 standalone pages. */}
             <Route path="/reports" element={<Reports />} />
             <Route path="/activity" element={<ActivityLog />} />
             <Route path="/reminders" element={<Reminders />} />
+            <Route path="/public-matches" element={<PublicMatches />} />
             {/* Sprint 4 — in-app notifications list. Auth is already
                 enforced by the parent `if (!user) return <Login/>` gate
                 above, matching the pattern used for /reminders and the

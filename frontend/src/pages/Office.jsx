@@ -24,7 +24,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2, UserPlus, Users, Mail, Crown, Trash2, Plus, Copy, Send,
-  X, Sparkles, Trophy, AlertCircle, Link2,
+  X, Sparkles, Trophy, AlertCircle, Link2, LogOut, ArrowLeftRight,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -45,7 +45,7 @@ const DT = {
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 export default function Office() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const toast = useToast();
   const [office, setOffice] = useState(null);
   const [members, setMembers] = useState([]);
@@ -54,6 +54,10 @@ export default function Office() {
   // Create-office form
   const [officeName, setOfficeName] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Close-office popup (delete vs transfer).
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   // Invite form. `inviteMode` toggles between adding an already-
   // registered user ("existing") and sending an email-based invite
@@ -118,11 +122,30 @@ export default function Office() {
       await api.createOffice({ name });
       toast.success('המשרד נוצר');
       setOfficeName('');
+      // Server promoted us to OWNER atomically — refresh the auth
+      // context so the OWNER-only sections (invites panel, close-
+      // office button) surface without a page reload.
+      await refresh?.();
       await load();
     } catch {
       toast.error('יצירת המשרד נכשלה');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleClose = async ({ mode, newOwnerId }) => {
+    setClosing(true);
+    try {
+      await api.closeOffice({ mode, newOwnerId });
+      toast.success(mode === 'delete' ? 'המשרד נסגר' : 'בעלות על המשרד הועברה');
+      setCloseOpen(false);
+      await refresh?.();
+      await load();
+    } catch (e) {
+      toast.error(e?.message || 'סגירת המשרד נכשלה');
+    } finally {
+      setClosing(false);
     }
   };
 
@@ -346,7 +369,34 @@ export default function Office() {
             )}
           </div>
         </div>
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => setCloseOpen(true)}
+            aria-label="סגור משרד"
+            style={{
+              ...FONT, background: DT.white, border: `1px solid ${DT.danger}`,
+              color: DT.danger, padding: '9px 14px', borderRadius: 10,
+              cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              display: 'inline-flex', gap: 6, alignItems: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <LogOut size={14} /> סגור משרד
+          </button>
+        )}
       </div>
+
+      {/* Close-office popup (OWNER-only). Two modes — transfer to
+          another member or hard-delete the office row. */}
+      {isOwner && closeOpen && (
+        <CloseOfficeDialog
+          members={members.filter((m) => m.id !== user?.id)}
+          busy={closing}
+          onCancel={() => setCloseOpen(false)}
+          onConfirm={handleClose}
+        />
+      )}
 
       {/* Invite section (OWNER-only) */}
       {isOwner && (
@@ -756,3 +806,166 @@ const listReset = {
 // features (Sparkles on create-office illustration, AlertCircle on
 // error banners — wired in when the relevant state surfaces).
 void Sparkles; void AlertCircle;
+
+// ─── CloseOfficeDialog ───────────────────────────────────────────
+// Two-mode close flow: transfer ownership to an existing member, or
+// delete the office row. The parent page is already OWNER-gated.
+function CloseOfficeDialog({ members, busy, onCancel, onConfirm }) {
+  const [mode, setMode] = useState(members.length > 0 ? 'transfer' : 'delete');
+  const [newOwnerId, setNewOwnerId] = useState(members[0]?.id || '');
+  const canTransfer = members.length > 0;
+  const canSubmit =
+    (mode === 'delete') ||
+    (mode === 'transfer' && newOwnerId);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="סגירת משרד"
+      onClick={(e) => { if (e.target === e.currentTarget && !busy) onCancel(); }}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(30,26,20,0.55)',
+        display: 'grid', placeItems: 'center', padding: 16, zIndex: 60,
+      }}
+    >
+      <div style={{
+        ...FONT, background: DT.white, borderRadius: 16,
+        maxWidth: 460, width: '100%', padding: 22,
+        border: `1px solid ${DT.border}`,
+        boxShadow: '0 10px 30px rgba(30,26,20,0.3)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: DT.ink }}>סגירת המשרד</h2>
+          <button
+            type="button"
+            onClick={() => { if (!busy) onCancel(); }}
+            aria-label="סגור"
+            style={{
+              border: 'none', background: DT.cream3, borderRadius: 9,
+              width: 32, height: 32, cursor: 'pointer',
+              display: 'grid', placeItems: 'center', color: DT.ink,
+            }}
+          ><X size={15} /></button>
+        </div>
+        <p style={{ fontSize: 13, color: DT.muted, lineHeight: 1.6, margin: '0 0 14px' }}>
+          בחרו מה לעשות עם המשרד — להעביר את הבעלות לסוכנ/ית מהצוות או למחוק את המשרד ולפזר את החברים.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+            padding: '12px 14px', borderRadius: 10,
+            border: `1px solid ${mode === 'transfer' ? DT.gold : DT.border}`,
+            background: mode === 'transfer' ? DT.goldSoft : DT.white,
+            cursor: canTransfer ? 'pointer' : 'not-allowed',
+            opacity: canTransfer ? 1 : 0.55,
+          }}>
+            <input
+              type="radio"
+              name="close-mode"
+              value="transfer"
+              checked={mode === 'transfer'}
+              onChange={() => setMode('transfer')}
+              disabled={!canTransfer}
+              style={{ marginTop: 3, accentColor: DT.gold }}
+            />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                fontSize: 13, fontWeight: 800, color: DT.ink,
+              }}>
+                <ArrowLeftRight size={13} /> העבר בעלות וצא
+              </span>
+              <span style={{ display: 'block', fontSize: 12, color: DT.muted, marginTop: 3 }}>
+                המשרד נשאר פעיל — הסוכנ/ית שתבחרו תהפוך למנהל/ת.
+                {!canTransfer && ' (לא נמצאו חברים נוספים להעברת הבעלות)'}
+              </span>
+              {mode === 'transfer' && canTransfer && (
+                <select
+                  value={newOwnerId}
+                  onChange={(e) => setNewOwnerId(e.target.value)}
+                  aria-label="בחר/י בעלים חדש"
+                  style={{
+                    ...FONT, marginTop: 10, width: '100%',
+                    padding: '8px 10px', fontSize: 13,
+                    border: `1px solid ${DT.border}`,
+                    borderRadius: 9, background: DT.white, color: DT.ink,
+                    outline: 'none',
+                  }}
+                >
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.displayName || m.email}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </span>
+          </label>
+
+          <label style={{
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+            padding: '12px 14px', borderRadius: 10,
+            border: `1px solid ${mode === 'delete' ? DT.danger : DT.border}`,
+            background: mode === 'delete' ? 'rgba(185,28,28,0.06)' : DT.white,
+            cursor: 'pointer',
+          }}>
+            <input
+              type="radio"
+              name="close-mode"
+              value="delete"
+              checked={mode === 'delete'}
+              onChange={() => setMode('delete')}
+              style={{ marginTop: 3, accentColor: DT.danger }}
+            />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                fontSize: 13, fontWeight: 800, color: DT.danger,
+              }}>
+                <Trash2 size={13} /> מחק את המשרד
+              </span>
+              <span style={{ display: 'block', fontSize: 12, color: DT.muted, marginTop: 3 }}>
+                המשרד יימחק לצמיתות. החברים יהפכו לסוכנים עצמאיים בלי משרד.
+                הנכסים והלידים שלהם לא נמחקים.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            style={{
+              ...FONT, background: DT.white, color: DT.ink,
+              border: `1px solid ${DT.border}`, padding: '9px 14px',
+              borderRadius: 10, cursor: busy ? 'wait' : 'pointer',
+              fontSize: 13, fontWeight: 700,
+            }}
+          >ביטול</button>
+          <button
+            type="button"
+            onClick={() => onConfirm({ mode, newOwnerId: mode === 'transfer' ? newOwnerId : undefined })}
+            disabled={busy || !canSubmit}
+            style={{
+              ...FONT,
+              background: mode === 'delete' ? DT.danger : `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+              color: mode === 'delete' ? '#fff' : DT.ink,
+              border: 'none', padding: '9px 14px',
+              borderRadius: 10, cursor: busy ? 'wait' : 'pointer',
+              fontSize: 13, fontWeight: 800,
+              display: 'inline-flex', gap: 6, alignItems: 'center',
+              opacity: busy || !canSubmit ? 0.55 : 1,
+            }}
+          >
+            {mode === 'delete' ? <Trash2 size={14} /> : <ArrowLeftRight size={14} />}
+            {busy ? 'פועל…' : (mode === 'delete' ? 'מחק לצמיתות' : 'העבר בעלות')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+void LogOut;

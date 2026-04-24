@@ -584,6 +584,18 @@ model Property {
   sellerSeriousness  Seriousness?
   brokerNotes        String?
 
+  // Sprint 10 — התאמות פומביות. When true, the property appears in
+  // the cross-agent shared pool. Other agents can clone it into their
+  // own list; the clone's `publicMatchSourceId` points back for
+  // attribution (SetNull on delete so attribution survives opt-outs
+  // but breaks cleanly if the source is hard-deleted).
+  isPublicMatch       Boolean   @default(false)
+  publicMatchAt       DateTime?
+  publicMatchNote     String?
+  publicMatchSourceId String?
+  publicMatchSource   Property? @relation("PublicMatchSource", fields: [publicMatchSourceId], references: [id], onDelete: SetNull)
+  publicMatchCopies   Property[] @relation("PublicMatchSource")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

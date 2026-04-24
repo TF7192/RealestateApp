@@ -555,6 +555,8 @@ export const api = {
   createOffice:        (body) => request('/office', { method: 'POST', body }),
   updateOffice:        (body) => request('/office', { method: 'PATCH', body }),
   addOfficeMember:     (body) => request('/office/members', { method: 'POST', body }),
+  // Sprint 10 — close the office. body: { mode: 'delete'|'transfer', newOwnerId? }.
+  closeOffice:         (body) => request('/office/close', { method: 'POST', body }),
   removeOfficeMember:  (id) => request(`/office/members/${id}`, { method: 'DELETE' }),
   // A1 fill-in — email-based invites. The server returns a surrogate
   // inviteUrl ({origin}/accept-invite?token=<id>) that the owner can
@@ -625,6 +627,18 @@ export const api = {
   completeReminder:    (id) => request(`/reminders/${id}/complete`, { method: 'POST' }),
   cancelReminder:      (id) => request(`/reminders/${id}/cancel`, { method: 'POST' }),
   deleteReminder:      (id) => request(`/reminders/${id}`, { method: 'DELETE' }),
+
+  // Sprint 10 — התאמות פומביות (cross-agent shared pool).
+  listPublicMatches:    () => request('/public-matches'),
+  publicMatchesCount:   () => request('/public-matches/count'),
+  publishPublicMatch:   (propertyId, body = {}) =>
+    request(`/public-matches/publish/${propertyId}`, { method: 'POST', body }),
+  unpublishPublicMatch: (propertyId) =>
+    request(`/public-matches/publish/${propertyId}`, { method: 'DELETE' }),
+  duplicatePublicMatch: (id, body = {}) =>
+    request(`/public-matches/${id}/duplicate`, { method: 'POST', body }),
+  publicMatchCopies:    (propertyId) =>
+    request(`/public-matches/property/${propertyId}/copies`),
 
   // LeadSearchProfile (K4)
   listLeadSearchProfiles:   (leadId) => request(`/leads/${leadId}/search-profiles`),

@@ -194,12 +194,21 @@ async function main() {
     },
   ];
 
+  // Sprint 10 — mark the penthouse + commercial shop as public so
+  // manager logins see cross-office inventory to browse.
+  const publicStreets = new Set(['הרצל 28', 'סוקולוב 12']);
   for (const p of sampleProps) {
     const { images, completedKeys, ...rest } = p as any;
+    const isPublic = publicStreets.has((rest as any).street);
     const created = await prisma.property.create({
       data: {
         agentId,
         ...rest,
+        isPublicMatch: isPublic,
+        publicMatchAt: isPublic ? new Date() : null,
+        publicMatchNote: isPublic
+          ? 'חשיפה מקסימלית — בעל מוכן לשיתוף פעולה מלא עם סוכנים אחרים.'
+          : null,
         exclusiveStart: new Date('2025-02-01'),
         exclusiveEnd: new Date('2025-10-01'),
         marketingActions: {
@@ -432,9 +441,16 @@ async function main() {
   // the transfer block below can target real property rows.
   const teamPropertyIds: Record<string, string> = {};
 
+  // Sprint 10 — spread 3 team properties into the public-match pool so
+  // any demo login has inventory to browse. Distinct cities so the
+  // match-scoring visibly ranks them.
+  const publicMatchIndexes = new Set([0, 3, 5]);
+  let propCounter = 0;
   for (const lane of demoPipelines) {
     const agent = teamAgents[lane.agentIdx];
     for (const r of lane.rows) {
+      const isPublicIdx = publicMatchIndexes.has(propCounter);
+      propCounter += 1;
       // Mirror each deal with a matching property so /properties
       // shows the team's inventory on any agent login.
       const createdProp = await prisma.property.create({
@@ -454,6 +470,11 @@ async function main() {
           totalFloors: 8,
           status: r.status === 'SIGNED' ? 'SOLD' : 'ACTIVE',
           notes: null,
+          isPublicMatch: isPublicIdx && r.status !== 'SIGNED',
+          publicMatchAt: isPublicIdx && r.status !== 'SIGNED' ? new Date() : null,
+          publicMatchNote: isPublicIdx && r.status !== 'SIGNED'
+            ? 'בעל גמיש במו״מ — דחוף למכור לפני סוף החודש.'
+            : null,
         },
       });
       teamPropertyIds[`${agent.id}::${r.street}`] = createdProp.id;

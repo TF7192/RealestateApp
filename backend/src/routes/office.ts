@@ -104,10 +104,14 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     return { office };
   });
 
-  // POST /api/office/members — add a user (by email) to this office.
-  // Owner-only. The invited user keeps their current role (AGENT stays
-  // AGENT) but now sees office-wide data where applicable.
-  const addMemberSchema = z.object({ email: z.string().email() });
+  // POST /api/office/members — add a user (by email OR userId) to
+  // this office. Owner-only. Accepts `{ userId }` (the frontend's
+  // flow: resolve via searchAgentByEmail first) as well as the
+  // legacy `{ email }` path for direct calls.
+  const addMemberSchema = z.object({
+    email:  z.string().email().optional(),
+    userId: z.string().optional(),
+  }).refine((v) => v.email || v.userId, { message: 'email or userId required' });
   app.post('/members', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
     const body = addMemberSchema.parse(req.body);
     const u = requireUser(req);
@@ -115,10 +119,22 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     if (!me?.officeId) {
       return reply.code(404).send({ error: { message: 'No office attached to your user' } });
     }
-    const target = await prisma.user.findUnique({ where: { email: body.email.toLowerCase() } });
+    // Case-insensitive email lookup — legacy rows may have mixed-case
+    // emails stored as typed at signup.
+    let target: Awaited<ReturnType<typeof prisma.user.findFirst>> = null;
+    if (body.userId) {
+      target = await prisma.user.findUnique({ where: { id: body.userId } });
+    } else if (body.email) {
+      target = await prisma.user.findFirst({
+        where: { email: { equals: body.email.trim().toLowerCase(), mode: 'insensitive' } },
+      });
+    }
     if (!target) return reply.code(404).send({ error: { message: 'User not found' } });
     if (target.role === 'CUSTOMER') {
       return reply.code(400).send({ error: { message: 'Only AGENT/OWNER users can join an office' } });
+    }
+    if (target.officeId === me.officeId) {
+      return reply.code(409).send({ error: { message: 'User already a member of this office' } });
     }
     const updated = await prisma.user.update({
       where: { id: target.id },
@@ -154,11 +170,13 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     if (!me?.officeId) {
       return reply.code(404).send({ error: { message: 'No office attached to your user' } });
     }
-    const email = body.email.toLowerCase();
+    const email = body.email.trim().toLowerCase();
     // If a user with this email is already a member of the same office
     // there's nothing to invite — reject with 409 so the UI can show a
-    // useful toast.
-    const existing = await prisma.user.findUnique({ where: { email } });
+    // useful toast. Case-insensitive so mixed-case legacy emails match.
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
     if (existing?.officeId === me.officeId) {
       return reply.code(409).send({ error: { message: 'User already a member of this office' } });
     }
@@ -211,6 +229,60 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
       data: { revokedAt: new Date() },
     });
     return { ok: true };
+  });
+
+  // POST /api/office/close — close the office. Two modes:
+  //   - mode: 'transfer' + newOwnerId: promote another existing
+  //     member to OWNER and step the caller down to AGENT.
+  //   - mode: 'delete': hard-delete the office row, detach every
+  //     member (officeId → null), demote the caller to AGENT.
+  const closeSchema = z.object({
+    mode: z.enum(['transfer', 'delete']),
+    newOwnerId: z.string().optional(),
+  });
+  app.post('/close', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+    const body = closeSchema.parse(req.body);
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!me?.officeId) {
+      return reply.code(404).send({ error: { message: 'No office attached to your user' } });
+    }
+    const officeId = me.officeId;
+
+    if (body.mode === 'transfer') {
+      if (!body.newOwnerId || body.newOwnerId === me.id) {
+        return reply.code(400).send({ error: { message: 'Select another member to transfer ownership' } });
+      }
+      const target = await prisma.user.findUnique({ where: { id: body.newOwnerId } });
+      if (!target || target.officeId !== officeId) {
+        return reply.code(404).send({ error: { message: 'Target member not in this office' } });
+      }
+      await prisma.$transaction(async (tx) => {
+        await tx.user.update({ where: { id: target.id }, data: { role: 'OWNER' } });
+        await tx.user.update({ where: { id: me.id },     data: { role: 'AGENT' } });
+      });
+      await logActivity({
+        agentId: u.id, actorId: u.id,
+        verb: 'transferred_ownership', entityType: 'Office', entityId: officeId,
+        summary: `העברת בעלות על המשרד לסוכנ/ית ${target.displayName ?? target.email}`,
+        metadata: { newOwnerId: target.id },
+      });
+      return { ok: true, mode: 'transfer', newOwnerId: target.id };
+    }
+
+    // mode: 'delete' — detach every member and drop the office row in
+    // a single transaction so we never leave dangling FKs.
+    await prisma.$transaction(async (tx) => {
+      await tx.user.updateMany({ where: { officeId }, data: { officeId: null } });
+      await tx.user.update({ where: { id: me.id }, data: { role: 'AGENT' } });
+      await tx.office.delete({ where: { id: officeId } });
+    });
+    await logActivity({
+      agentId: u.id, actorId: u.id,
+      verb: 'deleted', entityType: 'Office', entityId: officeId,
+      summary: 'סגירת משרד',
+    });
+    return { ok: true, mode: 'delete' };
   });
 
   // DELETE /api/office/members/:id — remove a user from the office.

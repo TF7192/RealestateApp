@@ -39,6 +39,8 @@ import { popoutCurrentRoute } from '../lib/popout';
 import { printPage } from '../lib/print';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
+import { PROPERTY_STAGE_LABELS } from '../lib/mlsLabels';
+import PropertyPublicMatchBlock from '../components/PropertyPublicMatchBlock';
 import { useAuth } from '../lib/auth';
 import MarketingActionDialog from '../components/MarketingActionDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -1324,7 +1326,7 @@ export default function PropertyDetail() {
         >
           <div className="pd-pipeline-preview">
             <span className="pd-pipeline-label">שלב: </span>
-            <strong>{property.stage || 'WATCHING'}</strong>
+            <strong>{PROPERTY_STAGE_LABELS[property.stage || 'WATCHING'] || PROPERTY_STAGE_LABELS.WATCHING}</strong>
             {property.agentCommissionPct != null && (
               <span className="pd-pipeline-chip">עמלה {property.agentCommissionPct}%</span>
             )}
@@ -1353,6 +1355,14 @@ export default function PropertyDetail() {
         >
           <p className="dc-empty">לחץ "נהל" לפתיחה</p>
         </DashCard>
+
+        {/* Sprint 10 — התאמות פומביות. Owner-only opt-in + attribution
+            widget (non-owners already see the pool on /public-matches). */}
+        <PropertyPublicMatchBlock
+          property={property}
+          isOwner={property.agentId === user?.id}
+          onChange={(updated) => setProperty(updated)}
+        />
 
         {/* MLS parity — assignees (J10) */}
         <DashCard
