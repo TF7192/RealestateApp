@@ -71,6 +71,116 @@ import { paginate } from '../lib/pagination';
 import useInfiniteScroll from '../lib/useInfiniteScroll';
 import './Properties.css';
 
+// Cream & Gold DT tokens — port-of-design inline styles used by the
+// page header + filter row. The cards/table/map rendering below the
+// filter row still runs off the existing `.properties-page` CSS,
+// which renders cream & gold via [data-theme=light] tokens.
+const _DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  border: 'rgba(30,26,20,0.08)',
+};
+const _FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
+
+const PROPS_DT = {
+  pageShell: { ..._FONT, padding: 28, color: _DT.ink, minHeight: '100%' },
+  titleRow: {
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+    gap: 16, flexWrap: 'wrap', marginBottom: 18,
+  },
+  title: { fontSize: 26, fontWeight: 800, letterSpacing: -0.7, margin: 0 },
+  subtitle: { fontSize: 13, color: _DT.muted, marginTop: 2 },
+  actionsRow: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  filterRow: {
+    display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  searchWrap: {
+    position: 'relative', display: 'inline-flex', alignItems: 'center',
+  },
+  searchIcon: {
+    position: 'absolute', insetInlineEnd: 10,
+    top: '50%', transform: 'translateY(-50%)',
+    color: _DT.muted, pointerEvents: 'none',
+  },
+  searchInput: {
+    ..._FONT, padding: '8px 30px 8px 12px',
+    border: `1px solid ${_DT.border}`, borderRadius: 99,
+    background: _DT.white, fontSize: 12, color: _DT.ink,
+    outline: 'none', width: 260, textAlign: 'right',
+  },
+  pill: {
+    ..._FONT,
+    background: _DT.white,
+    color: _DT.ink,
+    border: `1px solid ${_DT.border}`,
+    padding: '7px 12px', borderRadius: 99,
+    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+  },
+  pillActive: {
+    ..._FONT,
+    background: _DT.ink,
+    color: _DT.cream,
+    border: `1px solid ${_DT.ink}`,
+    padding: '7px 12px', borderRadius: 99,
+    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+  },
+  ghostBtn: {
+    ..._FONT,
+    background: 'transparent',
+    border: `1px solid ${_DT.border}`,
+    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    display: 'inline-flex', gap: 5, alignItems: 'center', color: _DT.ink,
+    textDecoration: 'none',
+  },
+  primaryBtn: {
+    ..._FONT,
+    background: `linear-gradient(180deg, ${_DT.goldLight}, ${_DT.gold})`,
+    border: 'none', color: _DT.ink,
+    padding: '9px 16px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 13, fontWeight: 800,
+    display: 'inline-flex', gap: 6, alignItems: 'center',
+    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    textDecoration: 'none',
+  },
+};
+
+function DtPillRow({ value, onChange, items }) {
+  return (
+    <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+      {items.map((f) => (
+        <button
+          key={f.k}
+          type="button"
+          onClick={() => onChange(f.k)}
+          style={value === f.k ? PROPS_DT.pillActive : PROPS_DT.pill}
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DtToggleBtn({ active, children, ...rest }) {
+  return (
+    <button
+      type="button"
+      {...rest}
+      style={active ? PROPS_DT.pillActive : PROPS_DT.pill}
+      aria-pressed={!!active}
+    >
+      {children}
+    </button>
+  );
+}
+
 function formatPrice(price) {
   if (!price) return '—';
   if (price < 10000) return `₪${price.toLocaleString('he-IL')}/חודש`;
@@ -826,175 +936,128 @@ export default function Properties() {
           content: 'כל הנכסים במקום אחד. לחצו על כרטיס כדי לפתוח, החליקו ימינה לפעולות מהירות, או הוסיפו נכס חדש בכפתור ה-+.' },
       ]}
     />
-    <div className="properties-page app-wide-cap">
-      {/* P1-M16 — desktop-only page header. Mobile uses breadcrumb + ⋯ + bottom FAB. */}
+    <div className="properties-page app-wide-cap" dir="rtl" style={PROPS_DT.pageShell}>
+      {/* Title row — desktop only. Mobile uses the global top-bar
+          breadcrumb + bottom FAB. */}
       {!isMobile && (
-        <div className="page-header animate-in">
-          <div className="page-header-info">
-            <h2>הנכסים שלי</h2>
-            <p>{filtered.length} מתוך {items.length} נכסים</p>
+        <div style={PROPS_DT.titleRow}>
+          <div>
+            <h1 style={PROPS_DT.title}>הנכסים שלי</h1>
+            <div style={PROPS_DT.subtitle}>
+              {filtered.length} מתוך {items.length} נכסים
+            </div>
           </div>
-          <div className="page-header-actions">
-            {/* N-7 — the top-left ⋯ menu previously hid "בחירה מרובה" and
-                "קישור ללקוח" inside a popover. Per the punch list both are
-                now exposed as direct toolbar buttons so the action surface
-                is always visible. The ⋯ is gone entirely on desktop. */}
+          <div style={PROPS_DT.actionsRow}>
             <ViewToggle value={viewMode} onChange={setViewMode} />
-            {/* Sprint 7 B3 — saved-search menu for the current filter set. */}
             <SavedSearchMenu
               entityType="PROPERTY"
               currentFilters={currentSavedFilters}
               onLoad={handleLoadSavedSearch}
             />
-            {/* N-10 — favorites-only toggle, same pattern as /customers. */}
-            <button
-              type="button"
-              className={`btn btn-ghost btn-sm ${onlyFavorites ? 'is-active' : ''}`}
+            <DtToggleBtn
+              active={onlyFavorites}
               onClick={() => setOnlyFavorites((v) => !v)}
-              aria-pressed={onlyFavorites}
-              aria-label="רק מועדפים"
               title="הצג רק נכסים במועדפים"
+              aria-label="רק מועדפים"
             >
-              <Star size={14} aria-hidden="true" fill={onlyFavorites ? 'currentColor' : 'none'} />
-              <span>רק מועדפים</span>
-            </button>
-            <button
-              type="button"
-              className={`btn btn-ghost btn-sm ${selectMode ? 'is-active' : ''}`}
+              <Star size={13} fill={onlyFavorites ? 'currentColor' : 'none'} /> רק מועדפים
+            </DtToggleBtn>
+            <DtToggleBtn
+              active={selectMode}
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-              aria-pressed={selectMode}
               title="בחר כמה נכסים בבת אחת"
             >
-              <CheckSquare size={14} aria-hidden="true" />
-              <span>{selectMode ? 'יציאה מבחירה' : 'בחירה מרובה'}</span>
+              <CheckSquare size={13} /> {selectMode ? 'יציאה מבחירה' : 'בחירה מרובה'}
+            </DtToggleBtn>
+            <button type="button" onClick={handleGenerateLink} style={PROPS_DT.ghostBtn}
+              title="העתק קישור ציבורי ללקוח עם הסינון הנוכחי">
+              {copiedLink ? <Check size={13} /> : <LinkIcon size={13} />}
+              {copiedLink ? 'הקישור הועתק' : 'קישור ללקוח'}
             </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={handleGenerateLink}
-              title="העתק קישור ציבורי ללקוח עם הסינון הנוכחי"
-            >
-              {copiedLink ? <Check size={14} aria-hidden="true" /> : <LinkIcon size={14} aria-hidden="true" />}
-              <span>{copiedLink ? 'הקישור הועתק' : 'קישור ללקוח'}</span>
-            </button>
-            <Link
-              to="/import/properties"
-              className="btn btn-ghost btn-sm"
-              title="ייבוא נכסים מ-Excel / CSV"
-            >
-              <Upload size={14} aria-hidden="true" />
-              <span>ייבוא מ-Excel</span>
+            <Link to="/import/properties" style={PROPS_DT.ghostBtn} title="ייבוא נכסים מ-Excel / CSV">
+              <Upload size={13} /> ייבוא מ-Excel
             </Link>
-            <Link to="/properties/new" className="btn btn-primary">
-              <Plus size={18} />
-              קליטת נכס חדש
+            <Link to="/properties/new" style={PROPS_DT.primaryBtn}>
+              <Plus size={14} /> קליטת נכס חדש
             </Link>
           </div>
         </div>
       )}
 
-      <div className="filters-bar animate-in animate-in-delay-1">
-        {/* P1-M12 — sticky search wrapper. N-7 removed the mobile ⋯ that
-            hid "בחירה מרובה" + "קישור ללקוח"; both are now exposed in
-            the filter bar below on every viewport. */}
-        <div className="sticky-search properties-sticky-search">
-          <div className="search-box">
-            <Search size={18} />
-            <input
-              type="search"
-              inputMode="search"
-              enterKeyHint="search"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              placeholder="חיפוש לפי כתובת, עיר או בעל נכס..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+      {/* Filter row — search + tabs + advanced toggle. */}
+      <div style={PROPS_DT.filterRow}>
+        <div style={PROPS_DT.searchWrap}>
+          <Search size={14} style={PROPS_DT.searchIcon} />
+          <input
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder="חיפוש לפי כתובת, עיר או בעל נכס…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={PROPS_DT.searchInput}
+          />
         </div>
-        <div className="filter-tabs">
-          {[
-            { key: 'all', label: 'הכל' },
-            { key: 'RESIDENTIAL', label: 'מגורים' },
-            { key: 'COMMERCIAL', label: 'מסחרי' },
-          ].map((f) => (
-            <button
-              key={f.key}
-              className={`filter-tab ${assetClassFilter === f.key ? 'active' : ''}`}
-              onClick={() => setAssetClassFilter(f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="filter-tabs">
-          {[
-            { key: 'all', label: 'הכל' },
-            { key: 'SALE', label: 'מכירה' },
-            { key: 'RENT', label: 'השכרה' },
-          ].map((f) => (
-            <button
-              key={f.key}
-              className={`filter-tab ${filter === f.key ? 'active' : ''}`}
-              onClick={() => setFilter(f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <DtPillRow
+          value={assetClassFilter}
+          onChange={setAssetClassFilter}
+          items={[
+            { k: 'all', label: 'הכל' },
+            { k: 'RESIDENTIAL', label: 'מגורים' },
+            { k: 'COMMERCIAL', label: 'מסחרי' },
+          ]}
+        />
+        <DtPillRow
+          value={filter}
+          onChange={setFilter}
+          items={[
+            { k: 'all', label: 'הכל' },
+            { k: 'SALE', label: 'מכירה' },
+            { k: 'RENT', label: 'השכרה' },
+          ]}
+        />
         <button
-          className={`btn btn-ghost btn-sm ${showAdvanced ? 'active' : ''} ${hasActiveFilters ? 'has-filters' : ''}`}
+          type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
+          style={showAdvanced || hasActiveFilters ? PROPS_DT.pillActive : PROPS_DT.pill}
         >
-          <SlidersHorizontal size={16} />
+          <SlidersHorizontal size={13} />
           {hasActiveFilters ? `סינון מתקדם · ${activeFilterCount}` : 'סינון מתקדם'}
         </button>
-        {/* N-10 — favorites-only toggle (mobile parity: desktop also shows
-            it here for discoverability, but the header-actions copy is the
-            "canonical" one). */}
         {isMobile && (
-          <button
-            type="button"
-            className={`btn btn-ghost btn-sm ${onlyFavorites ? 'is-active' : ''}`}
+          <DtToggleBtn
+            active={onlyFavorites}
             onClick={() => setOnlyFavorites((v) => !v)}
-            aria-pressed={onlyFavorites}
-            aria-label="רק מועדפים"
             title="הצג רק נכסים במועדפים"
+            aria-label="רק מועדפים"
           >
-            <Star size={14} aria-hidden="true" fill={onlyFavorites ? 'currentColor' : 'none'} />
-            <span>רק מועדפים</span>
-          </button>
+            <Star size={13} fill={onlyFavorites ? 'currentColor' : 'none'} /> רק מועדפים
+          </DtToggleBtn>
         )}
-        {/* N-7 — mobile: direct "בחירה מרובה" + "קישור ללקוח" (no ⋯ menu). */}
         {isMobile && (
           <>
-            <button
-              type="button"
-              className={`btn btn-ghost btn-sm ${selectMode ? 'is-active' : ''}`}
+            <DtToggleBtn
+              active={selectMode}
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-              aria-pressed={selectMode}
               title="בחר כמה נכסים בבת אחת"
             >
-              <CheckSquare size={14} aria-hidden="true" />
-              <span>{selectMode ? 'יציאה' : 'בחירה מרובה'}</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={handleGenerateLink}
-              title="העתק קישור ציבורי ללקוח עם הסינון הנוכחי"
-            >
-              {copiedLink ? <Check size={14} aria-hidden="true" /> : <LinkIcon size={14} aria-hidden="true" />}
-              <span>{copiedLink ? 'הועתק' : 'קישור ללקוח'}</span>
+              <CheckSquare size={13} /> {selectMode ? 'יציאה' : 'בחירה מרובה'}
+            </DtToggleBtn>
+            <button type="button" onClick={handleGenerateLink} style={PROPS_DT.ghostBtn}
+              title="העתק קישור ציבורי ללקוח עם הסינון הנוכחי">
+              {copiedLink ? <Check size={13} /> : <LinkIcon size={13} />}
+              {copiedLink ? 'הועתק' : 'קישור ללקוח'}
             </button>
           </>
         )}
         {anyFilterActive && (
           <button
             type="button"
-            className="btn btn-ghost btn-sm filter-clear-all"
             onClick={clearAllFilters}
+            style={PROPS_DT.ghostBtn}
             title="נקה את כל הסינונים"
           >
             <X size={13} /> נקה הכל
