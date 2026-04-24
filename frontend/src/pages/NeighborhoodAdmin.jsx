@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { MapPin, Plus, Trash2, Pencil, Check, X as XIcon } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -199,10 +199,52 @@ export default function NeighborhoodAdmin() {
     )
   );
 
-  // OWNER gate — all hooks have run above so this early-return is safe
-  // under rules-of-hooks. Plain agents bounce to the dashboard.
+  // OWNER gate — the page is OWNER-only, but a silent redirect to
+  // /dashboard felt like a broken link from Settings. Render an
+  // in-place locked card with the requirement + a CTA to /office
+  // where a user can create or join an office (and be promoted).
   if (user && user.role !== 'OWNER') {
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <div className="nbhadmin-page" dir="rtl" style={{ padding: 28 }}>
+        <header className="nbhadmin-header">
+          <div className="nbhadmin-title">
+            <MapPin size={22} aria-hidden="true" />
+            <h1>קבוצות שכונות</h1>
+          </div>
+        </header>
+        <div style={{
+          background: '#fff',
+          border: '1px solid rgba(30,26,20,0.08)',
+          borderRadius: 14,
+          padding: 24,
+          marginTop: 18,
+          textAlign: 'center',
+          fontFamily: 'Assistant, Heebo, -apple-system, sans-serif',
+          color: '#1e1a14',
+        }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 8px' }}>
+            ניהול שכונות זמין לבעלי משרד בלבד
+          </h2>
+          <p style={{ fontSize: 14, color: '#6b6356', lineHeight: 1.7, margin: '0 0 16px' }}>
+            כדי להגדיר קבוצות שכונות (למשל: "צפון ישן תל אביב") ולשתף אותן בין
+            סוכני המשרד, יש ליצור משרד או להצטרף לאחד קיים. לאחר יצירת משרד
+            תשודרג אוטומטית לתפקיד OWNER.
+          </p>
+          <Link
+            to="/office"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'linear-gradient(180deg, #d9b774, #b48b4c)',
+              color: '#1e1a14', padding: '9px 16px', borderRadius: 10,
+              fontWeight: 800, fontSize: 13, textDecoration: 'none',
+              boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+            }}
+          >
+            לניהול המשרד
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

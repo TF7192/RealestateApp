@@ -59,30 +59,42 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     return { office };
   });
 
-  // POST /api/office — create an office and attach the caller (must be
-  // OWNER already). Kept tight: a user can only have one office at a
-  // time. Creating a second one returns 409.
+  // POST /api/office — create an office and attach the caller. Any
+  // authenticated user without an existing office may create one; on
+  // success the caller's role is promoted to OWNER atomically. This
+  // resolves the chicken-and-egg where the previous `requireOwner`
+  // gate meant a fresh AGENT could never reach a state where they
+  // own an office.
   const createSchema = z.object({
     name:    z.string().min(1).max(200),
     phone:   z.string().max(40).nullable().optional(),
     address: z.string().max(400).nullable().optional(),
     logoUrl: z.string().url().nullable().optional(),
   });
-  app.post('/', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
+  app.post('/', { onRequest: [app.requireAuth] }, async (req, reply) => {
     const body = createSchema.parse(req.body);
     const u = requireUser(req);
-    const user = await prisma.user.findUnique({ where: { id: u.id } });
-    if (user?.officeId) {
+    const existing = await prisma.user.findUnique({ where: { id: u.id } });
+    if (existing?.officeId) {
       return reply.code(409).send({ error: { message: 'User already belongs to an office' } });
     }
-    const office = await prisma.office.create({
-      data: {
-        name:    body.name,
-        phone:   body.phone ?? null,
-        address: body.address ?? null,
-        logoUrl: body.logoUrl ?? null,
-        members: { connect: { id: u.id } },
-      },
+    // Create the office + promote the creator to OWNER in a single
+    // transaction so we never leave a half-created orphan row.
+    const office = await prisma.$transaction(async (tx) => {
+      const created = await tx.office.create({
+        data: {
+          name:    body.name,
+          phone:   body.phone ?? null,
+          address: body.address ?? null,
+          logoUrl: body.logoUrl ?? null,
+          members: { connect: { id: u.id } },
+        },
+      });
+      await tx.user.update({
+        where: { id: u.id },
+        data:  { role: 'OWNER' },
+      });
+      return created;
     });
     await logActivity({
       agentId: u.id, actorId: u.id,

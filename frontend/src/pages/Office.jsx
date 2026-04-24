@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
 import {
   Building2,
   UserPlus,
@@ -97,11 +96,13 @@ export default function Office() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Non-owner without an office → send them home. Owners without an
-  // office still see the create form.
-  if (!loading && !office && !isOwner) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  // Any authenticated user without an office should see the create
+  // form — the server promotes them to OWNER atomically when they
+  // create their first office. The previous "non-owner → /dashboard"
+  // redirect was a chicken-and-egg: a plain AGENT could never reach
+  // the page that would make them an OWNER.
+  // Non-owners who ARE in someone else's office still see a read-only
+  // members list, which is handled by the render below.
 
   const handleCreate = async (e) => {
     e?.preventDefault?.();

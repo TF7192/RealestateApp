@@ -529,6 +529,7 @@ function NavRow({ item, active, tight, collapsed }) {
 
 // ═══ Topbar ══════════════════════════════════════════════════════
 function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, user }) {
+  const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
   // Sprint 4 — unread count from /api/notifications drives the bell
@@ -680,9 +681,21 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
             <NotificationsPopover items={notifs} loading={loadingNotifs} onClose={() => setNotifOpen(false)} />
           )}
         </div>
+        {/* Chat launcher. The ChatWidget component intentionally
+            returns null for admin users (they live in /admin/chats
+            instead), so a raw `estia:open-chat` dispatch does nothing
+            for the admin account on desktop — that was the "doesn't
+            work on computer" bug. Admins navigate directly to their
+            admin console; everyone else still pops the ChatPanel. */}
         <button
           type="button"
-          onClick={onOpenChat}
+          onClick={() => {
+            if (ADMIN_EMAILS.has((user?.email || '').toLowerCase())) {
+              navigate('/admin/chats');
+            } else {
+              onOpenChat();
+            }
+          }}
           aria-label="שיחה עם הצוות"
           title="שיחה עם הצוות"
           style={{
