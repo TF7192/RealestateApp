@@ -11,12 +11,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   UserPlus, Search, Phone, MessageCircle, Building2, Star, Sparkles,
+  MessageSquareText,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatPhone } from '../lib/phone';
 import { useToast } from '../lib/toast';
 import { relativeDate } from '../lib/relativeDate';
 import OwnerEditDialog from '../components/OwnerEditDialog';
+import SwipeRow from '../components/SwipeRow';
+import PullRefresh from '../components/PullRefresh';
+import { useViewportMobile } from '../hooks/mobile';
+import { telUrl, waUrl } from '../lib/waLink';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -33,6 +38,7 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 export default function Owners() {
   const navigate = useNavigate();
   const toast = useToast();
+  const isMobile = useViewportMobile();
   const [owners, setOwners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -115,8 +121,19 @@ export default function Owners() {
     { k: 'withoutProps', label: 'ללא נכסים',   count: counts.withoutProps },
   ];
 
+  // Sprint 8 parity sweep — pull-to-refresh wraps the whole page on
+  // mobile so the Owners surface matches Properties.jsx + Customers.jsx.
+  // The PullRefresh component is a no-op under pointer:fine (CSS-gated).
+  const Container = isMobile
+    ? ({ children }) => <PullRefresh onRefresh={load}>{children}</PullRefresh>
+    : ({ children }) => <>{children}</>;
+
   return (
-    <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
+    <Container>
+    <div dir="rtl" style={{
+      ...FONT, padding: isMobile ? '16px 14px 40px' : 28,
+      color: DT.ink, minHeight: '100%',
+    }}>
       {/* Title row */}
       <div style={{
         display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
@@ -183,7 +200,38 @@ export default function Owners() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* List — dense desktop table OR mobile swipe-card stack. */}
+      {isMobile ? (
+        <div>
+          {loading && (
+            <div style={{
+              padding: 40, textAlign: 'center', color: DT.muted, fontSize: 13,
+              background: DT.white, border: `1px solid ${DT.border}`, borderRadius: 14,
+            }}>טוען בעלי נכסים…</div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <div style={{
+              background: DT.white, border: `1px solid ${DT.border}`,
+              borderRadius: 14, overflow: 'hidden',
+            }}>
+              <EmptyState hasAny={owners.length > 0} onCreate={() => setEditing({})} />
+            </div>
+          )}
+          {!loading && filtered.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {filtered.map((o) => (
+                <MobileOwnerRow
+                  key={o.id}
+                  owner={o}
+                  isFav={favoriteIds.has(o.id)}
+                  onToggleFav={toggleFavorite}
+                  onOpen={() => navigate(`/owners/${o.id}`)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
       <div style={{
         background: DT.white, border: `1px solid ${DT.border}`,
         borderRadius: 14, overflow: 'hidden',
@@ -298,6 +346,7 @@ export default function Owners() {
           </div>
         )}
       </div>
+      )}
 
       {editing !== null && (
         <OwnerEditDialog
@@ -311,6 +360,91 @@ export default function Owners() {
         />
       )}
     </div>
+    </Container>
+  );
+}
+
+// Sprint 8 — MobileOwnerRow wraps the owner card in a SwipeRow. The
+// RTL swipe-left gesture reveals call / WhatsApp / SMS actions on the
+// trailing edge; the star stays inline so agents can pin without
+// opening the sheet.
+function MobileOwnerRow({ owner, isFav, onToggleFav, onOpen }) {
+  const o = owner;
+  const phone = (o.phone || '').replace(/\D/g, '');
+  const first = (o.properties || [])[0];
+  const addrLine = first ? [first.street, first.city].filter(Boolean).join(', ') : null;
+  const actions = phone ? [
+    {
+      icon: Phone, label: 'התקשר', color: 'gold',
+      onClick: () => { window.location.href = telUrl(o.phone); },
+    },
+    {
+      icon: MessageCircle, label: 'וואטסאפ', color: 'green',
+      onClick: () => {
+        const text = `שלום ${(o.name || '').split(' ')[0] || ''},`;
+        window.open(waUrl(o.phone, text), '_blank', 'noopener,noreferrer');
+      },
+    },
+    {
+      icon: MessageSquareText, label: 'SMS', color: 'blue',
+      onClick: () => { window.location.href = `sms:${o.phone}`; },
+    },
+  ] : [];
+
+  return (
+    <SwipeRow actions={actions}>
+      <div
+        onClick={onOpen}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpen?.(); }}
+        style={{
+          background: DT.white, border: `1px solid ${DT.border}`,
+          borderRadius: 14, padding: 12, cursor: 'pointer',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Avatar name={o.name} size={44} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+            }}>
+              <div style={{
+                fontSize: 14, fontWeight: 700,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{o.name || 'בעל נכס'}</div>
+              {(o.propertyCount || 0) > 0 && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  background: DT.goldSoft, color: DT.goldDark,
+                  borderRadius: 99, fontWeight: 700, fontSize: 10,
+                  padding: '1px 7px',
+                }}>
+                  <Building2 size={10} /> {o.propertyCount}
+                </span>
+              )}
+            </div>
+            <div style={{
+              fontSize: 11, color: DT.muted, marginTop: 2,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {addrLine || (o.phone ? formatPhone(o.phone) : '—')}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleFav?.(o.id, !isFav); }}
+            aria-label={isFav ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+            style={{
+              background: 'transparent', border: 'none', padding: 6, cursor: 'pointer',
+              color: isFav ? DT.gold : DT.muted, lineHeight: 0,
+            }}
+          >
+            <Star size={18} fill={isFav ? DT.gold : 'none'} />
+          </button>
+        </div>
+      </div>
+    </SwipeRow>
   );
 }
 

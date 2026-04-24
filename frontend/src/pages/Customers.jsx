@@ -5,15 +5,19 @@
 // direct phone + WhatsApp launchers so the agent never has to open
 // the detail page for a one-tap outreach.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Upload, Filter, Phone, MessageCircle, Sparkles, Search,
+  MessageSquareText,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatPhone } from '../lib/phone';
 import { useViewportMobile } from '../hooks/mobile';
 import LeadFiltersSheet from '../components/LeadFiltersSheet';
+import SwipeRow from '../components/SwipeRow';
+import PullRefresh from '../components/PullRefresh';
+import { telUrl, waUrl } from '../lib/waLink';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -72,18 +76,18 @@ export default function Customers() {
     return () => { cancelled = true; };
   }, [sheetOpen, cityList.length]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.listLeads();
-        if (!cancelled) setLeads(res?.items || []);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  // `load` is callable from PullRefresh on mobile. Plain stable ref —
+  // no dependencies change the listLeads call shape.
+  const load = useCallback(async () => {
+    try {
+      const res = await api.listLeads();
+      setLeads(res?.items || []);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const counts = useMemo(() => {
     const by = { hot: 0, warm: 0, cold: 0, stale: 0 };
@@ -150,8 +154,21 @@ export default function Customers() {
     return n;
   }, [filter, advanced]);
 
+  // Sprint 8 parity sweep — on mobile (<=820px) the page content lives
+  // inside a PullRefresh wrapper so the list reloads with a gold-spinner
+  // PTR gesture. Desktop keeps its static render (PTR hook is a no-op
+  // under pointer:fine per PullRefresh.css) so the behaviour is
+  // mobile-only without two code paths.
+  const Container = isMobile
+    ? ({ children }) => <PullRefresh onRefresh={load}>{children}</PullRefresh>
+    : ({ children }) => <>{children}</>;
+
   return (
-    <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
+    <Container>
+    <div dir="rtl" style={{
+      ...FONT, padding: isMobile ? '16px 14px 40px' : 28,
+      color: DT.ink, minHeight: '100%',
+    }}>
       {/* Title row */}
       <div style={{
         display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
@@ -280,102 +297,198 @@ export default function Customers() {
         onClose={() => setSheetOpen(false)}
       />
 
-      {/* Table */}
-      <div style={{
-        background: DT.white, border: `1px solid ${DT.border}`,
-        borderRadius: 14, overflow: 'hidden',
-      }}>
-        {loading && (
-          <div style={{ padding: 40, textAlign: 'center', color: DT.muted, fontSize: 13 }}>
-            טוען לידים…
-          </div>
-        )}
-        {!loading && filtered.length === 0 && (
-          <EmptyState filter={filter} hasAny={leads.length > 0} />
-        )}
-        {!loading && filtered.length > 0 && (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${DT.border}`, background: DT.cream2 }}>
-                  {['שם', 'טלפון', 'עיר', 'תקציב', 'מה מחפש', 'מקור', 'עודכן', ''].map((h) => (
-                    <th key={h} style={headerCell()}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((l) => (
-                  <tr
-                    key={l.id}
-                    onClick={() => navigate(`/customers/${l.id}`)}
-                    onMouseEnter={() => setHoverId(l.id)}
-                    onMouseLeave={() => setHoverId(null)}
-                    style={{
-                      borderBottom: `1px solid ${DT.border}`,
-                      cursor: 'pointer',
-                      background: hoverId === l.id ? DT.cream4 : 'transparent',
-                    }}
-                  >
-                    <td style={bodyCell()}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Avatar name={l.name} />
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{l.name || 'ליד'}</div>
-                          <StatusChip status={l.status} />
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ ...bodyCell(), color: DT.muted, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'right' }}>
-                      {l.phone ? formatPhone(l.phone) : '—'}
-                    </td>
-                    <td style={bodyCell()}>{l.city || '—'}</td>
-                    <td style={{ ...bodyCell(), fontWeight: 700 }}>
-                      {l.budget ? `₪${Math.round(l.budget / 1000)}K` : (l.priceRangeLabel || '—')}
-                    </td>
-                    <td style={{
-                      ...bodyCell(), color: DT.muted,
-                      maxWidth: 220, overflow: 'hidden',
-                      textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {[l.rooms ? `${l.rooms} חד׳` : null, l.lookingFor === 'BUY' ? 'קנייה' : 'שכירות']
-                        .filter(Boolean).join(' · ') || '—'}
-                    </td>
-                    <td style={{ ...bodyCell(), color: DT.muted, fontSize: 12 }}>{l.source || '—'}</td>
-                    <td style={{ ...bodyCell(), color: DT.muted, fontSize: 12 }}>
-                      {l.updatedAt
-                        ? new Date(l.updatedAt).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })
-                        : '—'}
-                    </td>
-                    <td style={{ ...bodyCell(), textAlign: 'left' }}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                        {l.phone && (
-                          <a
-                            href={`tel:${l.phone}`}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label="התקשר"
-                            style={iconBtn(DT.cream2, DT.ink)}
-                          ><Phone size={12} /></a>
-                        )}
-                        {l.phone && (
-                          <a
-                            href={`https://wa.me/${l.phone.replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label="WhatsApp"
-                            style={iconBtn('rgba(21,128,61,0.12)', DT.success)}
-                          ><MessageCircle size={12} /></a>
-                        )}
-                      </div>
-                    </td>
+      {/* List — dense table on desktop, swipe-card stack on mobile. */}
+      {isMobile ? (
+        <div>
+          {loading && (
+            <div style={{
+              padding: 40, textAlign: 'center', color: DT.muted, fontSize: 13,
+              background: DT.white, border: `1px solid ${DT.border}`, borderRadius: 14,
+            }}>טוען לידים…</div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <div style={{
+              background: DT.white, border: `1px solid ${DT.border}`,
+              borderRadius: 14, overflow: 'hidden',
+            }}>
+              <EmptyState filter={filter} hasAny={leads.length > 0} />
+            </div>
+          )}
+          {!loading && filtered.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {filtered.map((l) => (
+                <MobileLeadRow
+                  key={l.id}
+                  lead={l}
+                  onOpen={() => navigate(`/customers/${l.id}`)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{
+          background: DT.white, border: `1px solid ${DT.border}`,
+          borderRadius: 14, overflow: 'hidden',
+        }}>
+          {loading && (
+            <div style={{ padding: 40, textAlign: 'center', color: DT.muted, fontSize: 13 }}>
+              טוען לידים…
+            </div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <EmptyState filter={filter} hasAny={leads.length > 0} />
+          )}
+          {!loading && filtered.length > 0 && (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${DT.border}`, background: DT.cream2 }}>
+                    {['שם', 'טלפון', 'עיר', 'תקציב', 'מה מחפש', 'מקור', 'עודכן', ''].map((h) => (
+                      <th key={h} style={headerCell()}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                </thead>
+                <tbody>
+                  {filtered.map((l) => (
+                    <tr
+                      key={l.id}
+                      onClick={() => navigate(`/customers/${l.id}`)}
+                      onMouseEnter={() => setHoverId(l.id)}
+                      onMouseLeave={() => setHoverId(null)}
+                      style={{
+                        borderBottom: `1px solid ${DT.border}`,
+                        cursor: 'pointer',
+                        background: hoverId === l.id ? DT.cream4 : 'transparent',
+                      }}
+                    >
+                      <td style={bodyCell()}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar name={l.name} />
+                          <div>
+                            <div style={{ fontWeight: 700 }}>{l.name || 'ליד'}</div>
+                            <StatusChip status={l.status} />
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ ...bodyCell(), color: DT.muted, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'right' }}>
+                        {l.phone ? formatPhone(l.phone) : '—'}
+                      </td>
+                      <td style={bodyCell()}>{l.city || '—'}</td>
+                      <td style={{ ...bodyCell(), fontWeight: 700 }}>
+                        {l.budget ? `₪${Math.round(l.budget / 1000)}K` : (l.priceRangeLabel || '—')}
+                      </td>
+                      <td style={{
+                        ...bodyCell(), color: DT.muted,
+                        maxWidth: 220, overflow: 'hidden',
+                        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {[l.rooms ? `${l.rooms} חד׳` : null, l.lookingFor === 'BUY' ? 'קנייה' : 'שכירות']
+                          .filter(Boolean).join(' · ') || '—'}
+                      </td>
+                      <td style={{ ...bodyCell(), color: DT.muted, fontSize: 12 }}>{l.source || '—'}</td>
+                      <td style={{ ...bodyCell(), color: DT.muted, fontSize: 12 }}>
+                        {l.updatedAt
+                          ? new Date(l.updatedAt).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })
+                          : '—'}
+                      </td>
+                      <td style={{ ...bodyCell(), textAlign: 'left' }}>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                          {l.phone && (
+                            <a
+                              href={`tel:${l.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="התקשר"
+                              style={iconBtn(DT.cream2, DT.ink)}
+                            ><Phone size={12} /></a>
+                          )}
+                          {l.phone && (
+                            <a
+                              href={`https://wa.me/${l.phone.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="WhatsApp"
+                              style={iconBtn('rgba(21,128,61,0.12)', DT.success)}
+                            ><MessageCircle size={12} /></a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
+    </Container>
+  );
+}
+
+// Sprint 8 — MobileLeadRow wraps the lead card in a SwipeRow so RTL
+// swipe-left (trailing reveal) exposes call / WhatsApp / SMS actions.
+// Matches the ScreenLeads mockup's card shape (avatar + name + need +
+// city/budget meta) while routing taps to /customers/:id.
+function MobileLeadRow({ lead, onOpen }) {
+  const phone = (lead.phone || '').replace(/\D/g, '');
+  const actions = phone ? [
+    {
+      icon: Phone, label: 'התקשר', color: 'gold',
+      onClick: () => { window.location.href = telUrl(lead.phone); },
+    },
+    {
+      icon: MessageCircle, label: 'וואטסאפ', color: 'green',
+      onClick: () => {
+        const text = `שלום ${(lead.name || '').split(' ')[0] || ''}, כאן מהמשרד.`;
+        window.open(waUrl(lead.phone, text), '_blank', 'noopener,noreferrer');
+      },
+    },
+    {
+      icon: MessageSquareText, label: 'SMS', color: 'blue',
+      onClick: () => { window.location.href = `sms:${lead.phone}`; },
+    },
+  ] : [];
+
+  return (
+    <SwipeRow actions={actions}>
+      <div
+        onClick={onOpen}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpen?.(); }}
+        style={{
+          background: DT.white, border: `1px solid ${DT.border}`,
+          borderRadius: 14, padding: 12, display: 'flex',
+          gap: 12, alignItems: 'center', cursor: 'pointer',
+        }}
+      >
+        <Avatar name={lead.name} size={44} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3,
+            flexWrap: 'wrap',
+          }}>
+            <div style={{
+              fontWeight: 700, fontSize: 15,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{lead.name || 'ליד'}</div>
+            <StatusChip status={lead.status} />
+          </div>
+          <div style={{
+            fontSize: 11, color: DT.muted,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {[
+              lead.city || null,
+              lead.budget ? `₪${Math.round(lead.budget / 1000)}K` : null,
+              lead.rooms ? `${lead.rooms} חד׳` : null,
+            ].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+      </div>
+    </SwipeRow>
   );
 }
 
