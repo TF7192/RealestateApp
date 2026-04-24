@@ -27,7 +27,7 @@ import {
   Bell, Search, Plus, MessageCircle, LogOut, Menu, X,
   ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
   Activity as ActivityIcon, Tag, Download as DownloadIcon, Heart,
-  Star, FolderOpen,
+  Star, FolderOpen, MapPin,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
@@ -69,6 +69,7 @@ const PRIMARY_NAV = [
   { k: 'deals',       to: '/deals',      label: 'עסקאות',     Icon: Banknote },
   { k: 'calendar',    to: '/reminders',  label: 'יומן',       Icon: CalendarDays },
   { k: 'calendar-month', to: '/calendar', label: 'לוח שנה',    Icon: CalendarDays },
+  { k: 'map',         to: '/map',        label: 'מפה',         Icon: MapPin },
   { k: 'transfers',   to: '/transfers',  label: 'העברות',     Icon: ArrowLeftRight },
   { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
   { k: 'activity',    to: '/activity',   label: 'פעילות',     Icon: ActivityIcon },

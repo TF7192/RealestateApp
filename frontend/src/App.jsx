@@ -61,6 +61,10 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 // the cards grid + file icons don't weigh down the main bundle.
 const Documents = lazy(() => import('./pages/Documents'));
 const Calendar = lazy(() => import('./pages/Calendar'));
+// Sprint 7 — Leaflet map of the agent's properties. Lazy so the
+// ~150KB leaflet + react-leaflet chunk doesn't weigh down first paint
+// for agents who never open the map view.
+const MapPage = lazy(() => import('./pages/Map'));
 const Office = lazy(() => import('./pages/Office'));
 const Team = lazy(() => import('./pages/Team'));
 const TagSettings = lazy(() => import('./pages/TagSettings'));
@@ -342,6 +346,10 @@ function AppRoutes() {
                 S3-backed; route matches `api.listDocuments` / `api.uploadDocument`. */}
             <Route path="/documents" element={<Documents />} />
             <Route path="/calendar" element={<Calendar />} />
+            {/* Sprint 7 — /map shows property pins on a Leaflet /
+                OpenStreetMap tile layer. Auth-gated via the outer
+                `if (!user)` check above. */}
+            <Route path="/map" element={<MapPage />} />
             <Route path="/office" element={<Office />} />
             <Route path="/team" element={<Team />} />
             <Route path="/settings" element={<Settings />} />
