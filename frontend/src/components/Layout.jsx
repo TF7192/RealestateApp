@@ -504,6 +504,10 @@ function NavRow({ item, active, tight, collapsed }) {
 function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, user }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
+  // Sprint 4 — unread count from /api/notifications drives the bell
+  // badge. Separate from `notifs.length` so the badge reflects the
+  // real server count even before the popover has been opened.
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifs, setLoadingNotifs] = useState(false);
   const notifAnchorRef = useRef(null);
 
@@ -521,27 +525,35 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
     };
   }, [notifOpen]);
 
-  // Load notifications on first open. Uses /reminders list + /activity
-  // as a stand-in for a dedicated notifications endpoint — both return
-  // recent items the agent hasn't acted on yet.
+  // Sprint 4 — fetch unread count on mount so the badge is accurate
+  // even before the popover is opened. Silent-fail so a transient
+  // network hiccup never jams the topbar.
+  useEffect(() => {
+    let cancelled = false;
+    api.listNotifications?.({ limit: 1 })
+      .then((r) => { if (!cancelled) setUnreadCount(r?.unreadCount || 0); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Load notifications on popover open. /api/notifications returns
+  // { items, unreadCount }; the badge mirrors `unreadCount`, the
+  // popover renders the first handful of `items`.
   const loadNotifs = async () => {
     setLoadingNotifs(true);
     try {
-      const [rem, act] = await Promise.all([
-        api.listReminders?.({ upcoming: '1' }).catch(() => null),
-        api.activityLog?.({ limit: 10 }).catch(() => null),
-      ]);
-      const reminderItems = (rem?.items || []).slice(0, 5).map((r) => ({
-        key: `r-${r.id}`, kind: 'reminder',
-        title: r.title || 'תזכורת', when: r.dueAt || r.createdAt,
-        to: '/reminders',
+      const res = await api.listNotifications?.({ limit: 10 });
+      const rawItems = res?.items || [];
+      const items = rawItems.map((n) => ({
+        key: `n-${n.id}`,
+        kind: n.type || 'activity',
+        title: n.title || 'התראה',
+        when: n.createdAt,
+        to: n.link || '/notifications',
+        readAt: n.readAt,
       }));
-      const activityItems = (act?.items || []).slice(0, 5).map((a) => ({
-        key: `a-${a.id}`, kind: 'activity',
-        title: a.summary || `${a.verb} ${a.entityType}`, when: a.createdAt,
-        to: '/activity',
-      }));
-      setNotifs([...reminderItems, ...activityItems]);
+      setNotifs(items);
+      setUnreadCount(res?.unreadCount || 0);
     } catch { setNotifs([]); }
     finally { setLoadingNotifs(false); }
   };
@@ -616,12 +628,25 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
             }}
           >
             <Bell size={15} />
-            {notifs.length > 0 && (
-              <span style={{
-                position: 'absolute', top: 7, insetInlineStart: 9,
-                width: 7, height: 7, borderRadius: 99, background: DT.gold,
-                border: `2px solid ${DT.white}`,
-              }} />
+            {unreadCount > 0 && (
+              // Count badge — the old plain gold dot was ambiguous ("is
+              // this '1 new' or '100 new'?"). Showing the number helps
+              // agents triage; 9+ caps overflow so a surge of system
+              // notifications doesn't balloon the topbar.
+              <span
+                aria-label={`${unreadCount} התראות חדשות`}
+                style={{
+                  position: 'absolute', top: -4, insetInlineStart: -4,
+                  minWidth: 18, height: 18, padding: '0 5px',
+                  borderRadius: 99, background: DT.gold, color: DT.white,
+                  border: `2px solid ${DT.white}`,
+                  fontSize: 10, fontWeight: 800,
+                  display: 'grid', placeItems: 'center',
+                  fontFamily: FONT.fontFamily,
+                }}
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
             )}
           </button>
           {notifOpen && (
@@ -665,7 +690,7 @@ function NotificationsPopover({ items, loading, onClose }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ fontSize: 13, fontWeight: 800 }}>התראות</div>
-        <NavLink to="/reminders" onClick={onClose} style={{ fontSize: 11, color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>הכול ←</NavLink>
+        <NavLink to="/notifications" onClick={onClose} style={{ fontSize: 11, color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>הכול ←</NavLink>
       </div>
       <div style={{ maxHeight: 360, overflowY: 'auto' }}>
         {loading && <div style={{ padding: 16, color: DT.muted, fontSize: 12 }}>טוען…</div>}

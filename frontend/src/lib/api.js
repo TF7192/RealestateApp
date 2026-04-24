@@ -531,6 +531,20 @@ export const api = {
     return request(`/tags/for?${qs}`);
   },
 
+  // Notifications (Sprint 4) — in-app bell + /notifications list page.
+  // Server returns { items, unreadCount }; frontend uses both so the
+  // badge count is authoritative even when `items` is paginated.
+  listNotifications:   (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+    });
+    const s = qs.toString();
+    return request(`/notifications${s ? `?${s}` : ''}`);
+  },
+  markNotificationRead:      (id) => request(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllNotificationsRead:  () => request('/notifications/read-all', { method: 'POST' }),
+
   // Reminders (D1)
   listReminders:       (params = {}) => {
     const qs = new URLSearchParams();

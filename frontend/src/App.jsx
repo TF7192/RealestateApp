@@ -49,6 +49,8 @@ const ImportPicker = lazy(() => import('./pages/ImportPicker'));
 const Reports = lazy(() => import('./pages/Reports'));
 const ActivityLog = lazy(() => import('./pages/ActivityLog'));
 const Reminders = lazy(() => import('./pages/Reminders'));
+// Sprint 4 — in-app notifications full-page list + read endpoints.
+const Notifications = lazy(() => import('./pages/Notifications'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Office = lazy(() => import('./pages/Office'));
 const TagSettings = lazy(() => import('./pages/TagSettings'));
@@ -305,6 +307,11 @@ function AppRoutes() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/activity" element={<ActivityLog />} />
             <Route path="/reminders" element={<Reminders />} />
+            {/* Sprint 4 — in-app notifications list. Auth is already
+                enforced by the parent `if (!user) return <Login/>` gate
+                above, matching the pattern used for /reminders and the
+                other Layout-wrapped routes. */}
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/office" element={<Office />} />
             <Route path="/settings" element={<Settings />} />
