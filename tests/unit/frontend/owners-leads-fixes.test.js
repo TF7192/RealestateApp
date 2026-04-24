@@ -98,12 +98,13 @@ describe('L-11 — meeting-dialog notes textarea is dir="rtl" with Hebrew font',
     const src = read('frontend/src/components/LeadMeetingDialog.jsx');
     expect(src).toMatch(/dir="rtl"[\s\S]{0,60}lang="he"/);
   });
-  it('CSS lmd-textarea-he forces direction rtl + Hebrew font stack', () => {
-    const css = read('frontend/src/components/LeadMeetingDialog.css');
-    const block = css.match(/\.lmd-textarea-he\s*\{[^}]*\}/);
-    expect(block, '.lmd-textarea-he rule exists').not.toBeNull();
-    expect(block[0]).toMatch(/direction:\s*rtl/);
-    expect(block[0]).toMatch(/font-family:\s*var\(--font-body\)/);
+  it('inline DT styles force RTL textAlign + unicodeBidi plaintext on the notes textarea', () => {
+    // Sprint 3 port: CSS file replaced with inline DT styles; the
+    // RTL-override now lives on the textarea's style prop.
+    const src = read('frontend/src/components/LeadMeetingDialog.jsx');
+    expect(src).toMatch(/textAlign:\s*['"]right['"]/);
+    expect(src).toMatch(/unicodeBidi:\s*['"]plaintext['"]/);
+    expect(src).toMatch(/Assistant, Heebo/);
   });
 });
 
