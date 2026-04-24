@@ -1,58 +1,51 @@
-import { useState } from 'react';
+// Login — 1:1 port of the claude.ai/design bundle's DLogin + ScreenLogin
+// screens (estia-new-project/project/src/desktop/screens-auth.jsx and
+// estia-new-project/project/src/mobile/screens-auth.jsx). Inline styles
+// and tokens mirror the bundle byte-for-byte. Only the design's
+// `navigate('dashboard')` stubs are replaced with the production auth
+// handlers (email/password, Google OAuth, Sign in with Apple).
+
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { LogIn, Building2, Mail, Lock, ArrowLeft, UserPlus, Apple } from 'lucide-react';
+import {
+  Mail, Lock, Eye, EyeOff, User, Phone, Apple, ArrowLeft,
+  Sparkles,
+} from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { isNative, isIOS } from '../native/platform';
 import { Browser } from '@capacitor/browser';
 import api from '../lib/api';
-import './Login.css';
 
-const AGENT_IMG = 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=900&q=80';
-
-const FEATURE_KEYS = ['properties', 'leads', 'marketing', 'customerView'];
+// ─── Tokens lifted verbatim from the bundle (DT / T — merged) ──
+const DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14', ink2: '#3a3226',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
+  danger: '#b91c1c',
+};
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 export default function Login() {
-  const { t } = useTranslation('auth');
   const { login, signup } = useAuth();
   const [searchParams] = useSearchParams();
-  // Landing-page CTAs send `?flow=signup` so visitors arriving from the
-  // marketing page land directly on the signup form, skipping the
-  // Google/login choice screen.
-  const initialFlow = searchParams.get('flow') === 'signup' ? 'email-signup' : null;
-  const [flow, setFlow] = useState(initialFlow); // null | 'email-login' | 'email-signup'
-  const [form, setForm] = useState({
-    email: '',
-    password: '',
-    displayName: '',
-    phone: '',
-  });
+  const initialSignup = searchParams.get('flow') === 'signup';
+  const [mode, setMode] = useState(initialSignup ? 'signup' : 'login');
+  const [form, setForm] = useState({ email: '', password: '', displayName: '', phone: '' });
+  const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const role = 'AGENT';
+  const isSignup = mode === 'signup';
+  const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
-  const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
+  const isNarrow = useMedia('(max-width: 900px)');
 
   const handleGoogle = async () => {
-    // Two different OAuth flows depending on the runtime:
-    //
-    // • Web: just navigate the WebView (or browser tab) to the start URL.
-    //   Same-origin with the app bundle, cookie is set by the callback,
-    //   everything works.
-    //
-    // • Native (Capacitor iOS/Android): the WKWebView can't run Google's
-    //   consent screen — Google's "use secure browsers" policy blocks
-    //   every embedded WebView by fingerprint, regardless of UA. So we
-    //   launch SFSafariViewController via @capacitor/browser, pass
-    //   ?native=1 so the backend redirects to our com.estia.agent://
-    //   deep link with a one-time code, and an appUrlOpen listener in
-    //   App.jsx catches that, calls /native-exchange, and the Set-Cookie
-    //   response lands in the app's WebView.
     if (isNative()) {
-      // Always resolve against the production origin — on native there
-      // is no window.location meaningful for this hop; the app bundle
-      // loads from estia.co.il and that's where /api lives.
       const origin = window.location.origin.startsWith('http')
         ? window.location.origin
         : 'https://estia.co.il';
@@ -62,25 +55,12 @@ export default function Login() {
       });
       return;
     }
-    // After OAuth success the backend redirects to this `redirect` param.
-    // Two gotchas:
-    //   - If the user starts from /login, bouncing back to /login lands
-    //     on a 404 in the authenticated router.
-    //   - `/` is served by the static marketing landing page (nginx),
-    //     NOT the SPA — so redirecting there after login shows the
-    //     landing, not the dashboard.
-    // Default post-login target is /dashboard, which is an SPA alias
-    // for Dashboard added exactly for this flow.
     const here = window.location.pathname + window.location.search;
     const onLogin = window.location.pathname === '/login';
     const redirect = (onLogin || window.location.pathname === '/') ? '/dashboard' : here;
     window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirect)}`;
   };
 
-  // Sign in with Apple — required by App Store Guideline 4.8 when the
-  // app offers a third-party login service (we offer Google). iOS-only;
-  // we don't render the button on web/Android. The plugin presents
-  // Apple's native sheet; the backend verifies the identity token.
   const handleApple = async () => {
     if (!isIOS()) return;
     try {
@@ -100,18 +80,11 @@ export default function Login() {
         givenName: r.givenName,
         familyName: r.familyName,
       });
-      // Replace with an absolute same-origin URL so the Capacitor
-      // WKWebView doesn't treat it as a potentially-external URL and
-      // hand it to iOS's external browser. `location.replace` avoids
-      // leaving /login on the history stack, so the back gesture from
-      // /dashboard doesn't bounce back into the login screen.
       window.location.replace(`${window.location.origin}/dashboard`);
     } catch (err) {
-      // User-cancel codes vary by iOS version — .code / .error / string
-      // that includes 'canceled'. Don't show a scary error for those.
       const msg = String(err?.message || err || '');
       if (/cancel/i.test(msg) || err?.code === '1001') return;
-      setError(err?.message || t('errors.loginFailed'));
+      setError(err?.message || 'הכניסה עם Apple נכשלה');
     }
   };
 
@@ -120,12 +93,12 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      if (flow === 'email-signup') {
-        if (form.password.length < 8) throw new Error(t('errors.passwordTooShort'));
+      if (isSignup) {
+        if (form.password.length < 8) throw new Error('סיסמה חייבת להיות לפחות 8 תווים');
         await signup({
           email: form.email,
           password: form.password,
-          role,
+          role: 'AGENT',
           displayName: form.displayName || form.email.split('@')[0],
           phone: form.phone || undefined,
         });
@@ -133,252 +106,338 @@ export default function Login() {
         await login({ email: form.email, password: form.password });
       }
     } catch (err) {
-      setError(err.message || t(flow === 'email-signup' ? 'errors.signupFailed' : 'errors.loginFailed'));
+      setError(err.message || (isSignup ? 'הרשמה נכשלה' : 'התחברות נכשלה'));
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
-    <div className="login-page mode-agent">
-      <div className="noise-overlay" />
+  // Narrow viewports render the bundle's ScreenLogin layout (single
+  // cream column). Wider ones render DLogin's split-pane (dark brand
+  // gradient left, cream form right).
+  if (isNarrow) return <MobileLogin {...{ mode, isSignup, form, update, showPass, setShowPass, error, submitting, handleSubmit, handleGoogle, handleApple, setMode, setError }} />;
+  return <DesktopLogin {...{ mode, isSignup, form, update, showPass, setShowPass, error, submitting, handleSubmit, handleGoogle, handleApple, setMode, setError }} />;
+}
 
-      <div className="login-bg">
-        <div className="login-bg-orb login-bg-orb-1" />
-        <div className="login-bg-orb login-bg-orb-2" />
-        <div className="login-bg-orb login-bg-orb-3" />
+function useMedia(query) {
+  const [match, setMatch] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mq = window.matchMedia(query);
+    const h = () => setMatch(mq.matches);
+    mq.addEventListener ? mq.addEventListener('change', h) : mq.addListener(h);
+    return () => {
+      mq.removeEventListener ? mq.removeEventListener('change', h) : mq.removeListener(h);
+    };
+  }, [query]);
+  return match;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Desktop · DLogin — ink/gold-dark brand pane + cream form pane
+// ═══════════════════════════════════════════════════════════════════
+function DesktopLogin(p) {
+  const { isSignup, form, update, showPass, setShowPass, error, submitting,
+    handleSubmit, handleGoogle, handleApple, setMode, setError } = p;
+  return (
+    <div dir="rtl" style={{
+      ...FONT, width: '100%', minHeight: '100vh', display: 'flex', background: DT.cream,
+    }}>
+      {/* Left: brand panel */}
+      <div style={{
+        flex: 1, background: `linear-gradient(160deg, ${DT.ink} 0%, #2a241b 60%, ${DT.goldDark} 120%)`,
+        color: DT.cream, padding: 60, position: 'relative', overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{ position: 'absolute', top: -60, left: -60, width: 240, height: 240, borderRadius: 99, background: DT.goldSoft, filter: 'blur(40px)' }} />
+        <div style={{ position: 'absolute', bottom: -40, right: -40, width: 200, height: 200, borderRadius: 99, background: 'rgba(217,183,116,0.15)', filter: 'blur(30px)' }} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12,
+            background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+            display: 'grid', placeItems: 'center', color: DT.ink, fontWeight: 900, fontSize: 22,
+          }}>E</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>Estia</div>
+        </div>
+        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 440 }}>
+          <div style={{ fontSize: 12, color: DT.goldLight, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>נדל״ן · AI · בעברית</div>
+          <h1 style={{ fontSize: 48, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1.1, marginTop: 14 }}>הזמן שלך<br />שווה יותר.</h1>
+          <div style={{ fontSize: 16, color: 'rgba(247,243,236,0.7)', lineHeight: 1.7, marginTop: 18 }}>
+            Estia מחליף את Excel + WhatsApp + היומן בכלי אחד שחושב בעברית,
+            מבין את השוק הישראלי ועובד איתך.
+          </div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '28px 0 0', display: 'grid', gap: 10 }}>
+            {[
+              'AI שכותב תיאור נכס מקצועי בלחיצה',
+              'התאמת לידים לנכסים אוטומטית',
+              'סנכרון מלא בין דסקטופ ונייד',
+              '30 יום Premium חינם · בלי כרטיס אשראי',
+            ].map((b) => (
+              <li key={b} style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(247,243,236,0.88)', fontSize: 14 }}>
+                <span style={{
+                  width: 22, height: 22, borderRadius: 99,
+                  background: 'rgba(217,183,116,0.2)', color: DT.goldLight,
+                  display: 'inline-grid', placeItems: 'center', flex: 'none',
+                }}><Sparkles size={12} /></span>
+                {b}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div style={{ position: 'relative', fontSize: 12, color: 'rgba(247,243,236,0.4)' }}>
+          © 2026 Estia · תל אביב
+        </div>
       </div>
 
-      <div className="login-container fade-in">
-        <div className="login-branding">
-          <div className="login-brand-bg">
-            <img src={AGENT_IMG} alt="" />
-            <div className="login-brand-overlay" />
+      {/* Right: form */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60 }}>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+          <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: -0.8, margin: 0, color: DT.ink }}>
+            {isSignup ? 'צור חשבון' : 'ברוך שובך'}
+          </h2>
+          <div style={{ fontSize: 14, color: DT.muted, marginTop: 6 }}>
+            {isSignup ? 'הצטרפו · 30 יום Premium חינם' : 'התחבר לחשבון Estia שלך'}
           </div>
-
-          <div className="login-brand-content">
-            <div className="login-logo">
-              <div className="logo-diamond">◆</div>
-              <h1>Estia</h1>
-            </div>
-
-            <h2 className="login-tagline">{t('tagline')}</h2>
-
-            <div className="login-features-list">
-              {FEATURE_KEYS.map((key, i) => (
-                <div
-                  key={key}
-                  className="login-feature-item"
-                  style={{ animationDelay: `${0.4 + i * 0.1}s` }}
-                >
-                  <div className="feature-line" />
-                  <span>{t(`features.${key}`)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="login-brand-badge">
-              <Building2 size={14} />
-              <span>{t('badge')}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="login-form-panel">
-          <div className="login-form-header">
-            <h2>{t(flow === 'email-signup' ? 'titles.signup' : 'titles.login')}</h2>
-            <p>{t(flow === 'email-signup' ? 'subtitles.signup' : 'subtitles.login')}</p>
-          </div>
-
-          {!flow && (
-            <div className="auth-methods">
-              {isIOS() && (
-                <button className="auth-method-btn apple" onClick={handleApple} type="button">
-                  <Apple size={20} aria-hidden="true" fill="currentColor" />
-                  <span>כניסה עם Apple</span>
+          <form onSubmit={handleSubmit} style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {isSignup && (
+              <>
+                <DField label="שם מלא" placeholder="אדם ברקוביץ" value={form.displayName} onChange={(v) => update('displayName', v)} icon={<User size={15} />} />
+                <DField label="טלפון (רשות)" type="tel" inputMode="tel" dir="ltr" placeholder="050-0000000" value={form.phone} onChange={(v) => update('phone', v)} icon={<Phone size={15} />} />
+              </>
+            )}
+            <DField label="אימייל" type="email" inputMode="email" dir="ltr" placeholder="name@domain.co.il" value={form.email} onChange={(v) => update('email', v)} icon={<Mail size={15} />} />
+            <DField
+              label="סיסמה" type={showPass ? 'text' : 'password'} placeholder="••••••••"
+              value={form.password} onChange={(v) => update('password', v)} icon={<Lock size={15} />}
+              adornment={(
+                <button type="button" onClick={() => setShowPass((s) => !s)}
+                  style={{ background: 'transparent', border: 'none', color: DT.muted, cursor: 'pointer', padding: 4, display: 'inline-flex' }}
+                  aria-label={showPass ? 'הסתר סיסמה' : 'הצג סיסמה'}>
+                  {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               )}
-              <button className="auth-method-btn google" onClick={handleGoogle}>
-                <svg width="20" height="20" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                </svg>
-                <span>{t('buttons.google')}</span>
-              </button>
-
-              <div className="auth-divider">
-                <span>{t('divider')}</span>
-              </div>
-
-              <button
-                className="auth-method-btn phone-btn"
-                onClick={() => setFlow('email-login')}
-              >
-                <Mail size={20} />
-                <span>{t('buttons.emailLogin')}</span>
-              </button>
-
-              <button
-                className="auth-method-btn signup-btn"
-                onClick={() => setFlow('email-signup')}
-              >
-                <UserPlus size={20} />
-                <span>{t('buttons.emailSignup')}</span>
-              </button>
-
-              {error && <div className="auth-error">{error}</div>}
-            </div>
-          )}
-
-          {(flow === 'email-login' || flow === 'email-signup') && (
-            <form onSubmit={handleSubmit} className="phone-auth-form animate-in">
-              <button
-                type="button"
-                className="auth-back-btn"
-                onClick={() => { setFlow(null); setError(''); }}
-              >
-                <ArrowLeft size={16} />
-                {t('buttons.back')}
-              </button>
-
-              {flow === 'email-signup' && (
-                <>
-                  {/* A-2 — give visitors who landed directly on the signup
-                      form (from a /login?flow=signup CTA on the landing)
-                      a Google shortcut so they don't have to back out
-                      through the method chooser to find it. Reuses the
-                      same OAuth handler the login path uses. */}
-                  <button
-                    type="button"
-                    className="auth-method-btn google signup-google-btn"
-                    onClick={handleGoogle}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 48 48">
-                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                    </svg>
-                    <span>{t('buttons.googleSignup')}</span>
-                  </button>
-                  <div className="auth-divider">
-                    <span>{t('divider')}</span>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">{t('fields.displayName')}</label>
-                    <input
-                      type="text"
-                      autoComplete="name"
-                      autoCapitalize="words"
-                      autoCorrect="off"
-                      enterKeyHint="next"
-                      className="form-input"
-                      placeholder={t('placeholders.displayName')}
-                      value={form.displayName}
-                      onChange={(e) => update('displayName', e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">{t('fields.phone')}</label>
-                    <input
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      enterKeyHint="next"
-                      dir="ltr"
-                      className="form-input"
-                      placeholder={t('placeholders.phone')}
-                      value={form.phone}
-                      onChange={(e) => update('phone', e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="form-group">
-                <label className="form-label">{t('fields.email')}</label>
-                <input
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  enterKeyHint="next"
-                  dir="ltr"
-                  className="form-input"
-                  placeholder={t('placeholders.email')}
-                  value={form.email}
-                  onChange={(e) => update('email', e.target.value)}
-                  required
-                  autoFocus={flow === 'email-login'}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  <Lock size={13} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
-                  {t('fields.password')}{' '}
-                  {flow === 'email-signup' && (
-                    <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                      {t('fields.passwordHint')}
-                    </span>
-                  )}
+            />
+            {!isSignup && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.muted }}>
+                  <input type="checkbox" defaultChecked /> זכור אותי
                 </label>
-                <input
-                  type="password"
-                  autoComplete={flow === 'email-signup' ? 'new-password' : 'current-password'}
-                  enterKeyHint="go"
-                  className="form-input"
-                  placeholder={t('placeholders.password')}
-                  value={form.password}
-                  onChange={(e) => update('password', e.target.value)}
-                  required
-                  minLength={flow === 'email-signup' ? 8 : undefined}
-                />
+                <a href="mailto:hello@estia.co.il?subject=איפוס סיסמה"
+                  style={{ color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>שכחת סיסמה?</a>
               </div>
-
-              {error && <div className="auth-error">{error}</div>}
-
-              <button
-                type="submit"
-                className="btn btn-primary btn-lg login-submit-btn"
-                disabled={submitting}
-              >
-                {flow === 'email-signup' ? <UserPlus size={18} /> : <LogIn size={18} />}
-                {submitting
-                  ? t('shared:buttons.justAMoment')
-                  : t(flow === 'email-signup' ? 'buttons.submitSignup' : 'buttons.submitLogin')}
-              </button>
-
-              <div className="auth-switch">
-                {flow === 'email-login' ? (
-                  <>
-                    {t('switch.noAccount')}{' '}
-                    <button type="button" onClick={() => { setFlow('email-signup'); setError(''); }}>
-                      {t('switch.toSignup')}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {t('switch.hasAccount')}{' '}
-                    <button type="button" onClick={() => { setFlow('email-login'); setError(''); }}>
-                      {t('switch.toLogin')}
-                    </button>
-                  </>
-                )}
-              </div>
-            </form>
-          )}
-
-          <div className="login-footer">
-            <span>{t('footer')}</span>
+            )}
+            {error && <div style={{ background: 'rgba(185,28,28,0.08)', color: DT.danger, padding: '10px 12px', borderRadius: 10, fontSize: 13 }} role="alert">{error}</div>}
+            <button type="submit" disabled={submitting} style={{
+              ...FONT, background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+              color: DT.ink, border: 'none', padding: 14, borderRadius: 11, fontSize: 15, fontWeight: 800,
+              cursor: submitting ? 'wait' : 'pointer', marginTop: 6,
+              boxShadow: '0 8px 20px rgba(180,139,76,0.28), inset 0 1px 0 rgba(255,255,255,0.35)',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              opacity: submitting ? 0.7 : 1,
+            }}>
+              {submitting ? 'רק רגע…' : isSignup ? 'צור חשבון' : 'התחברות'}
+              <ArrowLeft size={16} aria-hidden="true" />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0', color: DT.muted, fontSize: 11 }}>
+              <div style={{ flex: 1, height: 1, background: DT.border }} /> או
+              <div style={{ flex: 1, height: 1, background: DT.border }} />
+            </div>
+            <GhostBtn onClick={handleGoogle}><GoogleMark />המשך עם Google</GhostBtn>
+            {isIOS() && (
+              <GhostBtn onClick={handleApple}>
+                <Apple size={17} fill="currentColor" aria-hidden="true" />
+                המשך עם Apple
+              </GhostBtn>
+            )}
+          </form>
+          <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: DT.muted }}>
+            {isSignup ? 'יש לך כבר חשבון? ' : 'חדש ב-Estia? '}
+            <button type="button" onClick={() => { setMode(isSignup ? 'login' : 'signup'); setError(''); }}
+              style={{ background: 'transparent', border: 'none', color: DT.gold, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+              {isSignup ? 'התחבר' : 'צור חשבון'}
+            </button>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Mobile · ScreenLogin — single cream column, sticky logo, gold CTA
+// ═══════════════════════════════════════════════════════════════════
+function MobileLogin(p) {
+  const { isSignup, form, update, showPass, setShowPass, error, submitting,
+    handleSubmit, handleGoogle, handleApple, setMode, setError } = p;
+  return (
+    <div dir="rtl" style={{
+      ...FONT, background: DT.cream, color: DT.ink, minHeight: '100vh',
+      display: 'flex', flexDirection: 'column', padding: '44px 24px 28px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+          display: 'grid', placeItems: 'center', color: DT.ink, fontWeight: 900, fontSize: 18,
+        }}>E</div>
+        <div style={{ fontSize: 22, fontWeight: 800 }}>Estia</div>
+      </div>
+      <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: -1, lineHeight: 1.1, margin: '0 0 8px' }}>
+        {isSignup ? 'צור חשבון' : 'ברוכים השבים'}
+      </h1>
+      <p style={{ fontSize: 14, color: DT.muted, margin: '0 0 28px' }}>
+        {isSignup ? 'הצטרפו · 30 יום Premium חינם' : 'התחברו כדי להמשיך לנהל את העסק שלכם.'}
+      </p>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+        {isSignup && (
+          <>
+            <MField label="שם מלא" placeholder="אדם ברקוביץ" value={form.displayName} onChange={(v) => update('displayName', v)} icon={<User size={16} />} />
+            <MField label="טלפון (רשות)" type="tel" inputMode="tel" dir="ltr" placeholder="050-0000000" value={form.phone} onChange={(v) => update('phone', v)} icon={<Phone size={16} />} />
+          </>
+        )}
+        <MField label="אימייל" type="email" inputMode="email" dir="ltr" placeholder="name@domain.co.il" value={form.email} onChange={(v) => update('email', v)} icon={<Mail size={16} />} />
+        <MField
+          label="סיסמה" type={showPass ? 'text' : 'password'} placeholder="••••••••"
+          value={form.password} onChange={(v) => update('password', v)} icon={<Lock size={16} />}
+          rightAdorn={(
+            <button type="button" onClick={() => setShowPass((s) => !s)}
+              style={{ background: 'transparent', border: 'none', color: DT.muted, cursor: 'pointer', padding: 4, display: 'inline-flex' }}
+              aria-label={showPass ? 'הסתר סיסמה' : 'הצג סיסמה'}>
+              {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          )}
+        />
+        {!isSignup && (
+          <div style={{ textAlign: 'left', marginBottom: 18 }}>
+            <a href="mailto:hello@estia.co.il?subject=איפוס סיסמה" style={{ fontSize: 12, color: DT.gold, fontWeight: 600 }}>שכחתי סיסמה</a>
+          </div>
+        )}
+        {error && <div style={{ background: 'rgba(185,28,28,0.08)', color: DT.danger, padding: '10px 12px', borderRadius: 10, fontSize: 13, marginBottom: 12 }} role="alert">{error}</div>}
+        <PrimaryBtn type="submit" disabled={submitting}>
+          {submitting ? 'רק רגע…' : isSignup ? 'צור חשבון' : 'התחברות'}
+          <ArrowLeft size={15} aria-hidden="true" />
+        </PrimaryBtn>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
+          <div style={{ flex: 1, height: 1, background: DT.border }} />
+          <div style={{ fontSize: 11, color: DT.muted }}>או</div>
+          <div style={{ flex: 1, height: 1, background: DT.border }} />
+        </div>
+        <GhostBtn onClick={handleGoogle}><GoogleMark />המשך עם Google</GhostBtn>
+        {isIOS() && (
+          <>
+            <div style={{ height: 8 }} />
+            <GhostBtn onClick={handleApple}>
+              <Apple size={16} fill="currentColor" aria-hidden="true" />
+              המשך עם Apple
+            </GhostBtn>
+          </>
+        )}
+        <div style={{ marginTop: 'auto', paddingTop: 24, textAlign: 'center', fontSize: 13, color: DT.muted }}>
+          {isSignup ? 'יש לך כבר חשבון? ' : 'אין לכם חשבון? '}
+          <button type="button" onClick={() => { setMode(isSignup ? 'login' : 'signup'); setError(''); }}
+            style={{ background: 'transparent', border: 'none', color: DT.gold, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+            {isSignup ? 'התחבר' : 'הרשמה חינם ←'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ─── Desktop field ───────────────────────────────────────────
+function DField({ label, value, onChange, icon, adornment, ...rest }) {
+  return (
+    <label style={{ display: 'block' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: DT.ink2, marginBottom: 6 }}>{label}</div>
+      <div style={{
+        position: 'relative',
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: DT.white, border: `1px solid ${DT.border}`,
+        borderRadius: 10, padding: '0 12px',
+      }}>
+        {icon && <span style={{ color: DT.muted, display: 'inline-flex' }}>{icon}</span>}
+        <input
+          {...rest}
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
+          style={{
+            ...FONT, flex: 1, padding: '12px 0',
+            border: 'none', outline: 'none', background: 'transparent',
+            fontSize: 14, color: DT.ink, minWidth: 0, textAlign: rest.dir === 'ltr' ? 'left' : 'right',
+          }}
+        />
+        {adornment}
+      </div>
+    </label>
+  );
+}
+
+// ─── Mobile field ────────────────────────────────────────────
+function MField({ label, value, onChange, icon, rightAdorn, hint, ...rest }) {
+  const [focus, setFocus] = useState(false);
+  return (
+    <label style={{ display: 'block', marginBottom: 14 }}>
+      {label && <div style={{ fontSize: 12, fontWeight: 600, color: DT.ink, marginBottom: 6 }}>{label}</div>}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: DT.white,
+        border: `1.5px solid ${focus ? DT.gold : DT.border}`,
+        borderRadius: 12, padding: '0 14px',
+        transition: 'border-color 150ms, box-shadow 150ms',
+        boxShadow: focus ? '0 0 0 4px rgba(180,139,76,0.12)' : 'none',
+      }}>
+        {icon && <span style={{ color: DT.muted, display: 'inline-flex' }}>{icon}</span>}
+        <input
+          {...rest}
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
+          onFocus={() => setFocus(true)}
+          onBlur={() => setFocus(false)}
+          style={{
+            ...FONT, flex: 1, border: 'none', outline: 'none', background: 'transparent',
+            padding: '13px 0', fontSize: 15, color: DT.ink, minWidth: 0,
+            textAlign: rest.dir === 'ltr' ? 'left' : 'right',
+          }}
+        />
+        {rightAdorn}
+      </div>
+      {hint && <div style={{ fontSize: 11, color: DT.muted, marginTop: 4 }}>{hint}</div>}
+    </label>
+  );
+}
+
+// ─── Mobile primary / ghost buttons (bundle's PrimaryBtn/GhostBtn) ─
+function PrimaryBtn({ children, onClick, disabled, type = 'button' }) {
+  return (
+    <button type={type} onClick={onClick} disabled={disabled} style={{
+      ...FONT,
+      background: disabled ? '#d8cfbf' : `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+      color: DT.ink, fontWeight: 700, padding: '14px 18px', borderRadius: 12, border: 'none',
+      cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 15, width: '100%',
+      boxShadow: disabled ? 'none' : '0 8px 20px rgba(180,139,76,0.28), inset 0 1px 0 rgba(255,255,255,0.35)',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    }}>{children}</button>
+  );
+}
+function GhostBtn({ children, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      ...FONT, background: DT.white, color: DT.ink, fontWeight: 600,
+      padding: '13px 16px', borderRadius: 12, border: `1px solid ${DT.borderStrong}`,
+      cursor: 'pointer', fontSize: 14, width: '100%',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    }}>{children}</button>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
   );
 }
