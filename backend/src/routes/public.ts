@@ -56,7 +56,7 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     const agent =
       (await prisma.user.findUnique({ where: { slug: agentSlug }, include: { agentProfile: true } })) ||
       (await prisma.user.findUnique({ where: { id: agentSlug }, include: { agentProfile: true } }));
-    if (!agent || agent.role !== 'AGENT') {
+    if (!agent || agent.role !== 'AGENT' && agent.role !== 'OWNER') {
       return reply.code(404).send({ error: { message: 'Agent not found' } });
     }
     // Lazy slug-fill so older agents migrate over time
@@ -106,7 +106,7 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     const agent =
       (await prisma.user.findUnique({ where: { slug: agentSlug } })) ||
       (await prisma.user.findUnique({ where: { id: agentSlug } }));
-    if (!agent || agent.role !== 'AGENT') {
+    if (!agent || agent.role !== 'AGENT' && agent.role !== 'OWNER') {
       return reply.code(404).send({ error: { message: 'Agent not found' } });
     }
     const property =
@@ -199,7 +199,7 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     const agent =
       (await prisma.user.findUnique({ where: { slug: agentSlug } })) ||
       (await prisma.user.findUnique({ where: { id: agentSlug } }));
-    if (!agent || agent.role !== 'AGENT') {
+    if (!agent || agent.role !== 'AGENT' && agent.role !== 'OWNER') {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const property =
