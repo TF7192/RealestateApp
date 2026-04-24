@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Save, Clipboard, X, Check, Loader2,
   UserCircle, Search, Home, SlidersHorizontal, StickyNote, Shield,
-  AlertCircle,
+  AlertCircle, Building2,
 } from 'lucide-react';
 import api from '../lib/api';
 import { cityNames, streetNames } from '../data/mockData';
@@ -74,6 +74,21 @@ const INITIAL_FORM = {
   acRequired: false,
   storageRequired: false,
   notes: '',
+
+  // Commercial-lead brief (surfaced only when interestType === 'מסחרי').
+  // Matches the existing Lead schema fields. Mirrors the set already
+  // wired on CustomerEditDialog so agents can capture the same block
+  // at create-time, not only post-creation.
+  sqmGrossMin: null,
+  sqmNetMin: null,
+  workstationsMin: null,
+  buildStateRequired: '',       // 'מעטפת' / 'גמר' / specific finish
+  accessibilityRequired: false, // גישה לנכים
+  kitchenetteRequired: false,   // מטבחון
+  floorShelterRequired: false,  // ממ״ק
+  inOfficeToiletsRequired: false, // שירותים בתוך המשרד
+  onFloorToiletsRequired: false,  // שירותים משותפים בקומה
+  openSpaceRequired: false,       // חלל פתוח
 
   // K1 — contact / identity block (additive, all optional).
   firstName: '',
@@ -221,6 +236,22 @@ export default function NewLead() {
         acRequired: !!form.acRequired,
         storageRequired: !!form.storageRequired,
         notes: form.notes || null,
+
+        // Commercial brief — send integers or null. The backend drops
+        // them on PRIVATE leads anyway, but zod expects the shape.
+        sqmGrossMin: form.sqmGrossMin != null && form.sqmGrossMin !== ''
+          ? Math.max(0, Math.round(Number(form.sqmGrossMin))) : null,
+        sqmNetMin: form.sqmNetMin != null && form.sqmNetMin !== ''
+          ? Math.max(0, Math.round(Number(form.sqmNetMin))) : null,
+        workstationsMin: form.workstationsMin != null && form.workstationsMin !== ''
+          ? Math.max(0, Math.round(Number(form.workstationsMin))) : null,
+        buildStateRequired: form.buildStateRequired || null,
+        accessibilityRequired: !!form.accessibilityRequired,
+        kitchenetteRequired: !!form.kitchenetteRequired,
+        floorShelterRequired: !!form.floorShelterRequired,
+        inOfficeToiletsRequired: !!form.inOfficeToiletsRequired,
+        onFloorToiletsRequired: !!form.onFloorToiletsRequired,
+        openSpaceRequired: !!form.openSpaceRequired,
 
         // K1 — contact / identity (only send non-empty so the server
         // doesn't overwrite existing rows with "" on edit paths).
@@ -594,6 +625,95 @@ export default function NewLead() {
             />
           </div>
         </section>
+
+        {/* Section 4.5 — Commercial-lead brief. Surfaces only for לקוח
+            עסקי (interestType === 'מסחרי'); the same field-set is also
+            wired on CustomerEditDialog so post-creation edits match. */}
+        {form.interestType === 'מסחרי' && (
+          <section style={sectionCard()} aria-label="דרישות עסקיות">
+            <h3 style={sectionTitle()}>
+              <Building2 size={16} /> דרישות עסקיות
+            </h3>
+            <div style={gridRow2()}>
+              <Field label="מ״ר ברוטו (מינימום)">
+                <NumberField
+                  value={form.sqmGrossMin}
+                  onChange={(v) => update('sqmGrossMin', v)}
+                  unit="מ״ר"
+                  placeholder="למשל 60"
+                />
+              </Field>
+              <Field label="מ״ר נטו (מינימום)">
+                <NumberField
+                  value={form.sqmNetMin}
+                  onChange={(v) => update('sqmNetMin', v)}
+                  unit="מ״ר"
+                  placeholder="למשל 50"
+                />
+              </Field>
+              <Field label="מספר עמדות עבודה">
+                <NumberField
+                  value={form.workstationsMin}
+                  onChange={(v) => update('workstationsMin', v)}
+                  placeholder="למשל 3"
+                />
+              </Field>
+              <Field label="מצב הנכס">
+                <SelectField
+                  value={form.buildStateRequired}
+                  onChange={(v) => update('buildStateRequired', v)}
+                  placeholder="מעטפת / גמר / לא משנה"
+                  options={['מעטפת', 'גמר', 'גמר עם ריהוט', 'שיפוץ דרוש']}
+                />
+              </Field>
+            </div>
+            <div style={{
+              display: 'grid', gap: 8, marginTop: 12,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            }}>
+              <CheckboxItem
+                checked={form.accessibilityRequired}
+                onChange={(v) => update('accessibilityRequired', v)}
+                label="גישה לנכים"
+              />
+              <CheckboxItem
+                checked={form.kitchenetteRequired}
+                onChange={(v) => update('kitchenetteRequired', v)}
+                label="מטבחון"
+              />
+              <CheckboxItem
+                checked={form.floorShelterRequired}
+                onChange={(v) => update('floorShelterRequired', v)}
+                label="ממ״ק"
+              />
+              <CheckboxItem
+                checked={form.inOfficeToiletsRequired}
+                onChange={(v) => update('inOfficeToiletsRequired', v)}
+                label="שירותים בתוך המשרד"
+              />
+              <CheckboxItem
+                checked={form.onFloorToiletsRequired}
+                onChange={(v) => update('onFloorToiletsRequired', v)}
+                label="שירותים משותפים בקומה"
+              />
+              <CheckboxItem
+                checked={form.openSpaceRequired}
+                onChange={(v) => update('openSpaceRequired', v)}
+                label="חלל פתוח"
+              />
+              <CheckboxItem
+                checked={form.parkingRequired}
+                onChange={(v) => update('parkingRequired', v)}
+                label="חניה"
+              />
+              <CheckboxItem
+                checked={form.storageRequired}
+                onChange={(v) => update('storageRequired', v)}
+                label="מחסן"
+              />
+            </div>
+          </section>
+        )}
 
         {/* Section 5 — K1 contact / identity extended (optional) */}
         <section style={sectionCard()} aria-label={t('new.sections.extended')}>
