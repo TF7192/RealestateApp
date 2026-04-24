@@ -104,12 +104,30 @@ function wireCtas() {
     b.style.cursor = 'pointer';
     b.addEventListener('click', function (e) { e.preventDefault(); window.location.href = go; });
   });
-  // Anchor tags without hrefs (e.g., the top-nav "התחברות" link in the
-  // design uses href="#"). Rewrite those too.
-  document.querySelectorAll('#root a[href="#"]').forEach(function (a) {
-    var txt = (a.textContent || '').trim();
+  // Anchor tags used as CTA triggers. DirectionA's top-nav "התחברות"
+  // is an <a href="#">, but DirectionAMobile renders it as a bare <a>
+  // with no href attribute at all. Cover both shapes + any hrefless
+  // anchor whose text matches a CTA phrase.
+  document.querySelectorAll('#root a').forEach(function (a) {
     if (a.dataset.ctaWired) return;
-    if (/התחברות/.test(txt)) { a.href = '/login?utm_source=landing'; a.dataset.ctaWired = '1'; }
+    var txt = (a.textContent || '').trim();
+    var href = a.getAttribute('href');
+    // Only touch anchors without a real destination — anything already
+    // pointing at an in-page anchor (#features, #pricing) or external
+    // URL keeps its own behavior.
+    if (href && href !== '#') return;
+    var go = null;
+    if (/התחברות/.test(txt)) go = '/login?utm_source=landing';
+    else if (/הרשמה חינם|התחלה חינם/.test(txt)) go = '/login?flow=signup&utm_source=landing';
+    if (!go) return;
+    a.href = go;
+    a.style.cursor = 'pointer';
+    a.dataset.ctaWired = '1';
+    // <a> without href isn't focusable by default — add an explicit
+    // click handler so mobile taps route immediately, and a tabindex
+    // so keyboard users can reach it.
+    if (!a.hasAttribute('tabindex')) a.setAttribute('tabindex', '0');
+    a.addEventListener('click', function (e) { e.preventDefault(); window.location.href = go; });
   });
 }
 // Run once after initial mount, then again on every in-component
