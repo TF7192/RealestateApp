@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="theme-color" content="#f7f3ec" />
-<title>Estia · ה-CRM לסוכני נדל״ן בישראל — סוף לבלאגן בין WhatsApp, אקסל ויומן</title>
-<meta name="description" content="במקום WhatsApp, אקסל ויומן — מערכת אחת לסוכני נדל״ן בישראל. כל ליד, כל נכס, כל פגישה במקום אחד. בעברית. 30 יום חינם, בלי כרטיס אשראי." />
+<title>Estia · ה-CRM לסוכני נדל״ן בישראל — אפליקציה לאייפון ולאנדרואיד</title>
+<meta name="description" content="CRM מודרני לסוכני נדל״ן בישראל: לקוחות, נכסים, פגישות, AI לתיאורי נכסים והתאמת לידים — בנייד. 30 יום חינם, בלי כרטיס אשראי." />
 <link rel="canonical" href="https://estia.co.il/" />
 <meta property="og:locale" content="he_IL" />
 <meta property="og:type" content="website" />
@@ -14,11 +14,10 @@
 <meta property="og:description" content="כל ליד, כל נכס, כל פגישה — במקום אחד, בעברית. 30 יום חינם, בלי כרטיס אשראי." />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Estia · ה-CRM לסוכני נדל״ן" />
-<meta name="twitter:description" content="סוף לבלאגן בין WhatsApp, אקסל ויומן. 30 יום חינם." />
+<meta name="twitter:description" content="CRM לסוכני נדל״ן בישראל. AI, נייד, ועברית מלאה. 30 יום חינם." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=gd1" />
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=gd1" />
 
-<!-- Preconnect + preload the display font subset so LCP doesn't wait on CSS-driven font fetches -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" />
@@ -26,901 +25,1052 @@
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" /></noscript>
 
 <style>
-/* Critical CSS inlined — landing page is a single document, no external
-   stylesheet to block render. ~8 KB post-gzip. Variables intentionally
-   redeclared here (light mode only — landing is always warm cream). */
+/* ────────────────────────────────────────────────────────────
+   Landing — Cream & Gold redesign (handoff from claude.ai/design,
+   Direction A). Warm editorial B2B palette. No dark surfaces.
+   All CSS scoped to ≈ 600 lines; single inline stylesheet so the
+   landing loads without a blocking external CSS request.
+   ──────────────────────────────────────────────────────────── */
 :root {
+  --ink: #1e1a14;
+  --ink-soft: #2d261d;
+  --muted: #6b6356;
+  --cream-1: #f7f3ec;         /* page */
+  --cream-2: #efe9df;         /* section band */
+  --cream-3: #e8dfcf;         /* deeper warm surface */
+  --cream-4: #fbf7f0;         /* near-white card */
   --gold: #b48b4c;
-  --gold-light: #c9a36c;
-  --gold-dim: #8a6932;
+  --gold-light: #d9b774;
+  --gold-dim: #a07b40;
   --gold-readable: #7a5c2c;
-  --gold-glow: rgba(180, 139, 76, 0.14);
-  --gold-border: rgba(180, 139, 76, 0.28);
-  --bg-primary: #f7f3ec;
-  --bg-secondary: #efe9df;
-  --bg-card: #ffffff;
-  --text-primary: #1e1a14;
-  --text-secondary: #54503e;
-  --text-muted: #6b6356;
+  --gold-soft: rgba(180, 139, 76, 0.14);
   --border: rgba(30, 26, 20, 0.08);
-  --border-light: rgba(30, 26, 20, 0.14);
+  --border-strong: rgba(30, 26, 20, 0.14);
+  --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --shadow-md: 0 4px 16px rgba(30, 26, 20, 0.08), 0 2px 4px rgba(30, 26, 20, 0.05);
-  --shadow-lg: 0 10px 40px rgba(30, 26, 20, 0.10), 0 4px 12px rgba(30, 26, 20, 0.06);
-  --shadow-gold: 0 4px 20px rgba(180, 139, 76, 0.18);
-  --success: #15803d;
-  --danger: #b91c1c;
-  --warning: #b45309;
-  --info: #2563eb;
-  --font: 'Assistant', 'Heebo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+  --shadow-gold: 0 8px 24px rgba(180, 139, 76, 0.28), inset 0 1px 0 rgba(255,255,255,0.35);
+  --font: 'Assistant', 'Heebo', system-ui, -apple-system, Segoe UI, sans-serif;
 }
-*, *::before, *::after { box-sizing: border-box; }
+* { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  direction: rtl;
-  background: var(--bg-primary);
-  color: var(--text-primary);
   font-family: var(--font);
-  font-size: 16px; line-height: 1.7;
-  min-height: 100vh;
+  color: var(--ink);
+  background: var(--cream-1);
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 a { color: inherit; text-decoration: none; }
-.container { max-width: 1200px; margin-inline: auto; padding-inline: 20px; }
-@media (min-width: 768px) { .container { padding-inline: 32px; } }
-.section { padding-block: 64px; }
-@media (min-width: 768px) { .section { padding-block: 96px; } }
-.section + .section { border-top: 1px solid transparent; }
+img { max-width: 100%; display: block; }
+button { font-family: inherit; cursor: pointer; }
+
+/* ── container ─────────────────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-inline: 24px;
+}
+@media (min-width: 768px) { .container { padding-inline: 40px; } }
+
+.section { padding-block: 72px; }
+@media (min-width: 768px) { .section { padding-block: 112px; } }
+
 .eyebrow {
-  display: inline-block; font-size: 13px; font-weight: 700;
-  color: var(--gold-readable); letter-spacing: 0.04em; margin-bottom: 12px;
-}
-.h2 { font-size: 28px; line-height: 1.25; font-weight: 700; margin: 0 0 12px; }
-@media (min-width: 768px) { .h2 { font-size: 40px; } }
-@media (min-width: 1024px) { .h2 { font-size: 48px; } }
-.sub { font-size: 17px; color: var(--text-secondary); margin: 0 0 32px; max-width: 720px; }
-
-/* buttons */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 14px 26px; border-radius: var(--radius-md);
-  font: inherit; font-size: 16px; font-weight: 700;
-  border: 1px solid transparent; cursor: pointer;
-  min-height: 48px; transition: transform .12s ease, box-shadow .16s ease, background .16s ease;
-}
-.btn-primary {
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
-  color: #1e1a14; box-shadow: var(--shadow-gold);
-}
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(180,139,76,0.26); }
-.btn-primary:focus-visible { outline: 3px solid var(--gold-light); outline-offset: 2px; }
-.btn-secondary { background: transparent; color: var(--text-primary); border-color: var(--border-light); }
-.btn-secondary:hover { background: var(--bg-card); border-color: var(--gold-border); }
-.btn-ghost { background: transparent; color: var(--gold-readable); padding: 10px 14px; min-height: 0; font-weight: 700; }
-.btn-ghost:hover { color: var(--text-primary); }
-
-/* nav */
-.nav {
-  position: sticky; top: 0; z-index: 50;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border);
-}
-.nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; }
-.logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 22px; color: var(--text-primary); }
-.logo-mark { color: var(--gold); font-size: 20px; }
-.nav-links { display: none; gap: 28px; }
-.nav-links a { color: var(--text-secondary); font-size: 15px; font-weight: 600; }
-.nav-links a:hover { color: var(--text-primary); }
-.nav-actions { display: flex; align-items: center; gap: 8px; }
-.nav-actions .btn { padding: 10px 18px; font-size: 14px; min-height: 40px; }
-@media (min-width: 768px) { .nav-links { display: flex; } }
-
-/* hero */
-.hero {
-  padding-block: 40px 56px;
-  background:
-    radial-gradient(1100px 520px at 85% 0%, var(--gold-glow), transparent 60%),
-    radial-gradient(900px 420px at 15% 100%, var(--gold-glow), transparent 60%);
-}
-.hero-grid { display: grid; gap: 40px; }
-.hero-eyebrow {
-  display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px;
-  background: var(--gold-glow); border: 1px solid var(--gold-border); color: var(--gold-readable);
-  font-weight: 700; font-size: 13px; margin-bottom: 20px;
+  display: inline-block;
+  color: var(--gold-readable);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
 }
 .h1 {
-  font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary);
-  font-size: 38px; line-height: 1.08; margin: 0 0 20px;
+  font-size: clamp(40px, 6vw, 68px);
+  line-height: 1.02;
+  letter-spacing: -2px;
+  font-weight: 800;
+  margin: 0 0 20px;
+  text-wrap: balance;
 }
-.h1 > span { display: block; }
-.h1-accent { color: var(--gold); display: block; margin-top: 2px; }
-.hero-sub { font-size: 18px; color: var(--text-secondary); line-height: 1.65; max-width: 560px; margin: 0 0 28px; }
-.hero-cta-row { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
-.hero-cta-row .btn { width: 100%; }
-.hero-trust { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 13px; color: var(--text-muted); }
-.hero-trust-item { display: inline-flex; align-items: center; gap: 8px; }
-.hero-trust-item::before { content: ''; width: 8px; height: 8px; border-radius: 999px; background: var(--success); flex: none; }
-.hero-visual { order: 2; display: flex; justify-content: center; margin-top: 8px; }
-@media (min-width: 768px) {
-  .hero { padding-block: 80px 96px; }
-  .h1 { font-size: 56px; line-height: 1.05; }
-  .hero-cta-row { flex-direction: row; }
-  .hero-cta-row .btn { width: auto; }
+.h1-accent {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
-@media (min-width: 1024px) {
-  .hero-grid { grid-template-columns: 1.1fr 1fr; align-items: center; gap: 64px; }
-  .hero-visual { order: 0; margin-top: 0; }
-  .h1 { font-size: 64px; }
+.h2 {
+  font-size: clamp(30px, 4.5vw, 48px);
+  line-height: 1.06;
+  letter-spacing: -1.3px;
+  font-weight: 800;
+  margin: 0 0 14px;
+  text-wrap: balance;
 }
-
-/* phone mock — pure HTML/CSS so Hebrew RTL renders correctly */
-.device {
-  position: relative; width: 100%; max-width: 340px; aspect-ratio: 360/740;
-  margin-inline: auto; filter: drop-shadow(0 28px 56px rgba(30,26,20,0.28));
-  background: linear-gradient(155deg, #2a261f 0%, #0d0f14 100%);
-  border-radius: 48px; padding: 10px; direction: rtl;
-}
-.device-screen {
-  position: relative; width: 100%; height: 100%;
-  background: var(--bg-primary); border-radius: 40px; overflow: hidden;
-  display: flex; flex-direction: column;
-  font-size: 12px; line-height: 1.35; color: var(--text-primary);
-}
-.device-island {
-  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-  width: 90px; height: 22px; background: #0d0f14; border-radius: 12px; z-index: 2;
-}
-.device-status {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 22px 4px; font-size: 11px; font-weight: 700;
-}
-.device-status .status-icons { display: inline-flex; gap: 4px; align-items: center; }
-.device-status .status-icons span {
-  display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #1e1a14;
-}
-.device-status .status-icons .bat { width: 16px; height: 8px; border-radius: 2px; background: #1e1a14; opacity: 0.75; }
-.device-body { flex: 1; padding: 28px 14px 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
-.device-tabbar {
-  margin-top: auto; background: #fff; border-top: 1px solid rgba(30,26,20,0.08);
-  padding: 8px 10px 12px; display: grid; grid-template-columns: repeat(5, 1fr);
-  align-items: end; text-align: center; font-size: 10px; font-weight: 700; color: var(--text-muted);
-}
-.device-tabbar .tab-active { color: var(--gold-readable); position: relative; }
-.device-tabbar .tab-active::before {
-  content: ''; position: absolute; top: -8px; right: 50%; transform: translateX(50%);
-  width: 18px; height: 3px; background: linear-gradient(90deg, #d3b27a, #8a6932); border-radius: 2px;
-}
-.device-tabbar .tab-fab {
-  width: 40px; height: 40px; margin: -18px auto 2px;
-  border-radius: 50%; background: linear-gradient(135deg, #d3b27a, #8a6932);
-  color: #1e1a14; display: flex; align-items: center; justify-content: center;
-  font-size: 22px; font-weight: 800;
-}
-/* dashboard variant */
-.dev-greet h4 { margin: 0; font-size: 17px; font-weight: 800; color: #1e1a14; }
-.dev-greet small { display: block; color: var(--text-muted); font-size: 10px; margin-top: 2px; }
-.dev-ai {
-  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-  background: linear-gradient(90deg, #fdf3de, #f8e1b8); border: 1px solid #d6b787;
-  border-radius: 12px;
-}
-.dev-ai .ai-badge {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: linear-gradient(135deg, #d3b27a, #8a6932); color: #1e1a14;
-  font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex: none;
-}
-.dev-ai b { display: block; font-size: 11px; color: #3b2e13; }
-.dev-ai span { font-size: 10px; color: #6b5026; }
-.dev-kpis { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-.dev-kpi {
-  background: #fff; border: 1px solid rgba(30,26,20,0.08); border-radius: 12px;
-  padding: 8px 10px; display: flex; flex-direction: column; gap: 2px;
-}
-.dev-kpi.is-gold { border-color: #d6b787; background: #fffdf8; }
-.dev-kpi .k-label { font-size: 9px; color: var(--text-muted); }
-.dev-kpi.is-gold .k-label { color: #6b5026; }
-.dev-kpi .k-value { font-size: 18px; font-weight: 800; color: #1e1a14; line-height: 1; }
-.dev-kpi.is-gold .k-value { color: #7a5c2c; font-size: 15px; }
-.dev-kpi .k-delta { font-size: 9px; font-weight: 700; color: #15803d; }
-.dev-section-title {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; font-weight: 800;
-}
-.dev-section-title .count {
-  background: linear-gradient(135deg, #d3b27a, #8a6932); color: #1e1a14;
-  min-width: 18px; height: 14px; border-radius: 7px; padding: 0 5px;
-  display: inline-flex; align-items: center; justify-content: center; font-size: 9px;
-}
-.dev-leads { display: flex; flex-direction: column; gap: 6px; }
-.dev-lead {
-  display: flex; align-items: center; gap: 10px;
-  background: #fff; border: 1px solid rgba(30,26,20,0.06); border-radius: 12px;
-  padding: 8px 10px;
-}
-.dev-lead .avatar {
-  width: 34px; height: 34px; border-radius: 50%;
-  color: #fff; font-weight: 800; font-size: 13px;
-  display: inline-flex; align-items: center; justify-content: center; flex: none;
-}
-.dev-lead .lead-meta { flex: 1; min-width: 0; }
-.dev-lead .lead-meta b { display: block; font-size: 11px; color: #1e1a14; font-weight: 700; }
-.dev-lead .lead-meta span { font-size: 9px; color: var(--text-muted); display: block; }
-.dev-lead .pill {
-  font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 10px; flex: none;
-}
-.dev-lead .pill.hot { background: #fee2e2; color: #b91c1c; }
-.dev-lead .pill.meet { background: #fef3c7; color: #92400e; }
-.dev-calendar {
-  display: flex; align-items: center; gap: 10px;
-  background: #1e1a14; color: #f7f3ec; border-radius: 12px; padding: 8px 10px;
-}
-.dev-calendar .cal-date {
-  width: 34px; height: 34px; border-radius: 8px;
-  background: linear-gradient(135deg, #d3b27a, #8a6932); color: #1e1a14;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none;
-  font-weight: 800; line-height: 1;
-}
-.dev-calendar .cal-date small { font-size: 8px; font-weight: 800; }
-.dev-calendar .cal-date b { font-size: 13px; }
-.dev-calendar .cal-meta { flex: 1; min-width: 0; }
-.dev-calendar .cal-meta b { display: block; font-size: 11px; font-weight: 700; }
-.dev-calendar .cal-meta span { font-size: 9px; color: rgba(247,243,236,0.7); display: block; }
-
-/* property variant */
-.dev-photo {
-  margin: -28px -14px 0; height: 180px; position: relative;
-  background: linear-gradient(155deg, #d3b27a 0%, #8a6932 55%, #2a261f 100%);
-  overflow: hidden;
-}
-.dev-photo::before, .dev-photo::after {
-  content: ''; position: absolute; bottom: 0; background: rgba(30,26,20,0.32);
-}
-.dev-photo::before {
-  inset-inline-start: 16%; width: 22%; height: 65%;
-  box-shadow: inset 6px 12px 0 rgba(247,243,236,0.18), inset 6px 26px 0 rgba(247,243,236,0.18), inset 6px 40px 0 rgba(247,243,236,0.18);
-}
-.dev-photo::after {
-  inset-inline-start: 44%; width: 28%; height: 82%;
-  box-shadow: inset 6px 14px 0 rgba(247,243,236,0.18), inset 6px 34px 0 rgba(247,243,236,0.18), inset 6px 54px 0 rgba(247,243,236,0.18), inset 18px 14px 0 rgba(247,243,236,0.14), inset 18px 34px 0 rgba(247,243,236,0.14);
-}
-.dev-photo .ph-badge {
-  position: absolute; top: 12px; inset-inline-end: 12px;
-  background: rgba(30,26,20,0.85); color: #d3b27a;
-  padding: 5px 12px; border-radius: 11px; font-size: 10px; font-weight: 800; z-index: 1;
-}
-.dev-photo .ph-count {
-  position: absolute; bottom: 12px; inset-inline-end: 12px;
-  background: rgba(30,26,20,0.65); color: #fff;
-  padding: 4px 10px; border-radius: 10px; font-size: 10px; font-weight: 700; z-index: 1;
-}
-.dev-title { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-top: 6px; }
-.dev-title .t-left { min-width: 0; }
-.dev-title .t-left small { color: var(--gold-readable); font-size: 10px; font-weight: 800; display: block; }
-.dev-title .t-left h4 { margin: 2px 0 2px; font-size: 16px; font-weight: 800; color: #1e1a14; }
-.dev-title .t-left span { font-size: 10px; color: var(--text-muted); }
-.dev-title .t-right { text-align: start; }
-.dev-title .t-right b { font-size: 16px; font-weight: 800; color: #1e1a14; display: block; }
-.dev-title .t-right span { font-size: 9px; color: var(--text-muted); }
-.dev-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.dev-chip {
-  background: rgba(30,26,20,0.06); color: #1e1a14;
-  font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 10px;
-}
-.dev-chip.is-gold { background: #f8edd8; color: #7a5c2c; border: 1px solid #d6b787; }
-.dev-owner {
-  display: flex; align-items: center; gap: 10px;
-  background: #fff; border: 1px solid rgba(30,26,20,0.08); border-radius: 12px;
-  padding: 8px 10px;
-}
-.dev-owner .o-avatar {
-  width: 34px; height: 34px; border-radius: 50%; background: #b45309;
-  color: #fff; font-weight: 800; font-size: 14px; display: inline-flex;
-  align-items: center; justify-content: center; flex: none;
-}
-.dev-owner .o-meta { flex: 1; min-width: 0; }
-.dev-owner .o-meta b { display: block; font-size: 11px; color: #1e1a14; font-weight: 700; }
-.dev-owner .o-meta span { font-size: 9px; color: var(--text-muted); display: block; }
-.dev-owner .o-pill { background: rgba(21,128,61,0.14); color: #15803d; font-size: 9px; font-weight: 800; padding: 4px 8px; border-radius: 9px; flex: none; }
-.dev-actions { display: flex; gap: 6px; }
-.dev-actions .dev-wa {
-  flex: 1; background: #1a7f47; color: #fff;
-  padding: 11px 10px; border-radius: 12px;
-  font-size: 11px; font-weight: 800; text-align: center;
-}
-.dev-actions .dev-call {
-  width: 46px; background: #1e1a14; color: #f7f3ec;
-  border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px;
-}
-.dev-hints { display: flex; gap: 6px; }
-.dev-hints .h-chip {
-  flex: 1; background: rgba(30,26,20,0.06); color: #54503e;
-  font-size: 10px; font-weight: 700; padding: 6px 8px; border-radius: 10px; text-align: center;
-}
-.dev-hints .h-chip.is-gold { background: #f8edd8; color: #7a5c2c; border: 1px solid #d6b787; font-weight: 800; }
-
-/* store badges (disabled placeholder) */
-.stores { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
-.store-btn {
-  display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px;
-  background: #0d0f14; color: #f0ece4; border-radius: var(--radius-md);
-  font-size: 13px; opacity: 0.6; cursor: not-allowed; pointer-events: none;
-  min-height: 52px; line-height: 1.2;
-}
-.store-btn > span { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: start; }
-.store-btn strong { display: block; font-size: 16px; font-weight: 800; letter-spacing: 0.01em; }
-.store-btn small { display: block; font-size: 11px; opacity: 0.8; }
-.store-note { font-size: 12px; color: var(--text-muted); margin-top: 12px; max-width: 440px; line-height: 1.55; }
-
-/* features */
-.section-head { text-align: center; margin-bottom: 48px; }
-.section-head .sub { margin-inline: auto; }
-.feature-grid { display: grid; gap: 20px; grid-template-columns: 1fr; }
-@media (min-width: 640px)  { .feature-grid { grid-template-columns: 1fr 1fr; } }
-@media (min-width: 1024px) { .feature-grid { grid-template-columns: 1fr 1fr 1fr; } }
-.card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 28px 24px;
-}
-.card-icon {
-  width: 48px; height: 48px; border-radius: var(--radius-md);
-  background: var(--gold-glow); color: var(--gold-readable);
-  display: inline-flex; align-items: center; justify-content: center;
-  margin-bottom: 16px; font-size: 24px;
-}
-.card-title { font-size: 19px; font-weight: 700; margin: 0 0 8px; }
-.card-body { font-size: 15px; color: var(--text-secondary); margin: 0; line-height: 1.65; }
-.more {
-  margin-top: 40px; padding: 24px;
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-}
-.more-title { font-weight: 700; font-size: 15px; margin: 0 0 14px; }
-.more-list { list-style: none; padding: 0; margin: 0;
-  display: grid; gap: 8px 20px; grid-template-columns: 1fr;
-  font-size: 14px; color: var(--text-secondary); }
-@media (min-width: 640px)  { .more-list { grid-template-columns: 1fr 1fr; } }
-@media (min-width: 1024px) { .more-list { grid-template-columns: 1fr 1fr 1fr 1fr; } }
-.more-list li { display: flex; align-items: flex-start; gap: 8px; }
-.more-list li::before {
-  content: '✓'; color: var(--gold-readable); font-weight: 800; flex: none;
-  background: var(--gold-glow); width: 20px; height: 20px;
-  border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px; margin-top: 2px;
+.sub {
+  font-size: clamp(16px, 1.3vw, 19px);
+  color: var(--muted);
+  max-width: 620px;
+  margin: 0 0 28px;
 }
 
-/* mobile-app section */
-.mobile-section { background: var(--bg-secondary); border-block: 1px solid var(--border); }
-.mobile-grid { display: grid; gap: 48px; align-items: center; }
-@media (min-width: 1024px) { .mobile-grid { grid-template-columns: 1fr 1fr; gap: 72px; } }
-.mobile-bullets { list-style: none; padding: 0; margin: 24px 0 28px; display: grid; gap: 14px; }
-.mobile-bullet { display: flex; gap: 12px; font-size: 16px; color: var(--text-secondary); }
-.mobile-bullet::before {
-  content: '✓'; flex: none; width: 28px; height: 28px; border-radius: 999px;
-  background: var(--gold-glow); color: var(--gold-readable);
-  display: inline-flex; align-items: center; justify-content: center;
-  margin-top: 2px; font-weight: 800;
+/* ── buttons ───────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 22px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-size: 15px;
+  font-weight: 700;
+  min-height: 48px;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.btn-primary {
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
+  color: var(--ink);
+  box-shadow: var(--shadow-gold);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(180,139,76,0.34), inset 0 1px 0 rgba(255,255,255,0.4); }
+.btn-secondary {
+  background: #fff;
+  color: var(--ink);
+  border-color: var(--border-strong);
+  font-weight: 600;
+}
+.btn-secondary:hover { border-color: var(--gold); background: var(--cream-4); }
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  padding: 10px 14px;
+  min-height: 0;
+  font-weight: 600;
+}
+.btn-ghost:hover { color: var(--gold-readable); }
+.btn-large { padding: 16px 28px; font-size: 16px; }
+
+/* ── nav ───────────────────────────────────────────────────── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(247, 243, 236, 0.85);
+  backdrop-filter: saturate(150%) blur(12px);
+  -webkit-backdrop-filter: saturate(150%) blur(12px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.nav.is-scrolled { border-bottom-color: var(--border); background: rgba(247, 243, 236, 0.98); }
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 16px;
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+}
+.logo-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 15px;
+  box-shadow: 0 4px 10px rgba(180,139,76,0.35);
+}
+.nav-links {
+  display: none;
+  gap: 28px;
+  margin-inline-end: 16px;
+}
+.nav-links a { color: var(--muted); font-size: 14.5px; font-weight: 500; }
+.nav-links a:hover { color: var(--ink); }
+.nav-actions { display: flex; align-items: center; gap: 10px; margin-inline-start: auto; }
+@media (min-width: 840px) {
+  .nav-links { display: inline-flex; }
 }
 
-/* how-it-works */
-.steps { display: grid; gap: 20px; list-style: none; padding: 0; margin: 0; }
-@media (min-width: 768px) { .steps { grid-template-columns: 1fr 1fr 1fr; } }
-.step {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 28px 24px;
+/* ── hero ──────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  padding: 72px 0 40px;
 }
-.step-n { font-size: 44px; font-weight: 800; line-height: 1; color: var(--gold); margin-bottom: 14px; }
-.step-title { font-weight: 700; font-size: 18px; margin: 0 0 6px; }
-.step-body { font-size: 15px; color: var(--text-secondary); margin: 0; }
-
-/* pricing */
-.pricing-head { text-align: center; margin-bottom: 36px; }
-.pricing-banner {
-  display: inline-block; padding: 10px 20px; background: var(--gold-glow);
-  color: var(--gold-readable); border: 1px solid var(--gold-border);
-  border-radius: 999px; font-weight: 700; font-size: 14px; margin-bottom: 20px;
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -120px;
+  inset-inline-start: -120px;
+  width: 600px;
+  height: 600px;
+  pointer-events: none;
+  background: radial-gradient(circle at 30% 30%, rgba(180,139,76,0.18), transparent 60%);
 }
-.pricing-grid { display: grid; gap: 20px; align-items: stretch; }
-@media (min-width: 900px) { .pricing-grid { grid-template-columns: 1fr 1fr; max-width: 860px; margin-inline: auto; } }
-.tier {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 32px 28px; display: flex; flex-direction: column; gap: 16px; position: relative;
-}
-.tier.recommended { border-color: var(--gold); box-shadow: 0 10px 40px rgba(180,139,76,0.14); }
-.tier-badge {
-  position: absolute; top: -12px; inset-inline-end: 24px;
-  background: var(--gold); color: #1e1a14; padding: 4px 14px; border-radius: 999px;
-  font-size: 12px; font-weight: 800;
-}
-.tier-name { font-size: 22px; font-weight: 800; margin: 0; }
-.tier-lead { font-size: 14px; color: var(--text-muted); margin: 0 0 8px; }
-.tier-price { display: flex; align-items: baseline; gap: 6px; }
-.tier-n { font-size: 44px; font-weight: 800; line-height: 1; }
-.tier-c { font-size: 18px; color: var(--gold-readable); font-weight: 700; }
-.tier-s { font-size: 14px; color: var(--text-muted); }
-.tier-bullets { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-.tier-bullets li { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; color: var(--text-secondary); }
-.tier-bullets li::before {
-  content: '✓'; flex: none; width: 20px; height: 20px; border-radius: 999px;
-  color: var(--gold-readable); background: var(--gold-glow);
-  display: inline-flex; align-items: center; justify-content: center; font-size: 12px; margin-top: 2px; font-weight: 800;
-}
-.tier .btn { width: 100%; }
-.pricing-vat { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 16px; }
-.pricing-trust {
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 20px;
-  margin-top: 16px; font-size: 13px; color: var(--text-muted);
-}
-.pricing-trust span::before { content: '·'; margin-inline-end: 10px; color: var(--gold); }
-.pricing-trust span:first-child::before { content: none; }
-
-/* faq */
-.faq-list { display: grid; gap: 10px; max-width: 820px; margin-inline: auto; }
-.faq-item {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);
-  overflow: hidden;
-}
-.faq-item[open] { border-color: var(--gold-border); }
-.faq-item summary {
-  cursor: pointer; padding: 20px 22px;
-  font-weight: 700; font-size: 17px;
-  list-style: none;
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
-}
-.faq-item summary::-webkit-details-marker { display: none; }
-.faq-item summary::after { content: '+'; font-size: 22px; color: var(--gold); flex: none; }
-.faq-item[open] summary::after { content: '−'; }
-.faq-body { padding: 0 22px 22px; color: var(--text-secondary); font-size: 15px; line-height: 1.7; }
-
-/* final cta */
-.final-cta {
-  background: linear-gradient(135deg, #1e1a14 0%, #0d0f14 100%);
-  color: #f0ece4; text-align: center;
-  border-radius: var(--radius-xl); padding: 56px 24px;
-  margin: 24px 20px; box-shadow: var(--shadow-lg);
-  position: relative; overflow: hidden;
-}
-.final-cta::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(600px 300px at 80% 0%, rgba(180,139,76,0.22), transparent 60%),
-              radial-gradient(500px 280px at 20% 100%, rgba(180,139,76,0.16), transparent 60%);
-}
-.final-cta > * { position: relative; }
-.final-cta h2 { color: #f0ece4; font-size: 30px; margin: 0 0 12px; font-weight: 800; line-height: 1.2; }
-.final-cta p { color: #c4b597; margin: 0 0 28px; font-size: 17px; line-height: 1.55; }
-.final-cta .btn-primary { min-width: 260px; }
-@media (min-width: 768px) {
-  .final-cta { padding: 80px 40px; margin: 40px 32px; }
-  .final-cta h2 { font-size: 40px; }
-}
-
-/* footer */
-.footer { background: var(--bg-primary); border-top: 1px solid var(--border); padding-block: 48px 32px; }
-.footer-grid { display: grid; gap: 32px; grid-template-columns: 1fr; }
-@media (min-width: 768px) { .footer-grid { grid-template-columns: 1.4fr 1fr 1fr; gap: 48px; } }
-.footer-brand .logo { font-size: 24px; margin-bottom: 12px; }
-.footer-tagline { color: var(--text-muted); font-size: 14px; max-width: 320px; }
-.footer-col-title { font-weight: 700; font-size: 14px; margin: 0 0 14px; }
-.footer-col ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-.footer-col a { color: var(--text-secondary); font-size: 14px; }
-.footer-col a:hover { color: var(--gold-readable); }
-.footer-bottom {
-  border-top: 1px solid var(--border); margin-top: 32px; padding-top: 20px;
-  display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between;
-  font-size: 13px; color: var(--text-muted);
-}
-
-/* sticky mobile CTA */
-.sticky-cta {
-  position: fixed; inset-inline: 12px; bottom: 12px; z-index: 40; display: flex;
-  transform: translateY(120%); transition: transform 220ms ease;
-}
-.sticky-cta.is-visible { transform: translateY(0); }
-.sticky-cta .btn { width: 100%; box-shadow: 0 10px 30px rgba(30,26,20,0.35); }
-@media (min-width: 768px) { .sticky-cta { display: none; } }
-
-/* ── CRO additions ───────────────────────────────────────────── */
-/* Phase 1: hero CTA system */
-.btn-xl { padding: 18px 36px; font-size: 18px; min-height: 58px; }
-.btn-text {
-  display: inline-flex; align-items: center; padding: 10px 4px; min-height: 44px;
-  color: var(--text-secondary); font-size: 15px; font-weight: 600;
-}
-.btn-text:hover { color: var(--text-primary); }
-.hero-reassure {
-  margin: 18px 0 0; font-size: 13px; color: var(--text-muted); line-height: 1.7;
-  max-width: 560px;
-}
-
-/* Phase 2: beta / availability chip (replaces fake App-Store badges) */
-.beta-strip {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-  margin-top: 24px; max-width: 560px;
-}
-.beta-pill {
-  display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px;
-  background: var(--bg-card); border: 1px solid var(--gold-border); border-radius: 999px;
-  color: var(--gold-readable); font-size: 12.5px; font-weight: 700;
-}
-.beta-pill::before {
-  content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); flex: none;
-}
-.beta-note { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin: 0; }
-
-/* Phase 3: proof bar (safe placeholders, no fabricated claims) */
-.proof {
-  background: var(--bg-card); border-block: 1px solid var(--border);
-  padding-block: 28px;
-}
-.proof-inner {
-  display: grid; gap: 18px 44px; align-items: center; grid-template-columns: 1fr;
-}
-@media (min-width: 768px) { .proof-inner { grid-template-columns: auto 1fr; } }
-.proof-label {
-  font-size: 12px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.04em;
-  text-transform: none;
-}
-.proof-items {
-  display: grid; gap: 10px 20px; grid-template-columns: 1fr 1fr;
-  font-size: 14px; color: var(--text-secondary);
-}
-@media (min-width: 768px) { .proof-items { grid-template-columns: repeat(4, 1fr); } }
-.proof-item {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 10px 14px; border: 1px dashed var(--border-light); border-radius: 12px;
-}
-.proof-item::before {
-  content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex: none;
-}
-.proof-item strong { color: var(--text-primary); font-weight: 800; }
-
-/* Phase 3: why-switch comparison */
-.switch-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
-@media (min-width: 900px) { .switch-grid { grid-template-columns: 1fr 1fr; gap: 24px; } }
-.switch-card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 28px 24px;
-}
-.switch-card.is-before { background: var(--bg-secondary); border-style: dashed; }
-.switch-card.is-after { border-color: var(--gold); box-shadow: 0 10px 40px rgba(180,139,76,0.10); }
-.switch-tag {
-  display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 0.06em;
-  padding: 4px 10px; border-radius: 999px; margin-bottom: 14px;
-}
-.switch-card.is-before .switch-tag { background: rgba(30,26,20,0.08); color: var(--text-muted); }
-.switch-card.is-after .switch-tag { background: var(--gold-glow); color: var(--gold-readable); }
-.switch-card h3 { margin: 0 0 14px; font-size: 22px; font-weight: 800; }
-.switch-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-.switch-list li {
-  display: flex; gap: 10px; align-items: flex-start;
-  font-size: 15px; color: var(--text-secondary); line-height: 1.55;
-}
-.switch-list li::before { content: '—'; color: var(--text-muted); font-weight: 700; flex: none; }
-.switch-card.is-after .switch-list li::before {
-  content: '✓'; color: var(--gold-readable); background: var(--gold-glow);
-  width: 20px; height: 20px; border-radius: 999px;
-  display: inline-flex; align-items: center; justify-content: center; font-size: 12px; margin-top: 2px;
-}
-
-/* Light-graphic band: "5 scattered tools → 1 Estia" converger.
-   Playful CSS composition — reinforces the portfolio / one-place
-   message without a lot of extra copy. Works on mobile (wraps into
-   a centered vertical stack) and desktop (horizontal flow). */
-.converger {
-  display: grid; gap: 20px;
+.hero-grid {
+  display: grid;
+  gap: 40px;
   grid-template-columns: 1fr;
   align-items: center;
-  padding: 32px 24px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 6px 24px rgba(30,26,20,0.04);
-  overflow: hidden;
   position: relative;
 }
-@media (min-width: 900px) {
-  .converger { grid-template-columns: 1.3fr auto 1fr; padding: 40px 44px; gap: 28px; }
+@media (min-width: 1024px) {
+  .hero-grid { grid-template-columns: 1.05fr 0.95fr; gap: 48px; }
 }
-.conv-scatter {
-  display: flex; flex-wrap: wrap; gap: 10px;
-  justify-content: center; align-items: center;
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--gold-soft);
+  border: 1px solid rgba(180,139,76,0.22);
+  border-radius: 99px;
+  font-size: 13px;
+  color: var(--gold-readable);
+  font-weight: 600;
+  margin-bottom: 20px;
 }
-@media (min-width: 900px) { .conv-scatter { justify-content: flex-start; } }
-.conv-chip {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 8px 14px; border-radius: 999px;
-  background: var(--bg-secondary); border: 1px solid var(--border);
-  font-size: 13px; font-weight: 700; color: var(--text-secondary);
-  box-shadow: 0 2px 6px rgba(30,26,20,0.04);
-  transform: rotate(var(--rot, 0deg));
-  transition: transform 0.4s ease;
+.hero-sub {
+  font-size: clamp(16px, 1.4vw, 19px);
+  color: var(--muted);
+  max-width: 560px;
+  margin: 0 0 28px;
 }
-.conv-chip:hover { transform: rotate(0) scale(1.04); }
-.conv-chip .dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--c, var(--gold)); flex: none;
+.hero-cta-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
 }
-.conv-arrow {
-  display: flex; align-items: center; justify-content: center;
-  font-size: 26px; color: var(--gold);
-  transform: rotate(90deg);
+.hero-trust {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
 }
-@media (min-width: 900px) {
-  .conv-arrow { transform: none; font-size: 36px; }
+.hero-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
 }
-.conv-target {
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 18px 20px;
-  background: linear-gradient(135deg, #1e1a14 0%, #0d0f14 100%);
-  color: #f7f3ec; border-radius: 16px;
-  border: 1px solid rgba(180,139,76,0.3);
-  box-shadow: 0 10px 32px rgba(30,26,20,0.22);
-  position: relative; overflow: hidden;
-}
-.conv-target::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(200px 120px at 80% 10%, rgba(180,139,76,0.28), transparent 60%);
-}
-.conv-target-head {
-  display: inline-flex; align-items: center; gap: 10px;
-  font-weight: 800; letter-spacing: 0.02em;
-}
-.conv-target-logo {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
-  color: #1e1a14; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: 800;
-}
-.conv-target-h { font-size: 16px; color: #f7f3ec; }
-.conv-target p {
-  margin: 0; font-size: 13px; line-height: 1.5;
-  color: rgba(247,243,236,0.78); position: relative;
-}
-.conv-target strong { color: var(--gold-light); font-weight: 800; }
-
-/* Phase 4: outcome-based feature clusters */
-.outcome-list { display: grid; gap: 24px; }
-.outcome {
-  display: grid; gap: 24px; align-items: center; grid-template-columns: 1fr;
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-xl); padding: 32px 24px;
-}
-@media (min-width: 900px) {
-  .outcome { grid-template-columns: 1.2fr 1fr; padding: 40px; gap: 48px; }
-  .outcome.reverse { grid-template-columns: 1fr 1.2fr; }
-}
-.outcome-eyebrow { font-size: 13px; font-weight: 700; color: var(--gold-readable); letter-spacing: 0.04em; }
-.outcome h3 { font-size: 24px; font-weight: 800; margin: 6px 0 10px; line-height: 1.25; }
-@media (min-width: 768px) { .outcome h3 { font-size: 30px; } }
-.outcome p { font-size: 16px; color: var(--text-secondary); margin: 0 0 18px; line-height: 1.65; }
-.outcome-bullets { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-.outcome-bullets li { display: flex; gap: 10px; font-size: 15px; color: var(--text-secondary); line-height: 1.55; }
-.outcome-bullets li::before {
-  content: '✓'; color: var(--gold-readable); background: var(--gold-glow);
-  width: 22px; height: 22px; border-radius: 999px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;
-  margin-top: 2px;
-}
-.outcome-visual {
-  position: relative; aspect-ratio: 4/3;
-  border: 1px solid var(--border); border-radius: var(--radius-lg);
-  background:
-    radial-gradient(600px 300px at 70% 30%, var(--gold-glow), transparent 60%),
-    var(--bg-secondary);
-  overflow: hidden;
-  padding: 22px;
-  direction: rtl;
+.hero-trust-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  background: rgba(21,128,61,0.15);
+  color: #15803d;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 900;
 }
 
-/* Outcome visual 1 — Lead rows */
-.ov-leads { display: flex; flex-direction: column; gap: 10px; justify-content: center; height: 100%; }
-.ov-lead {
+/* Hero visual — desktop browser window, tilted 1.5°. */
+.hero-visual {
+  position: relative;
+  min-height: 420px;
+}
+.browser-frame {
+  position: relative;
+  transform: rotate(-1.5deg);
+  background: #fff;
+  border-radius: 20px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 30px 80px rgba(30,26,20,0.18), 0 10px 30px rgba(30,26,20,0.08);
+}
+.browser-chrome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 6px;
+  padding-block: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.browser-dot { width: 10px; height: 10px; border-radius: 99px; }
+.browser-dot.r { background: #e8806f; }
+.browser-dot.y { background: #ebc25d; }
+.browser-dot.g { background: #72bf6b; }
+.browser-url {
+  margin-inline-start: auto;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--cream-1);
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+.ld-grid {
+  display: grid;
+  gap: 10px;
+}
+.ld-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ld-kpi {
+  background: var(--cream-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.ld-kpi-label { font-size: 11px; color: var(--muted); }
+.ld-kpi-value { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+.ld-kpi.is-gold { background: var(--gold-soft); border-color: rgba(180,139,76,0.25); }
+.ld-kpi.is-gold .ld-kpi-value { color: var(--gold-readable); }
+.ld-kpi-delta {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: rgba(21,128,61,0.12);
+  color: #15803d;
+}
+.ld-ai {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(201,169,110,0.22), rgba(180,139,76,0.08));
+  border: 1px solid rgba(201,169,110,0.32);
+  font-size: 12.5px;
+}
+.ld-ai-icon {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  color: var(--ink);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800;
+  flex: none;
+}
+.ld-section-title { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+.ld-leads { display: grid; gap: 6px; }
+.ld-lead {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  background: var(--cream-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+.ld-avatar {
+  width: 26px; height: 26px; border-radius: 99px;
+  color: #fff; font-weight: 800; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.ld-lead-meta { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.ld-lead-name { font-weight: 700; font-size: 12.5px; }
+.ld-lead-sub { color: var(--muted); font-size: 11px; }
+.ld-pill { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 99px; letter-spacing: 0.05em; }
+.ld-pill.hot  { background: rgba(185,28,28,0.12); color: #b91c1c; }
+.ld-pill.warm { background: rgba(180,83,9,0.12); color: #b45309; }
+.ld-pill.cold { background: rgba(37,99,235,0.12); color: #2563eb; }
+
+/* ── features ──────────────────────────────────────────────── */
+.features { background: var(--cream-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.features-head { max-width: 720px; margin-bottom: 48px; }
+.feature-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) { .feature-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .feature-grid { grid-template-columns: repeat(3, 1fr); } }
+.feature-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+.feature-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(30,26,20,0.06); border-color: rgba(180,139,76,0.35); }
+.feature-card.is-featured {
+  background: linear-gradient(160deg, var(--cream-4) 0%, var(--cream-3) 100%);
+  border-color: var(--gold);
+  box-shadow: 0 20px 50px rgba(180,139,76,0.18);
+}
+.feature-ribbon {
+  position: absolute;
+  top: 18px;
+  inset-inline-start: 18px;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  color: var(--ink);
+  font-size: 11px; font-weight: 800; letter-spacing: 0.05em;
+  box-shadow: 0 4px 10px rgba(180,139,76,0.35);
+}
+.feature-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  margin-bottom: 18px;
+}
+.feature-title { font-size: 21px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 8px; }
+.feature-body { font-size: 14.5px; color: var(--muted); margin: 0; }
+.more-features { margin-top: 48px; }
+.more-features p { font-weight: 700; font-size: 15px; margin: 0 0 12px; }
+.more-features ul {
+  list-style: none; padding: 0; margin: 0;
+  display: grid; gap: 10px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) { .more-features ul { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .more-features ul { grid-template-columns: repeat(4, 1fr); } }
+.more-features li {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 14px; color: var(--muted);
+}
+.more-features li::before {
+  content: '✓';
+  color: var(--gold);
+  font-weight: 900;
+  flex: none;
+}
+
+/* ── AI spotlight ──────────────────────────────────────────── */
+.ai-section { background: var(--cream-1); }
+.ai-ribbon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  color: var(--ink);
+  font-size: 13px; font-weight: 800; letter-spacing: 0.05em;
+  box-shadow: 0 10px 26px rgba(180,139,76,0.35);
+  margin-bottom: 20px;
+}
+.ai-grid {
+  display: grid;
+  gap: 48px;
+  grid-template-columns: 1fr;
+  align-items: center;
+}
+@media (min-width: 900px) { .ai-grid { grid-template-columns: 1fr 1fr; gap: 64px; } }
+.ai-eyebrow { display: inline-flex; align-items: center; gap: 6px; }
+.ai-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px dashed var(--gold);
+  color: var(--gold-readable);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 22px;
+}
+.ai-actions { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.ai-action {
   display: flex; align-items: center; gap: 12px;
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
-  padding: 10px 12px; box-shadow: 0 1px 2px rgba(30,26,20,0.04);
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  transition: transform 160ms ease, border-color 160ms ease;
 }
-.ov-lead .avatar {
-  width: 34px; height: 34px; border-radius: 50%; flex: none;
+.ai-action:hover { border-color: rgba(180,139,76,0.35); transform: translateY(-1px); }
+.ai-action-icon {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  background: rgba(180,139,76,0.12);
+  color: var(--gold);
   display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; font-weight: 800; font-size: 14px;
+  font-weight: 800;
+  flex: none;
 }
-.ov-lead .meta { flex: 1; min-width: 0; }
-.ov-lead .meta b { display: block; font-size: 13px; color: var(--text-primary); font-weight: 700; }
-.ov-lead .meta span { display: block; font-size: 11px; color: var(--text-muted); }
-.ov-lead .pill {
-  font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 10px; flex: none;
+.ai-action-label { font-weight: 600; font-size: 15px; }
+.ai-action-hint { margin-inline-start: auto; font-size: 12px; color: var(--muted); }
+.ai-action-pro {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.05em;
+  padding: 3px 8px; border-radius: 99px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  color: var(--ink);
 }
-.ov-lead .pill.hot  { background: #fee2e2; color: #b91c1c; }
-.ov-lead .pill.warm { background: #fef3c7; color: #92400e; }
-.ov-lead .pill.meet { background: rgba(180,139,76,0.18); color: #7a5c2c; }
 
-/* Outcome visual 2 — Property card */
-.ov-prop {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
-  overflow: hidden; box-shadow: 0 4px 14px rgba(30,26,20,0.06);
-  max-width: 340px; margin: 0 auto;
+.ai-playground {
+  position: relative;
+  background: var(--cream-4);
+  border: 2px solid var(--gold);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 30px 80px rgba(30,26,20,0.10), 0 0 0 6px rgba(180,139,76,0.08);
+  min-height: 420px;
+  display: flex; flex-direction: column; gap: 12px;
 }
-.ov-prop-photo {
-  height: 110px; position: relative;
-  background: linear-gradient(145deg, #d3b27a 0%, #8a6932 55%, #2a261f 100%);
+.ai-pg-ribbon {
+  position: absolute; top: -14px; inset-inline-end: 24px;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  color: var(--ink);
+  font-size: 12px; font-weight: 800; letter-spacing: 0.05em;
+  box-shadow: 0 6px 16px rgba(180,139,76,0.4);
+}
+.ai-pg-head {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--gold-readable);
+  font-size: 13px; font-weight: 700;
+}
+.ai-pg-ver {
+  margin-inline-start: auto;
+  color: var(--muted); font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.ai-pg-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.ai-pg-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.ai-pg-fields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.ai-pg-field {
+  background: var(--cream-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.ai-pg-field-k { font-size: 10px; color: var(--muted); }
+.ai-pg-field-v { font-size: 13px; font-weight: 600; }
+.ai-pg-output {
+  flex: 1;
+  background: #fff;
+  border: 1px solid var(--gold);
+  border-radius: 14px;
+  padding: 14px;
+  min-height: 140px;
+}
+.ai-pg-output-head {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--gold-readable);
+  font-size: 11px; font-weight: 600;
+  margin-bottom: 8px;
+}
+.ai-pg-status { margin-inline-start: auto; color: var(--muted); font-size: 10px; font-weight: 600; }
+.ai-pg-status.is-running { color: var(--gold-readable); }
+.ai-pg-body { font-size: 14px; line-height: 1.7; color: var(--ink); }
+.ai-pg-idle { color: var(--muted); }
+.ai-pg-caret {
+  display: inline-block;
+  color: var(--gold);
+  animation: ai-blink 900ms steps(2, end) infinite;
+}
+@keyframes ai-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ai-pg-caret { animation: none; } }
+.ai-pg-cta {
+  width: 100%;
+  margin-top: auto;
+}
+
+/* ── mobile section ────────────────────────────────────────── */
+.mobile-band {
+  background: var(--cream-3);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.mobile-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+  align-items: center;
+}
+@media (min-width: 900px) { .mobile-grid { grid-template-columns: 1fr 1fr; gap: 48px; } }
+.mobile-phones {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  position: relative;
+}
+.mobile-phones-fade {
+  position: absolute; inset: -30px -10px -30px -10px;
+  pointer-events: none;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(180,139,76,0.15), transparent 70%);
+  filter: blur(10px);
+}
+.phone {
+  width: 220px;
+  aspect-ratio: 220 / 450;
+  background: #1e1a14;
+  border-radius: 36px;
+  padding: 10px;
+  box-shadow: 0 24px 60px rgba(30,26,20,0.22);
+  position: relative;
+  z-index: 1;
+}
+.phone.tilt-left  { transform: rotate(-4deg) translateY(20px); }
+.phone.tilt-right { transform: rotate(3deg)  translateY(-20px); }
+.phone-screen {
+  background: var(--cream-1);
+  border-radius: 28px;
+  height: 100%;
+  padding: 18px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   overflow: hidden;
 }
-.ov-prop-photo::before, .ov-prop-photo::after {
-  content: ''; position: absolute; bottom: 0; background: rgba(30,26,20,0.32);
+.phone-greet { font-weight: 800; font-size: 15px; }
+.phone-greet small { display: block; color: var(--muted); font-weight: 500; font-size: 11px; margin-top: 2px; }
+.phone-ai {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(201,169,110,0.22), rgba(180,139,76,0.1));
+  border: 1px solid rgba(201,169,110,0.32);
+  font-size: 11px; font-weight: 600; color: var(--gold-readable);
 }
-.ov-prop-photo::before { inset-inline-start: 18%; width: 22%; height: 62%; }
-.ov-prop-photo::after  { inset-inline-start: 46%; width: 28%; height: 78%; }
-.ov-prop-badge {
-  position: absolute; top: 10px; inset-inline-end: 10px;
-  background: rgba(30,26,20,0.85); color: #d3b27a;
-  font-size: 10px; font-weight: 800; padding: 4px 9px; border-radius: 10px;
+.phone-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  font-size: 11px;
 }
-.ov-prop-body { padding: 12px 14px 14px; display: grid; gap: 8px; }
-.ov-prop-body h4 { margin: 0; font-size: 15px; font-weight: 800; color: var(--text-primary); }
-.ov-prop-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.ov-prop-row small { font-size: 11px; color: var(--text-muted); }
-.ov-prop-row strong { font-size: 15px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.ov-prop-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.ov-prop-chip { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 9px; background: rgba(30,26,20,0.06); color: var(--text-primary); }
-.ov-prop-chip.is-gold { background: var(--gold-glow); color: var(--gold-readable); border: 1px solid var(--gold-border); }
-
-/* Outcome visual 3 — mini phone */
-.ov-phone {
-  display: flex; align-items: center; justify-content: center; height: 100%;
-}
-.ov-phone-frame {
-  position: relative; width: 160px; aspect-ratio: 9/19;
-  background: linear-gradient(155deg, #2a261f 0%, #0d0f14 100%);
-  border-radius: 26px; padding: 6px;
-  filter: drop-shadow(0 16px 36px rgba(30,26,20,0.28));
-}
-.ov-phone-screen {
-  width: 100%; height: 100%; background: var(--bg-primary);
-  border-radius: 22px; padding: 14px 10px; display: flex; flex-direction: column; gap: 8px;
-}
-.ov-phone-greet { font-size: 11px; font-weight: 800; color: var(--text-primary); }
-.ov-phone-greet small { display: block; font-size: 9px; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
-.ov-phone-ai {
-  display: flex; align-items: center; gap: 6px;
-  background: linear-gradient(90deg, #fdf3de, #f8e1b8);
-  border: 1px solid #d6b787; border-radius: 8px;
-  padding: 6px 8px;
-}
-.ov-phone-ai .dot { width: 16px; height: 16px; border-radius: 50%; background: linear-gradient(135deg, #d3b27a, #8a6932); color: #1e1a14; font-size: 10px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.ov-phone-ai span { font-size: 10px; font-weight: 700; color: #3b2e13; line-height: 1.2; }
-.ov-phone-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-.ov-phone-kpi {
-  background: #fff; border: 1px solid var(--border); border-radius: 8px;
-  padding: 5px 6px; text-align: start;
-}
-.ov-phone-kpi small { display: block; font-size: 8px; color: var(--text-muted); }
-.ov-phone-kpi b { display: block; font-size: 12px; color: var(--text-primary); font-weight: 800; }
-.ov-phone-action {
-  margin-top: auto; padding: 8px; background: #1a7f47; color: #fff;
-  text-align: center; border-radius: 8px;
-  font-size: 10px; font-weight: 800;
-}
-
-/* Outcome visual 4 — AI chat-like */
-.ov-ai { display: flex; flex-direction: column; gap: 10px; justify-content: center; height: 100%; }
-.ov-ai-row {
-  display: flex; gap: 10px; align-items: flex-start;
-}
-.ov-ai-row.is-assistant { flex-direction: row; }
-.ov-ai-row.is-user { flex-direction: row-reverse; }
-.ov-ai-avatar {
-  width: 32px; height: 32px; border-radius: 50%; flex: none;
+.phone-avatar {
+  width: 22px; height: 22px; border-radius: 99px;
   display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 14px;
+  color: #fff; font-weight: 800; font-size: 10px;
+  flex: none;
 }
-.ov-ai-row.is-assistant .ov-ai-avatar { background: linear-gradient(135deg, var(--gold), var(--gold-dim)); color: #1e1a14; }
-.ov-ai-row.is-user .ov-ai-avatar { background: #1e1a14; color: var(--gold-light); }
-.ov-ai-bubble {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 9px 12px;
-  font-size: 12px; line-height: 1.5; color: var(--text-primary);
-  max-width: 78%;
-  box-shadow: 0 1px 2px rgba(30,26,20,0.04);
+.phone-meta { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.phone-name { font-weight: 700; font-size: 11px; }
+.phone-sub { color: var(--muted); font-size: 9.5px; }
+.phone-pill {
+  font-size: 9px; font-weight: 800;
+  padding: 3px 6px; border-radius: 99px; letter-spacing: 0.05em;
 }
-.ov-ai-row.is-assistant .ov-ai-bubble { border-start-start-radius: 4px; }
-.ov-ai-row.is-user .ov-ai-bubble { border-start-end-radius: 4px; background: #1e1a14; color: #f7f3ec; border-color: #1e1a14; }
-.ov-ai-bubble strong { color: var(--gold-readable); }
-.ov-ai-row.is-user .ov-ai-bubble strong { color: var(--gold-light); }
+.phone-pill.hot  { background: rgba(185,28,28,0.14); color: #b91c1c; }
+.phone-pill.warm { background: rgba(180,83,9,0.14); color: #b45309; }
+
+.mobile-bullets { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
+.mobile-bullets li {
+  display: flex; gap: 12px; align-items: flex-start;
+  font-size: 15.5px;
+}
+.mobile-bullets .dot {
+  width: 22px; height: 22px; border-radius: 99px;
+  background: var(--gold-soft);
+  color: var(--gold-readable);
+  display: inline-grid; place-items: center;
+  flex: none; margin-top: 2px;
+  font-weight: 900;
+  font-size: 11px;
+}
+.store-badges { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+.store-badge {
+  background: #fff;
+  color: var(--ink);
+  padding: 10px 16px;
+  border-radius: 10px;
+  display: inline-flex; align-items: center; gap: 10px;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 2px 6px rgba(30,26,20,0.06);
+}
+.store-badge small { display: block; font-size: 9px; opacity: 0.6; }
+.store-badge b { font-size: 14px; font-weight: 700; }
+.store-note { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+/* ── how it works ──────────────────────────────────────────── */
+.how-head { text-align: center; max-width: 640px; margin: 0 auto 56px; }
+.how-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 900px) { .how-grid { grid-template-columns: repeat(3, 1fr); } }
+.how-step {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+}
+.how-num {
+  font-size: 56px;
+  font-weight: 900;
+  line-height: 1;
+  color: rgba(180,139,76,0.25);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-bottom: 16px;
+  letter-spacing: -2px;
+}
+.how-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 8px; }
+.how-body { font-size: 14.5px; color: var(--muted); margin: 0; }
+
+/* ── pricing ───────────────────────────────────────────────── */
+.pricing { background: var(--cream-2); }
+.pricing-head { text-align: center; margin-bottom: 36px; }
+.cycle-toggle {
+  display: inline-flex;
+  background: #fff;
+  border-radius: 99px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  gap: 2px;
+}
+.cycle-toggle button {
+  padding: 10px 20px;
+  border-radius: 99px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 200ms ease, color 200ms ease;
+}
+.cycle-toggle button.is-active {
+  background: var(--gold);
+  color: #fff;
+}
+.price-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+@media (min-width: 800px) { .price-grid { grid-template-columns: repeat(2, 1fr); } }
+.price-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 32px;
+}
+.price-card.is-featured {
+  background: linear-gradient(160deg, var(--cream-4) 0%, var(--cream-3) 100%);
+  border: 2px solid var(--gold);
+  box-shadow: 0 30px 80px rgba(180,139,76,0.22);
+  transform: none;
+}
+@media (min-width: 800px) { .price-card.is-featured { transform: scale(1.03); } }
+.price-badge {
+  position: absolute;
+  top: -14px;
+  inset-inline-end: 24px;
+  padding: 5px 14px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  color: var(--ink);
+  font-size: 12px; font-weight: 700;
+  box-shadow: 0 4px 12px rgba(180,139,76,0.3);
+}
+.price-name { font-size: 20px; font-weight: 700; margin: 0 0 2px; }
+.price-lead { font-size: 13px; color: var(--muted); margin: 0 0 20px; }
+.price-amount {
+  display: flex; align-items: baseline; gap: 6px;
+  margin-bottom: 6px;
+}
+.price-num {
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: -2px;
+  color: var(--ink);
+}
+.price-card.is-featured .price-num { color: var(--gold-readable); }
+.price-period { font-size: 14px; color: var(--muted); }
+.price-note { font-size: 12px; color: var(--muted); margin: 0 0 22px; }
+.price-bullets {
+  list-style: none;
+  padding: 18px 0 0;
+  margin: 0;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 10px;
+}
+.price-bullets li {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 14px;
+}
+.price-bullets li::before {
+  content: '✓';
+  color: var(--gold);
+  font-weight: 900;
+  flex: none;
+}
+.price-cta { width: 100%; }
+.price-trust {
+  display: flex; justify-content: center; gap: 22px;
+  margin-top: 26px; flex-wrap: wrap;
+}
+.price-trust span { font-size: 13px; color: var(--muted); }
+.price-trust span::before { content: '✓'; color: var(--gold); margin-inline-end: 6px; font-weight: 900; }
+
+/* ── FAQ ───────────────────────────────────────────────────── */
+.faq-head { text-align: center; margin-bottom: 36px; }
+.faq-list { max-width: 880px; margin: 0 auto; }
+.faq-item {
+  border-bottom: 1px solid var(--border);
+  padding: 20px 4px;
+  cursor: pointer;
+}
+.faq-q {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.faq-chev {
+  color: var(--gold);
+  transition: transform 200ms ease;
+  font-size: 18px;
+  line-height: 1;
+}
+.faq-item.is-open .faq-chev { transform: rotate(180deg); }
+.faq-a {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 280ms ease;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.faq-item.is-open .faq-a { max-height: 400px; margin-top: 12px; }
+
+/* ── final CTA ─────────────────────────────────────────────── */
+.final-cta-wrap { padding: 72px 0; }
+.final-cta {
+  background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 60%, var(--gold-readable) 100%);
+  border-radius: var(--radius-xl);
+  padding: 56px 32px;
+  color: var(--ink);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 40px 100px -20px rgba(180,139,76,0.45);
+}
+@media (min-width: 900px) { .final-cta { padding: 72px 48px; } }
+.final-cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.6;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255,248,229,0.6), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(122,92,44,0.2), transparent 40%);
+}
+.final-cta > * { position: relative; }
+.final-cta h2 {
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 900;
+  letter-spacing: -1.8px;
+  margin: 0 0 14px;
+  line-height: 1.05;
+}
+.final-cta p {
+  font-size: 18px;
+  color: rgba(30,26,20,0.75);
+  margin: 0 0 28px;
+}
+.final-cta .btn {
+  background: var(--cream-1);
+  color: var(--ink);
+  padding: 16px 28px;
+  font-size: 16px;
+  box-shadow: 0 10px 30px rgba(30,26,20,0.18);
+}
+.final-cta .btn:hover { background: #fff; }
+
+/* ── footer ────────────────────────────────────────────────── */
+.footer {
+  background: var(--cream-2);
+  border-top: 1px solid var(--border);
+  padding: 48px 0 32px;
+}
+.footer-grid {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) { .footer-grid { grid-template-columns: 1.5fr 1fr 1fr; gap: 48px; } }
+.footer-brand .logo { font-size: 22px; margin-bottom: 10px; }
+.footer-tagline { font-size: 14px; color: var(--muted); max-width: 320px; }
+.footer-col-title { font-weight: 700; font-size: 14px; margin: 0 0 14px; }
+.footer-col ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.footer-col a { color: var(--muted); font-size: 14px; }
+.footer-col a:hover { color: var(--ink); }
+.footer-bottom {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  font-size: 13px; color: var(--muted);
+}
+
+/* ── sticky mobile CTA ─────────────────────────────────────── */
+.sticky-cta {
+  position: fixed;
+  inset-inline: 12px;
+  bottom: 12px;
+  z-index: 40;
+  display: flex;
+  transform: translateY(130%);
+  transition: transform 220ms ease;
+}
+.sticky-cta.is-visible { transform: translateY(0); }
+.sticky-cta .btn { width: 100%; box-shadow: 0 10px 30px rgba(180,139,76,0.38); }
+@media (min-width: 768px) { .sticky-cta { display: none; } }
+
+/* ── fade-in ───────────────────────────────────────────────── */
+.fade-in { opacity: 0; transform: translateY(10px); transition: opacity 420ms ease, transform 420ms ease; }
+.fade-in.is-visible { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .fade-in { opacity: 1; transform: none; transition: none; } }
 </style>
 </head>
+
 <body>
 
 <nav class="nav" aria-label="ראשי">
   <div class="container nav-inner">
-    <a class="logo" href="/"><span class="logo-mark" aria-hidden="true">◆</span> Estia</a>
+    <a class="logo" href="/">
+      <span class="logo-mark" aria-hidden="true">◆</span>
+      <span>Estia</span>
+    </a>
     <div class="nav-links" role="list">
-      <a href="#why">למה Estia</a>
-      <a href="#features">מה יש במערכת</a>
+      <a href="#features">תכונות</a>
+      <a href="#ai">Estia AI</a>
       <a href="#pricing">מחירים</a>
       <a href="#faq">שאלות נפוצות</a>
     </div>
     <div class="nav-actions">
-      <a class="btn btn-ghost" href="/login?utm_source=landing&amp;utm_medium=nav_login">התחבר</a>
-      <a class="btn btn-primary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=nav_cta">התחל חינם</a>
+      <a class="btn btn-ghost" href="/login?utm_source=landing&amp;utm_medium=nav_login">התחברות</a>
+      <a class="btn btn-primary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=nav_cta">התחלה חינם</a>
     </div>
   </div>
 </nav>
 
 <main>
 
+<!-- HERO ──────────────────────────────────────────────────── -->
 <header class="hero">
   <div class="container hero-grid">
     <div>
-      <span class="hero-eyebrow">CRM + ניהול תיק נכסים · נבנה לסוכני נדל״ן בישראל</span>
+      <span class="hero-eyebrow">
+        <span aria-hidden="true">✦</span>
+        ה-CRM לסוכני הנדל״ן בישראל
+      </span>
       <h1 class="h1">
-        <span>ליד אחד שפספסת</span>
-        <span class="h1-accent">עולה יותר מ-Estia לשנה.</span>
+        ה-CRM של סוכני הנדל״ן.<br>
+        <span class="h1-accent">כולו בנייד שלך.</span>
       </h1>
-      <p class="hero-sub">כל תיק הנכסים, הלקוחות והפגישות שלך במקום אחד. סוף לבלאגן בין WhatsApp, אקסל ויומן — ותיק נכס שלם עובר ללקוח או לסוכן אחר בלחיצת כפתור.</p>
+      <p class="hero-sub">
+        ניהול לקוחות, נכסים, פגישות ולידים — מהמקום שבו אתם באמת עובדים.
+        עם AI שמבין נדל״ן, ו-30 יום חינם בלי כרטיס אשראי.
+      </p>
       <div class="hero-cta-row">
-        <a class="btn btn-primary btn-xl" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=hero_cta">התחל חינם ל-30 יום</a>
-        <a class="btn-text" href="/login?utm_source=landing&amp;utm_medium=hero_login">כבר יש לי חשבון ←</a>
+        <a class="btn btn-primary btn-large" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=hero_cta">
+          התחלה חינם ל-30 יום
+          <span aria-hidden="true">←</span>
+        </a>
+        <a class="btn btn-secondary btn-large" href="/login?utm_source=landing&amp;utm_medium=hero_secondary">
+          כבר יש לי חשבון
+        </a>
       </div>
-      <p class="hero-reassure">בלי כרטיס אשראי · ביטול בכל רגע · עברית מלאה · ייבוא מ-Excel</p>
-      <div class="beta-strip">
-        <span class="beta-pill">אפליקציית iPhone ו-Android · בטא</span>
-        <p class="beta-note">המערכת מלאה ועובדת בדפדפן. האפליקציות הנטיביות בגישה מוקדמת למשתמשים רשומים.</p>
+      <div class="hero-trust" aria-label="נקודות אמון">
+        <span class="hero-trust-item"><span class="hero-trust-dot">✓</span>בלי כרטיס אשראי</span>
+        <span class="hero-trust-item"><span class="hero-trust-dot">✓</span>ביטול בכל רגע</span>
+        <span class="hero-trust-item"><span class="hero-trust-dot">✓</span>תמיכה בעברית</span>
       </div>
     </div>
+
     <div class="hero-visual">
-      <div class="device" role="img" aria-label="מסך הבית של אפליקציית Estia: לידים חמים, KPIs, יומן פגישות">
-        <div class="device-island" aria-hidden="true"></div>
-        <div class="device-screen">
-          <div class="device-status">
-            <span>9:41</span>
-            <span class="status-icons"><span></span><span></span><span></span><span class="bat"></span></span>
+      <div class="browser-frame" role="img" aria-label="מסך הבית של Estia: לידים חמים, KPIs ופגישות היום">
+        <div class="browser-chrome" aria-hidden="true">
+          <span class="browser-dot r"></span>
+          <span class="browser-dot y"></span>
+          <span class="browser-dot g"></span>
+          <span class="browser-url">app.estia.co.il/dashboard</span>
+        </div>
+        <div class="ld-grid">
+          <div class="ld-ai">
+            <span class="ld-ai-icon" aria-hidden="true">✦</span>
+            <div><b>AI מציע 3 לידים</b> מתאימים לנכס החדש ברמלה</div>
           </div>
-          <div class="device-body">
-            <div class="dev-greet">
-              <h4>שלום, יוסי 👋</h4>
-              <small>יום שלישי · 22 באפריל</small>
+          <div class="ld-kpis">
+            <div class="ld-kpi">
+              <div class="ld-kpi-label">לידים</div>
+              <div class="ld-kpi-value">24</div>
+              <div class="ld-kpi-delta">+5 השבוע</div>
             </div>
-            <div class="dev-ai">
-              <span class="ai-badge">✦</span>
-              <div><b>AI מציע 3 לידים</b><span>מתאימים לנכס החדש ברמלה</span></div>
+            <div class="ld-kpi">
+              <div class="ld-kpi-label">נכסים</div>
+              <div class="ld-kpi-value">12</div>
+              <div class="ld-kpi-delta" style="background:rgba(30,26,20,0.06);color:var(--muted)">3 בלעדיים</div>
             </div>
-            <div class="dev-kpis">
-              <div class="dev-kpi"><span class="k-label">לידים</span><span class="k-value">24</span><span class="k-delta">+5 השבוע</span></div>
-              <div class="dev-kpi"><span class="k-label">נכסים</span><span class="k-value">12</span><span class="k-delta" style="color:#6b6356">3 בלעדיים</span></div>
-              <div class="dev-kpi is-gold"><span class="k-label">צנרת</span><span class="k-value">₪8.4M</span><span class="k-delta" style="color:#8a6932">+12%</span></div>
-            </div>
-            <div class="dev-section-title">
-              <span class="count">4</span>
-              <span>לידים חמים היום</span>
-            </div>
-            <div class="dev-leads">
-              <div class="dev-lead">
-                <span class="pill hot">חם</span>
-                <div class="lead-meta"><b>דוד לוי</b><span>4 חד׳ · רמת גן · עד ₪2.8M</span></div>
-                <span class="avatar" style="background:#b91c1c">ד</span>
-              </div>
-              <div class="dev-lead">
-                <span class="pill meet">פגישה</span>
-                <div class="lead-meta"><b>מיכל בן-עמי</b><span>פגישה היום · 14:30</span></div>
-                <span class="avatar" style="background:#b45309">מ</span>
-              </div>
-              <div class="dev-lead">
-                <span class="pill hot">חם</span>
-                <div class="lead-meta"><b>יונתן כהן</b><span>מרפסת · ראשון לציון · ₪3.4M</span></div>
-                <span class="avatar" style="background:#b91c1c">י</span>
-              </div>
-            </div>
-            <div class="dev-calendar">
-              <div class="cal-date"><small>אפר׳</small><b>22</b></div>
-              <div class="cal-meta"><b>פגישה · מיכל בן-עמי</b><span>14:30 · הרצל 42, רמלה</span></div>
+            <div class="ld-kpi is-gold">
+              <div class="ld-kpi-label">צנרת</div>
+              <div class="ld-kpi-value">₪8.4M</div>
+              <div class="ld-kpi-delta" style="background:rgba(180,139,76,0.2);color:var(--gold-readable)">+12%</div>
             </div>
           </div>
-          <div class="device-tabbar">
-            <span class="tab-active">בית</span>
-            <span>לידים</span>
-            <span><span class="tab-fab">+</span></span>
-            <span>נכסים</span>
-            <span>יומן</span>
+          <div class="ld-section-title">לידים חמים היום</div>
+          <div class="ld-leads">
+            <div class="ld-lead">
+              <span class="ld-avatar" style="background:#b91c1c">ד</span>
+              <div class="ld-lead-meta">
+                <span class="ld-lead-name">דוד לוי</span>
+                <span class="ld-lead-sub">4 חד׳ · רמת גן · עד ₪2.8M</span>
+              </div>
+              <span class="ld-pill hot">חם</span>
+            </div>
+            <div class="ld-lead">
+              <span class="ld-avatar" style="background:#b45309">מ</span>
+              <div class="ld-lead-meta">
+                <span class="ld-lead-name">מיכל בן-עמי</span>
+                <span class="ld-lead-sub">פגישה היום · 14:30</span>
+              </div>
+              <span class="ld-pill warm">פושר</span>
+            </div>
+            <div class="ld-lead">
+              <span class="ld-avatar" style="background:#b91c1c">י</span>
+              <div class="ld-lead-meta">
+                <span class="ld-lead-name">יונתן כהן</span>
+                <span class="ld-lead-sub">מרפסת · ראשון לציון · ₪3.4M</span>
+              </div>
+              <span class="ld-pill hot">חם</span>
+            </div>
+            <div class="ld-lead">
+              <span class="ld-avatar" style="background:#2563eb">ש</span>
+              <div class="ld-lead-meta">
+                <span class="ld-lead-name">שירה פרידמן</span>
+                <span class="ld-lead-sub">4.5 חד׳ · הרצליה · עד ₪4.2M</span>
+              </div>
+              <span class="ld-pill cold">קר</span>
+            </div>
           </div>
         </div>
       </div>
@@ -928,283 +1078,231 @@ a { color: inherit; text-decoration: none; }
   </div>
 </header>
 
-<!-- Phase 3 — why switch. Contrasts the agent's current tool-soup
-     workflow with Estia. No fabricated stats, just the common pain. -->
-<section id="why" class="section">
+<!-- FEATURES ─────────────────────────────────────────────── -->
+<section id="features" class="section features">
   <div class="container">
-    <div class="section-head">
-      <span class="eyebrow">למה סוכנים עוברים ל-Estia</span>
-      <h2 class="h2">כי ליד שנאבד בצ׳אט - הוא עמלה שנעלמת.</h2>
-      <p class="sub">רוב הסוכנים עובדים עם חמש אפליקציות שונות. Estia מחליפה את כולן.</p>
+    <div class="features-head">
+      <span class="eyebrow">תכונות</span>
+      <h2 class="h2">כל הכלים שסוכן נדל״ן באמת צריך</h2>
+      <p class="sub">
+        המערכת נבנתה מתוך עבודה אמיתית בשטח — כל מה שאתם עושים ביום-יום,
+        במקום אחד, גם בדסקטופ וגם בנייד.
+      </p>
     </div>
-    <div class="switch-grid">
-      <article class="switch-card is-before">
-        <span class="switch-tag">איך זה היום</span>
-        <h3>חמש אפליקציות, אף סדר.</h3>
-        <ul class="switch-list">
-          <li>לידים מתפזרים בין WhatsApp, שיחות ופוסט-איטים.</li>
-          <li>פרטי נכסים בצ׳אט עם הבעלים — ונעלמים שם.</li>
-          <li>פגישות ביומן נפרד, בלי לקוח ובלי נכס צמודים.</li>
-          <li>אקסל שחיים ומתים עליו, בלי גיבוי ובלי היסטוריה.</li>
-          <li>תיאורי נכסים שכל פעם כותבים מחדש.</li>
-          <li>כל סוף-שבוע חצי שעה של "איפה הכל?".</li>
-        </ul>
-      </article>
-      <article class="switch-card is-after">
-        <span class="switch-tag">איך זה עם Estia</span>
-        <h3>מערכת אחת. שקט בראש.</h3>
-        <ul class="switch-list">
-          <li>כל ליד - עם סטטוס, היסטוריה, תזכורות ופעולות אוטומטיות.</li>
-          <li>תיק נכס מלא: תמונות, בעלים, בלעדיות, מסלול שיווק.</li>
-          <li>פגישה קופצת עם הלקוח? הכל מתעדכן אוטומטית.</li>
-          <li>ייבוא קל של כל הנכסים והלידים שלכם.</li>
-          <li>אינטגרציה מלאה עם AI לפעולות אקטיביות ואוטמטיות שיחסכו לכם שעות.</li>
-          <li>הכל גם בטלפון, בתמיכה מלאה באפליקציה.</li>
-        </ul>
-      </article>
-    </div>
-  </div>
-</section>
 
-<!-- Light-graphic converger band: positions Estia as the single
-     CRM + property-management system that replaces the agent's
-     tool soup. No claims that need verification — just a visual
-     reinforcement of the "one place" promise with the "share a full
-     property file in one click" subtext. -->
-<section class="section" style="padding-block: 24px 0">
-  <div class="container">
-    <div class="converger" aria-label="מה Estia מחליפה">
-      <div class="conv-scatter" aria-hidden="true">
-        <span class="conv-chip" style="--rot: -3deg"><span class="dot" style="--c: #25D366"></span>WhatsApp</span>
-        <span class="conv-chip" style="--rot: 2deg"><span class="dot" style="--c: #1D6F42"></span>Excel</span>
-        <span class="conv-chip" style="--rot: -2deg"><span class="dot" style="--c: #4285F4"></span>Google Calendar</span>
-        <span class="conv-chip" style="--rot: 3deg"><span class="dot" style="--c: #b91c1c"></span>פנקס טלפונים</span>
-        <span class="conv-chip" style="--rot: -1deg"><span class="dot" style="--c: #b45309"></span>פתקיות</span>
-        <span class="conv-chip" style="--rot: 2deg"><span class="dot" style="--c: #6b21a8"></span>Drive / מיילים</span>
-      </div>
-      <div class="conv-arrow" aria-hidden="true">←</div>
-      <div class="conv-target">
-        <div class="conv-target-head">
-          <span class="conv-target-logo" aria-hidden="true">◆</span>
-          <span class="conv-target-h">Estia — מערכת ניהול נכסים + CRM</span>
-        </div>
-        <p>
-          כל <strong>תיק הנכסים</strong> שלך, <strong>הלקוחות</strong>,
-          <strong>הבלעדיות</strong> ו<strong>הפגישות</strong> במקום אחד.
-          תיק נכס שלם עובר ללקוח או לסוכן אחר — <strong>בלחיצת כפתור</strong>.
+    <div class="feature-grid">
+      <article class="feature-card is-featured fade-in">
+        <span class="feature-ribbon" aria-label="כלול רק במסלול Premium">
+          <span aria-hidden="true">★</span>PREMIUM
+        </span>
+        <span class="feature-icon" aria-hidden="true">✦</span>
+        <h3 class="feature-title">AI שמבין נדל״ן</h3>
+        <p class="feature-body">
+          תיאור נכס מקצועי בלחיצה — AI כותב עבורכם טקסט שיווק מושלם מהנתונים.
+          התאמת לידים חכמה שמראה לכם איזה לקוח מתאים לאיזה נכס, אוטומטית.
         </p>
+      </article>
+      <article class="feature-card fade-in">
+        <span class="feature-icon" aria-hidden="true">👥</span>
+        <h3 class="feature-title">ניהול לקוחות ולידים</h3>
+        <p class="feature-body">
+          מעקב מלא על כל ליד — מהשיחה הראשונה ועד העסקה. חם / פושר / קר,
+          תזכורות חכמות, והיסטוריה מלאה לכל לקוח במקום אחד.
+        </p>
+      </article>
+      <article class="feature-card fade-in">
+        <span class="feature-icon" aria-hidden="true">🏠</span>
+        <h3 class="feature-title">נכסים, בעלים ובלעדיויות</h3>
+        <p class="feature-body">
+          תיק נכס מלא: תמונות, בעלים, מסלול שיווק, זכויות חתומות והסכמי בלעדיות.
+          תמיד זמין לשליחה ללקוח בקישור אחד.
+        </p>
+      </article>
+      <article class="feature-card fade-in">
+        <span class="feature-icon" aria-hidden="true">📅</span>
+        <h3 class="feature-title">יומן פגישות חכם</h3>
+        <p class="feature-body">
+          פגישה חדשה שואבת את הלקוח, הנכס והכתובת אוטומטית.
+          סנכרון דו-כיווני ליומן גוגל — בנייד ובדסקטופ.
+        </p>
+      </article>
+      <article class="feature-card fade-in">
+        <span class="feature-icon" aria-hidden="true">🧮</span>
+        <h3 class="feature-title">מחשבון עמלות ועמלת תיווך</h3>
+        <p class="feature-body">
+          נטו למוכר או מחיר רישום — דינמי, עם מע״מ, שכר טרחת עו״ד ועלויות נוספות.
+          שיתוף תוצאה ללקוח בקישור אחד.
+        </p>
+      </article>
+      <article class="feature-card fade-in">
+        <span class="feature-icon" aria-hidden="true">📱</span>
+        <h3 class="feature-title">אפליקציה לאייפון ולאנדרואיד</h3>
+        <p class="feature-body">
+          כל מה שיש באתר — גם בכיס שלכם. שיחות, WhatsApp ופגישות
+          ישירות מהאפליקציה. עובדת במעלית, בנהיגה, בפגישה.
+        </p>
+      </article>
+    </div>
+
+    <div class="more-features">
+      <p>וגם:</p>
+      <ul>
+        <li>תבניות WhatsApp חכמות לשליחה מהירה</li>
+        <li>העברת נכסים ובלעדיות בין סוכנים</li>
+        <li>דף נכס ציבורי ללקוחות בקישור אחד</li>
+        <li>ייבוא נתונים מ-Excel</li>
+        <li>תזכורות ומשימות אוטומטיות</li>
+        <li>תיוג וסינון חכם של לקוחות ונכסים</li>
+        <li>דו״חות ביצועים לסוכן ולמשרד</li>
+        <li>תמיכה בעברית מלאה, RTL-first</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- AI SPOTLIGHT ─────────────────────────────────────────── -->
+<section id="ai" class="section ai-section">
+  <div class="container">
+    <span class="ai-ribbon" aria-hidden="true">
+      <span>★</span> PREMIUM ONLY · ✦
+    </span>
+
+    <div class="ai-grid">
+      <div>
+        <div class="eyebrow ai-eyebrow">
+          <span aria-hidden="true">✦</span>
+          Estia AI · Premium
+        </div>
+        <h2 class="h2">ה-AI הראשון שמבין באמת נדל״ן ישראלי</h2>
+        <p class="sub">
+          מתאר נכסים כמו קופירייטר מנוסה. מתאים לידים לנכסים בעצמו.
+          חוסך שעות של &quot;מי מתאים למה&quot;. כלול רק במסלול Premium.
+        </p>
+        <div class="ai-note" role="note">
+          <span aria-hidden="true">🛡️</span>
+          כלול רק במסלול Premium
+        </div>
+        <ul class="ai-actions" aria-label="פעולות AI">
+          <li class="ai-action">
+            <span class="ai-action-icon" aria-hidden="true">✦</span>
+            <span class="ai-action-label">כותב תיאור שיווקי</span>
+            <span class="ai-action-hint">≈ 22 שניות</span>
+            <span class="ai-action-pro">PRO</span>
+          </li>
+          <li class="ai-action">
+            <span class="ai-action-icon" aria-hidden="true">✦</span>
+            <span class="ai-action-label">מתאים ליד לנכס</span>
+            <span class="ai-action-hint">דירוג 0–100</span>
+            <span class="ai-action-pro">PRO</span>
+          </li>
+          <li class="ai-action">
+            <span class="ai-action-icon" aria-hidden="true">✦</span>
+            <span class="ai-action-label">סיכום פגישה</span>
+            <span class="ai-action-hint">מהקלטה</span>
+            <span class="ai-action-pro">PRO</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="ai-playground" aria-live="polite">
+        <div class="ai-pg-ribbon" aria-hidden="true"><span>★</span> PREMIUM</div>
+        <div class="ai-pg-head">
+          <span aria-hidden="true">✦</span>
+          <span>Estia AI Playground</span>
+          <span class="ai-pg-ver">v2.4 · נדל״ן</span>
+        </div>
+        <div class="ai-pg-card">
+          <div class="ai-pg-label">נתוני נכס</div>
+          <div class="ai-pg-fields">
+            <div class="ai-pg-field"><div class="ai-pg-field-k">סוג</div><div class="ai-pg-field-v">דירת 4 חד׳</div></div>
+            <div class="ai-pg-field"><div class="ai-pg-field-k">עיר</div><div class="ai-pg-field-v">רמת גן</div></div>
+            <div class="ai-pg-field"><div class="ai-pg-field-k">קומה</div><div class="ai-pg-field-v">5/7</div></div>
+            <div class="ai-pg-field"><div class="ai-pg-field-k">שטח</div><div class="ai-pg-field-v">104 מ״ר</div></div>
+          </div>
+        </div>
+        <div class="ai-pg-output">
+          <div class="ai-pg-output-head">
+            <span aria-hidden="true">✦</span>
+            <span>תיאור שיווקי · עברית</span>
+            <span class="ai-pg-status" id="aiStatus">○ מחכה</span>
+          </div>
+          <div class="ai-pg-body" id="aiOutput">
+            <span class="ai-pg-idle">לחצו על &quot;צור תיאור&quot;…</span>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary ai-pg-cta">
+          צור תיאור חדש <span aria-hidden="true">✦</span>
+        </button>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Phase 4 — outcome-based feature clusters. Replaces the 6-icon
-     grid. Each cluster pairs a benefit statement with a concrete
-     product-screenshot slot (placeholder visuals today; swap for
-     real screenshots as they stabilize). -->
-<section id="features" class="section" style="background: var(--bg-secondary)">
-  <div class="container">
-    <div class="section-head">
-      <span class="eyebrow">מה יש במערכת</span>
-      <h2 class="h2">ארבעה דברים שהמערכת עושה טוב יותר ממה שאתם עושים היום.</h2>
-      <p class="sub">לא פיצ׳רים — תוצאות. מה באמת משתנה בעבודה היומיומית אחרי שמתחילים ב-Estia.</p>
-    </div>
-
-    <div class="outcome-list">
-      <!-- 1. Lead follow-up -->
-      <article class="outcome">
-        <div>
-          <span class="outcome-eyebrow">מעקב לידים</span>
-          <h3>פחות לידים שנופלים בין הכיסאות.</h3>
-          <p>כל פנייה נכנסת עם סטטוס ברור, תאריך מעקב אוטומטי והיסטוריה שמצטברת אליה. אתם פותחים את האפליקציה בבוקר ויודעים עם מי לדבר — ולא נזכרים ביום שישי.</p>
-          <ul class="outcome-bullets">
-            <li>סטטוסים חם / פושר / קר עם תזכורת אוטומטית.</li>
-            <li>היסטוריית תקשורת לכל ליד — שיחות, הודעות, פגישות.</li>
-            <li>התאמה חכמה בין לידים לנכסים שיש לכם בתיק.</li>
-            <li>דף לקוח אחד — לא חמישה חיפושים.</li>
-          </ul>
-        </div>
-        <div class="outcome-visual" role="img" aria-label="דוגמה של ניהול לידים">
-          <div class="ov-leads">
-            <div class="ov-lead">
-              <span class="avatar" style="background:#b91c1c">ד</span>
-              <div class="meta"><b>דוד לוי</b><span>4 חד׳ · רמת גן · עד ₪2.8M</span></div>
-              <span class="pill hot">חם</span>
-            </div>
-            <div class="ov-lead">
-              <span class="avatar" style="background:#b45309">מ</span>
-              <div class="meta"><b>מיכל בן-עמי</b><span>פגישה היום · 14:30</span></div>
-              <span class="pill meet">פגישה</span>
-            </div>
-            <div class="ov-lead">
-              <span class="avatar" style="background:#b91c1c">י</span>
-              <div class="meta"><b>יונתן כהן</b><span>מרפסת · ראשון לציון · ₪3.4M</span></div>
-              <span class="pill hot">חם</span>
-            </div>
-            <div class="ov-lead">
-              <span class="avatar" style="background:#64748b">ש</span>
-              <div class="meta"><b>שירה פרידמן</b><span>4.5 חד׳ · הרצליה · עד ₪4.2M</span></div>
-              <span class="pill warm">פושר</span>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <!-- 2. Properties & owners -->
-      <article class="outcome reverse">
-        <div class="outcome-visual" role="img" aria-label="דוגמה של תיק נכס">
-          <div class="ov-prop">
-            <div class="ov-prop-photo">
-              <span class="ov-prop-badge">★ בלעדי</span>
-            </div>
-            <div class="ov-prop-body">
-              <h4>הרצל 42, רמת גן</h4>
-              <div class="ov-prop-row">
-                <strong>₪2,850,000</strong>
-                <small>₪29,689 למ״ר</small>
-              </div>
-              <div class="ov-prop-chips">
-                <span class="ov-prop-chip">4 חד׳</span>
-                <span class="ov-prop-chip">96 מ״ר</span>
-                <span class="ov-prop-chip">קומה 3/5</span>
-                <span class="ov-prop-chip is-gold">מרפסת שמש</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div>
-          <span class="outcome-eyebrow">נכסים ובעלים</span>
-          <h3>תיק נכס אחד — לא שיחת WhatsApp שנעלמה.</h3>
-          <p>כל מה שצריך כדי לסגור: תמונות, מחיר, בלעדיות, בעלים, מסמכים וקישור ציבורי ללקוח. לא עוד "רגע, איפה הטלפון שלו?" באמצע פגישה.</p>
-          <ul class="outcome-bullets">
-            <li>בלעדיות עם תאריך תפוגה והתראה לפני שפוקעת.</li>
-            <li>פרטי בעלים, תנאים וזכויות — תמיד מוצמדים לנכס.</li>
-            <li>AI כותב תיאור שיווקי ללקוח בלחיצה.</li>
-            <li>קישור ציבורי לדף נכס נקי — שולחים, סוגרים.</li>
-          </ul>
-        </div>
-      </article>
-
-      <!-- 3. Field / mobile workflow -->
-      <article class="outcome">
-        <div>
-          <span class="outcome-eyebrow">עבודה בשטח</span>
-          <h3>במשרד ובפגישה — אותה מערכת, אותו מידע.</h3>
-          <p>Estia רץ בדפדפן וכאפליקציית נייד. כל מה שעשיתם בדסקטופ בבוקר — מסונכרן כבר בדרך לפגישה. שיחות ו-WhatsApp ללקוח ישירות מכרטיס הליד.</p>
-          <ul class="outcome-bullets">
-            <li>שיחה ו-WhatsApp ישירות מכרטיס הליד.</li>
-            <li>פרטי נכס עם ניווט וכתובת בלחיצה.</li>
-            <li>סנכרון מיידי בין דסקטופ לנייד — בלי &quot;לרענן&quot;.</li>
-            <li>אפליקציית iOS ו-Android בגישה מוקדמת למשתמשים רשומים.</li>
-          </ul>
-        </div>
-        <div class="outcome-visual" role="img" aria-label="דוגמה של עבודה בנייד">
-          <div class="ov-phone">
-            <div class="ov-phone-frame">
-              <div class="ov-phone-screen">
-                <div class="ov-phone-greet">שלום, יוסי<small>יום שלישי · 22 באפריל</small></div>
-                <div class="ov-phone-ai">
-                  <span class="dot">✦</span>
-                  <span>AI מציע 3 לידים<br>מתאימים לנכס החדש</span>
-                </div>
-                <div class="ov-phone-kpis">
-                  <div class="ov-phone-kpi"><small>לידים</small><b>24</b></div>
-                  <div class="ov-phone-kpi"><small>נכסים</small><b>12</b></div>
-                  <div class="ov-phone-kpi"><small>צנרת</small><b>₪8.4M</b></div>
-                </div>
-                <div class="ov-phone-action">שיחה · WhatsApp · ניווט</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <!-- 4. Office efficiency + AI -->
-      <article class="outcome reverse">
-        <div class="outcome-visual" role="img" aria-label="דוגמה של שיחה עם ה-AI">
-          <div class="ov-ai">
-            <div class="ov-ai-row is-user">
-              <span class="ov-ai-avatar">י</span>
-              <div class="ov-ai-bubble">כתוב תיאור שיווקי לנכס ברמת גן, 4 חד׳, מרפסת שמש, קומה 3/5.</div>
-            </div>
-            <div class="ov-ai-row is-assistant">
-              <span class="ov-ai-avatar">✦</span>
-              <div class="ov-ai-bubble"><strong>דירת 4 חדרים מוארת</strong> בלב רמת גן — מרפסת שמש פתוחה, קומה נוחה 3/5, מיקום מנצח לצעירים ולמשפחות. מוכנה לכניסה מיידית.</div>
-            </div>
-            <div class="ov-ai-row is-user">
-              <span class="ov-ai-avatar">י</span>
-              <div class="ov-ai-bubble">מי מהלידים שלי מתאים לנכס?</div>
-            </div>
-          </div>
-        </div>
-        <div>
-          <span class="outcome-eyebrow">יעילות משרד + AI</span>
-          <h3>פחות אדמיניסטרציה, יותר סגירות.</h3>
-          <p>AI לכתיבת תיאורי נכסים ולהתאמת לידים לנכסים, מחשבון עמלות עם מע״מ ושכ״ט עו״ד, תבניות WhatsApp, יומן מסונכרן ל-Google, והעברות נכסים פנימית בין סוכני המשרד.</p>
-          <ul class="outcome-bullets">
-            <li>AI כותב תיאור נכס שיווקי לפי הנתונים.</li>
-            <li>התאמת לידים לנכסים — מי מתאים למה, אוטומטית.</li>
-            <li>מחשבון עמלות ועמלת תיווך עם מע״מ ושכ״ט עו״ד.</li>
-            <li>תבניות WhatsApp ודו״חות ביצועים למשרד.</li>
-          </ul>
-        </div>
-      </article>
-    </div>
-  </div>
-</section>
-
-<section class="section mobile-section">
+<!-- MOBILE APP ───────────────────────────────────────────── -->
+<section id="mobile" class="section mobile-band">
   <div class="container mobile-grid">
-    <div class="hero-visual">
-      <div class="device" role="img" aria-label="דף נכס באפליקציית Estia: תמונה, מחיר, פרטים, וכפתור שיתוף ללקוח בוואטסאפ">
-        <div class="device-island" aria-hidden="true"></div>
-        <div class="device-screen">
-          <div class="device-status">
-            <span>14:02</span>
-            <span class="status-icons"><span></span><span></span><span></span><span class="bat"></span></span>
+    <div class="mobile-phones" aria-hidden="true">
+      <div class="mobile-phones-fade"></div>
+      <div class="phone tilt-left">
+        <div class="phone-screen">
+          <div class="phone-greet">שלום, יוסי<small>יום שלישי · 22 באפריל</small></div>
+          <div class="phone-ai">
+            <span aria-hidden="true">✦</span>
+            <span>AI מציע 3 לידים מתאימים</span>
           </div>
-          <div class="device-body">
-            <div class="dev-photo">
-              <span class="ph-badge">★ בלעדי</span>
-              <span class="ph-count">1 / 14</span>
+          <div class="phone-row">
+            <span class="phone-avatar" style="background:#b91c1c">ד</span>
+            <div class="phone-meta">
+              <span class="phone-name">דוד לוי</span>
+              <span class="phone-sub">4 חד׳ · רמת גן</span>
             </div>
-            <div class="dev-title">
-              <div class="t-left">
-                <small>דירה · מכירה</small>
-                <h4>הרצל 42, רמת גן</h4>
-                <span>הבורסה · מרפסת שמש</span>
-              </div>
-              <div class="t-right">
-                <b>₪2,850,000</b>
-                <span>₪29,689 למ״ר</span>
-              </div>
+            <span class="phone-pill hot">חם</span>
+          </div>
+          <div class="phone-row">
+            <span class="phone-avatar" style="background:#b45309">מ</span>
+            <div class="phone-meta">
+              <span class="phone-name">מיכל בן-עמי</span>
+              <span class="phone-sub">פגישה 14:30</span>
             </div>
-            <div class="dev-chips">
-              <span class="dev-chip">4 חד׳</span>
-              <span class="dev-chip">96 מ״ר</span>
-              <span class="dev-chip">קומה 3/5</span>
-              <span class="dev-chip is-gold">חדש</span>
+            <span class="phone-pill warm">פושר</span>
+          </div>
+          <div class="phone-row">
+            <span class="phone-avatar" style="background:#b91c1c">י</span>
+            <div class="phone-meta">
+              <span class="phone-name">יונתן כהן</span>
+              <span class="phone-sub">₪3.4M · ראשון לציון</span>
             </div>
-            <div class="dev-owner">
-              <span class="o-pill">פנוי מיידי</span>
-              <div class="o-meta"><b>שמעון כהן</b><span>בעלים · בלעדיות עד 7/25</span></div>
-              <span class="o-avatar">ש</span>
-            </div>
-            <div class="dev-actions">
-              <span class="dev-call">📞</span>
-              <div class="dev-wa">שליחה בוואטסאפ ללקוח</div>
-            </div>
-            <div class="dev-hints">
-              <span class="h-chip">✓ 3 לקוחות מתאימים</span>
-              <span class="h-chip is-gold">✦ תיאור AI חדש</span>
+            <span class="phone-pill hot">חם</span>
+          </div>
+        </div>
+      </div>
+      <div class="phone tilt-right">
+        <div class="phone-screen">
+          <div class="phone-greet">הרצל 42, רמת גן<small>דירת 4 חד׳ · בלעדי</small></div>
+          <div class="phone-ai">
+            <span aria-hidden="true">✦</span>
+            <span>AI סיים לכתוב תיאור שיווקי</span>
+          </div>
+          <div class="phone-row" style="background:var(--cream-3);border-color:var(--gold-soft)">
+            <span class="phone-avatar" style="background:var(--gold);color:var(--ink)">₪</span>
+            <div class="phone-meta">
+              <span class="phone-name">₪2,850,000</span>
+              <span class="phone-sub">₪29,689 / מ״ר</span>
             </div>
           </div>
-          <div class="device-tabbar">
-            <span>בית</span>
-            <span class="tab-active">נכסים</span>
-            <span><span class="tab-fab">+</span></span>
-            <span>לקוחות</span>
-            <span>יומן</span>
+          <div class="phone-row">
+            <span class="phone-avatar" style="background:#2563eb">⬆</span>
+            <div class="phone-meta">
+              <span class="phone-name">שיתוף ללקוח</span>
+              <span class="phone-sub">WhatsApp · קישור ציבורי</span>
+            </div>
+          </div>
+          <div class="phone-row">
+            <span class="phone-avatar" style="background:#15803d">☑</span>
+            <div class="phone-meta">
+              <span class="phone-name">בלעדיות</span>
+              <span class="phone-sub">פוקעת ב-12/06</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1212,86 +1310,103 @@ a { color: inherit; text-decoration: none; }
     <div>
       <span class="eyebrow">האפליקציה</span>
       <h2 class="h2">כל הלידים שלכם — כבר עכשיו בכיס שלכם</h2>
-      <p class="sub">האפליקציות הנטיביות לאייפון ולאנדרואיד בגישה מוקדמת. המערכת המלאה כבר עובדת בדפדפן.</p>
+      <p class="sub">
+        אפליקציה נטיבית לאייפון ולאנדרואיד. עובדת גם במעלית,
+        גם בנהיגה, גם באמצע פגישה.
+      </p>
       <ul class="mobile-bullets">
-        <li class="mobile-bullet">הודעות WhatsApp, שיחות ופגישות — ישירות מכרטיס הליד.</li>
-        <li class="mobile-bullet">התראות חכמות שלא יגרמו לכם לפספס ליד חם.</li>
-        <li class="mobile-bullet">תמונות, מיקום, ניווט — הכול בנגיעה אחת.</li>
-        <li class="mobile-bullet">סנכרון מיידי עם הדסקטופ — ממשיכים מאיפה שעצרתם.</li>
+        <li><span class="dot">✓</span>הודעות WhatsApp, שיחות ופגישות — ישירות מהאפליקציה.</li>
+        <li><span class="dot">✓</span>התראות חכמות שלא יגרמו לכם לפספס ליד חם.</li>
+        <li><span class="dot">✓</span>תמונות, מיקום, ניווט — הכול בנגיעה אחת.</li>
+        <li><span class="dot">✓</span>סנכרון מיידי עם הדסקטופ — ממשיכים מאיפה שעצרתם.</li>
       </ul>
-      <div class="beta-strip">
-        <span class="beta-pill">iPhone &amp; Android · בטא סגורה</span>
-        <p class="beta-note">משתמשים רשומים מקבלים גישה מוקדמת לאפליקציה. מתחילים בדפדפן היום, עוברים לנייד ברגע שהבטא פתוחה לכם.</p>
+      <div class="store-badges">
+        <span class="store-badge" aria-label="זמין ב-App Store (בקרוב)">
+          <span aria-hidden="true" style="font-size:22px"></span>
+          <div><small>להוריד מ</small><b>App Store</b></div>
+        </span>
+        <span class="store-badge" aria-label="זמין ב-Google Play (בקרוב)">
+          <span aria-hidden="true" style="font-size:22px">▶</span>
+          <div><small>זמין ב</small><b>Google Play</b></div>
+        </span>
       </div>
-      <a class="btn-text" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=mobile_section" style="margin-top: 18px">התחל חינם — והיכנס לרשימת הבטא ←</a>
+      <p class="store-note">האפליקציות לאייפון ואנדרואיד בדרך — משתמשים רשומים יקבלו גישה ראשונים.</p>
     </div>
   </div>
 </section>
 
+<!-- HOW IT WORKS ─────────────────────────────────────────── -->
 <section class="section">
   <div class="container">
-    <div class="section-head">
-      <span class="eyebrow">מעבר בלי כאב ראש</span>
-      <h2 class="h2">מעבר מהאקסל של היום — ב-10 דקות, בלי לאבד שורה.</h2>
-      <p class="sub">רוב הסוכנים עולים לעבודה באותו היום. בלי מיגרציה מסובכת, בלי שיחת מכירה.</p>
+    <div class="how-head">
+      <h2 class="h2">בעוד 2 דקות — אתם כבר עובדים</h2>
+      <p class="sub" style="margin-inline:auto">הכנה זה לא מקצוע. עבודה — כן.</p>
     </div>
-    <ol class="steps">
-      <li class="step">
-        <div class="step-n">1</div>
-        <h3 class="step-title">נרשמים בדקה</h3>
-        <p class="step-body">אימייל וסיסמה או כניסה עם Google. בלי כרטיס אשראי, בלי שיחת מכירה.</p>
-      </li>
-      <li class="step">
-        <div class="step-n">2</div>
-        <h3 class="step-title">מייבאים את האקסל בקליק</h3>
-        <p class="step-body">העלאת קובץ אחד → נכסים, לקוחות ובעלים עולים ביחד. מי שמעדיף — מתחיל נקי.</p>
-      </li>
-      <li class="step">
-        <div class="step-n">3</div>
-        <h3 class="step-title">עובדים באותו היום</h3>
-        <p class="step-body">ממשק בעברית, תמיכה בעברית, ייצוא של כל הנתונים שלכם בכל רגע. 30 יום חינם, ביטול בכל רגע.</p>
-      </li>
-    </ol>
+    <div class="how-grid">
+      <article class="how-step fade-in">
+        <div class="how-num">01</div>
+        <h3 class="how-title">נרשמים בדקה</h3>
+        <p class="how-body">אימייל וסיסמה או התחברות עם Google. בלי כרטיס אשראי, בלי שיחת מכירה.</p>
+      </article>
+      <article class="how-step fade-in">
+        <div class="how-num">02</div>
+        <h3 class="how-title">מייבאים או מתחילים נקי</h3>
+        <p class="how-body">ייבוא מ-Excel, או הקלדת הנכסים והלקוחות הראשונים — הבחירה שלכם.</p>
+      </article>
+      <article class="how-step fade-in">
+        <div class="how-num">03</div>
+        <h3 class="how-title">עובדים. 30 יום חינם.</h3>
+        <p class="how-body">ביטול בכל רגע, בלי התחייבות, בלי הפתעות.</p>
+      </article>
+    </div>
   </div>
 </section>
 
-<section id="pricing" class="section">
+<!-- PRICING ──────────────────────────────────────────────── -->
+<section id="pricing" class="section pricing">
   <div class="container">
     <div class="pricing-head">
-      <div class="pricing-banner">30 יום חינם. בלי כרטיס אשראי. ביטול בכל רגע.</div>
-      <span class="eyebrow" style="display: block; margin-top: 18px">מחירים</span>
+      <span class="eyebrow">מחירים</span>
       <h2 class="h2">מחיר ברור. הכול כלול.</h2>
+      <p class="sub" style="margin-inline:auto">30 יום חינם. בלי כרטיס אשראי. ביטול בכל רגע.</p>
+      <div class="cycle-toggle" role="tablist" aria-label="מחזור חיוב">
+        <button type="button" class="cycle-btn" data-cycle="monthly" role="tab">חיוב חודשי</button>
+        <button type="button" class="cycle-btn is-active" data-cycle="yearly" role="tab">חיוב שנתי — חודשיים מתנה</button>
+      </div>
     </div>
-    <div class="pricing-grid">
-      <div class="tier">
-        <div>
-          <h3 class="tier-name">בסיס</h3>
-          <p class="tier-lead">סוכן/ת נדל״ן עצמאי/ת</p>
-          <p class="tier-lead" style="color: var(--gold-readable); font-weight: 700">הכי מתאים אם: עובדים לבד, עד ~50 נכסים פעילים בכל רגע.</p>
+
+    <div class="price-grid">
+      <article class="price-card">
+        <div class="price-name">בסיס</div>
+        <p class="price-lead">לסוכן נדל״ן עצמאי</p>
+        <div class="price-amount">
+          <span class="price-num" data-monthly="₪99"  data-yearly="₪83">₪83</span>
+          <span class="price-period">/ חודש</span>
         </div>
-        <div class="tier-price"><span class="tier-c">₪</span><span class="tier-n">99</span><span class="tier-s">/ חודש · כולל מע״מ</span></div>
-        <ul class="tier-bullets">
+        <p class="price-note">כולל מע״מ · <span class="yearly-hint">חודשיים מתנה בתשלום שנתי</span></p>
+        <a class="btn btn-secondary btn-large price-cta" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=pricing_basic">התחלה חינם</a>
+        <ul class="price-bullets">
           <li>עד 50 נכסים פעילים</li>
           <li>עד 100 לקוחות/לידים</li>
           <li>AI לתיאורי נכסים ולהתאמת לידים</li>
-          <li>אפליקציית iOS ו-Android (בגישה מוקדמת)</li>
+          <li>אפליקציה לאייפון ואנדרואיד</li>
           <li>סנכרון ליומן גוגל</li>
           <li>תמיכה בעברית</li>
         </ul>
-        <a class="btn btn-secondary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=pricing_starter">התחל חינם ל-30 יום</a>
-        <p style="font-size: 12px; color: var(--text-muted); text-align: center; margin: 0">בלי כרטיס אשראי · ביטול בכל רגע</p>
-      </div>
-      <div class="tier recommended">
-        <span class="tier-badge">הכי פופולרי</span>
-        <div>
-          <h3 class="tier-name">מקצועי</h3>
-          <p class="tier-lead">משרד או סוכן/ת בנפח גבוה</p>
-          <p class="tier-lead" style="color: var(--gold-readable); font-weight: 700">הכי מתאים אם: יש משרד עם כמה סוכנים, העברות נכסים פנימיות ודו״חות ביצועים.</p>
+      </article>
+      <article class="price-card is-featured">
+        <div class="price-badge">הכי פופולרי</div>
+        <div class="price-name">מקצועי</div>
+        <p class="price-lead">למשרד או לסוכן נדל״ן בנפח גבוה</p>
+        <div class="price-amount">
+          <span class="price-num" data-monthly="₪249" data-yearly="₪208">₪208</span>
+          <span class="price-period">/ חודש</span>
         </div>
-        <div class="tier-price"><span class="tier-c">₪</span><span class="tier-n">249</span><span class="tier-s">/ חודש · כולל מע״מ</span></div>
-        <ul class="tier-bullets">
+        <p class="price-note">כולל מע״מ · <span class="yearly-hint">חודשיים מתנה בתשלום שנתי</span></p>
+        <a class="btn btn-primary btn-large price-cta" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=pricing_pro">התחלה חינם</a>
+        <ul class="price-bullets">
           <li>נכסים ולקוחות ללא הגבלה</li>
-          <li>AI לתיאורי נכסים ולהתאמת לידים — ללא הגבלה</li>
+          <li>AI ללא הגבלה · ✦ Premium</li>
           <li>ייבוא מ-Excel ומיבואי צד ג׳</li>
           <li>יומן מתקדם + תבניות WhatsApp</li>
           <li>מחשבון עמלות ועמלת תיווך</li>
@@ -1299,12 +1414,10 @@ a { color: inherit; text-decoration: none; }
           <li>העברות נכסים בין סוכנים</li>
           <li>עדיפות תמיכה</li>
         </ul>
-        <a class="btn btn-primary" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=pricing_pro">התחל חינם ל-30 יום</a>
-        <p style="font-size: 12px; color: var(--text-muted); text-align: center; margin: 0">בלי כרטיס אשראי · ביטול בכל רגע</p>
-      </div>
+      </article>
     </div>
-    <p class="pricing-vat">כל המחירים כוללים מע״מ</p>
-    <div class="pricing-trust">
+
+    <div class="price-trust">
       <span>בלי כרטיס אשראי לניסיון</span>
       <span>ביטול בכל רגע</span>
       <span>תמיכה בעברית</span>
@@ -1313,82 +1426,210 @@ a { color: inherit; text-decoration: none; }
   </div>
 </section>
 
-<section id="faq" class="section" style="background: var(--bg-secondary)">
+<!-- FAQ ──────────────────────────────────────────────────── -->
+<section id="faq" class="section">
   <div class="container">
-    <div class="section-head">
+    <div class="faq-head">
       <span class="eyebrow">שאלות</span>
       <h2 class="h2">שאלות ששואלים אותנו</h2>
     </div>
     <div class="faq-list">
-      <details class="faq-item"><summary>האם באמת אין צורך בכרטיס אשראי?</summary><div class="faq-body">נכון. רושמים אימייל וסיסמה, נכנסים, עובדים. כרטיס אשראי מוזן רק אם החלטתם להמשיך אחרי 30 יום.</div></details>
-      <details class="faq-item"><summary>מה קורה אחרי 30 יום?</summary><div class="faq-body">יום לפני סוף התקופה נשלח אימייל. אם לא בחרתם מסלול בתשלום, החשבון עובר למצב צפייה בלבד — הנתונים נשמרים ותוכלו לחזור בכל רגע.</div></details>
-      <details class="faq-item"><summary>איפה המערכת רצה היום ומתי יש אפליקציה לנייד?</summary><div class="faq-body">המערכת המלאה עובדת בדפדפן (דסקטופ ונייד) כבר היום. יש אפליקציות iOS ו-Android בבטא סגורה — משתמשים רשומים מקבלים גישה מוקדמת אליהן לפני שהן ייצאו לחנויות.</div></details>
-      <details class="faq-item"><summary>מה ה-AI בדיוק עושה?</summary><div class="faq-body">שני דברים: כותב עבורכם תיאור נכס שיווקי מתוך הנתונים שהזנתם, ומציג התאמה חכמה בין לקוחות לנכסים — חוסך שעות של "מי מתאים למה".</div></details>
-      <details class="faq-item"><summary>האם אפשר לייבא נתונים מ-Excel?</summary><div class="faq-body">כן. ייבוא מ-Excel בקליק — נכסים, לקוחות ובעלים עולים ביחד בלי העתק-הדבק.</div></details>
-      <details class="faq-item"><summary>האם הנתונים שלי מאובטחים?</summary><div class="faq-body">הנתונים מוצפנים במעבר ובמנוחה, נשמרים על שרתים באירופה (AWS eu-north-1), וגיבויים אוטומטיים נשמרים 14 יום. אתם הבעלים של המידע — ניתן לייצא או למחוק אותו בכל רגע.</div></details>
-      <details class="faq-item"><summary>מתאים גם לסוכן עצמאי או רק למשרדים?</summary><div class="faq-body">שניהם. המסלול "בסיס" מתאים לסוכן עצמאי; "מקצועי" מיועד למשרדים ולסוכנים בנפח גבוה.</div></details>
+      <div class="faq-item" role="button" tabindex="0">
+        <div class="faq-q">האם באמת אין צורך בכרטיס אשראי?<span class="faq-chev" aria-hidden="true">▾</span></div>
+        <div class="faq-a">נכון. רושמים אימייל וסיסמה, נכנסים, עובדים. כרטיס אשראי מוזן רק אם החלטתם להמשיך אחרי 30 יום.</div>
+      </div>
+      <div class="faq-item" role="button" tabindex="0">
+        <div class="faq-q">מה קורה אחרי 30 יום?<span class="faq-chev" aria-hidden="true">▾</span></div>
+        <div class="faq-a">יום לפני סוף התקופה נשלח אימייל. אם לא בחרתם מסלול בתשלום, החשבון עובר למצב צפייה בלבד — הנתונים נשמרים ותוכלו לחזור בכל רגע.</div>
+      </div>
+      <div class="faq-item" role="button" tabindex="0">
+        <div class="faq-q">האם האפליקציה עובדת על אייפון ואנדרואיד?<span class="faq-chev" aria-hidden="true">▾</span></div>
+        <div class="faq-a">כן — אפליקציה נטיבית לשני המכשירים. האפליקציות בתהליך פרסום בחנויות; מי שנרשם עכשיו מקבל גישה ראשון.</div>
+      </div>
+      <div class="faq-item" role="button" tabindex="0">
+        <div class="faq-q">מה ה-AI בדיוק עושה?<span class="faq-chev" aria-hidden="true">▾</span></div>
+        <div class="faq-a">שני דברים: כותב עבורכם תיאור נכס שיווקי מתוך הנתונים שהזנתם, ומציג התאמה חכמה בין לקוחות לנכסים — חוסך שעות של "מי מתאים למה".</div>
+      </div>
+      <div class="faq-item" role="button" tabindex="0">
+        <div class="faq-q">האם אפשר לייבא נתונים מ-Excel?<span class="faq-chev" aria-hidden="true">▾</span></div>
+        <div class="faq-a">כן. ייבוא מ-Excel בקליק — נכסים, לקוחות ובעלים עולים ביחד בלי העתק-הדבק.</div>
+      </div>
+      <div class="faq-item" role="button" tabindex="0">
+        <div class="faq-q">האם הנתונים שלי מאובטחים?<span class="faq-chev" aria-hidden="true">▾</span></div>
+        <div class="faq-a">הנתונים מוצפנים במעבר ובמנוחה, נשמרים על שרתים באירופה (AWS eu-north-1), וגיבויים אוטומטיים נשמרים 14 יום. אתם הבעלים של המידע — ניתן לייצא או למחוק אותו בכל רגע.</div>
+      </div>
+      <div class="faq-item" role="button" tabindex="0">
+        <div class="faq-q">מתאים גם לסוכן עצמאי או רק למשרדים?<span class="faq-chev" aria-hidden="true">▾</span></div>
+        <div class="faq-a">שניהם. המסלול "בסיס" מתאים לסוכן עצמאי; "מקצועי" מיועד למשרדים ולסוכנים בנפח גבוה.</div>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="final-cta">
-  <h2>תפסיקו לחפש לידים בצ׳אט.</h2>
-  <p>30 יום חינם. בלי כרטיס אשראי. בלי התחייבות.</p>
-  <a class="btn btn-primary btn-xl" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=final_cta">התחל חינם ל-30 יום</a>
+<!-- FINAL CTA ────────────────────────────────────────────── -->
+<section class="final-cta-wrap">
+  <div class="container">
+    <div class="final-cta">
+      <h2>מוכנים לנהל את העסק שלכם אחרת?</h2>
+      <p>30 יום חינם. בלי כרטיס אשראי. בלי התחייבות.</p>
+      <a class="btn btn-large" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=final_cta">
+        להתחלה חינם
+        <span aria-hidden="true">←</span>
+      </a>
+    </div>
+  </div>
 </section>
 
 </main>
 
+<!-- FOOTER ───────────────────────────────────────────────── -->
 <footer class="footer">
-  <div class="container footer-grid">
-    <div class="footer-brand">
-      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true">◆</span> Estia</a>
-      <p class="footer-tagline">Estia — ה-CRM לסוכני הנדל״ן בישראל.</p>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <span class="logo-mark" aria-hidden="true">◆</span>
+          <span>Estia</span>
+        </div>
+        <p class="footer-tagline">Estia — ה-CRM לסוכני הנדל״ן בישראל.</p>
+      </div>
+      <div class="footer-col">
+        <p class="footer-col-title">מוצר</p>
+        <ul>
+          <li><a href="#features">תכונות</a></li>
+          <li><a href="#pricing">מחירים</a></li>
+          <li><a href="#faq">שאלות נפוצות</a></li>
+          <li><a href="/login">התחברות</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <p class="footer-col-title">חברה</p>
+        <ul>
+          <li><a href="mailto:hello@estia.co.il">צור קשר</a></li>
+          <li><a href="/terms">תנאי שימוש</a></li>
+          <li><a href="/privacy">מדיניות פרטיות</a></li>
+        </ul>
+      </div>
     </div>
-    <div class="footer-col">
-      <p class="footer-col-title">מוצר</p>
-      <ul>
-        <li><a href="#features">תכונות</a></li>
-        <li><a href="#pricing">מחירים</a></li>
-        <li><a href="#faq">שאלות נפוצות</a></li>
-        <li><a href="/login">התחבר</a></li>
-      </ul>
+    <div class="footer-bottom">
+      <div>© 2026 Estia · כל הזכויות שמורות</div>
+      <div>עברית · RTL</div>
     </div>
-    <div class="footer-col">
-      <p class="footer-col-title">חברה</p>
-      <ul>
-        <li><a href="mailto:hello@estia.co.il">צור קשר</a></li>
-        <li><a href="/terms">תנאי שימוש</a></li>
-        <li><a href="/privacy">מדיניות פרטיות</a></li>
-      </ul>
-    </div>
-  </div>
-  <div class="container footer-bottom">
-    <span>© 2026 Estia · כל הזכויות שמורות</span>
-    <span>נבנה בישראל · שרתים באירופה</span>
   </div>
 </footer>
 
 <div class="sticky-cta" id="stickyCTA">
-  <a class="btn btn-primary" id="stickyCtaLink" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=sticky_mobile" tabindex="-1">התחל חינם ל-30 יום</a>
+  <a class="btn btn-primary" id="stickyCtaLink" href="/login?flow=signup&amp;utm_source=landing&amp;utm_medium=sticky_mobile" tabindex="-1">התחלה חינם ל-30 יום</a>
 </div>
 
-<!-- Tiny JS only for the sticky-CTA reveal on scroll. Defer so it never
-     blocks render. Uses `inert`/tabindex to keep the hidden link out of
-     the a11y tree — avoids Lighthouse `aria-hidden-focus` violation. -->
-<script defer>
-  (function(){
-    var el = document.getElementById('stickyCTA');
-    var link = document.getElementById('stickyCtaLink');
-    if (!el || !link) return;
-    var onScroll = function() {
-      var show = window.scrollY > 600;
-      el.classList.toggle('is-visible', show);
-      link.setAttribute('tabindex', show ? '0' : '-1');
-    };
+<script>
+(function () {
+  // Nav scroll state — adds the border + solid background once the user
+  // scrolls past the hero, so the nav never looks half-detached.
+  var nav = document.querySelector('.nav');
+  if (nav) {
+    var onScroll = function () { nav.classList.toggle('is-scrolled', window.scrollY > 16); };
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
-  })();
+  }
+
+  // Sticky mobile CTA — reveal after ~600px; also toggles tabindex so the
+  // hidden link stays out of the a11y tree.
+  var stickyEl   = document.getElementById('stickyCTA');
+  var stickyLink = document.getElementById('stickyCtaLink');
+  if (stickyEl && stickyLink) {
+    var onStickyScroll = function () {
+      var show = window.scrollY > 600;
+      stickyEl.classList.toggle('is-visible', show);
+      stickyLink.setAttribute('tabindex', show ? '0' : '-1');
+    };
+    window.addEventListener('scroll', onStickyScroll, { passive: true });
+    onStickyScroll();
+  }
+
+  // Fade-in on scroll.
+  var nodes = document.querySelectorAll('.fade-in');
+  if (nodes.length && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.05 });
+    nodes.forEach(function (n) { io.observe(n); });
+  } else {
+    nodes.forEach(function (n) { n.classList.add('is-visible'); });
+  }
+
+  // FAQ accordion — click OR keyboard-activate.
+  document.querySelectorAll('.faq-item').forEach(function (item) {
+    var toggle = function () { item.classList.toggle('is-open'); };
+    item.addEventListener('click', toggle);
+    item.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+  });
+
+  // Pricing monthly/yearly toggle — swap the numbers on each .price-num
+  // via the data-attributes rather than building two card sets.
+  var cycleBtns = document.querySelectorAll('.cycle-btn');
+  function applyCycle(cycle) {
+    cycleBtns.forEach(function (b) { b.classList.toggle('is-active', b.dataset.cycle === cycle); });
+    document.querySelectorAll('.price-num').forEach(function (n) {
+      n.textContent = cycle === 'monthly' ? n.dataset.monthly : n.dataset.yearly;
+    });
+    document.querySelectorAll('.yearly-hint').forEach(function (h) {
+      h.style.display = cycle === 'yearly' ? '' : 'none';
+    });
+  }
+  cycleBtns.forEach(function (b) {
+    b.addEventListener('click', function () { applyCycle(b.dataset.cycle); });
+  });
+  applyCycle('yearly');
+
+  // AI spotlight playground — 3-state loop (idle → typing → done).
+  var outputEl = document.getElementById('aiOutput');
+  var statusEl = document.getElementById('aiStatus');
+  if (outputEl && statusEl) {
+    var full = 'דירת 4 חדרים מוארת ומרווחת ברחוב שקט בלב רמת גן, קומה 5 עם מעלית, מרפסת שמש 12 מ״ר פונה לפארק, חניה ומחסן. סמוכה לבתי ספר ותחבורה.';
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      outputEl.textContent = full;
+      statusEl.textContent = '✓ מוכן';
+    } else {
+      var step = 0;
+      var typeTimer = null;
+      function render() {
+        if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+        if (step === 0) {
+          statusEl.textContent = '○ מחכה';
+          statusEl.classList.remove('is-running');
+          outputEl.innerHTML = '<span class="ai-pg-idle">לחצו על &quot;צור תיאור&quot;…</span>';
+        } else if (step === 1) {
+          statusEl.textContent = '● מייצר';
+          statusEl.classList.add('is-running');
+          var i = 0;
+          outputEl.innerHTML = '';
+          typeTimer = setInterval(function () {
+            i += 2;
+            if (i >= full.length) {
+              outputEl.textContent = full;
+              clearInterval(typeTimer);
+              typeTimer = null;
+            } else {
+              outputEl.innerHTML = full.slice(0, i) + '<span class="ai-pg-caret">▍</span>';
+            }
+          }, 25);
+        } else {
+          statusEl.textContent = '✓ מוכן';
+          statusEl.classList.remove('is-running');
+          outputEl.textContent = full;
+        }
+      }
+      render();
+      setInterval(function () { step = (step + 1) % 3; render(); }, 3400);
+    }
+  }
+})();
 </script>
 
 <script type="application/ld+json">
@@ -1403,7 +1644,7 @@ a { color: inherit; text-decoration: none; }
   },
   { "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
     { "@type": "Question", "name": "האם באמת אין צורך בכרטיס אשראי?", "acceptedAnswer": { "@type": "Answer", "text": "נכון. רושמים אימייל וסיסמה, נכנסים, עובדים. כרטיס אשראי מוזן רק אם החלטתם להמשיך אחרי 30 יום." } },
-    { "@type": "Question", "name": "מה קורה אחרי 30 יום?",            "acceptedAnswer": { "@type": "Answer", "text": "יום לפני סוף התקופה נשלח אימייל. אם לא בחרתם מסלול בתשלום, החשבון עובר למצב צפייה בלבד — הנתונים נשמרים." } },
+    { "@type": "Question", "name": "מה קורה אחרי 30 יום?", "acceptedAnswer": { "@type": "Answer", "text": "יום לפני סוף התקופה נשלח אימייל. אם לא בחרתם מסלול בתשלום, החשבון עובר למצב צפייה בלבד — הנתונים נשמרים." } },
     { "@type": "Question", "name": "האם האפליקציה עובדת על אייפון ואנדרואיד?", "acceptedAnswer": { "@type": "Answer", "text": "כן — אפליקציה נטיבית לשני המכשירים. האפליקציות בתהליך פרסום בחנויות." } },
     { "@type": "Question", "name": "מה ה-AI בדיוק עושה?", "acceptedAnswer": { "@type": "Answer", "text": "כותב תיאור נכס שיווקי ומציג התאמה חכמה בין לקוחות לנכסים." } }
   ]}
