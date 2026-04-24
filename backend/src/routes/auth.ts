@@ -275,15 +275,7 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   });
 };
 
-function publicUser(u: {
-  id: string;
-  email: string;
-  role: string;
-  displayName: string;
-  slug?: string | null;
-  phone: string | null;
-  avatarUrl: string | null;
-}) {
+function publicUser(u: any) {
   return {
     id: u.id,
     email: u.email,
@@ -292,5 +284,17 @@ function publicUser(u: {
     slug: u.slug ?? null,
     phone: u.phone,
     avatarUrl: u.avatarUrl,
+    // A-4 — the SPA route guard reads `profileCompletedAt`. Login +
+    // signup used to omit it, which meant every login landed on the
+    // onboarding wizard for a blink until the subsequent /api/me
+    // refreshed it in — and in some flows the PATCH-then-refresh race
+    // meant the stamp never reached the client, so agents had to
+    // re-submit their license + office every session. Keep this in
+    // sync with the /api/me toPublic shape.
+    profileCompletedAt: u.profileCompletedAt || null,
+    hasCompletedTutorial: !!u.hasCompletedTutorial,
+    firstLoginPlatform: u.firstLoginPlatform || null,
+    agentProfile: u.agentProfile ?? undefined,
+    customerProfile: u.customerProfile ?? undefined,
   };
 }

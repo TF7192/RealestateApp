@@ -6,7 +6,6 @@
 // Phone is validated as an Israeli mobile when provided.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, IdCard, Phone, Building2, MapPin, Upload, Plus,
   Sparkles, LogOut, Search,
@@ -54,24 +53,42 @@ function validateLicense(raw) {
 }
 
 export default function Onboarding() {
-  const navigate = useNavigate();
-  const { user, refresh, logout } = useAuth();
+  // We intentionally do a hard nav with window.location.assign after
+  // submission (see comment near setExiting), so neither useNavigate
+  // nor the auth refresh callback are needed in this component.
+  const { user, logout } = useAuth();
   const toast = useToast();
 
   const [step, setStep] = useState(0);
-  // Pre-fill phone from the logged-in user record if it already
-  // exists (it does when the agent provided a phone during signup).
-  // Keeps the agent from having to type the same number twice.
+  // Pre-fill everything we already know from the logged-in user so
+  // agents who arrive at /onboarding with an existing agentProfile
+  // (legacy sessions whose `profileCompletedAt` was never stamped,
+  // re-runs from a router nav, etc.) don't have to retype the same
+  // license + office they already entered once.
+  const profile = user?.agentProfile || null;
+  const initialTitle = profile?.agency?.trim()
+    ? (profile?.title === 'מנהל משרד' ? 'agency' : 'office')
+    : 'solo';
   const [form, setForm] = useState(() => ({
-    license: '', title: 'solo', agency: '',
-    city: '',
+    license: profile?.license || '',
+    title: initialTitle,
+    agency: profile?.agency || '',
+    city: profile?.businessAddress || '',
     phone: user?.phone ? formatPhone(user.phone) : '',
   }));
-  // Top up phone when the auth context loads after mount (first render
-  // before /me returned may have user=null).
+  // Top up the form when the auth context loads after mount (first
+  // render before /me returned may have user=null). Only fill empty
+  // slots so we don't overwrite in-flight edits.
   useEffect(() => {
-    if (user?.phone && !form.phone) setForm((p) => ({ ...p, phone: formatPhone(user.phone) }));
-  }, [user?.phone]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!user) return;
+    setForm((p) => ({
+      ...p,
+      phone: p.phone || (user.phone ? formatPhone(user.phone) : ''),
+      license: p.license || (user.agentProfile?.license || ''),
+      agency: p.agency || (user.agentProfile?.agency || ''),
+      city: p.city || (user.agentProfile?.businessAddress || ''),
+    }));
+  }, [user?.phone, user?.agentProfile?.license, user?.agentProfile?.agency, user?.agentProfile?.businessAddress]); // eslint-disable-line react-hooks/exhaustive-deps
   const [err, setErr] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [exiting, setExiting] = useState(false);
