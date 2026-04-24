@@ -52,8 +52,17 @@ COPY --from=build /app/src/assets ./dist/assets
 # imported by addressNormalize.ts via resolveJsonModule, but tsc
 # doesn't emit .json files, so it would be missing at runtime.
 COPY --from=build /app/src/data ./dist/data
-COPY package.json ./
-# tsx runs the seed script in production without a separate build step
-RUN npm install --no-save tsx@4.19.1 --cache /tmp/npm-cache --no-audit --no-fund
+COPY package.json package-lock.json ./
+# tsx runs the seed script in production without a separate build step.
+# Also re-pin openai + @anthropic-ai/sdk here — the earlier
+# `npm install --no-save tsx@4.19.1` call (without a lockfile, npm 11)
+# was reconciling node_modules against package.json and silently
+# dropping openai on linux/amd64, so the final image shipped without
+# the module and the server crashed at boot. Explicitly naming them
+# keeps them pinned through the runtime install pass.
+RUN npm install --no-save \
+      tsx@4.19.1 openai@6.34.0 @anthropic-ai/sdk@0.91.0 \
+      --cache /tmp/npm-cache --no-audit --no-fund \
+  && node -e "require.resolve('openai'); require.resolve('@anthropic-ai/sdk'); console.log('runtime deps ok')"
 EXPOSE 4000
 CMD ["sh", "-c", "npx prisma migrate deploy && (npx tsx prisma/seed.ts || true) && node dist/server.js"]
