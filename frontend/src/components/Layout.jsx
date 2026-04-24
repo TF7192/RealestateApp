@@ -212,6 +212,7 @@ export default function Layout({ onLogout }) {
   const agentName = user?.displayName || user?.email?.split('@')[0] || 'סוכן';
   const agentInitial = (agentName || 'א').slice(0, 1);
   const agentSub = user?.agentProfile?.agency || 'נדל״ן';
+  const agentAvatarUrl = user?.avatarUrl || null;
 
   return (
     <div dir="rtl" style={{
@@ -227,6 +228,7 @@ export default function Layout({ onLogout }) {
           primary={primary} tools={TOOL_NAV} favorites={favorites}
           location={location}
           agentName={agentName} agentInitial={agentInitial} agentSub={agentSub}
+          agentAvatarUrl={agentAvatarUrl}
           onLogout={onLogout}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
@@ -333,7 +335,7 @@ function HiddenScrollbarStyles() {
 
 function SidebarInner({
   primary, tools, favorites = [],
-  location, agentName, agentInitial, agentSub,
+  location, agentName, agentInitial, agentSub, agentAvatarUrl = null,
   onLogout, collapsed = false, onToggleCollapse,
 }) {
   // Single-active resolver: of all items whose `to` is a prefix of the
@@ -459,11 +461,25 @@ function SidebarInner({
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; }}
         >
-          <span style={{
-            width: 34, height: 34, borderRadius: 99, background: DT.gold, color: DT.ink,
-            display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13,
-            flexShrink: 0,
-          }}>{agentInitial}</span>
+          {/* Show the agent's uploaded avatar when available, otherwise
+              fall back to the initial tile. */}
+          {agentAvatarUrl ? (
+            <img
+              src={agentAvatarUrl}
+              alt={agentName}
+              style={{
+                width: 34, height: 34, borderRadius: 99,
+                objectFit: 'cover', flexShrink: 0,
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            />
+          ) : (
+            <span style={{
+              width: 34, height: 34, borderRadius: 99, background: DT.gold, color: DT.ink,
+              display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13,
+              flexShrink: 0,
+            }}>{agentInitial}</span>
+          )}
           {!collapsed && (
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{

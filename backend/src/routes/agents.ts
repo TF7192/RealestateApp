@@ -10,7 +10,10 @@ export const registerAgentRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       include: { agentProfile: true },
     });
-    if (!agent || agent.role !== 'AGENT') {
+    // OWNER accounts (office managers) also own public storefronts.
+    // Without this the /a/:id public page 404'd for any manager — the
+    // same bug pattern that 5631863 fixed on /api/public/*.
+    if (!agent || (agent.role !== 'AGENT' && agent.role !== 'OWNER')) {
       return reply.code(404).send({ error: { message: 'Agent not found' } });
     }
     return {
