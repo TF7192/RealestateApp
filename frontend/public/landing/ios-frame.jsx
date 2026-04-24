@@ -241,10 +241,17 @@ function IOSDevice({
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
         <IOSStatusBar dark={dark} scale={s} />
       </div>
-      {/* nav + content */}
+      {/* nav + content — when no navbar is provided, push content below
+          the status bar + Dynamic Island so the screen's top element
+          (e.g. PhoneScreen's "שלום, אדם" greeting + avatar) doesn't
+          sit on top of the bezel chrome. Safe-area height tracks the
+          scaled island's bottom edge plus a little breathing room. */}
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {title !== undefined && <IOSNavBar title={title} dark={dark} />}
-        <div style={{ flex: 1, overflow: 'auto' }}>{children}</div>
+        <div style={{
+          flex: 1, overflow: 'auto',
+          paddingTop: title === undefined ? Math.round((islandTop + islandH + 14) * 1) : 0,
+        }}>{children}</div>
         {keyboard && <IOSKeyboard dark={dark} />}
       </div>
       {/* home indicator — always on top */}
