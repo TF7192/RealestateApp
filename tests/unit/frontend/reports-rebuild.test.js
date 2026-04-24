@@ -3,23 +3,25 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-// R-1 — Reports page uses the app design system rather than raw HTML.
-// Layout wrapper is provided by App.jsx routing; this file just checks
-// the page itself:
+// R-1 — Reports page, refined layout (Sprint 8.x, claude-design
+// bundle 2026-04-24). The page was ported from the CSS-variable
+// design-system to the cream & gold DT palette with inline styles,
+// mirroring Team.jsx / Dashboard.jsx. This test pins the new
+// contract:
 //   * h1 + subtitle, semantic sections
-//   * card-based sections keyed off design-system CSS variables
-//   * RTL-first (dir="rtl"), no inline color literals
-//   * DateRangePicker lives inside a filters card (SmartFields pattern)
-//   * CSV export uses `.btn btn-secondary` (canonical button)
+//   * dir="rtl" on root
+//   * DT palette declared (cream / gold / ink / muted)
+//   * KPI tiles render in a grid-template-columns container
+//   * DateRangePicker renders inside a filters section
+//   * CSV export uses canonical .btn btn-secondary anchors
+//   * aria-busy on the tiles section for loading state
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const jsxPath = path.join(here, '../../../frontend/src/pages/Reports.jsx');
-const cssPath = path.join(here, '../../../frontend/src/pages/Reports.css');
 const src = readFileSync(jsxPath, 'utf8');
-const css = readFileSync(cssPath, 'utf8');
 
-describe('R-1 — Reports page rebuild with the design system', () => {
-  it('renders an <h1> inside an h1-level header, not raw HTML', () => {
+describe('R-1 — Reports page refined layout (DT palette)', () => {
+  it('renders <h1>דוחות</h1>', () => {
     expect(src).toMatch(/<h1[^>]*>\s*דוחות\s*<\/h1>/);
   });
 
@@ -32,26 +34,34 @@ describe('R-1 — Reports page rebuild with the design system', () => {
   });
 
   it('filters + tiles + export render as semantic <section> elements', () => {
-    const sections = src.match(/<section[^>]*className=/g) || [];
+    const sections = src.match(/<section[^>]*/g) || [];
     expect(sections.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('declares the DT cream + gold + ink + muted tokens verbatim', () => {
+    expect(src).toMatch(/cream:\s*'#f7f3ec'/);
+    expect(src).toMatch(/gold:\s*'#b48b4c'/);
+    expect(src).toMatch(/ink:\s*'#1e1a14'/);
+    expect(src).toMatch(/muted:\s*'#6b6356'/);
   });
 
   it('CSV export uses canonical .btn btn-secondary', () => {
     expect(src).toMatch(/btn btn-secondary/);
   });
 
-  it('CSS uses design-system custom properties (no hardcoded greys)', () => {
-    expect(css).toMatch(/var\(--bg-card\)/);
-    expect(css).toMatch(/var\(--text-primary\)/);
-    expect(css).toMatch(/var\(--text-secondary\)/);
-    expect(css).toMatch(/var\(--border\)/);
-  });
-
-  it('card CSS uses logical properties (margin-block / margin-inline)', () => {
-    expect(css).toMatch(/margin-block-start/);
-  });
-
   it('exports an aria-busy hook on the tiles section for loading state', () => {
     expect(src).toMatch(/aria-busy=/);
+  });
+
+  it('KPI tiles render inside a grid-template-columns container', () => {
+    expect(src).toMatch(/gridTemplateColumns/);
+  });
+
+  it('uses Assistant / Heebo Hebrew font stack', () => {
+    expect(src).toMatch(/Assistant,\s*Heebo/);
+  });
+
+  it('includes DateRangePicker inside the filters section', () => {
+    expect(src).toMatch(/<DateRangePicker/);
   });
 });
