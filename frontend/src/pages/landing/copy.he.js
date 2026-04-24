@@ -44,6 +44,40 @@ export const copy = {
     store_disabled_note: 'האפליקציות לאייפון ואנדרואיד בדרך — משתמשים רשומים יקבלו גישה ראשונים.',
   },
 
+  // Dedicated AI spotlight block (between Features and MobileApp). The
+  // Cream-&-Gold redesign pulls the AI from "just another card" into
+  // its own hero-sized section so the premium-only nature of the
+  // feature is unmissable.
+  ai: {
+    eyebrow: 'Estia AI · Premium',
+    title: 'ה-AI הראשון שמבין באמת נדל״ן ישראלי',
+    sub:
+      'מתאר נכסים כמו קופירייטר מנוסה. מתאים לידים לנכסים בעצמו. ' +
+      'חוסך שעות של "מי מתאים למה". כלול רק במסלול Premium.',
+    premium_chip: 'PREMIUM ONLY · ✦',
+    premium_note: 'כלול רק במסלול Premium',
+    actions: [
+      { label: 'כותב תיאור שיווקי', hint: '≈ 22 שניות' },
+      { label: 'מתאים ליד לנכס',    hint: 'דירוג 0–100' },
+      { label: 'סיכום פגישה',       hint: 'מהקלטה' },
+    ],
+    playground_title: 'Estia AI Playground',
+    playground_badge: 'v2.4 · נדל״ן',
+    playground_fields_label: 'נתוני נכס',
+    playground_fields: [
+      { k: 'סוג',  v: 'דירת 4 חד׳' },
+      { k: 'עיר',  v: 'רמת גן' },
+      { k: 'קומה', v: '5/7' },
+      { k: 'שטח',  v: '104 מ״ר' },
+    ],
+    playground_output_label: 'תיאור שיווקי · עברית',
+    playground_idle: 'לחצו על "צור תיאור"…',
+    playground_sample:
+      'דירת 4 חדרים מוארת ומרווחת ברחוב שקט בלב רמת גן, קומה 5 עם מעלית, ' +
+      'מרפסת שמש 12 מ״ר פונה לפארק, חניה ומחסן. סמוכה לבתי ספר ותחבורה.',
+    playground_cta: 'צור תיאור חדש',
+  },
+
   features: {
     section_eyebrow: 'תכונות',
     section_title: 'כל הכלים שסוכן נדל״ן באמת צריך',

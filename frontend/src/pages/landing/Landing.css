@@ -2,9 +2,34 @@
    Landing page — Hebrew, mobile-first, RTL-native.
    Reuses the app's CSS variables (index.css). All class names are
    prefixed `lp-*` to avoid any product-page collisions.
+
+   Cream & Gold redesign (2026-04-24): the landing adopts a warm
+   editorial B2B palette that's distinct from the app shell. Tokens
+   are scoped to .lp-page so nothing leaks into /dashboard, etc.
    ─────────────────────────────────────────────────────────────── */
 
 .lp-page {
+  /* Overlay the shared design tokens with the marketing-site palette.
+     Every component inside the landing reads these (via var(--*)), so
+     switching the tokens here redresses the whole page without
+     touching section files. */
+  --bg-primary:     #f7f3ec;
+  --bg-secondary:   #efe9df;
+  --bg-tertiary:    #e8dfcf;
+  --bg-card:        #ffffff;
+  --bg-card-elev:   #fbf7f0;
+  --text-primary:   #1e1a14;
+  --text-secondary: #2d261d;
+  --text-muted:     #6b6356;
+  --gold:           #b48b4c;
+  --gold-dim:       #a07b40;
+  --gold-light:     #d9b774;
+  --gold-readable:  #7a5c2c;
+  --gold-border:    rgba(180, 139, 76, 0.35);
+  --border:         rgba(30, 26, 20, 0.08);
+  --border-light:   rgba(30, 26, 20, 0.14);
+  --shadow-gold:    0 8px 24px rgba(180, 139, 76, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+
   direction: rtl;
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -856,4 +881,224 @@
 .lp-fade-in.is-visible { opacity: 1; transform: translateY(0); }
 @media (prefers-reduced-motion: reduce) {
   .lp-fade-in { opacity: 1; transform: none; transition: none; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Feature card — PREMIUM ribbon on the AI card.
+   The Cream-&-Gold redesign lifts the AI into its own hero
+   section below, but the card in the features grid still carries
+   a top-left gold chip so the "premium" signal shows up even
+   before the visitor scrolls.
+   ─────────────────────────────────────────────────────────── */
+.lp-feature-card-featured {
+  position: relative;
+  background: linear-gradient(160deg, var(--bg-card-elev) 0%, var(--bg-tertiary) 100%);
+  border-color: var(--gold);
+  box-shadow: 0 20px 50px rgba(180, 139, 76, 0.18);
+}
+.lp-feature-ribbon {
+  position: absolute;
+  top: 16px;
+  inset-inline-start: 16px;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  color: var(--text-primary);
+  font-size: 11px; font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 10px rgba(180, 139, 76, 0.35);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   AI Spotlight — premium-only AI playground section. Two-column
+   on desktop (copy + live playground), stacked on mobile.
+   ─────────────────────────────────────────────────────────── */
+.lp-ai-section { background: var(--bg-primary); }
+.lp-ai-ribbon {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  color: var(--text-primary);
+  font-size: 13px; font-weight: 800; letter-spacing: 0.04em;
+  box-shadow: 0 10px 26px rgba(180, 139, 76, 0.35);
+  margin-bottom: 20px;
+}
+.lp-ai-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 48px;
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .lp-ai-grid { grid-template-columns: 1fr 1fr; gap: 64px; }
+}
+.lp-ai-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.lp-ai-premium-note {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px dashed var(--gold);
+  color: var(--gold-readable);
+  font-size: 13px; font-weight: 600;
+  margin-bottom: 22px;
+}
+.lp-ai-actions {
+  list-style: none; padding: 0; margin: 0;
+  display: grid; gap: 10px;
+}
+.lp-ai-action-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+.lp-ai-action-row:hover {
+  border-color: var(--gold-border);
+  transform: translateY(-1px);
+}
+.lp-ai-action-icon {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  background: rgba(180, 139, 76, 0.12);
+  color: var(--gold);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.lp-ai-action-label { font-weight: 600; font-size: 15px; }
+.lp-ai-action-hint {
+  margin-inline-start: auto;
+  font-size: 12px; color: var(--text-muted);
+}
+.lp-ai-action-pro {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.05em;
+  padding: 3px 8px; border-radius: 999px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  color: var(--text-primary);
+}
+
+/* Playground card ─ animated mini-product */
+.lp-ai-playground {
+  position: relative;
+  background: var(--bg-card-elev);
+  border: 2px solid var(--gold);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 30px 80px rgba(30, 26, 20, 0.10), 0 0 0 6px rgba(180, 139, 76, 0.08);
+  min-height: 420px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.lp-ai-playground-ribbon {
+  position: absolute; top: -14px; inset-inline-end: 24px;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  color: var(--text-primary);
+  font-size: 12px; font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 6px 16px rgba(180, 139, 76, 0.4);
+}
+.lp-ai-playground-head {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--gold-readable);
+  font-size: 13px; font-weight: 700;
+}
+.lp-ai-playground-ver {
+  margin-inline-start: auto;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.lp-ai-playground-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.lp-ai-playground-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.lp-ai-playground-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.lp-ai-playground-field {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.lp-ai-playground-field-key { font-size: 10px; color: var(--text-muted); }
+.lp-ai-playground-field-val { font-size: 13px; font-weight: 600; }
+.lp-ai-playground-output {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--gold);
+  border-radius: 14px;
+  padding: 14px;
+  min-height: 140px;
+}
+.lp-ai-playground-output-head {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--gold-readable);
+  font-size: 11px; font-weight: 600;
+  margin-bottom: 8px;
+}
+.lp-ai-playground-status {
+  margin-inline-start: auto;
+  color: var(--text-muted);
+  font-size: 10px; font-weight: 600;
+}
+.lp-ai-playground-status.is-running { color: var(--gold-readable); }
+.lp-ai-playground-output-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+.lp-ai-playground-idle { color: var(--text-muted); }
+.lp-ai-playground-caret {
+  display: inline-block;
+  color: var(--gold);
+  animation: lp-ai-blink 900ms steps(2, end) infinite;
+}
+@keyframes lp-ai-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .lp-ai-playground-caret { animation: none; }
+}
+.lp-ai-playground-cta {
+  width: 100%;
+  margin-top: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Final CTA block — gold gradient so the page ends on warm not
+   dark (the designer explicitly removed every dark surface). The
+   existing .lp-final-cta stays in place if you prefer; this
+   override keeps the component markup identical.
+   ─────────────────────────────────────────────────────────── */
+.lp-final-cta {
+  background:
+    linear-gradient(135deg,
+      var(--gold-light) 0%,
+      var(--gold)       60%,
+      var(--gold-readable) 100%);
+  color: var(--text-primary);
+}
+.lp-final-cta .lp-btn-primary {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-shadow: 0 10px 30px rgba(30, 26, 20, 0.18);
+}
+.lp-final-cta .lp-btn-primary:hover {
+  background: var(--bg-card);
 }

@@ -6,6 +6,7 @@ import {
   Calculator,
   Smartphone,
   Check,
+  Star,
 } from 'lucide-react';
 import { copy } from '../copy.he';
 
@@ -31,8 +32,18 @@ export default function Features() {
         <div className="lp-feature-grid">
           {copy.features.cards.map((card) => {
             const Icon = ICONS[card.key] || Check;
+            const featured = card.key === 'ai'; // Premium AI card gets the gold ribbon.
             return (
-              <article key={card.key} className="lp-feature-card lp-fade-in">
+              <article
+                key={card.key}
+                className={`lp-feature-card lp-fade-in${featured ? ' lp-feature-card-featured' : ''}`}
+              >
+                {featured && (
+                  <span className="lp-feature-ribbon" aria-label="כלול רק במסלול Premium">
+                    <Star size={12} aria-hidden="true" />
+                    PREMIUM
+                  </span>
+                )}
                 <span className="lp-feature-icon" aria-hidden="true">
                   <Icon size={22} />
                 </span>
