@@ -48,12 +48,28 @@ function ownerSub(o) {
   return [o.email, o.phone].filter(Boolean).join(' · ');
 }
 
+// Map the backend's raw enum statuses to Hebrew labels — same set
+// Deals.jsx uses. Anything unrecognized falls back to the raw value
+// so we never drop data silently.
+const DEAL_STATUS_LABELS = {
+  NEGOTIATING:      'משא ומתן',
+  WAITING_MORTGAGE: 'אישור משכנתא',
+  PENDING_CONTRACT: 'לקראת חתימה',
+  SIGNED:           'נחתם',
+  FELL_THROUGH:     'לא יצא לפועל',
+  CLOSED:           'נסגרה',
+  CANCELLED:        'בוטלה',
+};
+
 function dealLabel(d) {
-  return d.title || d.propertyAddress || d.propertyTitle || `עסקה #${d.id}`;
+  const addr = [d.propertyStreet, d.city].filter(Boolean).join(', ');
+  return addr || d.title || d.propertyAddress || d.propertyTitle || 'עסקה';
 }
 
 function dealSub(d) {
-  return [d.status, d.stage, d.propertyAddress].filter(Boolean).join(' · ');
+  const status = DEAL_STATUS_LABELS[d.status] || d.status;
+  const category = d.category === 'RENT' ? 'השכרה' : d.category === 'SALE' ? 'מכירה' : null;
+  return [status, category].filter(Boolean).join(' · ');
 }
 
 export default function CommandPalette({ open, onClose }) {
@@ -265,7 +281,7 @@ export default function CommandPalette({ open, onClose }) {
                     key={`d-${d.id}`}
                     item={{ icon: Handshake, title: dealLabel(d), subtitle: dealSub(d) }}
                     active={index === dealOffset + i}
-                    onPick={() => { navigate('/deals'); onClose(); }}
+                    onPick={() => { navigate(d.id ? `/deals/${d.id}` : '/deals'); onClose(); }}
                   />
                 ))}
               </Section>
