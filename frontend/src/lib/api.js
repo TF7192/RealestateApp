@@ -172,6 +172,9 @@ export const api = {
   // Auth
   signup: (body) => request('/auth/signup', { method: 'POST', body }),
   login: (body) => request('/auth/login', { method: 'POST', body }),
+  forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: { email } }),
+  resetPassword: (token, password) =>
+    request('/auth/reset-password', { method: 'POST', body: { token, password } }),
   googleMock: (body) => request('/auth/google/mock', { method: 'POST', body }),
   googleNativeExchange: (code) =>
     request('/auth/google/native-exchange', { method: 'POST', body: { code } }),

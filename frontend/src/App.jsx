@@ -27,6 +27,8 @@ import ProspectSign from './pages/ProspectSign';
 import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
 import Onboarding from './pages/Onboarding';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Transfers from './pages/Transfers';
 // S13: Templates, AdminChats, CommandPalette are heavy and not on the
 // critical path for the first page paint. Lazy-load them so the main
@@ -208,6 +210,8 @@ function AppRoutes() {
           {/* Explicit login route; the landing CTAs link here.
               `/login?flow=signup` preselects the signup tab inside Login.jsx. */}
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           {/* SEO-friendly public routes */}
           <Route path="/agents/:agentSlug" element={<AgentPortal />} />
           <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />

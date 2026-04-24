@@ -358,6 +358,9 @@ model User {
   // Excel import — saved column mappings keyed by header signature so
   // repeat imports from the same vendor format auto-apply last choice.
   importMappings       ImportMapping[]
+  // Password-reset tokens issued to this user. Rows persist after
+  // `usedAt` for auditability; a cron purges >30 day rows.
+  passwordResetTokens  PasswordResetToken[]
   reminderAnchors      Reminder[]         @relation("ReminderCustomer")
   // Sprint 1 / MLS parity — Task K2.
   leadAssignments      LeadAgent[]        @relation("LeadAssignments")
@@ -1381,4 +1384,23 @@ model ImportMapping {
 
   @@unique([agentId, entityType, headerSig])
   @@index([agentId])
+}
+
+// ────────────────────────────────────────────────────────────────────
+// PasswordResetToken — single-use password reset tokens.
+// Minted by POST /auth/forgot-password, consumed by
+// POST /auth/reset-password. Expires after 30 minutes; `usedAt`
+// flips on consume so tokens cannot be replayed.
+// ────────────────────────────────────────────────────────────────────
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }

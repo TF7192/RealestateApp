@@ -27,15 +27,76 @@ const DT = {
 };
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
-// AI priorities — this card is the premium demo surface, every row
-// opens the Premium modal on click.
-const AI_PRIORITIES = [
-  { p: 1, t: 'תתקשרו לדנה כהן · לא עניתם כבר 4 שעות',        sub: 'ליד חם · תקציב ₪3.2M · שלחה 2 הודעות',         tag: 'hot',  action: 'התקשר עכשיו' },
-  { p: 2, t: 'שלחו ל-מיכל אבן את הפנטהאוז בהרצליה',           sub: 'AI התאמה 88% · מחכה להצעה',                       tag: 'gold', action: 'שלח הצעה' },
-  { p: 3, t: 'תיאום צפייה · רון ברקוביץ',                      sub: 'ראה 4 דירות, מתלבט — הצעת פגישה מחר',             tag: 'warm', action: 'תאם פגישה' },
-  { p: 4, t: 'עדכנו מחיר נכס ז׳בוטינסקי 108',                  sub: 'ירד מ-142 ל-89 צפיות השבוע — מומלץ להוריד ₪50K', tag: 'ink',  action: 'ערוך' },
-  { p: 5, t: 'שלחו חוזה בלעדיות למשפ׳ כוכבי',                  sub: 'נחתם בסיכום השבועי · ממתין להעלאה',                tag: 'success', action: 'פתח חוזה' },
-];
+// AI priorities are computed from live data — no fixtures. Helper
+// below inspects the agent's real leads/properties/deals/meetings
+// and returns up to 5 actionable items sorted by urgency. Each row
+// is still gated by the Premium modal on click (the AI layer that
+// would auto-draft the action is premium-only); the signals come
+// from the agent's own records.
+function computeAiPriorities({ leads, properties, deals, meetings }) {
+  const out = [];
+  const now = Date.now();
+
+  // Hot leads whose last-contact is stale (>4 h ago or never). Sorted
+  // newest-stale-first so the most recently missed call surfaces.
+  const hotStale = (leads || [])
+    .filter((l) => (l.status || '').toUpperCase() === 'HOT')
+    .map((l) => ({ l, gap: l.lastContact ? now - new Date(l.lastContact).getTime() : Infinity }))
+    .filter((x) => x.gap > 4 * 60 * 60 * 1000)
+    .sort((a, b) => a.gap - b.gap);
+  for (const { l } of hotStale.slice(0, 2)) {
+    out.push({
+      key: `hot-${l.id}`,
+      t: `תתקשרו ל-${l.name || 'ליד'} · לא עניתם זמן רב`,
+      sub: [l.city, l.priceRangeLabel].filter(Boolean).join(' · ') || 'ליד חם ממתין למענה',
+      tag: 'hot', action: 'התקשר עכשיו',
+    });
+  }
+
+  // Upcoming meeting today → remind the agent to prep.
+  const nextMeeting = (meetings || []).find((m) => m.dueAt && new Date(m.dueAt).getTime() > now);
+  if (nextMeeting) {
+    out.push({
+      key: `meet-${nextMeeting.id}`,
+      t: `הכינו את הפגישה: ${nextMeeting.title || 'פגישה'}`,
+      sub: nextMeeting.description || 'סדר עדיפויות · נכסים · היסטוריית לקוח',
+      tag: 'gold', action: 'פתח סיכום',
+    });
+  }
+
+  // Deals sitting in NEGOTIATION for more than a week → nudge.
+  const stuckDeals = (deals || []).filter((d) => {
+    const stage = (d.stage || d.status || '').toUpperCase();
+    if (stage !== 'NEGOTIATION') return false;
+    const touched = d.updatedAt ? new Date(d.updatedAt).getTime() : 0;
+    return touched > 0 && now - touched > 7 * 24 * 60 * 60 * 1000;
+  });
+  for (const d of stuckDeals.slice(0, 1)) {
+    out.push({
+      key: `deal-${d.id}`,
+      t: `עסקה במו״מ ללא זיז שבוע — ${d.propertyStreet || 'עסקה'}`,
+      sub: 'מומלץ להתקשר לשני הצדדים ולסגור מועד חתימה.',
+      tag: 'warm', action: 'פתח עסקה',
+    });
+  }
+
+  // Stale properties (active + no updatedAt touch in 14 days).
+  const staleProps = (properties || []).filter((p) => {
+    const touched = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
+    return (p.status || '').toUpperCase() === 'ACTIVE' && touched > 0
+      && now - touched > 14 * 24 * 60 * 60 * 1000;
+  });
+  for (const p of staleProps.slice(0, 1)) {
+    out.push({
+      key: `prop-${p.id}`,
+      t: `רענן את הנכס ${p.street || ''}${p.street && p.city ? ', ' : ''}${p.city || ''}`,
+      sub: 'לא נגעתם בנכס יותר משבועיים — מומלץ לעדכן מחיר / תמונות.',
+      tag: 'ink', action: 'ערוך נכס',
+    });
+  }
+
+  return out.slice(0, 5);
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -68,6 +129,10 @@ export default function Dashboard() {
   const hotLeads = useMemo(
     () => leads.filter((l) => (l.status || '').toUpperCase() === 'HOT').slice(0, 4),
     [leads],
+  );
+  const aiPriorities = useMemo(
+    () => computeAiPriorities({ leads, properties, deals, meetings }),
+    [leads, properties, deals, meetings],
   );
   const kpis = useMemo(() => [
     { l: 'לידים פעילים',   v: leads.length,      i: Users },
@@ -159,21 +224,29 @@ export default function Dashboard() {
                 }}>PREMIUM</span>
               </div>
               <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2 }}>
-                5 פעולות שיזיזו אתכם קדימה היום
+                {aiPriorities.length > 0
+                  ? `${aiPriorities.length} פעולות שיזיזו אתכם קדימה היום`
+                  : 'אין פעולות דחופות כרגע'}
               </div>
             </div>
           </div>
-          {AI_PRIORITIES.map((r, i) => (
-            <div key={i} style={{
+          {aiPriorities.length === 0 && (
+            <div style={{ fontSize: 13, color: DT.muted, padding: '16px 0', lineHeight: 1.7 }}>
+              אין עדיפויות לטיפול עכשיו. מרגע שיופיעו לידים חמים, פגישות או
+              עסקאות במו״מ — ה-AI יסדר אותם כאן לפי דחיפות.
+            </div>
+          )}
+          {aiPriorities.map((r, i) => (
+            <div key={r.key} style={{
               display: 'flex', gap: 14, alignItems: 'center',
               padding: '12px 0',
-              borderBottom: i === AI_PRIORITIES.length - 1 ? 'none' : `1px solid ${DT.border}`,
+              borderBottom: i === aiPriorities.length - 1 ? 'none' : `1px solid ${DT.border}`,
             }}>
               <div style={{
                 width: 28, height: 28, borderRadius: 8, background: DT.cream3,
                 color: DT.muted, display: 'grid', placeItems: 'center',
                 fontWeight: 800, fontSize: 13, flexShrink: 0,
-              }}>{r.p}</div>
+              }}>{i + 1}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                   {r.t}

@@ -254,7 +254,7 @@ function DesktopLogin(p) {
                 <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.muted }}>
                   <input type="checkbox" defaultChecked /> זכור אותי
                 </label>
-                <a href="mailto:hello@estia.co.il?subject=איפוס סיסמה"
+                <a href="/forgot-password"
                   style={{ color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>שכחת סיסמה?</a>
               </div>
             )}
@@ -341,7 +341,7 @@ function MobileLogin(p) {
         />
         {!isSignup && (
           <div style={{ textAlign: 'left', marginBottom: 18 }}>
-            <a href="mailto:hello@estia.co.il?subject=איפוס סיסמה" style={{ fontSize: 12, color: DT.gold, fontWeight: 600 }}>שכחתי סיסמה</a>
+            <a href="/forgot-password" style={{ fontSize: 12, color: DT.gold, fontWeight: 600 }}>שכחתי סיסמה</a>
           </div>
         )}
         {error && <div style={{ background: 'rgba(185,28,28,0.08)', color: DT.danger, padding: '10px 12px', borderRadius: 10, fontSize: 13, marginBottom: 12 }} role="alert">{error}</div>}

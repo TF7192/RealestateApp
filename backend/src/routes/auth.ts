@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { randomBytes } from 'node:crypto';
 import argon2 from 'argon2';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
@@ -80,6 +81,19 @@ const googleMockSchema = z.object({
 const AUTH_RL_DISABLED = process.env.AUTH_RATE_LIMIT_DISABLED === '1';
 const LOGIN_LIMIT  = AUTH_RL_DISABLED ? false : { max: 10, timeWindow: '15 minutes' };
 const SIGNUP_LIMIT = AUTH_RL_DISABLED ? false : { max: 3,  timeWindow: '1 hour' };
+const FORGOT_LIMIT = AUTH_RL_DISABLED ? false : { max: 5, timeWindow: '1 hour' };
+
+const forgotSchema = z.object({ email: z.string().email() });
+const resetSchema = z.object({
+  token: z.string().min(16).max(200),
+  password: z.string().min(8).max(200),
+});
+
+// 30-minute token lifetime. Long enough for the user to read their
+// email and click back, short enough that a leaked token window is
+// small. 48-char hex (24 random bytes) — unguessable in any realistic
+// timeframe.
+const RESET_TTL_MS = 30 * 60 * 1000;
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post('/signup', { config: { rateLimit: SIGNUP_LIMIT } }, async (req, reply) => {
@@ -190,6 +204,55 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post('/logout', async (_req, reply) => {
     reply.clearCookie(COOKIE_NAME, { path: '/' });
     return { ok: true };
+  });
+
+  // Forgot-password flow. Always returns `{ ok: true }` regardless of
+  // whether the email exists — we don't want an attacker to enumerate
+  // registered addresses by diffing response codes. When the address
+  // does exist we mint a 24-byte hex token with a 30-minute lifetime
+  // and (in non-prod) surface it on the response so the client can
+  // deep-link the reset page without routing mail through SES yet.
+  // TODO (prod): wire an SES / Resend delivery here. For now the
+  // token also lands in server logs (level=info) so the team can pick
+  // it up during the email provider integration sprint.
+  app.post('/forgot-password', { config: { rateLimit: FORGOT_LIMIT } }, async (req, reply) => {
+    const parse = forgotSchema.safeParse(req.body);
+    if (!parse.success) {
+      return reply.code(400).send({ error: { message: 'כתובת אימייל לא תקינה' } });
+    }
+    const email = parse.data.email.toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || user.deletedAt || !user.passwordHash) {
+      return reply.send({ ok: true });
+    }
+    const token = randomBytes(24).toString('hex');
+    const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+    await prisma.passwordResetToken.create({
+      data: { userId: user.id, token, expiresAt },
+    });
+    req.log.info({ userId: user.id, token }, 'password reset token issued');
+    phTrack('password_reset_requested', user.id, {});
+    const devToken = process.env.NODE_ENV === 'production' ? undefined : token;
+    return reply.send({ ok: true, ...(devToken ? { devToken } : {}) });
+  });
+
+  app.post('/reset-password', async (req, reply) => {
+    const parse = resetSchema.safeParse(req.body);
+    if (!parse.success) {
+      return reply.code(400).send({ error: { message: 'סיסמה חייבת להיות לפחות 8 תווים' } });
+    }
+    const { token, password } = parse.data;
+    const row = await prisma.passwordResetToken.findUnique({ where: { token } });
+    if (!row || row.usedAt || row.expiresAt < new Date()) {
+      return reply.code(400).send({ error: { message: 'הקישור לא תקין או פג תוקפו' } });
+    }
+    const passwordHash = await argon2.hash(password);
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: row.userId }, data: { passwordHash } }),
+      prisma.passwordResetToken.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
+    ]);
+    phTrack('password_reset_completed', row.userId, {});
+    return reply.send({ ok: true });
   });
 
   // A-1 — soft-delete the authenticated user's account and clear the
