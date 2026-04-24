@@ -1,459 +1,386 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, Search, Phone, Building2, X, MessageSquare, ChevronLeft } from 'lucide-react';
-import api from '../lib/api';
-import { useRouteScrollRestore } from '../hooks/useScrollRestore';
-import OwnerEditDialog from '../components/OwnerEditDialog';
-import PullRefresh from '../components/PullRefresh';
-import SwipeRow from '../components/SwipeRow';
-import WhatsAppIcon from '../components/WhatsAppIcon';
-import FavoriteStar from '../components/FavoriteStar';
-import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
-import PageTour from '../components/PageTour';
-import { pageCache } from '../lib/pageCache';
-import { useToast } from '../lib/toast';
-import { telUrl } from '../lib/waLink';
-import { formatPhone } from '../lib/phone';
-import { openWhatsApp } from '../native/share';
-import { relativeDate } from '../lib/relativeDate';
-import Pagination from '../components/Pagination';
-import { paginate } from '../lib/pagination';
-import useInfiniteScroll from '../lib/useInfiniteScroll';
-import haptics from '../lib/haptics';
-import ViewToggle from '../components/ViewToggle';
-import DataTable from '../components/DataTable';
-import { useViewMode } from '../lib/useViewMode';
-import './Owners.css';
+// Owners (property owners) list — port of the claude.ai/design bundle
+// using the Cream & Gold DT palette with inline styles. Mirrors the
+// dense-table treatment of the Customers screen so the two CRM read
+// surfaces read the same at a glance.
+//
+// No fixtures: rows come from GET /api/owners. Favorites, phone +
+// WhatsApp shortcuts and the "new owner" dialog all stay from the
+// prior implementation.
 
-/**
- * Owners — list of every property-owner the agent has captured.
- * Cards on desktop; dense 64px swipe-able rows on mobile.
- */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  UserPlus, Search, Phone, MessageCircle, Building2, Star, Sparkles,
+} from 'lucide-react';
+import api from '../lib/api';
+import { formatPhone } from '../lib/phone';
+import { useToast } from '../lib/toast';
+import { relativeDate } from '../lib/relativeDate';
+import OwnerEditDialog from '../components/OwnerEditDialog';
+
+const DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14', ink2: '#3a3226',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
+  success: '#15803d',
+};
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
+
 export default function Owners() {
-  const isMobile = useViewportMobile(820);
-  const [viewMode, setViewMode] = useViewMode('owners', 'cards');
-  const toast = useToast();
   const navigate = useNavigate();
-  useRouteScrollRestore();
-  // Seed from cache so a return trip paints instantly.
-  const _cached = pageCache.get('owners');
-  const [owners, setOwners] = useState(_cached || []);
-  const [loading, setLoading] = useState(!_cached);
-  const [search, setSearch] = useState('');
-  const [editing, setEditing] = useState(null); // null | {} (new) | owner (edit)
-  // Lane 2 — favorite ids for OWNER entities. Seeded from /api/favorites
-  // so the star on each card reflects the current state before any toggle.
+  const toast = useToast();
+  const [owners, setOwners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
   const [favoriteIds, setFavoriteIds] = useState(() => new Set());
-  const cardRefs = useRef({});
+  const [filter, setFilter] = useState('all'); // all | favorites | withProps | withoutProps
+  const [editing, setEditing] = useState(null); // null | {} new | owner
+  const [hoverId, setHoverId] = useState(null);
+  const mounted = useRef(true);
 
   const load = useCallback(async () => {
     try {
       const res = await api.listOwners();
-      const next = res?.items || [];
-      setOwners(next);
-      pageCache.set('owners', next);
+      if (mounted.current) setOwners(res?.items || []);
     } catch (e) {
       toast?.error?.(e?.message || 'טעינת בעלי הנכסים נכשלה');
-      setOwners([]);
+      if (mounted.current) setOwners([]);
     }
   }, [toast]);
 
   useEffect(() => {
-    load().finally(() => setLoading(false));
-    // Seed favorite stars for OWNER — failures are non-fatal, each card
-    // simply shows an empty star until the agent toggles it.
+    mounted.current = true;
+    load().finally(() => { if (mounted.current) setLoading(false); });
     api.listFavorites('OWNER')
       .then((r) => {
-        const ids = new Set((r?.items || []).map((f) => f.entityId));
-        setFavoriteIds(ids);
+        if (mounted.current) {
+          setFavoriteIds(new Set((r?.items || []).map((f) => f.entityId)));
+        }
       })
-      .catch(() => { /* ignore */ });
+      .catch(() => { /* stars stay empty */ });
+    return () => { mounted.current = false; };
   }, [load]);
 
-  // Toggle an owner's favorite state with an optimistic update that
-  // rolls back on failure. Mirrors the Customers page pattern so the
-  // star flips the moment the agent taps.
-  const handleToggleFavorite = async (ownerId, nextActive) => {
+  const toggleFavorite = async (ownerId, nextActive) => {
     setFavoriteIds((cur) => {
       const copy = new Set(cur);
-      if (nextActive) copy.add(ownerId);
-      else copy.delete(ownerId);
+      if (nextActive) copy.add(ownerId); else copy.delete(ownerId);
       return copy;
     });
     try {
-      if (nextActive) {
-        await api.addFavorite({ entityType: 'OWNER', entityId: ownerId });
-      } else {
-        await api.removeFavorite('OWNER', ownerId);
-      }
+      if (nextActive) await api.addFavorite({ entityType: 'OWNER', entityId: ownerId });
+      else            await api.removeFavorite('OWNER', ownerId);
     } catch (e) {
       setFavoriteIds((cur) => {
         const copy = new Set(cur);
-        if (nextActive) copy.delete(ownerId);
-        else copy.add(ownerId);
+        if (nextActive) copy.delete(ownerId); else copy.add(ownerId);
         return copy;
       });
       toast?.error?.(e?.message || 'שינוי המועדפים נכשל');
     }
   };
 
+  const counts = useMemo(() => {
+    const by = { favorites: 0, withProps: 0, withoutProps: 0 };
+    for (const o of owners) {
+      if (favoriteIds.has(o.id)) by.favorites++;
+      if ((o.propertyCount || 0) > 0) by.withProps++;
+      else by.withoutProps++;
+    }
+    return by;
+  }, [owners, favoriteIds]);
+
   const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return owners;
-    return owners.filter(
-      (o) =>
-        (o.name || '').toLowerCase().includes(s) ||
-        (o.phone || '').includes(search.trim()) ||
-        (o.email || '').toLowerCase().includes(s),
-    );
-  }, [owners, search]);
+    const s = q.trim().toLowerCase();
+    return owners.filter((o) => {
+      if (s) {
+        const hay = `${o.name || ''} ${o.phone || ''} ${o.email || ''}`.toLowerCase();
+        if (!hay.includes(s)) return false;
+      }
+      if (filter === 'favorites' && !favoriteIds.has(o.id)) return false;
+      if (filter === 'withProps' && !(o.propertyCount > 0)) return false;
+      if (filter === 'withoutProps' && (o.propertyCount || 0) > 0) return false;
+      return true;
+    });
+  }, [owners, q, filter, favoriteIds]);
 
-  // Table view → numbered pager; card/mobile list → infinite scroll.
-  // Both reset when the search narrows.
-  const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search]);
-  const paged = useMemo(() => paginate(filtered, { page, pageSize: 8 }), [filtered, page]);
-  const infinite = useInfiniteScroll(filtered.length, { pageSize: 8, initial: 8 });
-  const cardVisible = useMemo(() => filtered.slice(0, infinite.visible), [filtered, infinite.visible]);
-
-  const onSaved = async (saved) => {
-    setEditing(null);
-    if (saved?.message) toast?.success?.(saved.message);
-    else toast?.success?.('בעל הנכס נשמר');
-    await load();
-  };
-
-  const showSkel = useDelayedFlag(loading, 220);
-  if (loading && showSkel) {
-    return (
-      <div className="owners-page app-wide-cap">
-        <div className="page-header animate-in">
-          <div className="page-header-info">
-            <h2>בעלי נכסים</h2>
-            <p>טוען…</p>
-          </div>
-        </div>
-        <div className="owners-grid">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="owner-card skel-card">
-              <div className="skel skel-circle" />
-              <div className="skel skel-line w-70" />
-              <div className="skel skel-line w-50" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (loading) {
-    return (
-      <div className="owners-page app-wide-cap">
-        <div className="page-header animate-in">
-          <div className="page-header-info">
-            <h2>בעלי נכסים</h2>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const filters = [
+    { k: 'all',          label: 'הכול',        count: owners.length },
+    { k: 'favorites',    label: 'מועדפים',     count: counts.favorites },
+    { k: 'withProps',    label: 'עם נכסים',    count: counts.withProps },
+    { k: 'withoutProps', label: 'ללא נכסים',   count: counts.withoutProps },
+  ];
 
   return (
-    <PullRefresh onRefresh={load}>
-      <PageTour
-        pageKey="owners"
-        steps={[
-          { target: 'body', placement: 'center',
-            title: 'בעלי הנכסים שלך',
-            content: 'ספר המוכרים והמשכירים. כל בעל נכס מקושר לנכסים שלו. החליקו על שורה לחיוג, וואטסאפ או פתיחת הכרטיס המלא.' },
-        ]}
-      />
-      <div className="owners-page app-wide-cap">
-        <div className="page-header animate-in">
-          <div className="page-header-info">
-            <h2>בעלי נכסים</h2>
-            <p>
-              {filtered.length} מתוך {owners.length} בעלי נכסים
-            </p>
-          </div>
-          <div className="page-header-actions owners-header-actions-desktop">
-            <ViewToggle value={viewMode} onChange={setViewMode} />
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setEditing({})}
-            >
-              <UserPlus size={18} />
-              בעל נכס חדש
-            </button>
+    <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
+      {/* Title row */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+        marginBottom: 18, gap: 16, flexWrap: 'wrap',
+      }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.7, margin: 0 }}>
+            בעלי נכסים
+          </h1>
+          <div style={{ fontSize: 13, color: DT.muted, marginTop: 2 }}>
+            {owners.length} סך הכול · {counts.favorites} מועדפים · {counts.withProps} עם נכסים
           </div>
         </div>
-
-        <div className="owners-toolbar animate-in animate-in-delay-1">
-          <div className="sticky-search owners-sticky-search">
-            <div className="search-box owners-search">
-              <Search size={18} />
-              <input
-                type="search"
-                inputMode="search"
-                enterKeyHint="search"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                placeholder="חיפוש לפי שם, טלפון או אימייל…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              {search && (
-                <button
-                  type="button"
-                  className="owners-search-clear"
-                  onClick={() => setSearch('')}
-                  aria-label="נקה חיפוש"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="owners-empty animate-in animate-in-delay-2">
-            <div className="oe-illustration">🏠</div>
-            <h3>{owners.length === 0 ? 'עוד אין בעלי נכסים במערכת' : 'אין תוצאות לחיפוש'}</h3>
-            <p>
-              {owners.length === 0
-                ? 'הוסף בעל נכס ראשון כדי להתחיל לעקוב אחרי קשרי הבעלות לנכסים.'
-                : 'נסה לשנות את החיפוש או לנקות את השדה.'}
-            </p>
-            {owners.length === 0 && (
-              <button className="btn btn-primary btn-lg" onClick={() => setEditing({})}>
-                <UserPlus size={18} />
-                בעל נכס חדש
-              </button>
-            )}
-          </div>
-        ) : isMobile ? (
-          <div className="owners-list animate-in animate-in-delay-2">
-            {cardVisible.map((o) => {
-              const createdRel = o.createdAt ? relativeDate(o.createdAt) : null;
-              const swipeActions = [
-                {
-                  icon: Phone,
-                  label: 'התקשר',
-                  color: 'gold',
-                  onClick: () => {
-                    if (!o.phone) return;
-                    haptics.tap();
-                    window.open(telUrl(o.phone), '_self');
-                  },
-                },
-                {
-                  icon: WhatsAppIcon,
-                  label: 'וואטסאפ',
-                  color: 'green',
-                  onClick: () => {
-                    if (!o.phone) return;
-                    haptics.tap();
-                    openWhatsApp({ phone: o.phone, text: `שלום ${o.name}` });
-                  },
-                },
-                {
-                  icon: ChevronLeft,
-                  label: 'פתח',
-                  color: 'gold-border',
-                  onClick: () => {
-                    haptics.tap();
-                    navigate(`/owners/${o.id}`);
-                  },
-                },
-              ];
-              return (
-                <div
-                  key={o.id}
-                  ref={(el) => { if (el) cardRefs.current[o.id] = el; }}
-                  className="owner-row-wrap"
-                >
-                  <SwipeRow actions={swipeActions}>
-                    <Link
-                      to={`/owners/${o.id}`}
-                      className="owner-row"
-                      onClick={() => haptics.tap()}
-                    >
-                      {/* Lane 2 — favorite toggle sits at the row start
-                          (top-left in RTL). stopPropagation keeps the
-                          tap from opening the owner detail page. */}
-                      <span className="owner-row-fav" onClick={(e) => e.stopPropagation()}>
-                        <FavoriteStar
-                          active={favoriteIds.has(o.id)}
-                          onToggle={(next) => handleToggleFavorite(o.id, next)}
-                          className="fav-star-sm"
-                        />
-                      </span>
-                      <div className="owner-row-avatar" aria-hidden="true">
-                        {(o.name || '?').charAt(0)}
-                      </div>
-                      <div className="owner-row-meta">
-                        <strong className="owner-row-name">{o.name}</strong>
-                        <span className="owner-row-phone">{o.phone ? formatPhone(o.phone) : '—'}</span>
-                        {createdRel && (
-                          <span className="owner-row-created">
-                            נוסף {createdRel.label}
-                          </span>
-                        )}
-                      </div>
-                      <span className="owner-pill" title={`${o.propertyCount || 0} נכסים`}>
-                        <Building2 size={11} />
-                        <strong>{o.propertyCount || 0}</strong>
-                        <span>נכסים</span>
-                      </span>
-                      <span className="owner-row-chev" aria-hidden="true">
-                        <ChevronLeft size={16} />
-                      </span>
-                    </Link>
-                  </SwipeRow>
-                </div>
-              );
-            })}
-            {infinite.hasMore && (
-              <div ref={infinite.sentinelRef} className="infinite-sentinel" aria-hidden="true" />
-            )}
-          </div>
-        ) : (viewMode === 'table' && !isMobile) ? (
-          <DataTable
-            ariaLabel="טבלת בעלי נכסים"
-            rows={paged.slice}
-            rowKey={(o) => o.id}
-            onRowClick={(o) => navigate(`/owners/${o.id}`)}
-            columns={[
-              {
-                key: 'name', header: 'שם', sortable: true,
-                sortValue: (o) => o.name || '',
-                render: (o) => <strong>{o.name}</strong>,
-              },
-              {
-                key: 'phone', header: 'טלפון',
-                render: (o) => o.phone ? formatPhone(o.phone) : <span className="cell-muted">—</span>,
-              },
-              {
-                key: 'email', header: 'אימייל',
-                render: (o) => o.email || <span className="cell-muted">—</span>,
-              },
-              {
-                key: 'propertyCount', header: 'נכסים', sortable: true, className: 'cell-num',
-                sortValue: (o) => o.propertyCount || 0,
-                render: (o) => <span className="cell-pill">{o.propertyCount || 0}</span>,
-              },
-              {
-                key: 'preview', header: 'כתובת ראשונה',
-                render: (o) => {
-                  const p = (o.properties || [])[0];
-                  return p
-                    ? <span className="cell-muted">{[p.street, p.city].filter(Boolean).join(', ')}</span>
-                    : <span className="cell-muted">—</span>;
-                },
-              },
-              {
-                key: 'created', header: 'נוסף', sortable: true,
-                sortValue: (o) => (o.createdAt ? new Date(o.createdAt).getTime() : 0),
-                render: (o) => {
-                  const r = o.createdAt ? relativeDate(o.createdAt) : null;
-                  return r ? <span className="cell-muted">{r.label}</span> : <span className="cell-muted">—</span>;
-                },
-              },
-            ]}
-          />
-        ) : (
-          <div className="owners-grid animate-in animate-in-delay-2">
-            {cardVisible.map((o) => {
-              const previews = (o.properties || []).slice(0, 2);
-              const createdRel = o.createdAt ? relativeDate(o.createdAt) : null;
-              return (
-                <Link
-                  key={o.id}
-                  to={`/owners/${o.id}`}
-                  className="owner-card"
-                  ref={(el) => { if (el) cardRefs.current[o.id] = el; }}
-                >
-                  {/* Lane 2 — favorite toggle anchored top-left of each
-                      card. FavoriteStar stops click propagation so it
-                      won't also fire the card's <Link> navigation. */}
-                  <span className="owner-card-fav" onClick={(e) => e.stopPropagation()}>
-                    <FavoriteStar
-                      active={favoriteIds.has(o.id)}
-                      onToggle={(next) => handleToggleFavorite(o.id, next)}
-                      className="fav-star-sm"
-                    />
-                  </span>
-                  <div className="owner-card-head">
-                    <div className="owner-card-avatar" aria-hidden="true">
-                      {(o.name || '?').charAt(0)}
-                    </div>
-                    <div className="owner-card-info">
-                      <strong className="owner-card-name">{o.name}</strong>
-                      <span className="owner-card-phone">{o.phone ? formatPhone(o.phone) : '—'}</span>
-                      {o.email && <span className="owner-card-email">{o.email}</span>}
-                      {createdRel && (
-                        <span className="owner-card-created">נוסף {createdRel.label}</span>
-                      )}
-                    </div>
-                    <span className="owner-pill" title={`${o.propertyCount || 0} נכסים`}>
-                      <Building2 size={11} />
-                      <strong>{o.propertyCount || 0}</strong>
-                      <span>נכסים</span>
-                    </span>
-                  </div>
-                  {previews.length > 0 && (
-                    <div className="owner-card-preview">
-                      {previews.map((p) => (
-                        <span key={p.id} className="owner-card-prop">
-                          {[p.street, p.city].filter(Boolean).join(', ')}
-                        </span>
-                      ))}
-                      {o.properties && o.properties.length > previews.length && (
-                        <span className="owner-card-more">
-                          +{o.properties.length - previews.length} נוספים
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </Link>
-              );
-            })}
-            {/* Card/mobile list → infinite-scroll sentinel. Hook
-                disconnects itself once the full list is revealed. */}
-            {infinite.hasMore && (
-              <div ref={infinite.sentinelRef} className="infinite-sentinel" aria-hidden="true" />
-            )}
-          </div>
-        )}
-
-        {/* Table view keeps the numbered pager. */}
-        {viewMode === 'table' && !isMobile && paged.needsPager && (
-          <Pagination page={paged.page} pageCount={paged.pageCount} onPage={setPage} />
-        )}
-
-        {/* Mobile-only floating FAB — adds a new owner */}
-        {isMobile && (
-          <button
-            type="button"
-            className="owners-fab"
-            onClick={() => { haptics.tap(); setEditing({}); }}
-            aria-label="בעל נכס חדש"
-          >
-            <UserPlus size={18} />
-            <span>בעל נכס חדש</span>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => setEditing({})} style={primaryBtn()}>
+            <UserPlus size={14} /> בעל נכס חדש
           </button>
-        )}
+        </div>
+      </div>
 
-        {editing !== null && (
-          <OwnerEditDialog
-            owner={editing.id ? editing : null}
-            onClose={() => setEditing(null)}
-            onSaved={onSaved}
+      {/* Filter pills + search */}
+      <div style={{
+        display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center',
+        flexWrap: 'wrap',
+      }}>
+        {filters.map((f) => {
+          const on = filter === f.k;
+          return (
+            <button
+              key={f.k}
+              type="button"
+              onClick={() => setFilter(f.k)}
+              style={{
+                ...FONT,
+                background: on ? DT.ink : DT.white,
+                color: on ? DT.cream : DT.ink,
+                border: `1px solid ${on ? DT.ink : DT.border}`,
+                padding: '7px 12px', borderRadius: 99,
+                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}
+            >{f.label} · {f.count}</button>
+          );
+        })}
+        <div style={{
+          marginInlineStart: 'auto', position: 'relative',
+          display: 'inline-flex', alignItems: 'center',
+        }}>
+          <Search size={14} style={{
+            position: 'absolute', insetInlineEnd: 10,
+            top: '50%', transform: 'translateY(-50%)',
+            color: DT.muted, pointerEvents: 'none',
+          }} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="חיפוש שם / טלפון / אימייל…"
+            style={{
+              ...FONT, padding: '8px 30px 8px 12px',
+              border: `1px solid ${DT.border}`, borderRadius: 99,
+              background: DT.white, fontSize: 12, color: DT.ink,
+              outline: 'none', width: 240, textAlign: 'right',
+            }}
           />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{
+        background: DT.white, border: `1px solid ${DT.border}`,
+        borderRadius: 14, overflow: 'hidden',
+      }}>
+        {loading && (
+          <div style={{ padding: 40, textAlign: 'center', color: DT.muted, fontSize: 13 }}>
+            טוען בעלי נכסים…
+          </div>
+        )}
+        {!loading && filtered.length === 0 && (
+          <EmptyState hasAny={owners.length > 0} onCreate={() => setEditing({})} />
+        )}
+        {!loading && filtered.length > 0 && (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${DT.border}`, background: DT.cream2 }}>
+                  {['', 'שם', 'טלפון', 'אימייל', 'נכסים', 'כתובת ראשונה', 'נוסף', ''].map((h, i) => (
+                    <th key={i} style={headerCell()}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((o) => {
+                  const first = (o.properties || [])[0];
+                  const createdRel = o.createdAt ? relativeDate(o.createdAt) : null;
+                  const isFav = favoriteIds.has(o.id);
+                  return (
+                    <tr
+                      key={o.id}
+                      onClick={() => navigate(`/owners/${o.id}`)}
+                      onMouseEnter={() => setHoverId(o.id)}
+                      onMouseLeave={() => setHoverId(null)}
+                      style={{
+                        borderBottom: `1px solid ${DT.border}`,
+                        cursor: 'pointer',
+                        background: hoverId === o.id ? DT.cream4 : 'transparent',
+                      }}
+                    >
+                      <td style={{ ...bodyCell(), width: 36 }}>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleFavorite(o.id, !isFav); }}
+                          aria-label={isFav ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+                          style={{
+                            background: 'transparent', border: 'none',
+                            padding: 4, cursor: 'pointer', lineHeight: 0,
+                            color: isFav ? DT.gold : DT.muted,
+                          }}
+                        >
+                          <Star size={16} fill={isFav ? DT.gold : 'none'} />
+                        </button>
+                      </td>
+                      <td style={bodyCell()}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar name={o.name} />
+                          <div style={{ fontWeight: 700 }}>{o.name || 'בעל נכס'}</div>
+                        </div>
+                      </td>
+                      <td style={{
+                        ...bodyCell(), color: DT.muted,
+                        fontVariantNumeric: 'tabular-nums',
+                        direction: 'ltr', textAlign: 'right',
+                      }}>
+                        {o.phone ? formatPhone(o.phone) : '—'}
+                      </td>
+                      <td style={{ ...bodyCell(), color: DT.muted }}>{o.email || '—'}</td>
+                      <td style={bodyCell()}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          background: DT.goldSoft, color: DT.goldDark,
+                          borderRadius: 99, fontWeight: 700, fontSize: 11,
+                          padding: '2px 8px',
+                        }}>
+                          <Building2 size={11} />
+                          {o.propertyCount || 0}
+                        </span>
+                      </td>
+                      <td style={{ ...bodyCell(), color: DT.muted, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {first ? [first.street, first.city].filter(Boolean).join(', ') : '—'}
+                      </td>
+                      <td style={{ ...bodyCell(), color: DT.muted, fontSize: 12 }}>
+                        {createdRel ? createdRel.label : '—'}
+                      </td>
+                      <td style={{ ...bodyCell(), textAlign: 'left' }}>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                          {o.phone && (
+                            <a
+                              href={`tel:${o.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="התקשר"
+                              style={iconBtn(DT.cream2, DT.ink)}
+                            ><Phone size={12} /></a>
+                          )}
+                          {o.phone && (
+                            <a
+                              href={`https://wa.me/${o.phone.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="WhatsApp"
+                              style={iconBtn('rgba(21,128,61,0.12)', DT.success)}
+                            ><MessageCircle size={12} /></a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
-    </PullRefresh>
+
+      {editing !== null && (
+        <OwnerEditDialog
+          owner={editing.id ? editing : null}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            setEditing(null);
+            toast?.success?.('בעל הנכס נשמר');
+            await load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function headerCell() {
+  return {
+    padding: '12px 14px', textAlign: 'right',
+    fontSize: 11, color: DT.muted, fontWeight: 700,
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  };
+}
+function bodyCell() {
+  return { padding: '12px 14px', verticalAlign: 'middle' };
+}
+function primaryBtn() {
+  return {
+    ...FONT,
+    background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+    border: 'none', color: DT.ink,
+    padding: '9px 16px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 13, fontWeight: 800,
+    display: 'inline-flex', gap: 6, alignItems: 'center',
+    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    textDecoration: 'none',
+  };
+}
+function actionBtn() {
+  return {
+    ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
+    padding: '9px 14px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 13, fontWeight: 700,
+    display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.ink,
+    textDecoration: 'none',
+  };
+}
+function iconBtn(bg, color) {
+  return {
+    background: bg, border: 'none',
+    width: 28, height: 28, borderRadius: 6, cursor: 'pointer',
+    color, display: 'grid', placeItems: 'center', textDecoration: 'none',
+  };
+}
+
+function Avatar({ name, size = 32 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: 99,
+      background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+      color: DT.ink, display: 'grid', placeItems: 'center',
+      fontWeight: 800, fontSize: size * 0.4, flexShrink: 0,
+    }}>{name ? name.charAt(0) : '?'}</div>
+  );
+}
+
+function EmptyState({ hasAny, onCreate }) {
+  return (
+    <div style={{ padding: '48px 24px', textAlign: 'center', color: DT.muted }}>
+      <Sparkles size={28} style={{ color: DT.gold, marginBottom: 10 }} aria-hidden="true" />
+      <div style={{ fontSize: 16, fontWeight: 800, color: DT.ink, marginBottom: 6 }}>
+        {hasAny ? 'אין תוצאות למסנן הזה' : 'עוד אין בעלי נכסים במערכת'}
+      </div>
+      <p style={{ fontSize: 13, margin: '0 0 16px', lineHeight: 1.7 }}>
+        {hasAny
+          ? 'נסו מסנן אחר או נקו את החיפוש כדי לראות את כל בעלי הנכסים.'
+          : 'הוסיפו בעל נכס ראשון כדי להתחיל לעקוב אחרי קשרי הבעלות לנכסים.'}
+      </p>
+      {!hasAny && (
+        <button type="button" onClick={onCreate} style={primaryBtn()}>
+          <UserPlus size={14} /> בעל נכס חדש
+        </button>
+      )}
+    </div>
   );
 }
