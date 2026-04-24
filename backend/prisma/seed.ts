@@ -435,6 +435,8 @@ async function main() {
       await prisma.property.create({
         data: {
           agentId: agent.id,
+          owner: 'בעל פרטי',
+          ownerPhone: '050-0000000',
           street: r.street,
           city: r.city,
           assetClass: 'RESIDENTIAL',
