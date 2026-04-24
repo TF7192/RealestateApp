@@ -8,7 +8,7 @@
 // header so OWNERs who land here can jump to the team-management tools.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Trophy, Sparkles, UsersRound, Building2, Banknote, ArrowUpDown,
   ChevronUp, ChevronDown, Users,
@@ -55,6 +55,7 @@ const COLS = [
 ];
 
 export default function Team() {
+  const navigate = useNavigate();
   const [agents, setAgents] = useState([]);
   const [quarter, setQuarter] = useState(() => recentQuarters(1)[0]);
   const [loading, setLoading] = useState(true);
@@ -253,10 +254,13 @@ export default function Team() {
                   return (
                     <tr
                       key={a.agentId}
+                      onClick={() => navigate(`/team/${a.agentId}`)}
+                      title="פתח פרטי סוכן"
                       style={{
                         borderBottom: `1px solid ${DT.border}`,
                         background: isTop ? DT.goldSoft : 'transparent',
                         position: 'relative',
+                        cursor: 'pointer',
                       }}
                     >
                       <td style={bodyCell()}>

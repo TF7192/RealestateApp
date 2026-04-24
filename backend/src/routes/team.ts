@@ -180,4 +180,69 @@ export const registerTeamRoutes: FastifyPluginAsync = async (app) => {
 
     return { agents, quarter: label };
   });
+
+  // GET /api/team/agents/:id — full intel on one agent in the caller's
+  // office. Returns the agent profile + active property inventory +
+  // active leads + recent deals so the /team/:agentId detail page can
+  // render everything in one round-trip.
+  app.get('/agents/:id', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const u = requireUser(req);
+    const caller = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!caller?.officeId) {
+      return reply.code(404).send({ error: { message: 'No office' } });
+    }
+    const agent = await prisma.user.findFirst({
+      where: { id, officeId: caller.officeId },
+      select: {
+        id: true, displayName: true, email: true, phone: true,
+        avatarUrl: true, role: true, officeId: true, createdAt: true,
+        agentProfile: {
+          select: { agency: true, title: true, license: true, bio: true },
+        },
+      },
+    });
+    if (!agent) {
+      return reply.code(404).send({ error: { message: 'Agent not found in your office' } });
+    }
+    const [properties, leads, deals] = await Promise.all([
+      prisma.property.findMany({
+        where: { agentId: id },
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true, street: true, city: true, assetClass: true, category: true,
+          type: true, marketingPrice: true, status: true, sqm: true, rooms: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.lead.findMany({
+        where: { agentId: id },
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true, name: true, phone: true, email: true, status: true,
+          city: true, lookingFor: true, budget: true, updatedAt: true,
+        },
+      }),
+      prisma.deal.findMany({
+        where: { agentId: id },
+        orderBy: { updateDate: 'desc' },
+        take: 20,
+        select: {
+          id: true, propertyStreet: true, city: true, status: true,
+          assetClass: true, category: true,
+          marketingPrice: true, closedPrice: true, commission: true,
+          signedAt: true, updateDate: true,
+        },
+      }),
+    ]);
+    const totals = deals.reduce((acc, d) => {
+      if (d.status === 'SIGNED' || d.status === 'CLOSED') {
+        acc.closedCount++;
+        acc.volume += d.closedPrice || 0;
+        acc.commissions += d.commission || 0;
+      }
+      return acc;
+    }, { closedCount: 0, volume: 0, commissions: 0 });
+    return { agent, properties, leads, deals, totals };
+  });
 };

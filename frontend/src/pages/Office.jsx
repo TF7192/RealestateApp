@@ -67,7 +67,10 @@ export default function Office() {
     try {
       const res = await api.getOffice();
       setOffice(res?.office || null);
-      setMembers(res?.members || []);
+      // Members come back nested inside `office.members` (the Prisma
+      // include), not as a sibling `res.members`. The previous read
+      // was always empty → "חברי המשרד" table was blank.
+      setMembers(res?.office?.members || []);
       // Invites are OWNER-only on the server; skip the request for
       // non-OWNER sessions to avoid a noisy 403 in the network panel.
       if (user?.role === 'OWNER' && res?.office) {

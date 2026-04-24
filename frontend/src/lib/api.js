@@ -570,6 +570,10 @@ export const api = {
     const qs = quarter ? `?${new URLSearchParams({ quarter }).toString()}` : '';
     return request(`/team/scoreboard${qs}`);
   },
+  // Full per-agent intel for the /team/:agentId detail page —
+  // { agent, properties, leads, deals, totals } scoped to the
+  // caller's office; 404 for an unknown id or cross-office access.
+  teamAgent:           (agentId) => request(`/team/agents/${agentId}`),
 
   // Tags (A2)
   listTags:            () => request('/tags'),
