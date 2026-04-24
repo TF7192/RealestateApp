@@ -489,36 +489,56 @@ function Chip({ children, tone = 'ink' }) {
 }
 
 function Pipeline({ deals }) {
+  // Match the real Deal.status enum the backend writes. The previous
+  // keys (NEW / VIEWING / OFFER / NEGOTIATION / CONTRACT) never
+  // matched anything, so every bar read 0. Bars now fill proportional
+  // to the bucket's share of the busiest stage.
   const stages = [
-    { key: 'NEW',         l: 'יצירת קשר', pct: 15 },
-    { key: 'VIEWING',     l: 'צפייה',     pct: 35 },
-    { key: 'OFFER',       l: 'הצעה',      pct: 65 },
-    { key: 'NEGOTIATION', l: 'מו״מ',      pct: 85 },
-    { key: 'CONTRACT',    l: 'חוזה',      pct: 95 },
+    { key: 'NEGOTIATING',      l: 'משא ומתן' },
+    { key: 'WAITING_MORTGAGE', l: 'אישור משכנתא' },
+    { key: 'PENDING_CONTRACT', l: 'לקראת חתימה' },
+    { key: 'SIGNED',           l: 'נחתמה' },
+    { key: 'CLOSED',           l: 'נסגרה' },
   ];
-  const rows = stages.map((s) => {
-    const matching = deals.filter((d) => (d.stage || d.status || '').toUpperCase() === s.key);
-    const sum = matching.reduce((acc, d) => acc + (d.dealValue || d.price || 0), 0);
-    return { ...s, n: matching.length, v: sum > 0 ? `₪${Math.round(sum / 1000)}K` : '—' };
+  const buckets = stages.map((s) => {
+    const matching = deals.filter((d) => String(d.status || '').toUpperCase() === s.key);
+    const sum = matching.reduce((acc, d) => (
+      acc + (d.closedPrice || d.marketingPrice || d.dealValue || d.price || 0)
+    ), 0);
+    return { ...s, n: matching.length, sum };
   });
+  const max = Math.max(1, ...buckets.map((b) => b.n));
+  const fmt = (n) => n >= 1_000_000
+    ? `₪${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000
+      ? `₪${Math.round(n / 1_000)}K`
+      : n > 0
+        ? `₪${n.toLocaleString('he-IL')}`
+        : '—';
   return (
     <>
-      {rows.map((s, i) => (
-        <div key={s.key} style={{ marginBottom: i === rows.length - 1 ? 0 : 10 }}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4,
-          }}>
-            <span style={{ fontWeight: 600 }}>{s.l} · {s.n}</span>
-            <span style={{ color: DT.gold, fontWeight: 700 }}>{s.v}</span>
-          </div>
-          <div style={{ background: DT.cream3, height: 8, borderRadius: 99, overflow: 'hidden' }}>
+      {buckets.map((s, i) => {
+        const pct = s.n === 0 ? 4 : Math.max(8, Math.round((s.n / max) * 100));
+        return (
+          <div key={s.key} style={{ marginBottom: i === buckets.length - 1 ? 0 : 10 }}>
             <div style={{
-              width: `${s.pct}%`, height: '100%',
-              background: `linear-gradient(90deg, ${DT.goldLight}, ${DT.gold})`,
-            }} />
+              display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4,
+            }}>
+              <span style={{ fontWeight: 600 }}>{s.l} · {s.n}</span>
+              <span style={{ color: DT.gold, fontWeight: 700 }}>{fmt(s.sum)}</span>
+            </div>
+            <div style={{ background: DT.cream3, height: 8, borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{
+                width: `${pct}%`, height: '100%',
+                background: s.n === 0
+                  ? DT.cream2
+                  : `linear-gradient(90deg, ${DT.goldLight}, ${DT.gold})`,
+                transition: 'width 420ms cubic-bezier(.2,.7,.2,1)',
+              }} />
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }

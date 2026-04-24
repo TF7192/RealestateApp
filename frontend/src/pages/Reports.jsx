@@ -50,23 +50,36 @@ const PLANNED_CSV_KINDS = [
 const PLANNED_CSV_TOOLTIP = 'ייצוא CSV בפיתוח — נוסף בקרוב';
 
 // Deal-status labels (Hebrew) + tone colours.
+// Deal-status labels (Hebrew) + tone colours. Keys match the real
+// Prisma enum values — the backend's /reports/dashboard byStatus
+// bucket is keyed by those enums, so any missing key here renders
+// raw English on the chart.
 const STATUS_LABELS = {
-  OPEN:        'פתוחה',
-  PENDING:     'בהמתנה',
-  NEGOTIATING: 'במו״מ',
-  SIGNED:      'נחתמה',
-  WON:         'נסגרה',
-  LOST:        'אבדה',
-  CANCELLED:   'בוטלה',
+  NEGOTIATING:      'במו״מ',
+  WAITING_MORTGAGE: 'אישור משכנתא',
+  PENDING_CONTRACT: 'לקראת חתימה',
+  SIGNED:           'נחתמה',
+  CLOSED:           'נסגרה',
+  FELL_THROUGH:     'לא יצאה לפועל',
+  CANCELLED:        'בוטלה',
+  // Legacy fallbacks — old data may still carry these.
+  OPEN:    'פתוחה',
+  PENDING: 'בהמתנה',
+  WON:     'נסגרה',
+  LOST:    'אבדה',
 };
 const STATUS_TONE = {
-  SIGNED:      DT.success,
-  WON:         DT.success,
-  OPEN:        DT.gold,
-  PENDING:     DT.goldDark,
-  NEGOTIATING: DT.goldDark,
-  LOST:        DT.danger,
-  CANCELLED:   DT.muted,
+  SIGNED:           DT.success,
+  CLOSED:           DT.success,
+  WON:              DT.success,
+  NEGOTIATING:      DT.goldDark,
+  WAITING_MORTGAGE: DT.gold,
+  PENDING_CONTRACT: DT.gold,
+  OPEN:             DT.gold,
+  PENDING:          DT.goldDark,
+  FELL_THROUGH:     DT.danger,
+  LOST:             DT.danger,
+  CANCELLED:        DT.muted,
 };
 
 export default function Reports() {
