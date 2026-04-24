@@ -91,10 +91,23 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    // Email + phone + password validation. Runs on submit so users
+    // aren't yelled at while still typing, and so the error surfaces
+    // in the form's own alert slot.
+    const email = form.email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('כתובת אימייל לא תקינה'); return;
+    }
+    if (isSignup && form.phone.trim()) {
+      const phoneOk = /^0(5\d|[23489])-?\d{3}-?\d{4}$/.test(form.phone.replace(/\s/g, ''));
+      if (!phoneOk) { setError('מספר טלפון לא תקין'); return; }
+    }
+    if (form.password.length < 8) {
+      setError(isSignup ? 'סיסמה חייבת להיות לפחות 8 תווים' : 'סיסמה קצרה מדי'); return;
+    }
     setSubmitting(true);
     try {
       if (isSignup) {
-        if (form.password.length < 8) throw new Error('סיסמה חייבת להיות לפחות 8 תווים');
         await signup({
           email: form.email,
           password: form.password,

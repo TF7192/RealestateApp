@@ -1,17 +1,15 @@
-// Onboarding — 1:1 port of the bundle's ScreenSignup wizard
-// (estia-new-project/project/src/mobile/screens-auth.jsx). Three-step
-// flow with a pill-progress indicator, radio-card role picker, and
-// a gold Premium note on the final step. The production hookup
-// keeps the real `submitOnboarding` API call that the App.jsx route
-// guard depends on (profileCompletedAt flips to non-null after POST).
-// License number remains required — enforced on step 1 "next" and
-// echoed in the server zod.
+// Onboarding — 3-step wizard matching the claude.ai/design ScreenSignup.
+// Design-match is visual; form wiring is production: POST /me/profile,
+// refresh auth, route guard unblocks. License required (6–8 digits);
+// city comes from a custom autocomplete backed by /lookups/cities so
+// the stored value lines up with the backend's canonical registry.
+// Phone is validated as an Israeli mobile when provided.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, IdCard, User, Phone, Building2, MapPin, Upload, Plus,
-  Sparkles, LogOut,
+  ArrowLeft, IdCard, Phone, Building2, MapPin, Upload, Plus,
+  Sparkles, LogOut, Search,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -31,6 +29,21 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const TOTAL_STEPS = 3;
 
+// ─── Field-level validators ──────────────────────────────────
+const PHONE_RE = /^0(5\d|[23489])-?\d{3}-?\d{4}$/;
+const LICENSE_RE = /^\d{6,8}$/;
+
+function validatePhone(raw) {
+  const v = (raw || '').trim();
+  if (!v) return null; // optional
+  return PHONE_RE.test(v.replace(/\s/g, '')) ? null : 'מספר טלפון לא תקין';
+}
+function validateLicense(raw) {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (!digits) return 'מספר רישיון הוא שדה חובה';
+  return LICENSE_RE.test(digits) ? null : 'מספר רישיון חייב להיות 6 עד 8 ספרות';
+}
+
 export default function Onboarding() {
   const navigate = useNavigate();
   const { refresh, logout } = useAuth();
@@ -38,60 +51,55 @@ export default function Onboarding() {
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
-    license: '',
-    title: 'solo',   // radio-card role: solo | office | agency
-    agency: '',
-    city: '',
-    phone: '',
+    license: '', title: 'solo', agency: '', city: '', phone: '',
   });
   const [err, setErr] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [cityOptions, setCityOptions] = useState([]);
 
-  // Canonical Israeli city list — same source the rest of the app
-  // normalizes against (backend /lookups/cities). Rendered as a
-  // native <datalist> so the agent gets autocomplete but can still
-  // type a city not in the list (e.g. new localities).
   useEffect(() => {
     let cancelled = false;
     api.cities().then((res) => {
       if (cancelled) return;
-      const names = (res?.cities || []).map((c) => c.name).filter(Boolean).sort((a, b) => a.localeCompare(b, 'he'));
+      const names = (res?.cities || [])
+        .map((c) => c?.name)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'he'));
       setCityOptions(names);
-    }).catch(() => { /* fallthrough — user can type freely */ });
+    }).catch(() => { /* user can type freely — fall through */ });
     return () => { cancelled = true; };
   }, []);
 
   const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-  const licenseDigits = form.license.replace(/\D/g, '');
-  const licenseValid = /^\d{6,8}$/.test(licenseDigits);
 
-  const canAdvance = () => {
-    if (step === 0) return licenseValid;
-    if (step === 1) return form.title && (form.title === 'solo' || form.agency.trim()) && form.city.trim();
-    return true;
-  };
+  const licenseErr = validateLicense(form.license);
+  const phoneErr = validatePhone(form.phone);
 
   const next = () => {
     setErr(null);
-    if (step === 0 && !licenseValid) { setErr('מספר רישיון חייב להיות 6 עד 8 ספרות'); return; }
-    if (step === 1 && form.title !== 'solo' && !form.agency.trim()) { setErr('נדרש שם משרד / סוכנות'); return; }
-    if (step === 1 && !form.city.trim()) { setErr('נדרש אזור פעילות עיקרי'); return; }
+    if (step === 0) {
+      if (licenseErr) { setErr(licenseErr); return; }
+      if (phoneErr) { setErr(phoneErr); return; }
+    }
+    if (step === 1) {
+      if (form.title !== 'solo' && !form.agency.trim()) { setErr('נדרש שם משרד / סוכנות'); return; }
+      if (!form.city.trim()) { setErr('נדרש אזור פעילות עיקרי'); return; }
+    }
     setStep((s) => Math.min(TOTAL_STEPS - 1, s + 1));
   };
   const back = () => { setErr(null); setStep((s) => Math.max(0, s - 1)); };
 
   const finish = async () => {
     setErr(null);
+    if (licenseErr) { setStep(0); setErr(licenseErr); return; }
+    if (phoneErr) { setStep(0); setErr(phoneErr); return; }
     setSubmitting(true);
     try {
-      // Map the design's role radio into the server's `title` string
-      // + agency free-text. Keeps the existing submitOnboarding shape.
       const titleLabel = form.title === 'office' ? 'סוכן'
         : form.title === 'agency' ? 'מנהל משרד'
         : 'סוכן עצמאי';
       await api.submitOnboarding({
-        license: licenseDigits,
+        license: form.license.replace(/\D/g, ''),
         title: titleLabel,
         agency: form.agency.trim() || null,
         phone: form.phone.trim() || null,
@@ -112,27 +120,26 @@ export default function Onboarding() {
   return (
     <div dir="rtl" lang="he" style={{
       ...FONT, background: T.cream, color: T.ink, minHeight: '100vh',
-      // Natural page scroll; sticky footer pins to the viewport bottom
-      // so the primary CTA is always reachable (previous layout used
-      // inner overflow with no container height, so step 3 hid the
-      // submit below the fold).
-      display: 'flex', justifyContent: 'center', padding: '0 0 96px',
+      display: 'flex', justifyContent: 'center', padding: 0,
     }}>
       <div style={{
-        width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column',
-        background: T.cream,
+        width: '100%', maxWidth: 520,
+        display: 'flex', flexDirection: 'column',
+        background: T.cream, paddingBottom: 28,
       }}>
         {/* Top bar */}
         <div style={{
-          padding: '16px 22px 12px', display: 'flex', alignItems: 'center', gap: 12,
-          borderBottom: 'none', position: 'sticky', top: 0, background: T.cream, zIndex: 5,
+          padding: '16px 22px 12px',
+          display: 'flex', alignItems: 'center', gap: 12,
+          position: 'sticky', top: 0, background: T.cream, zIndex: 5,
         }}>
-          <button type="button" onClick={step === 0 ? () => logout().catch(() => {}) : back}
+          <button type="button"
+            onClick={step === 0 ? () => logout().catch(() => {}) : back}
+            aria-label={step === 0 ? 'יציאה' : 'חזרה'}
             style={{
               width: 34, height: 34, borderRadius: 99, border: 'none', background: 'transparent',
               color: T.ink, display: 'grid', placeItems: 'center', cursor: 'pointer',
-            }}
-            aria-label={step === 0 ? 'יציאה' : 'חזרה'}>
+            }}>
             {step === 0 ? <LogOut size={18} /> : <ArrowLeft size={18} />}
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -169,6 +176,7 @@ export default function Onboarding() {
                 inputMode="numeric"
                 required
                 autoFocus
+                error={form.license && licenseErr}
               />
               <Field
                 label="טלפון (רשות)"
@@ -180,6 +188,7 @@ export default function Onboarding() {
                 onChange={(v) => setF('phone', v)}
                 placeholder="050-0000000"
                 hint="נשתמש רק להתראות קריטיות ולסנכרון WhatsApp."
+                error={form.phone && phoneErr}
               />
             </>
           )}
@@ -199,19 +208,13 @@ export default function Onboarding() {
               ].map((opt) => {
                 const on = form.title === opt.k;
                 return (
-                  <button
-                    type="button"
-                    key={opt.k}
-                    onClick={() => setF('title', opt.k)}
-                    style={{
-                      ...FONT,
-                      width: '100%', textAlign: 'inherit', cursor: 'pointer',
-                      background: on ? `linear-gradient(160deg, ${T.cream4}, ${T.cream3})` : T.white,
-                      border: `1.5px solid ${on ? T.gold : T.border}`,
-                      borderRadius: 14, padding: 16, marginBottom: 10,
-                      display: 'flex', alignItems: 'center', gap: 12, color: T.ink,
-                    }}
-                  >
+                  <button type="button" key={opt.k} onClick={() => setF('title', opt.k)} style={{
+                    ...FONT, width: '100%', textAlign: 'inherit', cursor: 'pointer',
+                    background: on ? `linear-gradient(160deg, ${T.cream4}, ${T.cream3})` : T.white,
+                    border: `1.5px solid ${on ? T.gold : T.border}`,
+                    borderRadius: 14, padding: 16, marginBottom: 10,
+                    display: 'flex', alignItems: 'center', gap: 12, color: T.ink,
+                  }}>
                     <span style={{
                       width: 22, height: 22, borderRadius: 99, flexShrink: 0,
                       border: `2px solid ${on ? T.gold : T.borderStrong}`,
@@ -236,17 +239,13 @@ export default function Onboarding() {
                   placeholder="לדוגמה: סוכנות אבני"
                 />
               )}
-              <Field
+              <CityField
                 label="אזור פעילות עיקרי"
-                icon={<MapPin size={16} />}
                 value={form.city}
                 onChange={(v) => setF('city', v)}
+                options={cityOptions}
                 placeholder="תל אביב, רמת גן…"
-                list="onboarding-cities"
               />
-              <datalist id="onboarding-cities">
-                {cityOptions.map((c) => <option key={c} value={c} />)}
-              </datalist>
             </>
           )}
 
@@ -275,7 +274,6 @@ export default function Onboarding() {
                     <div style={{ fontSize: 15, fontWeight: 700 }}>{o.t}</div>
                     <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{o.d}</div>
                   </div>
-                  <ArrowLeft size={15} style={{ color: T.muted }} />
                 </div>
               ))}
               <div style={{
@@ -301,16 +299,12 @@ export default function Onboarding() {
           )}
         </div>
 
-        {/* Sticky footer CTA — pins to viewport bottom so the primary
-            button is always reachable regardless of step length. */}
-        <div style={{
-          padding: '12px 22px 22px', borderTop: `1px solid ${T.border}`,
-          background: T.cream,
-          position: 'fixed', bottom: 0, left: 0, right: 0,
-          maxWidth: 520, margin: '0 auto', zIndex: 10,
-        }}>
+        {/* Inline footer CTA — placed at the end of the page so it's
+            always in the scroll flow. No position:fixed — that was
+            hiding behind the outer Layout's overflow container. */}
+        <div style={{ padding: '16px 22px 22px', borderTop: `1px solid ${T.border}`, background: T.cream }}>
           {step < TOTAL_STEPS - 1 ? (
-            <PrimaryBtn onClick={next} disabled={!canAdvance()}>
+            <PrimaryBtn onClick={next}>
               המשך
               <ArrowLeft size={15} aria-hidden="true" />
             </PrimaryBtn>
@@ -326,15 +320,17 @@ export default function Onboarding() {
   );
 }
 
-function Field({ label, value, onChange, icon, hint, ...rest }) {
+// ─── Standard field ─────────────────────────────────────────
+function Field({ label, value, onChange, icon, hint, error, ...rest }) {
   const [focus, setFocus] = useState(false);
+  const errorShown = !focus && error;
   return (
     <label style={{ display: 'block', marginBottom: 14 }}>
       {label && <div style={{ fontSize: 12, fontWeight: 600, color: T.ink, marginBottom: 6 }}>{label}</div>}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         background: T.white,
-        border: `1.5px solid ${focus ? T.gold : T.border}`,
+        border: `1.5px solid ${errorShown ? T.danger : focus ? T.gold : T.border}`,
         borderRadius: 12, padding: '0 14px',
         transition: 'border-color 150ms, box-shadow 150ms',
         boxShadow: focus ? '0 0 0 4px rgba(180,139,76,0.12)' : 'none',
@@ -353,8 +349,87 @@ function Field({ label, value, onChange, icon, hint, ...rest }) {
           }}
         />
       </div>
-      {hint && <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>{hint}</div>}
+      {errorShown ? (
+        <div style={{ fontSize: 11, color: T.danger, marginTop: 4, fontWeight: 600 }}>{error}</div>
+      ) : hint ? (
+        <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>{hint}</div>
+      ) : null}
     </label>
+  );
+}
+
+// ─── City autocomplete — custom dropdown (not <datalist>) so
+//    filtering is predictable and renders inside any flex container.
+function CityField({ label, value, onChange, options, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const [focus, setFocus] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (!wrapperRef.current) return;
+      if (!wrapperRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = (value || '').trim();
+    if (!q) return options.slice(0, 12);
+    const lower = q.toLowerCase();
+    return options.filter((o) => o.toLowerCase().includes(lower)).slice(0, 12);
+  }, [value, options]);
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', marginBottom: 14 }}>
+      {label && <div style={{ fontSize: 12, fontWeight: 600, color: T.ink, marginBottom: 6 }}>{label}</div>}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: T.white,
+        border: `1.5px solid ${focus ? T.gold : T.border}`,
+        borderRadius: 12, padding: '0 14px',
+        transition: 'border-color 150ms, box-shadow 150ms',
+        boxShadow: focus ? '0 0 0 4px rgba(180,139,76,0.12)' : 'none',
+      }}>
+        <span style={{ color: T.muted, display: 'inline-flex' }}><MapPin size={16} /></span>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => { onChange?.(e.target.value); setOpen(true); }}
+          onFocus={() => { setFocus(true); setOpen(true); }}
+          onBlur={() => setFocus(false)}
+          placeholder={placeholder}
+          autoComplete="off"
+          style={{
+            ...FONT, flex: 1, border: 'none', outline: 'none', background: 'transparent',
+            padding: '13px 0', fontSize: 15, color: T.ink, minWidth: 0, textAlign: 'right',
+          }}
+        />
+        <Search size={14} style={{ color: T.muted }} />
+      </div>
+      {open && filtered.length > 0 && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', insetInlineStart: 0, insetInlineEnd: 0,
+          background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
+          boxShadow: '0 14px 30px rgba(30,26,20,0.12)',
+          maxHeight: 260, overflowY: 'auto', zIndex: 20,
+          padding: 4,
+        }}>
+          {filtered.map((c) => (
+            <button key={c} type="button"
+              onMouseDown={(e) => { e.preventDefault(); onChange?.(c); setOpen(false); }}
+              style={{
+                ...FONT, width: '100%', textAlign: 'right', padding: '10px 12px',
+                background: c === value ? T.cream2 : 'transparent',
+                color: T.ink, fontSize: 14, border: 'none', borderRadius: 8, cursor: 'pointer',
+              }}>
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
