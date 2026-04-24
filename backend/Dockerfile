@@ -13,14 +13,17 @@ WORKDIR /app
 # Base image already has openssl + ca-certificates; nothing extra needed.
 
 FROM base AS deps
-COPY package.json package-lock.json* ./
-# `npm ci` is the deterministic install path — it refuses to run when
-# package.json + package-lock.json are out of sync, which surfaces
-# lockfile drift at build time instead of at `tsc` time. Previous use
-# of `npm install` here let a drifted lockfile sneak through and the
-# /voice-ingest route imports (openai, @anthropic-ai/sdk) to go
-# missing in the final image.
-RUN npm ci --no-audit --no-fund
+# Cache-bust arg — the deploy workflow passes a unique value (the
+# commit SHA) so the npm-ci layer below is never reused from a prior
+# build's GHA cache even when the lockfile is byte-identical. GHA
+# layer cache occasionally mis-correlates the RUN step when the
+# command string is unchanged; binding the step to a per-build ARG
+# sidesteps that.
+ARG DEPS_CACHEBUST=unset
+COPY package.json package-lock.json ./
+RUN echo "deps cachebust: $DEPS_CACHEBUST" \
+  && npm ci --no-audit --no-fund \
+  && node -e "require.resolve('openai'); require.resolve('@anthropic-ai/sdk'); console.log('deps ok')"
 
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules

@@ -112,11 +112,16 @@ jobs:
                                    # add SLSA attestations when we adopt
                                    # cosign properly.
           # Frontend needs the VITE_POSTHOG_* values baked in at build
-          # time; ignored by the backend build.
+          # time; ignored by the backend build. `DEPS_CACHEBUST` is
+          # read only by the backend Dockerfile — it's how we force
+          # the npm-ci layer to rebuild per commit so the GHA cache
+          # can't serve a stale node_modules where the last commit
+          # added a dep.
           build-args: |
             VITE_POSTHOG_KEY=${{ secrets.POSTHOG_PROJECT_API_KEY }}
             VITE_POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
             VITE_POSTHOG_ENABLED=true
+            DEPS_CACHEBUST=${{ steps.meta.outputs.sha }}
 
   summary:
     name: Publish summary
