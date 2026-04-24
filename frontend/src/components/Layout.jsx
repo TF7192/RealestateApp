@@ -22,7 +22,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Home, Users, Building2, MessageSquare, Crown, CalendarDays, Sparkles,
+  Home, Users, Building2, MessageSquare, Crown, CalendarDays, BellRing, Sparkles,
   BarChart2, Banknote, Upload, UsersRound, Settings,
   Bell, Search, Plus, MessageCircle, LogOut, Menu, X,
   ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
@@ -68,7 +68,11 @@ const PRIMARY_NAV = [
   { k: 'properties',  to: '/properties', label: 'נכסים',      Icon: Building2 },
   { k: 'owners',      to: '/owners',     label: 'בעלים',      Icon: Crown },
   { k: 'deals',       to: '/deals',      label: 'עסקאות',     Icon: Banknote },
-  { k: 'calendar',    to: '/reminders',  label: 'יומן',       Icon: CalendarDays },
+  // Two related routes with distinct affordances — /reminders is the
+  // agent's personal nudge list (BellRing), /calendar is the office
+  // month-view (CalendarDays). The pair used to share an icon which
+  // made it impossible to tell them apart in the sidebar.
+  { k: 'reminders',   to: '/reminders',  label: 'תזכורות',    Icon: BellRing },
   { k: 'calendar-month', to: '/calendar', label: 'לוח שנה',    Icon: CalendarDays },
   // Sprint 7 — Estia AI chat. Gold Sparkles icon + "חדש" badge so the
   // new surface surfaces for agents who are already in the app. Links

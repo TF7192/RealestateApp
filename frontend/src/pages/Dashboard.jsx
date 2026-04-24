@@ -315,7 +315,7 @@ export default function Dashboard() {
             marginBottom: 14,
           }}>
             <div style={{ fontSize: 15, fontWeight: 800 }}>
-              היום · {meetings.length || 0} פגישות
+              היום · {meetings.length || 0} תזכורות
             </div>
             <Link to="/reminders" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
               יומן מלא
