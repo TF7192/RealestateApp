@@ -37,7 +37,7 @@ const FILTERS = [
   { k: 'hot',    label: 'חמים' },
   { k: 'warm',   label: 'פושרים' },
   { k: 'cold',   label: 'קרים' },
-  { k: 'stale',  label: 'ללא מענה 24ש' },
+  { k: 'stale',  label: 'ללא מענה ביום אחרון' },
 ];
 
 export default function Customers() {
