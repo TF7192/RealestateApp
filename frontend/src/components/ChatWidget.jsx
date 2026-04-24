@@ -65,17 +65,10 @@ export default function ChatWidget() {
           display:none keeps stale CSS bundles from accidentally
           surfacing the old position — there's literally no DOM node
           to render. */}
-      {!isMobile && (
-        <button
-          className={`chatw-btn ${unread > 0 ? 'has-dot' : ''}`}
-          onClick={() => setOpen((o) => !o)}
-          aria-label={open ? 'סגור צ׳אט' : 'פתח צ׳אט'}
-          aria-expanded={open}
-        >
-          <MessageCircle size={20} />
-          {unread > 0 && <span className="chatw-dot" aria-hidden />}
-        </button>
-      )}
+      {/* Floating launcher removed — the topbar chat button is the
+          single entry point across desktop and mobile. ChatWidget
+          still mounts (just headless) so it keeps listening for the
+          `estia:open-chat` event and renders the panel. */}
 
       {open && (
         <ChatPanel

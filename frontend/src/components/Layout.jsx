@@ -47,15 +47,18 @@ const DT = {
   muted: '#6b6356',
   gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
   border: 'rgba(30,26,20,0.08)', borderStrong: 'rgba(30,26,20,0.14)',
-  // Sidebar palette — a touch brighter than the original #544433
-  // espresso so gold accents pop without the brown reading near-black.
-  sidebarBg: '#6b5841',
-  sidebarInk: '#f5ecd8',
-  sidebarMuted: '#c9b99a',
+  // Sidebar palette — warm taupe brown that keeps the editorial B&G
+  // pairing but reads brighter than the previous espresso, so the gold
+  // accents and labels both pop cleanly.
+  sidebarBg: '#806752',
+  sidebarInk: '#f7eedc',
+  sidebarMuted: '#d6c5a4',
 };
 
-const SIDEBAR_W = 216;  // a touch narrower than the bundle's 240
-const SIDEBAR_W_COLLAPSED = 68;
+// Sidebar sits at the pre-redesign width so the main content area
+// doesn't feel cramped on a 1440 workspace.
+const SIDEBAR_W = 200;
+const SIDEBAR_W_COLLAPSED = 64;
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
@@ -81,6 +84,19 @@ const TOOL_NAV = [
   { k: 'tags',       to: '/settings/tags',    label: 'ניהול תגיות',    Icon: Tag },
   { k: 'settings',   to: '/settings',         label: 'הגדרות',         Icon: Settings },
 ];
+
+// Pick the single most-specific nav route that matches the current
+// pathname. `/dashboard` also wins when the pathname is `/`.
+function pickActiveRoute(pathname, routes) {
+  const p = pathname === '/' ? '/dashboard' : pathname;
+  let best = null;
+  for (const to of routes) {
+    if (!to) continue;
+    if (to === p) return to;
+    if (p.startsWith(`${to}/`) && (!best || to.length > best.length)) best = to;
+  }
+  return best;
+}
 
 // ─── Responsive hook ────────────────────────────────────────
 function useIsNarrow() {
@@ -209,6 +225,8 @@ export default function Layout({ onLogout }) {
           narrow={narrow}
           onOpenPalette={openPalette}
           onNewLead={() => navigate('/customers/new')}
+          onNewProperty={() => navigate('/properties/new')}
+          onOpenChat={() => window.dispatchEvent(new Event('estia:open-chat'))}
           user={user}
         />
         <main style={{ flex: 1, minWidth: 0, background: DT.cream }}>
@@ -244,6 +262,37 @@ function Sidebar(p) {
     }}>
       <SidebarInner {...p} />
       <HiddenScrollbarStyles />
+      {/* Collapse handle — anchored on the sidebar's outer (content-
+          facing) edge, vertically centered, so it sits ON the seam
+          between the sidebar and the main area. */}
+      {p.onToggleCollapse && (
+        <button
+          type="button"
+          onClick={p.onToggleCollapse}
+          aria-label={p.collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+          title={p.collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+          style={{
+            position: 'absolute',
+            top: '50%',
+            // RTL: insetInlineEnd is the LEFT side of the sidebar —
+            // the edge that faces the main content. Putting the handle
+            // at -12 there hangs it over the seam. The previous
+            // `insetInlineStart: -12` put it on the OUTER edge, which
+            // in RTL is the viewport's right side → offscreen.
+            insetInlineEnd: -12,
+            transform: 'translateY(-50%)',
+            width: 24, height: 24, borderRadius: 99,
+            background: DT.white, color: DT.ink,
+            border: `1px solid ${DT.border}`,
+            boxShadow: '0 4px 12px rgba(30,26,20,0.18)',
+            cursor: 'pointer',
+            display: 'grid', placeItems: 'center',
+            zIndex: 2,
+          }}
+        >
+          {p.collapsed ? <ChevronsLeft size={14} /> : <ChevronsRight size={14} />}
+        </button>
+      )}
     </aside>
   );
 }
@@ -266,10 +315,17 @@ function SidebarInner({
   location, agentName, agentInitial, agentSub,
   onLogout, collapsed = false, onToggleCollapse,
 }) {
-  const isActive = (to) => {
-    if (to === '/dashboard') return location.pathname === '/dashboard' || location.pathname === '/';
-    return location.pathname === to || location.pathname.startsWith(`${to}/`);
-  };
+  // Single-active resolver: of all items whose `to` is a prefix of the
+  // current pathname, keep only the longest match. Without this,
+  // /settings/tags lit BOTH /settings and /settings/tags because
+  // startsWith matched both (bug the user just flagged).
+  const allRoutes = [
+    ...primary.map((i) => i.to),
+    ...tools.map((i) => i.to),
+    ...favorites.map((f) => f.to),
+  ];
+  const activeTo = pickActiveRoute(location.pathname, allRoutes);
+  const isActive = (to) => to === activeTo;
   return (
     <>
       {/* Brand + collapse toggle */}
@@ -295,21 +351,9 @@ function SidebarInner({
             </div>
           )}
         </NavLink>
-        {onToggleCollapse && (
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
-            title={collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
-            style={{
-              background: 'transparent', border: 'none',
-              color: DT.sidebarMuted, cursor: 'pointer', padding: 6,
-              display: 'inline-flex', flexShrink: 0,
-            }}
-          >
-            {collapsed ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
-          </button>
-        )}
+        {/* Collapse toggle moved out to the sidebar's outer edge
+            (rendered by the wrapping <Sidebar>). Cleaner — the brand
+            row stays clean. */}
       </div>
 
       <nav className="estia-sidebar-nav" style={{
@@ -458,7 +502,7 @@ function NavRow({ item, active, tight, collapsed }) {
 }
 
 // ═══ Topbar ══════════════════════════════════════════════════════
-function Topbar({ narrow, onOpenPalette, onNewLead, user }) {
+function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, user }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const [loadingNotifs, setLoadingNotifs] = useState(false);
@@ -537,16 +581,28 @@ function Topbar({ narrow, onOpenPalette, onNewLead, user }) {
       </button>
       <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
         {!narrow && (
-          <button
-            type="button"
-            onClick={onNewLead}
-            style={{
-              ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
-              padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
-              color: DT.ink, display: 'inline-flex', gap: 6, alignItems: 'center',
-              fontSize: 12, fontWeight: 700,
-            }}
-          ><Plus size={14} /> ליד חדש</button>
+          <>
+            <button
+              type="button"
+              onClick={onNewLead}
+              style={{
+                ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
+                padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
+                color: DT.ink, display: 'inline-flex', gap: 6, alignItems: 'center',
+                fontSize: 12, fontWeight: 700,
+              }}
+            ><Plus size={14} /> ליד חדש</button>
+            <button
+              type="button"
+              onClick={onNewProperty}
+              style={{
+                ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
+                padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
+                color: DT.ink, display: 'inline-flex', gap: 6, alignItems: 'center',
+                fontSize: 12, fontWeight: 700,
+              }}
+            ><Plus size={14} /> נכס חדש</button>
+          </>
         )}
         <div ref={notifAnchorRef} style={{ position: 'relative' }}>
           <button
@@ -573,20 +629,19 @@ function Topbar({ narrow, onOpenPalette, onNewLead, user }) {
             <NotificationsPopover items={notifs} loading={loadingNotifs} onClose={() => setNotifOpen(false)} />
           )}
         </div>
-        <a
-          href={`https://wa.me/972501234567?text=${encodeURIComponent(`שלום, אני ${user?.displayName || ''} — צריך/ה תמיכה ב-Estia.`)}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={onOpenChat}
           aria-label="שיחה עם הצוות"
           title="שיחה עם הצוות"
           style={{
             background: DT.white, border: `1px solid ${DT.border}`,
             width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
-            color: DT.ink, display: 'grid', placeItems: 'center', textDecoration: 'none',
+            color: DT.ink, display: 'grid', placeItems: 'center',
           }}
         >
           <MessageCircle size={15} />
-        </a>
+        </button>
       </div>
     </header>
   );
@@ -595,7 +650,11 @@ function Topbar({ narrow, onOpenPalette, onNewLead, user }) {
 function NotificationsPopover({ items, loading, onClose }) {
   return (
     <div style={{
-      position: 'absolute', top: 'calc(100% + 6px)', insetInlineStart: 0,
+      // Anchor to the bell's RIGHT edge (in RTL this is the viewport-
+      // side; the popover extends leftward into the page). Using plain
+      // `right: 0` is direction-agnostic and reliable — the previous
+      // `insetInlineStart: 0` pushed the popover offscreen.
+      position: 'absolute', top: 'calc(100% + 6px)', right: 0,
       width: 340, maxWidth: 'calc(100vw - 24px)',
       background: DT.white, border: `1px solid ${DT.border}`,
       borderRadius: 12, boxShadow: '0 14px 34px rgba(30,26,20,0.14)',

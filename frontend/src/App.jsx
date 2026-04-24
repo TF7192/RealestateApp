@@ -67,7 +67,9 @@ const OnboardingTour = lazy(() => import('./components/OnboardingTour'));
 // landing's CSS + hero weight; same for authed sessions.
 const Landing = lazy(() => import('./pages/landing/Landing'));
 const LegalPage = lazy(() => import('./pages/landing/LegalPage'));
-// ChatWidget removed (see Cream & Gold redesign) — topbar developer-chat button replaces it.
+// Headless ChatWidget — topbar chat button dispatches `estia:open-chat`
+// to summon its panel. The old floating bubble is permanently hidden.
+import ChatWidget from './components/ChatWidget';
 import Yad2ScanBanner from './components/Yad2ScanBanner';
 import MarketScanBanner from './components/MarketScanBanner';
 import { useScrollRestore } from './hooks/mobile';
@@ -348,8 +350,10 @@ function AppRoutes() {
       <Suspense fallback={null}>
         <OnboardingTour />
       </Suspense>
-      {/* ChatWidget removed per Cream & Gold redesign — the topbar's
-          developer-chat button replaces the floating bottom-left bubble. */}
+      {/* Headless — renders the in-app developer chat panel when the
+          topbar chat button dispatches `estia:open-chat`. The floating
+          launcher is gone; the topbar is the single entry point. */}
+      <ChatWidget />
       <Yad2ScanBanner />
       <MarketScanBanner />
     </>
