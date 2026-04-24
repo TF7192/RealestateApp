@@ -211,6 +211,11 @@ export default function PropertyDetail() {
   const [pickerLeadsOverride, setPickerLeadsOverride] = useState(null);
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  // Landing-link copy feedback. Declared up here with the rest of the
+  // top-level hooks — putting it below the `if (loading) return …`
+  // guard triggers "Rendered more hooks than during the previous
+  // render" on the loading → loaded transition.
+  const [landingCopied, setLandingCopied] = useState(false);
   // Active sliding panel: 'marketing' | 'owner' | 'photos' | 'exclusivity' | 'notes' | 'map' | null
   // F-4.3 — respect `?panel=marketing` deep-link from the Dashboard's
   // marketing-progress card.
@@ -342,7 +347,6 @@ export default function PropertyDetail() {
   const landingLink = property.slug && user?.slug
     ? `${window.location.origin}/l/${encodeURI(user.slug)}/${encodeURI(property.slug)}`
     : null;
-  const [landingCopied, setLandingCopied] = useState(false);
   const copyLandingLink = async () => {
     let url = landingLink;
     if (!url) {
