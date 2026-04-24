@@ -24,7 +24,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2, UserPlus, Users, Mail, Crown, Trash2, Plus, Copy, Send,
-  X, Sparkles, Trophy, AlertCircle,
+  X, Sparkles, Trophy, AlertCircle, Link2,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -354,63 +354,51 @@ export default function Office() {
           aria-label="הזמנת סוכן"
           style={sectionCard({ marginBottom: 16 })}
         >
+          {/* Row 1: section title only. */}
           <h3 style={sectionTitle()}>
             <UserPlus size={16} /> הזמנת סוכן
           </h3>
 
-          {/* Mode toggle */}
-          <div
-            role="radiogroup"
-            aria-label="סוג הזמנה"
-            style={{
-              display: 'inline-flex', background: DT.cream2,
-              padding: 4, borderRadius: 10, gap: 4, marginBottom: 14,
-            }}
-          >
-            <ModePill
-              active={inviteMode === 'existing'}
-              onClick={() => setInviteMode('existing')}
-              label="קיים במערכת"
-            />
-            <ModePill
-              active={inviteMode === 'email'}
-              onClick={() => setInviteMode('email')}
-              label="הזמן לפי אימייל"
-            />
-          </div>
-
+          {/* Row 2: mode pill + compact email input + submit, all on a
+              single baseline. Email input is constrained so the pill
+              doesn't jump to its own row on common desktop widths. */}
           <form
             onSubmit={handleInvite}
             style={{
-              display: 'flex', gap: 10, alignItems: 'flex-end',
+              display: 'flex', gap: 10, alignItems: 'center',
               flexWrap: 'wrap',
             }}
           >
-            <div style={{
-              display: 'flex', flexDirection: 'column', gap: 4,
-              flex: 1, minWidth: 220,
-            }}>
-              <label
-                htmlFor="invite-email"
-                style={{
-                  fontSize: 11, fontWeight: 700, color: DT.muted,
-                  textTransform: 'uppercase', letterSpacing: 0.3,
-                }}
-              >
-                {inviteMode === 'existing' ? 'אימייל הסוכן' : 'אימייל החבר החדש'}
-              </label>
-              <input
-                id="invite-email"
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="agent@example.com"
-                aria-label={inviteMode === 'existing' ? 'אימייל הסוכן' : 'אימייל להזמנה'}
-                dir="ltr"
-                required
-                style={inputStyle()}
+            <div
+              role="radiogroup"
+              aria-label="סוג הזמנה"
+              style={{
+                display: 'inline-flex', background: DT.cream2,
+                padding: 4, borderRadius: 10, gap: 4, flexShrink: 0,
+              }}
+            >
+              <ModePill
+                active={inviteMode === 'existing'}
+                onClick={() => setInviteMode('existing')}
+                label="קיים במערכת"
+              />
+              <ModePill
+                active={inviteMode === 'email'}
+                onClick={() => setInviteMode('email')}
+                label="הזמן לפי אימייל"
               />
             </div>
+            <input
+              id="invite-email"
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder={inviteMode === 'existing' ? 'אימייל הסוכן' : 'אימייל החבר החדש'}
+              aria-label={inviteMode === 'existing' ? 'אימייל הסוכן' : 'אימייל להזמנה'}
+              dir="ltr"
+              required
+              style={{ ...inputStyle(), flex: '0 1 240px', minWidth: 160 }}
+            />
             <button
               type="submit"
               disabled={inviting || !inviteEmail.trim()}
@@ -585,7 +573,7 @@ export default function Office() {
                       style={iconBtn()}
                       title="העתק קישור"
                     >
-                      <Copy size={14} aria-hidden="true" />
+                      <Link2 size={14} aria-hidden="true" />
                     </button>
                     <button
                       type="button"
