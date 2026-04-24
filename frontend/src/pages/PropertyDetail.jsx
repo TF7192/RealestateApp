@@ -80,6 +80,113 @@ import {
 import { useToast } from '../lib/toast';
 import './PropertyDetail.css';
 
+// Cream & Gold DT tokens — inline styles for the page top-shell
+// (toolbar + header card). The dashboard body below (PropertyHero,
+// KPI strip, dashboard cards, panels) keeps its existing class-based
+// markup and already renders cream & gold via [data-theme=light].
+const _DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)',
+  success: '#15803d', danger: '#b91c1c',
+};
+const _FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
+
+const PD_DT = {
+  toolbar: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: 12, flexWrap: 'wrap', marginBottom: 16,
+  },
+  backLink: {
+    ..._FONT,
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    color: _DT.muted, textDecoration: 'none', fontSize: 13, fontWeight: 700,
+  },
+  actionsRow: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  primaryBtn: {
+    ..._FONT,
+    background: `linear-gradient(180deg, ${_DT.goldLight}, ${_DT.gold})`,
+    border: 'none', color: _DT.ink,
+    padding: '7px 14px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 800,
+    display: 'inline-flex', gap: 5, alignItems: 'center',
+    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    textDecoration: 'none',
+  },
+  secondaryBtn: {
+    ..._FONT, background: _DT.white, border: `1px solid ${_DT.border}`,
+    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    display: 'inline-flex', gap: 5, alignItems: 'center', color: _DT.ink,
+    textDecoration: 'none',
+  },
+  ghostBtn: {
+    ..._FONT, background: 'transparent', border: `1px solid ${_DT.border}`,
+    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    display: 'inline-flex', gap: 5, alignItems: 'center', color: _DT.ink,
+    textDecoration: 'none',
+  },
+  dangerBtn: {
+    ..._FONT, background: 'rgba(185,28,28,0.08)',
+    border: `1px solid rgba(185,28,28,0.2)`,
+    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    display: 'inline-flex', gap: 5, alignItems: 'center', color: _DT.danger,
+  },
+  headerCard: {
+    background: _DT.white, border: `1px solid ${_DT.border}`,
+    borderRadius: 14, padding: 20, marginBottom: 16,
+    display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+  },
+  headerAvatar: {
+    width: 64, height: 64, borderRadius: 14,
+    background: `linear-gradient(160deg, ${_DT.goldLight}, ${_DT.gold})`,
+    color: _DT.ink, display: 'grid', placeItems: 'center',
+    flexShrink: 0,
+  },
+  headerTitle: {
+    fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: 0,
+    color: _DT.ink,
+  },
+  headerSub: {
+    display: 'inline-flex', alignItems: 'center', gap: 10,
+    fontSize: 13, color: _DT.muted, marginTop: 6, flexWrap: 'wrap',
+  },
+  chipRow: {
+    display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  price: {
+    fontSize: 20, fontWeight: 800, color: _DT.goldDark,
+    letterSpacing: -0.3, whiteSpace: 'nowrap',
+  },
+};
+
+function pdChip({ bg, fg, border }) {
+  return {
+    ..._FONT,
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    background: bg, color: fg,
+    border: border ? `1px solid ${border}` : '1px solid transparent',
+    padding: '3px 10px', borderRadius: 99,
+    fontWeight: 700, fontSize: 11,
+  };
+}
+
+function statusChipMeta(status) {
+  const s = (status || '').toUpperCase();
+  if (s === 'SOLD')       return { label: 'נמכר',    bg: 'rgba(21,128,61,0.12)',  fg: _DT.success };
+  if (s === 'OFF_MARKET') return { label: 'הוסר',    bg: 'rgba(107,99,86,0.12)',  fg: _DT.muted };
+  if (s === 'PAUSED')     return { label: 'מושהה',   bg: 'rgba(180,139,76,0.12)', fg: _DT.goldDark };
+  if (s === 'ARCHIVED')   return { label: 'בארכיון', bg: 'rgba(30,26,20,0.08)',   fg: _DT.ink };
+  return { label: 'פעיל', bg: 'rgba(21,128,61,0.12)', fg: _DT.success };
+}
+
 const MARKETING_LABELS = {
   tabuExtract: 'הפקת נסח טאבו',
   photography: 'צילום הנכס',
@@ -623,43 +730,45 @@ export default function PropertyDetail() {
             content: 'דשבורד מלא: 22 פעולות שיווק, בעל הנכס, תמונות, בלעדיות והערות. מעל — כפתורי העברה, עריכה, שיתוף לקוח (וסטורי באפליקציה).' },
         ]}
       />
-      {/* Top toolbar */}
-      <div className="pd-topbar">
-        <Link to="/properties" className="pd-back animate-in">
+      {/* Top toolbar — DT inline styles (back link + action buttons).
+          UX review F-6.1 + F-6.2 — canonical toolbar order:
+          Edit (highest frequency) · Share · landing · Prospect ·
+          Transfer · Story (native only) · Print · Pop-out · Delete. */}
+      <div style={PD_DT.toolbar}>
+        <Link to="/properties" style={PD_DT.backLink}>
           <ArrowRight size={16} />
           <span>חזרה לנכסים</span>
         </Link>
-        <div className="pd-top-actions">
-          {/* UX review F-6.1 + F-6.2 — canonical toolbar order:
-              Edit (highest frequency) · Share · Add-Prospect · overflow
-              for rare actions (Transfer, Story) · Delete (red, last). */}
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/properties/${id}/edit`)}>
+        <div style={PD_DT.actionsRow}>
+          <button type="button" style={PD_DT.secondaryBtn} onClick={() => navigate(`/properties/${id}/edit`)}>
             <Edit3 size={14} />
             <span>עריכה</span>
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={handleShare}>
+          <button type="button" style={PD_DT.secondaryBtn} onClick={handleShare}>
             <Share2 size={14} />
             <span>שתף</span>
           </button>
           <button
-            className="btn btn-secondary btn-sm"
+            type="button"
+            style={PD_DT.secondaryBtn}
             onClick={copyLandingLink}
             title="קישור לדף נחיתה פרימיום — תמונות, טופס, ללא פרטים"
           >
             {landingCopied ? <Check size={14} aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
             <span>{landingCopied ? 'הקישור הועתק' : 'דף נחיתה'}</span>
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => setProspectOpen(true)}>
+          <button type="button" style={PD_DT.secondaryBtn} onClick={() => setProspectOpen(true)}>
             <UserPlus size={14} />
             <span>צור הסכם תיווך</span>
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => setTransferOpen(true)} title="העברה לסוכן אחר">
+          <button type="button" style={PD_DT.secondaryBtn} onClick={() => setTransferOpen(true)} title="העברה לסוכן אחר">
             <ArrowLeftRight size={14} />
             <span>העבר</span>
           </button>
           {isNative() && (
             <button
-              className="btn btn-secondary btn-sm pd-ig-btn"
+              type="button"
+              style={PD_DT.secondaryBtn}
               onClick={handleInstagramStory}
               aria-label="שתף בסטורי של אינסטגרם"
             >
@@ -671,20 +780,79 @@ export default function PropertyDetail() {
               <span>סטורי</span>
             </button>
           )}
-          <button className="btn btn-ghost btn-sm" onClick={() => printPage()} title="הדפס">
+          <button type="button" style={PD_DT.ghostBtn} onClick={() => printPage()} title="הדפס">
             <Printer size={14} />
             <span>הדפס</span>
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => popoutCurrentRoute()} title="פתח בחלון חדש">
+          <button type="button" style={PD_DT.ghostBtn} onClick={() => popoutCurrentRoute()} title="פתח בחלון חדש">
             <Maximize2 size={14} />
             <span>פתח בחלון חדש</span>
           </button>
-          <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>
+          <button type="button" style={PD_DT.dangerBtn} onClick={() => setConfirmDelete(true)}>
             <Trash2 size={14} />
             <span>מחיקה</span>
           </button>
         </div>
       </div>
+
+      {/* Header card — address + asset-class / category / status chips + price.
+          Sub-panels below (PropertyHero, KPI strip, etc.) keep their
+          existing class-based markup. */}
+      {(() => {
+        const statusChip = statusChipMeta(property.status);
+        const assetLabel = property.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים';
+        const categoryLabel = property.category === 'SALE' ? 'למכירה' : 'להשכרה';
+        const streetLine = [property.street, property.city].filter(Boolean).join(', ');
+        return (
+          <div style={PD_DT.headerCard}>
+            <div style={PD_DT.headerAvatar} aria-hidden="true">
+              <Building2 size={28} />
+            </div>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <h1 style={PD_DT.headerTitle}>
+                {streetLine || property.type || 'נכס ללא כתובת'}
+              </h1>
+              <div style={PD_DT.headerSub}>
+                {property.type && <span>{property.type}</span>}
+                {property.rooms != null && <span>· {property.rooms} חד׳</span>}
+                {property.sqm != null && <span>· {property.sqm} מ״ר</span>}
+                {property.floor != null && (
+                  <span>· קומה {formatFloor(property.floor, property.totalFloors)}</span>
+                )}
+              </div>
+              <div style={PD_DT.chipRow}>
+                <span style={pdChip({
+                  bg: property.assetClass === 'COMMERCIAL' ? 'rgba(180,83,9,0.12)' : _DT.goldSoft,
+                  fg: property.assetClass === 'COMMERCIAL' ? '#b45309' : _DT.goldDark,
+                })}>
+                  <Building2 size={12} /> {assetLabel}
+                </span>
+                <span style={pdChip({
+                  bg: property.category === 'SALE' ? _DT.goldSoft : 'rgba(30,26,20,0.06)',
+                  fg: property.category === 'SALE' ? _DT.goldDark : _DT.ink,
+                })}>
+                  {categoryLabel}
+                </span>
+                <span style={pdChip({ bg: statusChip.bg, fg: statusChip.fg })}>
+                  {statusChip.label}
+                </span>
+                {hasExclusivity && exclusivityDaysLeft != null && exclusivityDaysLeft > 0 && (
+                  <span style={pdChip({
+                    bg: _DT.goldSoft, fg: _DT.goldDark,
+                  })}>
+                    <Sparkles size={12} /> בלעדיות · {exclusivityDaysLeft} ימים
+                  </span>
+                )}
+              </div>
+            </div>
+            {property.marketingPrice != null && (
+              <div style={PD_DT.price} title="מחיר שיווק">
+                {formatPrice(property.marketingPrice)}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Hero — gallery + price/title/CTAs */}
       <PropertyHero
