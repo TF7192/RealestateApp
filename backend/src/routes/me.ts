@@ -102,6 +102,11 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
     title: z.string().max(120).nullable().optional(),
     agency: z.string().max(120).nullable().optional(),
     phone: z.string().max(40).nullable().optional(),
+    // Primary activity city from the onboarding wizard. Stored on
+    // agentProfile.businessAddress (the existing freeform field) so
+    // we don't need a schema migration; downstream queries that read
+    // it treat "city" and "address" interchangeably.
+    city: z.string().max(80).nullable().optional(),
   });
 
   app.post('/profile', { onRequest: [app.requireAuth] }, async (req, reply) => {
@@ -127,18 +132,21 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
     // endpoint still get `profileCompletedAt` stamped but we skip the
     // profile write.
     if (requireUser(req).role === 'AGENT') {
+      const city = body.city?.trim() || undefined;
       await prisma.agentProfile.upsert({
         where: { userId: uid },
         update: {
           license: body.license,
           title: body.title ?? undefined,
           agency: body.agency ?? undefined,
+          businessAddress: city,
         },
         create: {
           userId: uid,
           license: body.license,
           title: body.title ?? undefined,
           agency: body.agency ?? undefined,
+          businessAddress: city,
         },
       });
     }

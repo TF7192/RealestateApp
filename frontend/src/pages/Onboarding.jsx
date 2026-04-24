@@ -7,7 +7,7 @@
 // License number remains required — enforced on step 1 "next" and
 // echoed in the server zod.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, IdCard, User, Phone, Building2, MapPin, Upload, Plus,
@@ -46,6 +46,21 @@ export default function Onboarding() {
   });
   const [err, setErr] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [cityOptions, setCityOptions] = useState([]);
+
+  // Canonical Israeli city list — same source the rest of the app
+  // normalizes against (backend /lookups/cities). Rendered as a
+  // native <datalist> so the agent gets autocomplete but can still
+  // type a city not in the list (e.g. new localities).
+  useEffect(() => {
+    let cancelled = false;
+    api.cities().then((res) => {
+      if (cancelled) return;
+      const names = (res?.cities || []).map((c) => c.name).filter(Boolean).sort((a, b) => a.localeCompare(b, 'he'));
+      setCityOptions(names);
+    }).catch(() => { /* fallthrough — user can type freely */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
   const licenseDigits = form.license.replace(/\D/g, '');
@@ -80,6 +95,7 @@ export default function Onboarding() {
         title: titleLabel,
         agency: form.agency.trim() || null,
         phone: form.phone.trim() || null,
+        city: form.city.trim() || null,
       });
       await refresh();
       toast.success('ברוך הבא');
@@ -96,16 +112,20 @@ export default function Onboarding() {
   return (
     <div dir="rtl" lang="he" style={{
       ...FONT, background: T.cream, color: T.ink, minHeight: '100vh',
-      display: 'flex', justifyContent: 'center', padding: '0',
+      // Natural page scroll; sticky footer pins to the viewport bottom
+      // so the primary CTA is always reachable (previous layout used
+      // inner overflow with no container height, so step 3 hid the
+      // submit below the fold).
+      display: 'flex', justifyContent: 'center', padding: '0 0 96px',
     }}>
       <div style={{
         width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column',
-        background: T.cream, minHeight: '100vh',
+        background: T.cream,
       }}>
         {/* Top bar */}
         <div style={{
           padding: '16px 22px 12px', display: 'flex', alignItems: 'center', gap: 12,
-          borderBottom: 'none',
+          borderBottom: 'none', position: 'sticky', top: 0, background: T.cream, zIndex: 5,
         }}>
           <button type="button" onClick={step === 0 ? () => logout().catch(() => {}) : back}
             style={{
@@ -130,7 +150,7 @@ export default function Onboarding() {
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '14px 22px 20px' }}>
+        <div style={{ padding: '14px 22px 20px' }}>
           {step === 0 && (
             <>
               <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.8, lineHeight: 1.15, margin: '0 0 6px' }}>
@@ -222,7 +242,11 @@ export default function Onboarding() {
                 value={form.city}
                 onChange={(v) => setF('city', v)}
                 placeholder="תל אביב, רמת גן…"
+                list="onboarding-cities"
               />
+              <datalist id="onboarding-cities">
+                {cityOptions.map((c) => <option key={c} value={c} />)}
+              </datalist>
             </>
           )}
 
@@ -277,8 +301,14 @@ export default function Onboarding() {
           )}
         </div>
 
-        {/* Sticky footer CTA */}
-        <div style={{ padding: '12px 22px 22px', borderTop: `1px solid ${T.border}`, background: T.cream }}>
+        {/* Sticky footer CTA — pins to viewport bottom so the primary
+            button is always reachable regardless of step length. */}
+        <div style={{
+          padding: '12px 22px 22px', borderTop: `1px solid ${T.border}`,
+          background: T.cream,
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          maxWidth: 520, margin: '0 auto', zIndex: 10,
+        }}>
           {step < TOTAL_STEPS - 1 ? (
             <PrimaryBtn onClick={next} disabled={!canAdvance()}>
               המשך

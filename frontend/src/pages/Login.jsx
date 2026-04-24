@@ -162,7 +162,13 @@ function DesktopLogin(p) {
         </div>
         <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 440 }}>
           <div style={{ fontSize: 12, color: DT.goldLight, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>נדל״ן · AI · בעברית</div>
-          <h1 style={{ fontSize: 48, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1.1, marginTop: 14 }}>הזמן שלך<br />שווה יותר.</h1>
+          <h1 style={{ fontSize: 48, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1.1, marginTop: 14 }}>
+            הזמן שלך<br />
+            <span style={{
+              background: `linear-gradient(135deg, ${DT.goldLight}, ${DT.gold})`,
+              WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+            }}>שווה יותר.</span>
+          </h1>
           <div style={{ fontSize: 16, color: 'rgba(247,243,236,0.7)', lineHeight: 1.7, marginTop: 18 }}>
             Estia מחליף את Excel + WhatsApp + היומן בכלי אחד שחושב בעברית,
             מבין את השוק הישראלי ועובד איתך.
@@ -273,20 +279,20 @@ function MobileLogin(p) {
   return (
     <div dir="rtl" style={{
       ...FONT, background: DT.cream, color: DT.ink, minHeight: '100vh',
-      display: 'flex', flexDirection: 'column', padding: '44px 24px 28px',
+      display: 'flex', flexDirection: 'column', padding: '22px 22px 22px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
         <div style={{
-          width: 36, height: 36, borderRadius: 10,
+          width: 34, height: 34, borderRadius: 10,
           background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
-          display: 'grid', placeItems: 'center', color: DT.ink, fontWeight: 900, fontSize: 18,
+          display: 'grid', placeItems: 'center', color: DT.ink, fontWeight: 900, fontSize: 17,
         }}>E</div>
-        <div style={{ fontSize: 22, fontWeight: 800 }}>Estia</div>
+        <div style={{ fontSize: 21, fontWeight: 800 }}>Estia</div>
       </div>
-      <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: -1, lineHeight: 1.1, margin: '0 0 8px' }}>
+      <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.8, lineHeight: 1.12, margin: '0 0 6px' }}>
         {isSignup ? 'צור חשבון' : 'ברוכים השבים'}
       </h1>
-      <p style={{ fontSize: 14, color: DT.muted, margin: '0 0 28px' }}>
+      <p style={{ fontSize: 13.5, color: DT.muted, margin: '0 0 20px' }}>
         {isSignup ? 'הצטרפו · 30 יום Premium חינם' : 'התחברו כדי להמשיך לנהל את העסק שלכם.'}
       </p>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
