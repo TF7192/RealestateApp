@@ -63,6 +63,20 @@ function isConfigured(): boolean {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
+// SEC-015 — guard against open redirect via ?redirect=.
+// Browsers process `//evil.com` as a protocol-relative URL pointing at
+// https://evil.com, and Edge/older-IE normalize backslash-prefixed
+// values like `/\evil.com` to the same. Both must be rejected; only
+// genuine same-origin paths starting with a single `/` survive.
+// Exported so the unit test can pin the behavior in isolation.
+export function safeRedirectPath(s: string | undefined): string {
+  if (!s) return '/';
+  if (!s.startsWith('/')) return '/';
+  if (s.startsWith('//')) return '/';
+  if (s.startsWith('/\\')) return '/';
+  return s;
+}
+
 function redirectUri(): string {
   const origin = process.env.PUBLIC_ORIGIN || 'https://estia.co.il';
   return `${origin}/api/auth/google/callback`;
@@ -255,8 +269,10 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 * 30,
     });
-    // Bounce back to the place the user came from (default: dashboard)
-    const target = decoded.r && decoded.r.startsWith('/') ? decoded.r : '/';
+    // Bounce back to the place the user came from (default: dashboard).
+    // safeRedirectPath rejects protocol-relative + backslash variants
+    // so a malicious ?redirect=//evil.com can't bounce off-site.
+    const target = safeRedirectPath(decoded.r);
     return reply.redirect(target);
   });
 

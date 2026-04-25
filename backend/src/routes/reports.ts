@@ -14,9 +14,19 @@ const rangeSchema = z.object({
 // CSV escape: wrap values that contain comma/quote/newline in quotes,
 // and double any embedded quotes. Hebrew is UTF-8 safe so nothing
 // special needed there — only the structural characters.
-function csvCell(v: unknown): string {
+//
+// SEC-013 — CSV / formula injection. Excel, Numbers, LibreOffice all
+// interpret cells starting with `=`, `+`, `-`, `@`, `\t`, or `\r` as
+// formulas at import time. A malicious lead-form submission of
+// `=cmd|'/c calc'!A1` would silently execute when the agent later
+// opened the export. Prefix-escape with an apostrophe (a long-standing
+// OWASP recommendation — Excel hides the apostrophe but renders the
+// rest of the cell literally). Exported so the unit test can pin the
+// behavior in isolation.
+export function csvCell(v: unknown): string {
   if (v == null) return '';
-  const s = String(v);
+  let s = String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
