@@ -239,14 +239,17 @@ ${facts.join('\n')}
       let description = '';
       let highlights: string[] = [];
       try {
+        // Sprint 10 — marketing copy doesn't need Opus. Sonnet 4.6
+        // handles Hebrew prose + 5 bullets at the same quality for
+        // ~20% of the price.
         const response = await client.messages.create({
-          model: 'claude-opus-4-7',
+          model: 'claude-sonnet-4-6',
           max_tokens: 1024,
           system:
             'אתה כותב תוכן שיווקי מומחה בנדל"ן ישראלי. אתה כותב בעברית טבעית, תקנית, וזורמת. אל תמציא עובדות.',
           messages: [{ role: 'user', content: userPrompt }],
         });
-        recordAnthropic({ userId: user.id, feature: 'describe-property', model: 'claude-opus-4-7', usage: response.usage as any });
+        recordAnthropic({ userId: user.id, feature: 'describe-property', model: 'claude-sonnet-4-6', usage: response.usage as any });
 
         // Narrow to the first text block. The SDK's ContentBlock union
         // includes `text`, `thinking`, `tool_use` — we only care about
@@ -409,14 +412,17 @@ ${JSON.stringify(candidates, null, 2)}
 </matches>`;
 
     try {
+      // Sprint 10 — pattern matching + XML ranking is squarely in
+      // Haiku's wheelhouse: structured output, short reasoning,
+      // deterministic scoring. 15× cheaper than Opus per call.
       const response = await client.messages.create({
-        model: 'claude-opus-4-7',
+        model: 'claude-haiku-4-5',
         max_tokens: 1024,
         system:
           'אתה מומחה התאמת לקוחות לנכסים בישראל. אתה מדייק, לא ממציא עובדות, ומחזיר תשובות בפורמט XML מדויק.',
         messages: [{ role: 'user', content: prompt }],
       });
-      recordAnthropic({ userId: requireUser(req).id, feature: 'ai-match', model: 'claude-opus-4-7', usage: response.usage as any });
+      recordAnthropic({ userId: requireUser(req).id, feature: 'ai-match', model: 'claude-haiku-4-5', usage: response.usage as any });
       // Content is a discriminated union of TextBlock / ThinkingBlock / etc.
       // Loop and read `.text` only on text blocks so TypeScript narrows.
       let raw = '';
@@ -721,14 +727,15 @@ ${propertySummaries || '(אין נכסים פעילים)'}
       let checklist: string[] = [];
       let talkingPoints: string[] = [];
       try {
+        // Sprint 10 — meeting brief: structured output, short. Sonnet.
         const response = await client.messages.create({
-          model: 'claude-opus-4-7',
+          model: 'claude-sonnet-4-6',
           max_tokens: 1024,
           system:
             'אתה יועץ מכירות בכיר בתחום הנדל"ן הישראלי. אתה מכין briefs מקצועיים, קצרים ופרקטיים, בעברית טבעית. אל תמציא עובדות.',
           messages: [{ role: 'user', content: userPrompt }],
         });
-        recordAnthropic({ userId: user.id, feature: 'meeting-brief', model: 'claude-opus-4-7', usage: response.usage as any });
+        recordAnthropic({ userId: user.id, feature: 'meeting-brief', model: 'claude-sonnet-4-6', usage: response.usage as any });
         const textBlock = response.content.find((b) => b.type === 'text');
         const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
 
@@ -860,14 +867,16 @@ ${compsText || '(אין נכסים להשוואה)'}
       let confidence: 'low' | 'medium' | 'high' = 'low';
       let reasoning = '';
       try {
+        // Sprint 10 — offer-review: price reasoning, needs some
+        // nuance. Sonnet is the right tier (not Haiku).
         const response = await client.messages.create({
-          model: 'claude-opus-4-7',
+          model: 'claude-sonnet-4-6',
           max_tokens: 512,
           system:
             'אתה יועץ מחיר לסוכני נדל"ן בישראל. אתה מדייק, מחושב, ולא ממציא עובדות. אתה מחזיר תשובות בפורמט XML מדויק.',
           messages: [{ role: 'user', content: userPrompt }],
         });
-        recordAnthropic({ userId: user.id, feature: 'offer-review', model: 'claude-opus-4-7', usage: response.usage as any });
+        recordAnthropic({ userId: user.id, feature: 'offer-review', model: 'claude-sonnet-4-6', usage: response.usage as any });
         const textBlock = response.content.find((b) => b.type === 'text');
         const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
 
@@ -1013,8 +1022,11 @@ ${compsText || '(אין נכסים להשוואה)'}
       let replyText = '';
       try {
         for (let iter = 0; iter < 6; iter += 1) {
+          // Sprint 10 — Sonnet 4.6 is the right tier for this
+          // surface: tool-use + Hebrew writing + CRM Q&A don't need
+          // Opus-level reasoning, and it's 5× cheaper per call.
           const response = await client.messages.create({
-            model: 'claude-opus-4-7',
+            model: 'claude-sonnet-4-6',
             // Tightened from 2048 → 1024. The chat replies that hit
             // the previous ceiling were almost always runaway table
             // regens; capping halves the worst-case output cost
@@ -1029,7 +1041,7 @@ ${compsText || '(אין נכסים להשוואה)'}
           recordAnthropic({
             userId: user.id,
             feature: 'chat',
-            model: 'claude-opus-4-7',
+            model: 'claude-sonnet-4-6',
             usage: response.usage as any,
           });
 

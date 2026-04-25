@@ -125,7 +125,10 @@ export default function Ai() {
       // bounded height so the panel doesn't eat the whole viewport
       // — feels like a card, not a landing page. The inner panel
       // still scrolls on its own for long transcripts.
-      height: 'min(72vh, 640px)',
+      // ~80% of the viewport (excluding the topbar) so the chat
+      // feels like a proper workspace, not a widget. Still caps at
+      // 960px so it doesn't get absurd on 4K screens.
+      height: 'min(80vh, 960px)',
       maxHeight: 'calc(100vh - 48px)',
       maxWidth: 880,
       marginInline: 'auto',
@@ -150,7 +153,7 @@ export default function Ai() {
             Estia AI
           </h1>
           <div style={{ fontSize: 13, color: DT.muted, marginTop: 2 }}>
-            עוזר מקצועי לסוכני נדל"ן — מבוסס Claude Opus 4.7
+            עוזר מקצועי לסוכני נדל"ן — מבוסס Claude Sonnet 4.6
           </div>
         </div>
       </header>
