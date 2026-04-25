@@ -99,18 +99,27 @@ const plugin: FastifyPluginAsync = async (app) => {
   });
 
   // SEC-010 — admin gate. The JWT carries `role` from the User row at
-  // login time, so a re-login is required for a freshly-promoted user
-  // to gain access. The previous email-allowlist gate relied on the
-  // (mutable) `email` claim, which produced surprises when an agent
-  // changed their primary email.
+  // login time. If the JWT already says `ADMIN` we accept it without
+  // touching the DB; otherwise we do a single `User.findUnique` to
+  // catch the "freshly-promoted user with a stale token" case so the
+  // admin doesn't have to log out and back in to gain access. Cheap:
+  // one indexed PK lookup per non-admin-token request to an admin
+  // route, and admin routes are low-frequency by design.
   app.decorate('requireAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
     const u = getUser(req);
     if (!u) {
       return reply.code(401).send({ error: { message: 'Unauthorized' } });
     }
-    if (u.role !== 'ADMIN') {
-      return reply.code(403).send({ error: { message: 'Admin only' } });
-    }
+    if (u.role === 'ADMIN') return;
+    try {
+      const { prisma } = await import('../lib/prisma.js');
+      const fresh = await prisma.user.findUnique({
+        where: { id: u.id },
+        select: { role: true },
+      });
+      if (fresh?.role === 'ADMIN') return;
+    } catch { /* fall through to 403 */ }
+    return reply.code(403).send({ error: { message: 'Admin only' } });
   });
 };
 
