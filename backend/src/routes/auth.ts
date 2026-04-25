@@ -96,6 +96,16 @@ const resetSchema = z.object({
 const RESET_TTL_MS = 30 * 60 * 1000;
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
+  // SEC-001 — the legacy POST /google/mock route below issues a fully
+  // signed JWT for any caller that knows an email; in production that's
+  // unauthenticated account takeover. Gate registration on env so prod
+  // returns 404, while dev / test / disposable staging can opt back in.
+  // AUTH_ALLOW_MOCK=1 is the explicit override (set in CI integration
+  // test setup so existing tests that depend on the mock keep working).
+  const ALLOW_MOCK =
+    process.env.AUTH_ALLOW_MOCK === '1' ||
+    process.env.NODE_ENV !== 'production';
+
   app.post('/signup', { config: { rateLimit: SIGNUP_LIMIT } }, async (req, reply) => {
     const body = signupSchema.parse(req.body);
     const existing = await prisma.user.findUnique({ where: { email: body.email } });
@@ -165,41 +175,45 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
 
   // Mock Google OAuth — the frontend already has a "Login with Google" button
   // that posts the user role. In production this would verify a real ID token.
-  app.post('/google/mock', async (req, reply) => {
-    const body = googleMockSchema.parse(req.body ?? {});
-    const email = body.email || (body.role === 'AGENT' ? 'agent.demo@estia.app' : 'customer.demo@estia.app');
-    const displayName = body.displayName || (body.role === 'AGENT' ? 'יוסי כהן' : 'רינה שמעון');
+  // SEC-001 — only registered when ALLOW_MOCK is true. Same rate limit as
+  // /login so a permissive staging env can't be brute-forced for emails.
+  if (ALLOW_MOCK) {
+    app.post('/google/mock', { config: { rateLimit: LOGIN_LIMIT } }, async (req, reply) => {
+      const body = googleMockSchema.parse(req.body ?? {});
+      const email = body.email || (body.role === 'AGENT' ? 'agent.demo@estia.app' : 'customer.demo@estia.app');
+      const displayName = body.displayName || (body.role === 'AGENT' ? 'יוסי כהן' : 'רינה שמעון');
 
-    let user = await prisma.user.findUnique({ where: { email } });
-    // A-1 — same soft-delete gate as the email path. A deleted account
-    // can't come back via the Google shortcut either.
-    if (user?.deletedAt) {
-      return reply.code(401).send({ error: { message: 'Invalid credentials' } });
-    }
-    if (!user) {
-      const slug = body.role === 'AGENT' ? await buildAgentSlug(displayName) : null;
-      user = await prisma.user.create({
-        data: {
-          email,
-          role: body.role,
-          displayName,
-          slug,
-          provider: 'GOOGLE',
-          googleId: `mock-${body.role.toLowerCase()}`,
-          agentProfile: body.role === 'AGENT' ? { create: {} } : undefined,
-          customerProfile: body.role === 'CUSTOMER' ? { create: {} } : undefined,
-        },
-      });
-    }
-    const token = app.jwt.sign(
-      { sub: user.id, role: user.role, email: user.email },
-      { expiresIn: '30d' }
-    );
-    reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
-    // A1 fill-in — claim any pending OfficeInvite for this email.
-    await claimOfficeInvites(user.id, user.email, user.role);
-    return { user: publicUser(user), token };
-  });
+      let user = await prisma.user.findUnique({ where: { email } });
+      // A-1 — same soft-delete gate as the email path. A deleted account
+      // can't come back via the Google shortcut either.
+      if (user?.deletedAt) {
+        return reply.code(401).send({ error: { message: 'Invalid credentials' } });
+      }
+      if (!user) {
+        const slug = body.role === 'AGENT' ? await buildAgentSlug(displayName) : null;
+        user = await prisma.user.create({
+          data: {
+            email,
+            role: body.role,
+            displayName,
+            slug,
+            provider: 'GOOGLE',
+            googleId: `mock-${body.role.toLowerCase()}`,
+            agentProfile: body.role === 'AGENT' ? { create: {} } : undefined,
+            customerProfile: body.role === 'CUSTOMER' ? { create: {} } : undefined,
+          },
+        });
+      }
+      const token = app.jwt.sign(
+        { sub: user.id, role: user.role, email: user.email },
+        { expiresIn: '30d' }
+      );
+      reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
+      // A1 fill-in — claim any pending OfficeInvite for this email.
+      await claimOfficeInvites(user.id, user.email, user.role);
+      return { user: publicUser(user), token };
+    });
+  }
 
   app.post('/logout', async (_req, reply) => {
     reply.clearCookie(COOKIE_NAME, { path: '/' });
