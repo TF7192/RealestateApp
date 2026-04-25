@@ -19,6 +19,7 @@ import { logActivity } from '../lib/activity.js';
 import { prisma } from '../lib/prisma.js';
 import { buildAnthropic } from '../lib/anthropic.js';
 import { CHAT_TOOLS, runChatTool } from '../lib/aiChatTools.js';
+import { recordAnthropic } from '../lib/aiUsage.js';
 
 const AI_AGENT_URL = (process.env.AI_AGENT_URL || 'http://estia-ai-agent:8080').replace(/\/$/, '');
 
@@ -240,11 +241,12 @@ ${facts.join('\n')}
       try {
         const response = await client.messages.create({
           model: 'claude-opus-4-7',
-          max_tokens: 2048,
+          max_tokens: 1024,
           system:
             'אתה כותב תוכן שיווקי מומחה בנדל"ן ישראלי. אתה כותב בעברית טבעית, תקנית, וזורמת. אל תמציא עובדות.',
           messages: [{ role: 'user', content: userPrompt }],
         });
+        recordAnthropic({ userId: user.id, feature: 'describe-property', model: 'claude-opus-4-7', usage: response.usage as any });
 
         // Narrow to the first text block. The SDK's ContentBlock union
         // includes `text`, `thinking`, `tool_use` — we only care about
@@ -409,11 +411,12 @@ ${JSON.stringify(candidates, null, 2)}
     try {
       const response = await client.messages.create({
         model: 'claude-opus-4-7',
-        max_tokens: 2048,
+        max_tokens: 1024,
         system:
           'אתה מומחה התאמת לקוחות לנכסים בישראל. אתה מדייק, לא ממציא עובדות, ומחזיר תשובות בפורמט XML מדויק.',
         messages: [{ role: 'user', content: prompt }],
       });
+      recordAnthropic({ userId: requireUser(req).id, feature: 'ai-match', model: 'claude-opus-4-7', usage: response.usage as any });
       // Content is a discriminated union of TextBlock / ThinkingBlock / etc.
       // Loop and read `.text` only on text blocks so TypeScript narrows.
       let raw = '';
@@ -720,11 +723,12 @@ ${propertySummaries || '(אין נכסים פעילים)'}
       try {
         const response = await client.messages.create({
           model: 'claude-opus-4-7',
-          max_tokens: 2048,
+          max_tokens: 1024,
           system:
             'אתה יועץ מכירות בכיר בתחום הנדל"ן הישראלי. אתה מכין briefs מקצועיים, קצרים ופרקטיים, בעברית טבעית. אל תמציא עובדות.',
           messages: [{ role: 'user', content: userPrompt }],
         });
+        recordAnthropic({ userId: user.id, feature: 'meeting-brief', model: 'claude-opus-4-7', usage: response.usage as any });
         const textBlock = response.content.find((b) => b.type === 'text');
         const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
 
@@ -858,11 +862,12 @@ ${compsText || '(אין נכסים להשוואה)'}
       try {
         const response = await client.messages.create({
           model: 'claude-opus-4-7',
-          max_tokens: 1024,
+          max_tokens: 512,
           system:
             'אתה יועץ מחיר לסוכני נדל"ן בישראל. אתה מדייק, מחושב, ולא ממציא עובדות. אתה מחזיר תשובות בפורמט XML מדויק.',
           messages: [{ role: 'user', content: userPrompt }],
         });
+        recordAnthropic({ userId: user.id, feature: 'offer-review', model: 'claude-opus-4-7', usage: response.usage as any });
         const textBlock = response.content.find((b) => b.type === 'text');
         const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
 
@@ -991,15 +996,41 @@ ${compsText || '(אין נכסים להשוואה)'}
       const convo: Array<AssistantMsg | UserMsg> =
         messages.map((m) => ({ role: m.role, content: m.content } as any));
 
+      // Prompt-caching: the system prompt + tool schemas are the same
+      // on every turn, so tagging them with `cache_control: ephemeral`
+      // drops the billed-input cost on the second+ request to ~10% of
+      // normal. The last tool entry carries the marker; everything
+      // above it in the tools array gets cached by the server.
+      const systemCached = [
+        { type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } },
+      ];
+      const toolsCached = CHAT_TOOLS.map((t, i) => (
+        i === CHAT_TOOLS.length - 1
+          ? { ...t, cache_control: { type: 'ephemeral' as const } }
+          : t
+      ));
+
       let replyText = '';
       try {
         for (let iter = 0; iter < 6; iter += 1) {
           const response = await client.messages.create({
             model: 'claude-opus-4-7',
-            max_tokens: 2048,
-            system: SYSTEM,
-            tools: CHAT_TOOLS,
+            // Tightened from 2048 → 1024. The chat replies that hit
+            // the previous ceiling were almost always runaway table
+            // regens; capping halves the worst-case output cost
+            // without clipping normal conversational answers.
+            max_tokens: 1024,
+            system: systemCached as any,
+            tools: toolsCached as any,
             messages: convo as any,
+          });
+
+          // Observability — one row per LLM round-trip.
+          recordAnthropic({
+            userId: user.id,
+            feature: 'chat',
+            model: 'claude-opus-4-7',
+            usage: response.usage as any,
           });
 
           // Record the assistant turn (blocks verbatim so tool_use ids

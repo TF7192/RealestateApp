@@ -572,6 +572,8 @@ export const api = {
   acceptOfficeInvite:  (id) => request(`/office/invites/${id}/accept`, { method: 'POST' }),
   // Promote a member to OWNER without closing the office.
   promoteOfficeMember: (id) => request(`/office/members/${id}/promote`, { method: 'POST' }),
+  // OWNER-scoped AI spend observability for the office.
+  officeAiUsage:       (month) => request(`/office/ai-usage${month ? `?month=${encodeURIComponent(month)}` : ''}`),
   // A1 fill-in — email-based invites. The server returns a surrogate
   // inviteUrl ({origin}/accept-invite?token=<id>) that the owner can
   // copy/share manually; the invite resolves automatically when the

@@ -121,12 +121,12 @@ export default function Ai() {
     <div dir="rtl" style={{
       ...FONT,
       padding: 24, color: DT.ink,
-      // Constrain the whole surface to the viewport so the chat's
-      // own panel can handle the scroll, and cap max width so the
-      // conversation reads as a centered column instead of spanning
-      // the full page (was hard to follow on desktop widths).
-      height: 'calc(100vh - 0px)',
-      maxHeight: '100%',
+      // Cap the chat to a comfortable column (≤880 wide) and a
+      // bounded height so the panel doesn't eat the whole viewport
+      // — feels like a card, not a landing page. The inner panel
+      // still scrolls on its own for long transcripts.
+      height: 'min(72vh, 640px)',
+      maxHeight: 'calc(100vh - 48px)',
       maxWidth: 880,
       marginInline: 'auto',
       width: '100%',

@@ -27,6 +27,7 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { recordAnthropic } from '../lib/aiUsage.js';
 import { requirePremium } from '../middleware/requirePremium.js';
 import { buildAnthropic } from '../lib/anthropic.js';
 import { putMeetingAudio } from '../lib/meetingAudio.js';

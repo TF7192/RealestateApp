@@ -388,8 +388,36 @@ model User {
   // offer) authored by this agent.
   contracts             Contract[]        @relation("AgentContracts")
 
+  // Sprint 10 — AI usage ledger. Observability only; no quotas yet.
+  aiUsage               AiUsage[]
+
   @@index([role])
   @@index([officeId])
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Sprint 10 — AI usage ledger. One row per Anthropic call (chat /
+// describe / voice-ingest / meeting-brief / offer-review / matcher).
+// Cost is computed server-side from the model's published prices at
+// the time of the call and stored so historic rows don't shift when
+// Anthropic changes pricing.
+// ────────────────────────────────────────────────────────────────────
+model AiUsage {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feature           String
+  model             String
+  inputTokens       Int      @default(0)
+  outputTokens      Int      @default(0)
+  cacheReadTokens   Int      @default(0)
+  cacheCreateTokens Int      @default(0)
+  audioSeconds      Int      @default(0)
+  costUsd           Float    @default(0)
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
 }
 
 model AgentProfile {

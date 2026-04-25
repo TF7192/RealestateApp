@@ -24,6 +24,7 @@ import {
 import api from '../lib/api';
 import { useToast } from '../lib/toast.jsx';
 import useFocusTrap from '../hooks/useFocusTrap';
+import Portal from './Portal';
 
 const MAX_SECONDS = 120;
 const DT = {
@@ -681,34 +682,49 @@ export default function VoiceCaptureDialog({
       </div>
     );
   }
+  // Portal into document.body so the backdrop actually covers the
+  // topbar + sidebar — previously the dialog rendered inside <main>,
+  // whose stacking context clipped the backdrop. zIndex 1000 so it
+  // sits above any sticky/fixed app chrome (topbar z:20, sidebar z:30,
+  // scan banners z:40).
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="הקלטה חכמה"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy && !recording) onClose?.();
-      }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 60,
-        background: 'rgba(30,26,20,0.55)',
-        display: 'grid', placeItems: 'center',
-        padding: 16,
-      }}
-    >
+    <Portal>
       <div
-        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="הקלטה חכמה"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !busy && !recording) onClose?.();
+        }}
         style={{
-          ...FONT, color: DT.ink, background: DT.white,
-          borderRadius: 18, maxWidth: 720, width: '100%',
-          maxHeight: '92vh', overflow: 'auto',
-          border: `1px solid ${DT.border}`,
-          boxShadow: '0 20px 40px rgba(30,26,20,0.25)',
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(30,26,20,0.6)',
+          // Grid centers the panel on both axes so it never drifts
+          // off-center on narrow viewports.
+          display: 'grid', placeItems: 'center',
+          padding: 24,
+          overflowY: 'auto',
         }}
       >
-        {body}
+        <div
+          ref={panelRef}
+          style={{
+            ...FONT, color: DT.ink, background: DT.white,
+            borderRadius: 18,
+            maxWidth: 720, width: 'min(720px, calc(100vw - 48px))',
+            // Taller panel — user asked. 88vh on tall screens, cap at
+            // 900px so it stops growing on 4K displays.
+            maxHeight: 'min(900px, 88vh)',
+            overflow: 'auto',
+            boxSizing: 'border-box',
+            border: `1px solid ${DT.border}`,
+            boxShadow: '0 24px 60px rgba(30,26,20,0.35)',
+          }}
+        >
+          {body}
+        </div>
       </div>
-    </div>
+    </Portal>
   );
 }
 

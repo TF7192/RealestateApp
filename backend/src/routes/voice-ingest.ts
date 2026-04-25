@@ -14,6 +14,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import { requireUser } from '../middleware/auth.js';
+import { recordAnthropic, recordWhisper } from '../lib/aiUsage.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -69,6 +71,8 @@ export const registerVoiceIngestRoutes: FastifyPluginAsync = async (app) => {
     // over the filename + mime explicitly.
     const audioFile = new File([new Uint8Array(audioBuf)], filename, { type: mimetype });
 
+    const u = requireUser(req);
+
     let transcript = '';
     try {
       const whisper = await openai.audio.transcriptions.create({
@@ -77,6 +81,11 @@ export const registerVoiceIngestRoutes: FastifyPluginAsync = async (app) => {
         language: 'he',
       });
       transcript = (whisper as any).text || '';
+      // Whisper is billed per-minute (rounded up). Audio length isn't
+      // in the response; approximate from the buffer size + typical
+      // webm/opus bitrate (~16 kbps) so the number is within ~20%.
+      const approxSeconds = Math.max(1, Math.round(audioBuf.byteLength / 2000));
+      recordWhisper({ userId: u.id, durationSec: approxSeconds });
     } catch (e: any) {
       req.log.error({ err: e }, 'whisper failed');
       return reply.code(502).send({
@@ -88,15 +97,22 @@ export const registerVoiceIngestRoutes: FastifyPluginAsync = async (app) => {
       return { transcript: '', kind: 'unclear', confidence: 0, fields: {}, missing: [], notes_he: 'לא נקלט קול' };
     }
 
-    // 2. Extract structured fields with Haiku.
+    // 2. Extract structured fields with Haiku. Cap output at 400
+    // tokens — the emitted JSON is never larger than ~300.
     let extracted: any = null;
     try {
       const msg = await anthropic.messages.create({
         model: 'claude-haiku-4-5',
-        max_tokens: 800,
-        system: SYSTEM_PROMPT,
+        max_tokens: 400,
+        // Tag the system prompt for Anthropic prompt caching. After
+        // the first call in a 5-minute window, re-reads of the same
+        // prompt bill at ~10% of normal input rate.
+        system: [
+          { type: 'text' as any, text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' as any } },
+        ] as any,
         messages: [{ role: 'user', content: `Transcript:\n${transcript}` }],
       });
+      recordAnthropic({ userId: u.id, feature: 'voice-ingest', model: 'claude-haiku-4-5', usage: (msg as any).usage });
       const text = msg.content
         .filter((b: any) => b.type === 'text')
         .map((b: any) => b.text)

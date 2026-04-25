@@ -25,6 +25,7 @@ import { Link } from 'react-router-dom';
 import {
   Building2, UserPlus, Users, Mail, Crown, Trash2, Plus, Copy, Send,
   X, Sparkles, Trophy, AlertCircle, Link2, LogOut, ArrowLeftRight,
+  Activity as ActivityIcon,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -599,6 +600,9 @@ export default function Office() {
           )}
         </section>
 
+        {/* AI usage (OWNER-only) — per-member monthly spend. */}
+        {isOwner && <AiUsageBlock />}
+
         {/* Pending invites (OWNER-only) */}
         {isOwner && pendingCount > 0 && (
           <section style={sectionCard()} aria-label="הזמנות בהמתנה">
@@ -826,6 +830,104 @@ const listReset = {
 // features (Sparkles on create-office illustration, AlertCircle on
 // error banners — wired in when the relevant state surfaces).
 void Sparkles; void AlertCircle;
+
+// ─── AiUsageBlock (owner-only) ───────────────────────────────
+// Month-to-date AI spend across the office — per-member + per-
+// feature. Observability only; no quota enforcement yet.
+const FEATURE_LABELS = {
+  'chat': 'Estia AI (צ\'אט)',
+  'voice-ingest': 'הקלטה → טופס',
+  'describe-property': 'תיאור נכס AI',
+  'meeting-brief': 'סיכום פגישה',
+  'offer-review': 'ניתוח הצעה',
+  'ai-match': 'התאמה חכמה',
+};
+function AiUsageBlock() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    api.officeAiUsage()
+      .then((r) => { if (!cancelled) setData(r); })
+      .catch(() => { if (!cancelled) setData({ members: [], features: [], totalUsd: 0, month: null }); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+  if (loading) return null;
+  const fmtUsd = (n) => `$${(n || 0).toFixed(2)}`;
+  return (
+    <section style={sectionCard({ marginBottom: 16 })} aria-label="צריכת AI">
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 10, marginBottom: 10, flexWrap: 'wrap',
+      }}>
+        <h3 style={{ ...sectionTitle(), margin: 0 }}>
+          <ActivityIcon size={14} /> צריכת AI בחודש הנוכחי
+        </h3>
+        <div style={{ fontSize: 20, fontWeight: 800, color: DT.goldDark }}>
+          {fmtUsd(data.totalUsd)}
+        </div>
+      </div>
+      {data.members.length === 0 && (
+        <div style={{ fontSize: 12, color: DT.muted }}>אין קריאות AI החודש.</div>
+      )}
+      {data.members.length > 0 && (
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div>
+            <div style={{
+              fontSize: 11, color: DT.muted, fontWeight: 700,
+              letterSpacing: 0.4, marginBottom: 6,
+            }}>לפי חבר/ת צוות</div>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
+              {data.members.map((m) => (
+                <li key={m.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  gap: 10, padding: '6px 10px', borderRadius: 8,
+                  background: m.costUsd > 0 ? DT.cream4 : 'transparent',
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: DT.ink, minWidth: 0 }}>
+                    {displayText(m.displayName) || m.email}
+                    {m.role === 'OWNER' && (
+                      <span style={{ marginInlineStart: 6, color: DT.goldDark, fontSize: 11 }}>· מנהל/ת</span>
+                    )}
+                  </span>
+                  <span style={{
+                    display: 'inline-flex', gap: 10, alignItems: 'baseline',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    <bdi style={{ fontSize: 11, color: DT.muted }}>{m.callCount} קריאות</bdi>
+                    <bdi style={{ fontSize: 13, fontWeight: 800, color: DT.ink, direction: 'ltr' }}>
+                      {fmtUsd(m.costUsd)}
+                    </bdi>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div style={{
+              fontSize: 11, color: DT.muted, fontWeight: 700,
+              letterSpacing: 0.4, marginBottom: 6,
+            }}>לפי פיצ\'ר</div>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {data.features.map((f) => (
+                <li key={f.feature} style={{
+                  padding: '6px 10px', borderRadius: 99,
+                  background: DT.cream3, fontSize: 12, fontWeight: 700,
+                  display: 'inline-flex', gap: 6, alignItems: 'center',
+                }}>
+                  <span>{FEATURE_LABELS[f.feature] || f.feature}</span>
+                  <bdi style={{ color: DT.goldDark, direction: 'ltr' }}>{fmtUsd(f.costUsd)}</bdi>
+                  <span style={{ color: DT.muted, fontWeight: 500 }}>· {f.callCount}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 // ─── PendingInvitesBlock ─────────────────────────────────────
 // Shown on the "no office" screen. Lists any OfficeInvite rows the

@@ -313,6 +313,70 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
+  // GET /api/office/ai-usage?month=YYYY-MM (defaults to current month)
+  // Owner-scoped summary of AI spend across the office: per-member
+  // totals + per-feature breakdown + month-to-date dollars.
+  app.get('/ai-usage', { onRequest: [app.requireAuth, app.requireOwner] }, async (req) => {
+    const u = requireUser(req);
+    const me = await prisma.user.findUnique({ where: { id: u.id } });
+    if (!me?.officeId) return { members: [], features: [], totalUsd: 0, month: null };
+    const q = req.query as { month?: string };
+    const today = new Date();
+    const [yStr, mStr] = (q.month || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`).split('-');
+    const year = Number(yStr), month = Number(mStr);
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+
+    const members = await prisma.user.findMany({
+      where: { officeId: me.officeId, deletedAt: null },
+      select: { id: true, displayName: true, email: true, role: true },
+    });
+    const rows = await prisma.aiUsage.findMany({
+      where: {
+        userId: { in: members.map((m) => m.id) },
+        createdAt: { gte: start, lt: end },
+      },
+      select: {
+        userId: true, feature: true, model: true,
+        inputTokens: true, outputTokens: true,
+        cacheReadTokens: true, cacheCreateTokens: true,
+        audioSeconds: true, costUsd: true,
+      },
+    });
+    const perMember = new Map<string, { costUsd: number; callCount: number }>();
+    const perFeature = new Map<string, { costUsd: number; callCount: number }>();
+    let totalUsd = 0;
+    for (const r of rows) {
+      totalUsd += r.costUsd || 0;
+      const m = perMember.get(r.userId) || { costUsd: 0, callCount: 0 };
+      m.costUsd += r.costUsd || 0; m.callCount += 1;
+      perMember.set(r.userId, m);
+      const f = perFeature.get(r.feature) || { costUsd: 0, callCount: 0 };
+      f.costUsd += r.costUsd || 0; f.callCount += 1;
+      perFeature.set(r.feature, f);
+    }
+    const memberRows = members.map((m) => {
+      const agg = perMember.get(m.id) || { costUsd: 0, callCount: 0 };
+      return {
+        id: m.id,
+        displayName: m.displayName,
+        email: m.email,
+        role: m.role,
+        costUsd: Number(agg.costUsd.toFixed(4)),
+        callCount: agg.callCount,
+      };
+    }).sort((a, b) => b.costUsd - a.costUsd);
+    const featureRows = Array.from(perFeature.entries())
+      .map(([feature, agg]) => ({ feature, costUsd: Number(agg.costUsd.toFixed(4)), callCount: agg.callCount }))
+      .sort((a, b) => b.costUsd - a.costUsd);
+    return {
+      month: `${year}-${String(month).padStart(2, '0')}`,
+      totalUsd: Number(totalUsd.toFixed(4)),
+      members: memberRows,
+      features: featureRows,
+    };
+  });
+
   app.delete('/invites/:id', { onRequest: [app.requireAuth, app.requireOwner] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const u = requireUser(req);
