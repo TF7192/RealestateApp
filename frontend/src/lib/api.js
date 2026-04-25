@@ -674,6 +674,10 @@ export const api = {
     request(`/public-matches/${id}/duplicate`, { method: 'POST', body }),
   publicMatchCopies:    (propertyId) =>
     request(`/public-matches/property/${propertyId}/copies`),
+  publicMatchSeen:      (id) =>
+    request(`/public-matches/${id}/seen`, { method: 'POST' }),
+  publicMatchUnseen:    (id) =>
+    request(`/public-matches/${id}/seen`, { method: 'DELETE' }),
 
   // LeadSearchProfile (K4)
   listLeadSearchProfiles:   (leadId) => request(`/leads/${leadId}/search-profiles`),

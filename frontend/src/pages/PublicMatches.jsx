@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Sparkles, Users, Building2, Copy, X as XIcon, Search,
   MapPin, Bed, BedSingle, Bath, Wallet, Tag,
+  Check, Eye, EyeOff,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
@@ -80,6 +81,24 @@ export default function PublicMatches() {
       toast.error(e?.message || 'שכפול הנכס נכשל');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  // Toggle the per-viewer "seen" flag. Optimistic so the UI feels
+  // instant; on error we revert + toast. The topbar badge listens
+  // to `estia:public-matches-changed` and refetches /count, so
+  // dispatching here covers the badge too.
+  const handleToggleSeen = async (row) => {
+    const wasSeen = !!row.viewerSeenAt;
+    const nextStamp = wasSeen ? null : new Date().toISOString();
+    setItems((prev) => prev.map((r) => r.id === row.id ? { ...r, viewerSeenAt: nextStamp } : r));
+    try {
+      if (wasSeen) await api.publicMatchUnseen(row.id);
+      else await api.publicMatchSeen(row.id);
+      window.dispatchEvent(new CustomEvent('estia:public-matches-changed'));
+    } catch {
+      setItems((prev) => prev.map((r) => r.id === row.id ? { ...r, viewerSeenAt: wasSeen ? row.viewerSeenAt : null } : r));
+      toast.error('עדכון הסטטוס נכשל');
     }
   };
 
@@ -196,6 +215,7 @@ export default function PublicMatches() {
               row={r}
               busy={busyId === r.id}
               onDuplicate={() => setDupeFor(r)}
+              onToggleSeen={() => handleToggleSeen(r)}
             />
           ))}
         </div>
@@ -233,17 +253,34 @@ function Chip({ active, onClick, children }) {
   );
 }
 
-function PoolCard({ row, busy, onDuplicate }) {
+function PoolCard({ row, busy, onDuplicate, onToggleSeen }) {
   const assetLabel = row.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים';
   const dealLabel = row.category === 'RENT' ? 'להשכרה' : 'למכירה';
   const priceLabel = row.marketingPrice != null ? displayPrice(row.marketingPrice) : '—';
+  // Already-cloned wins over manually-seen for the visual state — once
+  // you've actually duplicated the row, "seen" is implicit and the
+  // green ring + check chip are more informative than the eye icon.
+  const isCloned = !!row.viewerDuplicatedAt;
+  const isSeen = !isCloned && !!row.viewerSeenAt;
+  // Border priority: cloned (green) → seen (muted) → matches (gold) → none.
+  const border =
+    isCloned ? `2px solid ${DT.success}` :
+    isSeen   ? `1px solid ${DT.border}` :
+    row.matchCount > 0 ? `1px solid ${DT.gold}` :
+                         `1px solid ${DT.border}`;
+  const shadow =
+    isCloned ? '0 4px 12px rgba(21,128,61,0.18)' :
+    row.matchCount > 0 && !isSeen ? '0 4px 12px rgba(180,139,76,0.15)' :
+                                   '0 1px 0 rgba(30,26,20,0.03)';
   return (
     <article style={{
       background: DT.white,
-      border: row.matchCount > 0 ? `1px solid ${DT.gold}` : `1px solid ${DT.border}`,
+      border,
       borderRadius: 14, padding: 0, overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
-      boxShadow: row.matchCount > 0 ? '0 4px 12px rgba(180,139,76,0.15)' : '0 1px 0 rgba(30,26,20,0.03)',
+      boxShadow: shadow,
+      // Seen rows fade slightly so the eye is drawn to fresh ones.
+      opacity: isSeen ? 0.78 : 1,
     }}>
       {/* Photo or placeholder */}
       <div style={{
@@ -275,6 +312,33 @@ function PoolCard({ row, busy, onDuplicate }) {
             display: 'inline-flex', gap: 4, alignItems: 'center',
           }}>
             <Copy size={11} /> {row.copies}
+          </div>
+        )}
+        {/* "Already cloned" green chip — wins over the copies badge
+            when both apply; renders on the bottom-end so it doesn't
+            collide with the copies indicator at the top. */}
+        {isCloned && (
+          <div style={{
+            position: 'absolute', bottom: 10, insetInlineEnd: 10,
+            background: DT.success, color: DT.white,
+            fontSize: 11, fontWeight: 800,
+            padding: '4px 10px', borderRadius: 99,
+            display: 'inline-flex', gap: 4, alignItems: 'center',
+            boxShadow: '0 2px 6px rgba(21,128,61,0.3)',
+          }}>
+            <Check size={11} /> כבר שוכפל
+          </div>
+        )}
+        {/* "Seen" muted chip — only when not also cloned. */}
+        {isSeen && (
+          <div style={{
+            position: 'absolute', bottom: 10, insetInlineEnd: 10,
+            background: 'rgba(30,26,20,0.6)', color: DT.cream,
+            fontSize: 11, fontWeight: 700,
+            padding: '4px 10px', borderRadius: 99,
+            display: 'inline-flex', gap: 4, alignItems: 'center',
+          }}>
+            <Eye size={11} /> מסומן כנצפה
           </div>
         )}
       </div>
@@ -323,23 +387,54 @@ function PoolCard({ row, busy, onDuplicate }) {
               {priceLabel}
             </div>
           </div>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onDuplicate}
-            style={{
-              ...FONT,
-              background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
-              border: 'none', color: DT.ink,
-              padding: '9px 14px', borderRadius: 10,
-              fontSize: 12, fontWeight: 800, cursor: busy ? 'wait' : 'pointer',
-              opacity: busy ? 0.6 : 1,
-              display: 'inline-flex', gap: 6, alignItems: 'center',
-              boxShadow: '0 2px 6px rgba(180,139,76,0.28)',
-            }}
-          >
-            <Copy size={13} /> {busy ? 'משכפל…' : 'שכפל לרשימה שלי'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Seen toggle — small, ghost-styled so the duplicate CTA
+                stays the visual primary. Hidden when the row is already
+                cloned (the green ring already conveys "you're done with
+                this one"). */}
+            {!isCloned && onToggleSeen && (
+              <button
+                type="button"
+                onClick={onToggleSeen}
+                aria-label={isSeen ? 'סמן כלא נצפה' : 'סמן כנצפה'}
+                title={isSeen ? 'סמן כלא נצפה' : 'סמן כנצפה — לא יספר במונה ההתאמות'}
+                style={{
+                  ...FONT,
+                  background: DT.white, border: `1px solid ${DT.border}`,
+                  color: DT.muted,
+                  padding: '8px 10px', borderRadius: 10,
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  display: 'inline-flex', gap: 4, alignItems: 'center',
+                }}
+              >
+                {isSeen
+                  ? <><EyeOff size={12} /> סמן כלא נצפה</>
+                  : <><Eye size={12} /> סמן כנצפה</>}
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={busy || isCloned}
+              onClick={onDuplicate}
+              style={{
+                ...FONT,
+                background: isCloned
+                  ? DT.cream2
+                  : `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+                border: 'none', color: isCloned ? DT.muted : DT.ink,
+                padding: '9px 14px', borderRadius: 10,
+                fontSize: 12, fontWeight: 800,
+                cursor: isCloned ? 'default' : (busy ? 'wait' : 'pointer'),
+                opacity: busy ? 0.6 : 1,
+                display: 'inline-flex', gap: 6, alignItems: 'center',
+                boxShadow: isCloned ? 'none' : '0 2px 6px rgba(180,139,76,0.28)',
+              }}
+            >
+              {isCloned
+                ? <><Check size={13} /> שוכפל</>
+                : <><Copy size={13} /> {busy ? 'משכפל…' : 'שכפל לרשימה שלי'}</>}
+            </button>
+          </div>
         </div>
 
         {/* Published-by strip */}

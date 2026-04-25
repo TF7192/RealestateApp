@@ -63,6 +63,7 @@ function serializePoolProperty(
   matchCount: number,
   topMatches: Array<{ id: string; name: string | null }>,
   viewerDuplicatedAt: Date | null,
+  viewerSeenAt: Date | null,
 ) {
   return {
     id: p.id,
@@ -100,6 +101,11 @@ function serializePoolProperty(
     // grid can show "כבר שוכפל" + a green ring instead of the
     // normal "שכפל" CTA. Value is the ISO timestamp of the clone.
     viewerDuplicatedAt: viewerDuplicatedAt ? viewerDuplicatedAt.toISOString() : null,
+    // Sprint 10 — per-viewer "seen" flag. Set when the viewer clicks
+    // "סמן כנצפה". Excluded from the topbar badge count, but the row
+    // still renders in the pool with a "מסומן כנצפה" chip + an
+    // "סמן כלא נצפה" toggle so the agent can flip back.
+    viewerSeenAt: viewerSeenAt ? viewerSeenAt.toISOString() : null,
   };
 }
 
@@ -109,7 +115,7 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const u = requireUser(req);
 
-    const [pool, leads, myClones] = await Promise.all([
+    const [pool, leads, myClones, mySeen] = await Promise.all([
       prisma.property.findMany({
         where: {
           isPublicMatch: true,
@@ -149,6 +155,12 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
         where: { agentId: u.id, publicMatchSourceId: { not: null } },
         select: { publicMatchSourceId: true, createdAt: true },
       }),
+      // Viewer's per-row "seen" state — used to mute the badge count
+      // and to render "מסומן כנצפה" chips on the cards.
+      prisma.publicMatchSeen.findMany({
+        where: { viewerId: u.id },
+        select: { propertyId: true, seenAt: true },
+      }),
     ]);
 
     const dupedBySource = new Map<string, Date>();
@@ -157,6 +169,9 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
       const prev = dupedBySource.get(c.publicMatchSourceId);
       if (!prev || c.createdAt < prev) dupedBySource.set(c.publicMatchSourceId, c.createdAt);
     }
+    const seenByProperty = new Map<string, Date>(
+      mySeen.map((s) => [s.propertyId, s.seenAt]),
+    );
 
     const scored = pool.map((p) => {
       const matches: Array<{ id: string; name: string | null; score: number }> = [];
@@ -168,7 +183,13 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
       }
       matches.sort((a, b) => b.score - a.score);
       const top = matches.slice(0, 3).map(({ id, name }) => ({ id, name }));
-      return serializePoolProperty(p, matches.length, top, dupedBySource.get(p.id) ?? null);
+      return serializePoolProperty(
+        p,
+        matches.length,
+        top,
+        dupedBySource.get(p.id) ?? null,
+        seenByProperty.get(p.id) ?? null,
+      );
     });
 
     // Highest match-count first, then most-recently published. An item
@@ -190,7 +211,7 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
   // the full list endpoint above.
   app.get('/count', { onRequest: [app.requireAgent] }, async (req) => {
     const u = requireUser(req);
-    const [pool, leads] = await Promise.all([
+    const [pool, leads, mySeen] = await Promise.all([
       prisma.property.findMany({
         where: { isPublicMatch: true, NOT: { agentId: u.id } },
         select: {
@@ -211,9 +232,18 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
         },
         include: { searchProfiles: true },
       }),
+      // Rows the viewer has already triaged — excluded from the
+      // badge count so the chip doesn't keep nagging about pool
+      // entries they've explicitly dismissed.
+      prisma.publicMatchSeen.findMany({
+        where: { viewerId: u.id },
+        select: { propertyId: true },
+      }),
     ]);
+    const seenIds = new Set(mySeen.map((s) => s.propertyId));
     let count = 0;
     for (const p of pool) {
+      if (seenIds.has(p.id)) continue;
       for (const l of leads) {
         if (evaluateLeadProperty(l as any, p as any).matches) { count += 1; break; }
       }
@@ -415,5 +445,38 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
         city: c.city,
       })),
     };
+  });
+
+  // POST /api/public-matches/:id/seen — viewer marks a pool row as seen.
+  // Idempotent: re-marking the same row is a no-op (composite PK
+  // guarantees uniqueness; upsert keeps the original seenAt).
+  app.post('/:id/seen', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const u = requireUser(req);
+    // Make sure the row exists and is actually in the pool — saves us
+    // from accumulating PublicMatchSeen rows pointing at deleted or
+    // private properties.
+    const exists = await prisma.property.findFirst({
+      where: { id, isPublicMatch: true, NOT: { agentId: u.id } },
+      select: { id: true },
+    });
+    if (!exists) return reply.code(404).send({ error: { message: 'Public property not found' } });
+    await prisma.publicMatchSeen.upsert({
+      where: { viewerId_propertyId: { viewerId: u.id, propertyId: id } },
+      create: { viewerId: u.id, propertyId: id },
+      update: {},
+    });
+    return { ok: true };
+  });
+
+  // DELETE /api/public-matches/:id/seen — flip back to "unseen". The
+  // row pops back into the badge count on the next /count poll.
+  app.delete('/:id/seen', { onRequest: [app.requireAgent] }, async (req) => {
+    const { id } = req.params as { id: string };
+    const u = requireUser(req);
+    await prisma.publicMatchSeen.deleteMany({
+      where: { viewerId: u.id, propertyId: id },
+    });
+    return { ok: true };
   });
 };
