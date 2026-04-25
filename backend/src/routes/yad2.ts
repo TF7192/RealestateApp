@@ -6,6 +6,7 @@ import { getUser } from '../middleware/auth.js';
 import { putUpload } from '../lib/storage.js';
 import { crawlAgency, mapSectionToAssetClass, type Yad2Listing } from '../lib/yad2-crawler.js';
 import { normalizeAddress } from '../lib/addressNormalize.js';
+import { assertRehostUrlSafe } from '../lib/rehostGuards.js';
 
 /**
  * Yad2 import — agency-wide.
@@ -666,15 +667,58 @@ async function findAlreadyImported(agentId: string, sourceIds: string[]): Promis
 // directly. On production (S3) that put the bytes on the ephemeral
 // container disk while the /uploads/<key> route looked them up in S3 —
 // every Yad2-imported property displayed an unresolvable photo URL.
+// SEC-006 — cap re-host body at 10MB. Yad2 image CDN serves originals
+// in the 100s-of-KB range, so anything beyond this is suspect (and would
+// gum up the EC2 root filesystem on its way through). We verify against
+// the Content-Length header here; an attacker who omits the header could
+// in principle stream more bytes, but `await r.arrayBuffer()` will still
+// OOM the container before delivering them anywhere — the gap is
+// tracked rather than fixed because the fetch host is now allowlisted
+// to Yad2's CDN, which always sets Content-Length.
+const REHOST_MAX_BYTES = 10 * 1024 * 1024;
+
 async function rehostImage(srcUrl: string, propertyId: string): Promise<string> {
-  const r = await fetch(srcUrl, {
+  // SEC-006 — refuse anything that isn't a Yad2 CDN https URL up-front,
+  // before the fetch is even issued. Throws on the SSRF cases (private
+  // IP, loopback, AWS metadata endpoint, non-https, off-allowlist host).
+  assertRehostUrlSafe(srcUrl);
+
+  // `redirect: 'manual'` so we can re-validate the Location target
+  // against the same allowlist instead of letting the runtime follow a
+  // 302 → 169.254.169.254 silently. The Yad2 CDN does occasionally 301
+  // (uppercase → lowercase path), so we follow ONE hop after re-guard.
+  let r = await fetch(srcUrl, {
+    redirect: 'manual',
     headers: {
       // Yad2 image CDN doesn't enforce referrer or UA but be consistent.
       'User-Agent': 'EstiaImporter/1.0 (https://estia.co.il)',
       'Accept': 'image/jpeg,image/png,image/webp,*/*;q=0.5',
     },
   });
+  if (r.status >= 300 && r.status < 400) {
+    const loc = r.headers.get('location');
+    if (!loc) throw new Error(`image fetch ${r.status} (no Location)`);
+    // Resolve relative redirects against the source URL so a Location
+    // of "/Pic/foo.jpg" still gets validated as the full origin.
+    const next = new URL(loc, srcUrl).toString();
+    assertRehostUrlSafe(next);
+    r = await fetch(next, {
+      redirect: 'manual',
+      headers: {
+        'User-Agent': 'EstiaImporter/1.0 (https://estia.co.il)',
+        'Accept': 'image/jpeg,image/png,image/webp,*/*;q=0.5',
+      },
+    });
+    // Refuse to follow a second hop — Yad2 doesn't chain redirects.
+    if (r.status >= 300 && r.status < 400) {
+      throw new Error(`image fetch redirect loop`);
+    }
+  }
   if (!r.ok) throw new Error(`image fetch ${r.status}`);
+  const cl = Number(r.headers.get('content-length') || '0');
+  if (cl > REHOST_MAX_BYTES) {
+    throw new Error(`image too large: ${cl} bytes (max ${REHOST_MAX_BYTES})`);
+  }
   const ct = (r.headers.get('content-type') || '').toLowerCase();
   if (!ct.startsWith('image/')) throw new Error(`not an image: ${ct}`);
   const ext =
@@ -685,6 +729,11 @@ async function rehostImage(srcUrl: string, propertyId: string): Promise<string> 
     ext === 'png'  ? 'image/png'  :
     ext === 'webp' ? 'image/webp' : 'image/jpeg';
   const buf = Buffer.from(await r.arrayBuffer());
+  // Defence-in-depth: re-check actual byte length in case Content-Length
+  // was missing or wrong.
+  if (buf.byteLength > REHOST_MAX_BYTES) {
+    throw new Error(`image too large: ${buf.byteLength} bytes (max ${REHOST_MAX_BYTES})`);
+  }
   const key = `properties/${propertyId}/yad2-cover-${randomUUID()}.${ext}`;
   return putUpload(key, buf, mime);
 }
