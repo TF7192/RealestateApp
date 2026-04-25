@@ -45,7 +45,6 @@ export default function Owners() {
   const [favoriteIds, setFavoriteIds] = useState(() => new Set());
   const [filter, setFilter] = useState('all'); // all | favorites | withProps | withoutProps
   const [editing, setEditing] = useState(null); // null | {} new | owner
-  const [hoverId, setHoverId] = useState(null);
   const mounted = useRef(true);
 
   const load = useCallback(async () => {
@@ -265,13 +264,11 @@ export default function Owners() {
                   return (
                     <tr
                       key={o.id}
+                      className="estia-row-hover"
                       onClick={() => navigate(`/owners/${o.id}`)}
-                      onMouseEnter={() => setHoverId(o.id)}
-                      onMouseLeave={() => setHoverId(null)}
                       style={{
                         borderBottom: `1px solid ${DT.border}`,
                         cursor: 'pointer',
-                        background: hoverId === o.id ? DT.cream4 : 'transparent',
                       }}
                     >
                       <td style={{ ...bodyCell(), width: 36 }}>
@@ -470,15 +467,6 @@ function primaryBtn() {
     fontSize: 13, fontWeight: 800,
     display: 'inline-flex', gap: 6, alignItems: 'center',
     boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
-    textDecoration: 'none',
-  };
-}
-function actionBtn() {
-  return {
-    ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
-    padding: '9px 14px', borderRadius: 10, cursor: 'pointer',
-    fontSize: 13, fontWeight: 700,
-    display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.ink,
     textDecoration: 'none',
   };
 }

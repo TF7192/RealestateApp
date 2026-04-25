@@ -948,31 +948,25 @@ html, body {
   main { animation: none !important; }
 }
 
-/* Sprint 10 — card-level entry animation. Each route mounts a fresh
-   <main key={pathname}>, so direct first-level blocks inside the
-   page wrapper run this keyframe on navigation. Staggered delays
-   make the grid feel like it "settles in" rather than snapping. */
-@keyframes estia-card-fade {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* Sprint 10 — card-level entry animation REMOVED.
+   The previous rule animated every direct child of `main > *[dir=rtl]`
+   on every render, which double-fired with pages that already have
+   their own `animate-in` keyframes (Owners, Properties, etc.) and
+   produced a visible jitter on first paint and on hover-induced
+   re-renders. The `<main key={pathname}>` fade above already covers
+   the route-change transition; per-card stagger isn't load-bearing.
+   Per-page `animate-in` classes remain authoritative. */
+
+/* Pure-CSS row hover. Replaces the per-page `useState(hoverId)`
+   pattern that re-rendered the whole table every mouse-enter — visible
+   as text "loading" / jitter on /owners and /customers when the user
+   moves their cursor through the rows. CSS `:hover` is composited and
+   doesn't touch React state, so big lists stay smooth. */
+.estia-row-hover {
+  transition: background-color 80ms ease;
 }
-/* Target the direct children of the page-root wrapper (the first
-   element each page's component returns — typically <div dir="rtl">).
-   This covers inline-style pages without each page opting in. */
-main > *[dir="rtl"] > * {
-  animation: estia-card-fade 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  animation-delay: var(--estia-card-delay, 0ms);
-}
-main > *[dir="rtl"] > *:nth-child(1) { --estia-card-delay: 0ms; }
-main > *[dir="rtl"] > *:nth-child(2) { --estia-card-delay: 40ms; }
-main > *[dir="rtl"] > *:nth-child(3) { --estia-card-delay: 80ms; }
-main > *[dir="rtl"] > *:nth-child(4) { --estia-card-delay: 120ms; }
-main > *[dir="rtl"] > *:nth-child(5) { --estia-card-delay: 160ms; }
-main > *[dir="rtl"] > *:nth-child(6) { --estia-card-delay: 200ms; }
-main > *[dir="rtl"] > *:nth-child(7) { --estia-card-delay: 240ms; }
-main > *[dir="rtl"] > *:nth-child(n+8) { --estia-card-delay: 280ms; }
-@media (prefers-reduced-motion: reduce) {
-  main > *[dir="rtl"] > * { animation: none !important; }
+.estia-row-hover:hover {
+  background-color: rgba(180, 139, 76, 0.06);
 }
 
 /* Sprint 10 — soften the loading→loaded swap. When a page's data

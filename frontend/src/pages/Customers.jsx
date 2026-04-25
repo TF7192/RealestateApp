@@ -56,7 +56,6 @@ export default function Customers() {
     minBudget: null, maxBudget: null, minRooms: null, maxRooms: null,
   });
   const [q, setQ] = useState('');
-  const [hoverId, setHoverId] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cityList, setCityList] = useState([]);
 
@@ -353,13 +352,11 @@ export default function Customers() {
                   {filtered.map((l) => (
                     <tr
                       key={l.id}
+                      className="estia-row-hover"
                       onClick={() => navigate(`/customers/${l.id}`)}
-                      onMouseEnter={() => setHoverId(l.id)}
-                      onMouseLeave={() => setHoverId(null)}
                       style={{
                         borderBottom: `1px solid ${DT.border}`,
                         cursor: 'pointer',
-                        background: hoverId === l.id ? DT.cream4 : 'transparent',
                       }}
                     >
                       <td style={bodyCell()}>
@@ -562,7 +559,7 @@ function StatusChip({ status }) {
   );
 }
 
-function EmptyState({ filter, hasAny }) {
+function EmptyState({ hasAny }) {
   return (
     <div style={{ padding: '48px 24px', textAlign: 'center', color: DT.muted }}>
       <Sparkles size={28} style={{ color: DT.gold, marginBottom: 10 }} aria-hidden="true" />
