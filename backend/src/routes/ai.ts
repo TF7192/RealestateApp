@@ -36,7 +36,11 @@ export const registerAiRoutes: FastifyPluginAsync = async (app) => {
   app.post(
     '/voice-lead',
     {
-      onRequest: [app.requireAgent],
+      // Voice ingest is a premium feature — gating server-side so a
+      // free-tier user can't bypass the client check by hitting the
+      // endpoint directly. The 402 envelope here surfaces the same
+      // upgrade dialog as the other premium-gated endpoints.
+      onRequest: [app.requireAgent, requirePremium({ feature: 'הקלטה חכמה' })],
       config: { rateLimit: VOICE_RATE_LIMIT },
     },
     async (req, reply) => {

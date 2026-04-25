@@ -8,11 +8,12 @@
 //      browser — no DB writes on this route. The frontend demo renders
 //      it as JSON so we can iterate on the prompt before wiring save.
 //
-// Auth: requireAgent. Even though nothing is persisted yet, only signed-
-// in agents should be able to burn OpenAI / Anthropic credits.
+// Auth: requireAgent + requirePremium. Only premium agents can burn
+// OpenAI / Anthropic credits via this endpoint.
 
 import type { FastifyPluginAsync } from 'fastify';
 import OpenAI from 'openai';
+import { requirePremium } from '../middleware/requirePremium.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireUser } from '../middleware/auth.js';
 import { recordAnthropic, recordWhisper } from '../lib/aiUsage.js';
@@ -52,7 +53,9 @@ Rules:
   - Output valid JSON only — no prose before or after.`;
 
 export const registerVoiceIngestRoutes: FastifyPluginAsync = async (app) => {
-  app.post('/demo-ingest', { onRequest: [app.requireAgent] }, async (req, reply) => {
+  app.post('/demo-ingest', {
+    onRequest: [app.requireAgent, requirePremium({ feature: 'הקלטה חכמה' })],
+  }, async (req, reply) => {
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: { message: 'No file' } });
 

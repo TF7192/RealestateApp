@@ -9,6 +9,7 @@
 // no new CSS file (one less moving part for this drop-in).
 
 import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Sparkles, Send, X, Loader2, AlertCircle, Bot, User } from 'lucide-react';
 import Portal from './Portal';
 import useFocusTrap from '../hooks/useFocusTrap';
@@ -50,6 +51,7 @@ function persistMessages(messages) {
 
 export default function AiChatWidget() {
   const { user } = useAuth();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
 
   // Toggle-on-event. When opening, dispatch `estia:close-chat` so the
@@ -72,6 +74,14 @@ export default function AiChatWidget() {
       window.removeEventListener('estia:close-ai-chat', onForceClose);
     };
   }, []);
+
+  // Auto-close when the user navigates to /ai — the full-page chat
+  // makes the popup redundant and showing both simultaneously is
+  // confusing (especially because they share localStorage and would
+  // appear to mirror each other).
+  useEffect(() => {
+    if (location.pathname.startsWith('/ai')) setOpen(false);
+  }, [location.pathname]);
 
   if (!user) return null;
 

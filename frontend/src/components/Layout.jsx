@@ -443,12 +443,15 @@ function SidebarInner({
         flex: 1, padding: `12px ${collapsed ? 8 : 10}px`,
         overflowY: 'auto', overflowX: 'hidden',
       }}>
-        {!collapsed && <SectionLabel>עבודה יומיומית</SectionLabel>}
+        {/* Section labels are noise for the admin (the nav has only
+            three items and zero tools/favorites) — render the section
+            headers only for non-admin users. */}
+        {!collapsed && !isAdmin && <SectionLabel>עבודה יומיומית</SectionLabel>}
         {primary.map((item) => (
           <NavRow key={item.k} item={item} active={isActive(item.to)} collapsed={collapsed} />
         ))}
-        <div style={{ height: 10 }} />
-        {!collapsed && <SectionLabel>כלים</SectionLabel>}
+        {!isAdmin && <div style={{ height: 10 }} />}
+        {!collapsed && !isAdmin && <SectionLabel>כלים</SectionLabel>}
         {tools.map((item) => (
           <NavRow key={item.k} item={item} active={isActive(item.to)} collapsed={collapsed} tight />
         ))}
@@ -456,9 +459,10 @@ function SidebarInner({
             the affordance even before they've starred anything. When
             the list is empty we surface a small cream-toned hint
             (expanded rail) or a ghosted Star tile (72-px collapsed
-            rail) so the dead-space stays informative. */}
-        <div style={{ height: 10 }} />
-        {!collapsed && <SectionLabel>מועדפים</SectionLabel>}
+            rail) so the dead-space stays informative. Hidden for the
+            platform admin since they don't accumulate favorites. */}
+        {!isAdmin && <div style={{ height: 10 }} />}
+        {!collapsed && !isAdmin && <SectionLabel>מועדפים</SectionLabel>}
         {favorites.length > 0 && favorites.map((fav) => (
           <NavRow
             key={fav.key}
@@ -468,7 +472,7 @@ function SidebarInner({
             tight
           />
         ))}
-        {favorites.length === 0 && (
+        {favorites.length === 0 && !isAdmin && (
           collapsed ? (
             <div
               aria-hidden="true"
