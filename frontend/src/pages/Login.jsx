@@ -75,7 +75,16 @@ export default function Login() {
     if (!isIOS()) return;
     try {
       setError('');
-      const { SignInWithApple } = await import('@capacitor-community/apple-sign-in');
+      // Direct Capacitor-bridge call into the in-tree native plugin
+      // at frontend/ios/App/App/SignInWithApplePlugin.swift (registered
+      // as `SignInWithApple` via @objc). We dropped the npm community
+      // plugin (`@capacitor-community/apple-sign-in`) because it pins
+      // capacitor-swift-pm <8.0.0, which conflicts with the rest of
+      // the project on Capacitor 8 — and even when patched, its
+      // compiled Swift output collides with the in-tree class on
+      // `_OBJC_METACLASS_$_SignInWithApple` at link time.
+      const { Capacitor } = await import('@capacitor/core');
+      const SignInWithApple = Capacitor.Plugins.SignInWithApple;
       const res = await SignInWithApple.authorize({
         clientId: 'com.estia.agent',
         redirectURI: 'https://estia.co.il/api/auth/apple/native-exchange',

@@ -16,7 +16,9 @@ Status legend:
 | IOS-3 | P0 | Native | PrivacyInfo.xcprivacy | deferred-blocked |
 | IOS-4 | P0 | Native / App Review | App Store Connect notes | deferred-blocked |
 | IOS-5 | P1 | Native | Info.plist:50 | shipped |
-| IOS-6 | P1 | Native | SignInWithApplePlugin.swift | deferred-needs-device |
+| IOS-6 | P1 | Native | SignInWithApplePlugin.swift | **failed-attempt — duplicate-symbol blocker** |
+| IOS-NEW-1 | P0 | Native | apple-sign-in plugin pins capacitor-swift-pm 7.x while project is on Cap 8 | open (decision call) |
+| IOS-NEW-2 | P0 | Native | duplicate symbol `_OBJC_METACLASS_$_SignInWithApple` between custom `frontend/ios/App/App/SignInWithApplePlugin.swift` and npm community plugin's compiled output under Cap 8 SPM | open (decision call) |
 | IOS-7 | P2 | Native | Info.plist + capacitor.config.json | deferred-blocked |
 | IOS-8 | P2 | Native | capacitor.config.json | skipped (Google rotates hosts) |
 | IOS-9 | P2 | Native | AppIcon.appiconset | deferred-needs-device |
