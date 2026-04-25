@@ -31,6 +31,11 @@ const listQuery = z.object({
   search: z.string().optional(),
   agentId: z.string().optional(),
   mine: z.string().optional(),
+  // PERF-002 — pagination. Default is 200 to keep the legacy frontend
+  // (which doesn't paginate yet) working unchanged; Commit B lowers
+  // this. `cursor` is the id of the last item from the previous page.
+  take: z.coerce.number().int().min(1).max(200).optional(),
+  cursor: z.string().min(1).max(40).optional(),
 });
 
 const propertyInput = z.object({
@@ -204,6 +209,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     // and `imageList: {id,url,sortOrder}[]` — just of length 1 — so
     // callers that do `prop.images?.[0]` continue to work unchanged.
     // The detail endpoint (`GET /:id` below) still returns the full set.
+    //
+    // PERF-002 — pagination. `take` defaults to 200 so the existing FE
+    // (which doesn't pass it) continues to receive its full page-load
+    // payload; Commit B will pass an explicit lower default plus the
+    // returned `nextCursor` for "load more". `+1` overfetch lets us
+    // detect "more rows exist" without a second count query.
+    const take = q.take ?? 200;
     const items = await prisma.property.findMany({
       where,
       include: {
@@ -212,12 +224,20 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         propertyOwner: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: take + 1,
+      ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
     });
+    const hasMore = items.length > take;
+    const page = hasMore ? items.slice(0, take) : items;
+    const nextCursor = hasMore ? page[page.length - 1].id : null;
     // List view uses only `marketingActions` (bool map) — the heavier
     // `marketingActionsDetail` block (done/notes/link/doneAt per action)
     // is ~1.4 KB per property and only consumed by PropertyDetail,
     // which has its own endpoint. Pass `{ compact: true }` to drop it.
-    return { items: items.map((p) => serialize(p, { compact: true })) };
+    return {
+      items: page.map((p) => serialize(p, { compact: true })),
+      nextCursor,
+    };
   });
 
   app.get('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
@@ -507,6 +527,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
 
   // Sprint 2 / MLS parity — Task C3. Reverse direction: leads from the
   // signed-in agent that match this property, sorted by match score.
+  //
+  // PERF-009 — push the obvious filters into the SQL `where` clause so
+  // we don't pull every lead into Node just to discard most of them.
+  // PERF-027 — also exclude terminal customer statuses (mirrors what
+  // /public-matches/count already does). The soft scorer still runs in
+  // JS on the narrowed set so the return shape and scoring output are
+  // unchanged (FE renders `score` + `reasons` directly).
   app.get('/:id/matching-customers', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const uid = requireUser(req).id;
@@ -514,10 +541,52 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       where: { id, agentId: uid },
     });
     if (!property) return reply.code(404).send({ error: { message: 'Property not found' } });
+
+    // Build the SQL pre-filter. Each clause is an AND over the lead
+    // columns; we use OR-wrapped `null OR matches` patterns for nullable
+    // columns so leads that haven't filled in (say) a city aren't
+    // dropped — the JS scorer handles those gracefully.
+    const wantsLookingFor = property.category === 'SALE' ? 'BUY' : 'RENT';
+    const interestType = property.assetClass === 'COMMERCIAL' ? 'COMMERCIAL' : 'PRIVATE';
+    const where: any = {
+      agentId: uid,
+      // PERF-027 — skip closed-out customers. Mirrors public-matches.
+      OR: [
+        { customerStatus: null },
+        { customerStatus: { notIn: ['CANCELLED', 'BOUGHT', 'RENTED'] } },
+      ],
+      // category match — wantsLookingFor is BUY for SALE / RENT for RENT.
+      AND: [
+        { OR: [{ lookingFor: null }, { lookingFor: wantsLookingFor }] },
+        // assetClass match (lead.interestType maps to PRIVATE/COMMERCIAL).
+        { OR: [{ interestType: null }, { interestType }] },
+      ],
+    };
+    // City: leads with a city filter must match the property's city.
+    if (property.city) {
+      where.AND.push({ OR: [{ city: null }, { city: property.city }] });
+    }
+    // Price: 20% budget tolerance — lead.budget is a single nullable Int
+    // ("preferred budget"). When set, narrow to ±20% of property price.
+    if (property.marketingPrice) {
+      const lo = Math.round(property.marketingPrice * 0.8);
+      const hi = Math.round(property.marketingPrice * 1.2);
+      where.AND.push({
+        OR: [
+          { budget: null },
+          { budget: { gte: lo, lte: hi } },
+        ],
+      });
+    }
+
     const leads = await prisma.lead.findMany({
-      where: { agentId: uid },
+      where,
       include: { searchProfiles: true },
     });
+
+    // Rooms ±1 lives in JS — Lead.rooms is a free-form string ("3-4",
+    // "3.5+") so a SQL range clause would miss legitimate matches. The
+    // JS scorer already does the right thing.
     const scored = leads
       .map((l: any) => ({ l, sig: evaluateLeadProperty(l, property as any) }))
       .filter((r) => r.sig.matches)

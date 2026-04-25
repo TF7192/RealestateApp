@@ -59,6 +59,13 @@ import {
   registerFavoriteRoutes,
 } from './routes/mlsSprint7.js';
 import { registerNeighborhoodGroupRoutes } from './routes/neighborhoodGroups.js';
+// PERF-007 / PERF-019 — server-computed dashboard summary +
+// combined topbar counts. Replaces 4-call dashboard fan-out and
+// 3-call topbar fan-out with one round-trip each.
+import {
+  registerDashboardRoutes,
+  registerTopbarRoutes,
+} from './routes/dashboard.js';
 import { storageBackend, resolveUpload } from './lib/storage.js';
 import { track as phTrack, captureException as phCapture, shutdownAnalytics } from './lib/analytics.js';
 import { getUser } from './middleware/auth.js';
@@ -283,6 +290,9 @@ export async function build() {
   await app.register(registerNeighborhoodGroupRoutes, { prefix: '/api/neighborhood-groups' });
   await app.register(registerSavedSearchRoutes, { prefix: '/api/saved-searches' });
   await app.register(registerFavoriteRoutes, { prefix: '/api/favorites' });
+  // PERF-007 / PERF-019 — new bundled-summary endpoints.
+  await app.register(registerDashboardRoutes, { prefix: '/api/dashboard' });
+  await app.register(registerTopbarRoutes, { prefix: '/api' });
 
   // /sitemap.xml — root-scoped so Google Search Console finds it at
   // the conventional URL. Not under /api.

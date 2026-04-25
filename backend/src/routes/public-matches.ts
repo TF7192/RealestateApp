@@ -209,7 +209,15 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
   // where the viewer has at least one matching lead. Cheap enough to
   // poll on every top-bar render; avoid the serialisation roundtrip of
   // the full list endpoint above.
-  app.get('/count', { onRequest: [app.requireAgent] }, async (req) => {
+  //
+  // PERF-003 — short-term cap on the O(pool × leads) inner loop until
+  // we materialise match candidates. Pool capped at 200 most-recent
+  // (`orderBy publicMatchAt desc`) and leads capped at 100. Once the
+  // pool grows past 200 the count is a *floor* — the FE rendering
+  // layer already shows "9+" for large badges so a slight under-count
+  // is acceptable for a badge. The full count comes from
+  // `/public-matches` which paginates on the way out.
+  app.get('/count', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const u = requireUser(req);
     const [pool, leads, mySeen] = await Promise.all([
       prisma.property.findMany({
@@ -218,6 +226,8 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
           id: true, assetClass: true, category: true, type: true,
           city: true, neighborhood: true, rooms: true, marketingPrice: true,
         },
+        orderBy: { publicMatchAt: 'desc' },
+        take: 200,
       }),
       prisma.lead.findMany({
         // `status` is the thermal rating (HOT/WARM/COLD) — every thermal
@@ -231,6 +241,7 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
           ],
         },
         include: { searchProfiles: true },
+        take: 100,
       }),
       // Rows the viewer has already triaged — excluded from the
       // badge count so the chip doesn't keep nagging about pool
@@ -248,6 +259,9 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
         if (evaluateLeadProperty(l as any, p as any).matches) { count += 1; break; }
       }
     }
+    // PERF-003 — 60s private cache so a session reloading three pages
+    // in a minute doesn't re-run the inner loop on every nav.
+    reply.header('Cache-Control', 'private, max-age=60');
     return { count, poolSize: pool.length };
   });
 

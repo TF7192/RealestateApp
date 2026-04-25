@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { Readable } from 'node:stream';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
 
@@ -57,42 +58,57 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Dashboard summary
+  //
+  // PERF-006 — rewrite to a single $transaction of count() aggregates +
+  // one tiny sum aggregate. Previously this loaded every property/lead/
+  // deal row just to call .filter().length on it; for an active agent
+  // that's hundreds of KB of unused row data marshaled out of Postgres.
+  // Response shape is byte-for-byte identical to the previous version
+  // so the frontend doesn't need to change.
   app.get('/dashboard', { onRequest: [app.requireAgent] }, async (req) => {
     const agentId = requireUser(req).id;
-    const [properties, leads, deals] = await Promise.all([
-      prisma.property.findMany({ where: { agentId } }),
-      prisma.lead.findMany({ where: { agentId } }),
-      prisma.deal.findMany({ where: { agentId } }),
+    const propertyWhere = (extra: Record<string, unknown>) => ({
+      agentId, status: 'ACTIVE' as const, ...extra,
+    });
+    const [
+      resTotal, resSale, resRent,
+      comTotal, comSale, comRent,
+      leadsTotal, leadsHot, leadsWarm, leadsCold,
+      dealsTotal, dealsSigned, signedCommissionAgg,
+    ] = await prisma.$transaction([
+      prisma.property.count({ where: propertyWhere({ assetClass: 'RESIDENTIAL' }) }),
+      prisma.property.count({ where: propertyWhere({ assetClass: 'RESIDENTIAL', category: 'SALE' }) }),
+      prisma.property.count({ where: propertyWhere({ assetClass: 'RESIDENTIAL', category: 'RENT' }) }),
+      prisma.property.count({ where: propertyWhere({ assetClass: 'COMMERCIAL' }) }),
+      prisma.property.count({ where: propertyWhere({ assetClass: 'COMMERCIAL', category: 'SALE' }) }),
+      prisma.property.count({ where: propertyWhere({ assetClass: 'COMMERCIAL', category: 'RENT' }) }),
+      prisma.lead.count({ where: { agentId } }),
+      prisma.lead.count({ where: { agentId, status: 'HOT' } }),
+      prisma.lead.count({ where: { agentId, status: 'WARM' } }),
+      prisma.lead.count({ where: { agentId, status: 'COLD' } }),
+      prisma.deal.count({ where: { agentId } }),
+      prisma.deal.count({ where: { agentId, status: 'SIGNED' } }),
+      prisma.deal.aggregate({
+        where: { agentId, status: 'SIGNED' },
+        _sum: { commission: true },
+      }),
     ]);
-    const active = properties.filter((p) => p.status === 'ACTIVE');
-    const residential = active.filter((p) => p.assetClass === 'RESIDENTIAL');
-    const commercial = active.filter((p) => p.assetClass === 'COMMERCIAL');
     return {
       properties: {
-        residential: {
-          total: residential.length,
-          sale: residential.filter((p) => p.category === 'SALE').length,
-          rent: residential.filter((p) => p.category === 'RENT').length,
-        },
-        commercial: {
-          total: commercial.length,
-          sale: commercial.filter((p) => p.category === 'SALE').length,
-          rent: commercial.filter((p) => p.category === 'RENT').length,
-        },
+        residential: { total: resTotal, sale: resSale, rent: resRent },
+        commercial: { total: comTotal, sale: comSale, rent: comRent },
       },
       leads: {
-        total: leads.length,
-        hot: leads.filter((l) => l.status === 'HOT').length,
-        warm: leads.filter((l) => l.status === 'WARM').length,
-        cold: leads.filter((l) => l.status === 'COLD').length,
+        total: leadsTotal,
+        hot:   leadsHot,
+        warm:  leadsWarm,
+        cold:  leadsCold,
       },
       deals: {
-        total: deals.length,
-        active: deals.filter((d) => d.status !== 'SIGNED').length,
-        signed: deals.filter((d) => d.status === 'SIGNED').length,
-        totalCommission: deals
-          .filter((d) => d.status === 'SIGNED')
-          .reduce((s, d) => s + (d.commission || 0), 0),
+        total:           dealsTotal,
+        active:          dealsTotal - dealsSigned,
+        signed:          dealsSigned,
+        totalCommission: signedCommissionAgg._sum.commission || 0,
       },
     };
   });
@@ -216,65 +232,150 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Sprint 4 / MLS parity — Task B5. CSV export endpoints. Always
-  // owner-scoped; never paginated (agents have < 10k rows each so a
-  // single-shot download is fine and simpler than streaming). BOM
-  // prefix so Excel detects UTF-8 and renders Hebrew correctly.
+  // owner-scoped. BOM prefix so Excel detects UTF-8 and renders Hebrew
+  // correctly.
+  //
+  // PERF-008 — stream rows out of a Prisma cursor loop instead of
+  // buffering the whole table. Previously a 10,000-row export OOM'd
+  // the Fastify process; now we walk the table in pages of 500 with
+  // `setImmediate` between pages so the event loop yields. Hard cap
+  // 50,000 rows; over that we 413 (export tools should split).
   const BOM = '﻿';
+  const PAGE_SIZE = 500;
+  const MAX_ROWS = 50_000;
+
+  // Yield control to the event loop between cursor pages so the export
+  // doesn't starve other handlers on the same Node process.
+  function tick(): Promise<void> {
+    return new Promise((resolve) => setImmediate(resolve));
+  }
+
+  // PERF-008 — async generator-backed Readable that yields one chunk
+  // per Prisma cursor page. Fastify pipes the stream through
+  // `reply.send()` so headers + the response lifecycle stay in
+  // Fastify's hands (and `app.inject()` keeps capturing the body for
+  // tests). `setImmediate` between pages lets the event loop service
+  // other requests during a long export.
+  async function* csvPages<T extends { id: string }>(
+    fetchPage: (cursor: string | null) => Promise<T[]>,
+    headerRow: string[],
+    rowMap: (row: T) => unknown[],
+  ) {
+    yield BOM + csvRow(headerRow) + '\n';
+    let cursor: string | null = null;
+    let written = 0;
+    while (true) {
+      const page = await fetchPage(cursor);
+      if (!page.length) return;
+      let chunk = '';
+      for (const row of page) {
+        chunk += csvRow(rowMap(row)) + '\n';
+        written += 1;
+        if (written >= MAX_ROWS) break;
+      }
+      yield chunk;
+      cursor = page[page.length - 1].id;
+      if (page.length < PAGE_SIZE || written >= MAX_ROWS) return;
+      // Yield to the event loop between pages so the export doesn't
+      // starve other requests on the same Node process.
+      await tick();
+    }
+  }
+
+  function streamCsv<T extends { id: string }>(
+    fetchPage: (cursor: string | null) => Promise<T[]>,
+    headerRow: string[],
+    rowMap: (row: T) => unknown[],
+  ): NodeJS.ReadableStream {
+    return Readable.from(csvPages(fetchPage, headerRow, rowMap));
+  }
 
   app.get('/export/properties.csv', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const uid = requireUser(req).id;
-    const rows = await prisma.property.findMany({
-      where: { agentId: uid },
-      orderBy: { createdAt: 'desc' },
-    });
-    const header = [
-      'id', 'type', 'city', 'street', 'marketingPrice', 'status', 'stage',
-      'assetClass', 'category', 'rooms', 'sqm', 'floor', 'createdAt',
-    ];
-    const body = rows.map((p) => csvRow([
-      p.id, p.type, p.city, p.street, p.marketingPrice, p.status, p.stage,
-      p.assetClass, p.category, p.rooms, p.sqm, p.floor, p.createdAt.toISOString(),
-    ]));
-    reply
+    // Check the row count up-front so we can 413 cleanly before we
+    // start streaming. count() is cheap; the heavy cost is the row scan.
+    const total = await prisma.property.count({ where: { agentId: uid } });
+    if (total > MAX_ROWS) {
+      return reply.code(413).send({
+        error: { message: `Too many rows for a single export (${total}). Filter the range and retry.` },
+      });
+    }
+    const stream = streamCsv(
+      (cursor) => prisma.property.findMany({
+        where: { agentId: uid },
+        orderBy: { createdAt: 'desc' },
+        take: PAGE_SIZE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      }),
+      [
+        'id', 'type', 'city', 'street', 'marketingPrice', 'status', 'stage',
+        'assetClass', 'category', 'rooms', 'sqm', 'floor', 'createdAt',
+      ],
+      (p: any) => [
+        p.id, p.type, p.city, p.street, p.marketingPrice, p.status, p.stage,
+        p.assetClass, p.category, p.rooms, p.sqm, p.floor, p.createdAt.toISOString(),
+      ],
+    );
+    return reply
       .header('Content-Type', 'text/csv; charset=utf-8')
-      .header('Content-Disposition', 'attachment; filename="properties.csv"');
-    return BOM + [csvRow(header), ...body].join('\n');
+      .header('Content-Disposition', 'attachment; filename="properties.csv"')
+      .send(stream);
   });
 
   app.get('/export/leads.csv', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const uid = requireUser(req).id;
-    const rows = await prisma.lead.findMany({
-      where: { agentId: uid },
-      orderBy: { createdAt: 'desc' },
-    });
-    const header = [
-      'id', 'name', 'phone', 'email', 'city', 'interestType', 'lookingFor',
-      'status', 'leadStatus', 'customerStatus', 'budget', 'rooms', 'createdAt',
-    ];
-    const body = rows.map((l) => csvRow([
-      l.id, l.name, l.phone, l.email, l.city, l.interestType, l.lookingFor,
-      l.status, l.leadStatus, l.customerStatus, l.budget, l.rooms, l.createdAt.toISOString(),
-    ]));
-    reply
+    const total = await prisma.lead.count({ where: { agentId: uid } });
+    if (total > MAX_ROWS) {
+      return reply.code(413).send({
+        error: { message: `Too many rows for a single export (${total}). Filter the range and retry.` },
+      });
+    }
+    const stream = streamCsv(
+      (cursor) => prisma.lead.findMany({
+        where: { agentId: uid },
+        orderBy: { createdAt: 'desc' },
+        take: PAGE_SIZE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      }),
+      [
+        'id', 'name', 'phone', 'email', 'city', 'interestType', 'lookingFor',
+        'status', 'leadStatus', 'customerStatus', 'budget', 'rooms', 'createdAt',
+      ],
+      (l: any) => [
+        l.id, l.name, l.phone, l.email, l.city, l.interestType, l.lookingFor,
+        l.status, l.leadStatus, l.customerStatus, l.budget, l.rooms, l.createdAt.toISOString(),
+      ],
+    );
+    return reply
       .header('Content-Type', 'text/csv; charset=utf-8')
-      .header('Content-Disposition', 'attachment; filename="leads.csv"');
-    return BOM + [csvRow(header), ...body].join('\n');
+      .header('Content-Disposition', 'attachment; filename="leads.csv"')
+      .send(stream);
   });
 
   app.get('/export/deals.csv', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const uid = requireUser(req).id;
-    const rows = await prisma.deal.findMany({
-      where: { agentId: uid },
-      orderBy: { createdAt: 'desc' },
-    });
-    const header = ['id', 'propertyId', 'propertyStreet', 'city', 'status', 'closedPrice', 'commission', 'signedAt', 'createdAt'];
-    const body = rows.map((d) => csvRow([
-      d.id, d.propertyId, d.propertyStreet, d.city, d.status, d.closedPrice, d.commission,
-      d.signedAt ? d.signedAt.toISOString() : '', d.createdAt.toISOString(),
-    ]));
-    reply
+    const total = await prisma.deal.count({ where: { agentId: uid } });
+    if (total > MAX_ROWS) {
+      return reply.code(413).send({
+        error: { message: `Too many rows for a single export (${total}). Filter the range and retry.` },
+      });
+    }
+    const stream = streamCsv(
+      (cursor) => prisma.deal.findMany({
+        where: { agentId: uid },
+        orderBy: { createdAt: 'desc' },
+        take: PAGE_SIZE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      }),
+      ['id', 'propertyId', 'propertyStreet', 'city', 'status', 'closedPrice', 'commission', 'signedAt', 'createdAt'],
+      (d: any) => [
+        d.id, d.propertyId, d.propertyStreet, d.city, d.status, d.closedPrice, d.commission,
+        d.signedAt ? d.signedAt.toISOString() : '', d.createdAt.toISOString(),
+      ],
+    );
+    return reply
       .header('Content-Type', 'text/csv; charset=utf-8')
-      .header('Content-Disposition', 'attachment; filename="deals.csv"');
-    return BOM + [csvRow(header), ...body].join('\n');
+      .header('Content-Disposition', 'attachment; filename="deals.csv"')
+      .send(stream);
   });
 };

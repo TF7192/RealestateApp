@@ -15,20 +15,32 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
   // ── List all owners for the signed-in agent ───────────────────────────
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const u = requireUser(req);
+    const q = req.query as { take?: string; cursor?: string };
+    // PERF-002 — id-cursor pagination. Default 200 to match the legacy
+    // FE which doesn't paginate yet; Commit B will lower the default.
+    const takeRaw = q.take != null ? Number(q.take) : 200;
+    const take = Number.isFinite(takeRaw)
+      ? Math.max(1, Math.min(200, Math.floor(takeRaw)))
+      : 200;
+    const cursor = typeof q.cursor === 'string' && q.cursor ? q.cursor : null;
+    // PERF-021 — drop the nested `properties.take(5)` from the list
+    // endpoint. List view uses `propertyCount` (from `_count`) only;
+    // the per-owner property preview lives on the detail endpoint.
+    // Saves up to N×5 sub-rows on every Owners list load.
     const owners = await prisma.owner.findMany({
       where: { agentId: u.id },
       include: {
         _count: { select: { properties: true } },
-        properties: {
-          select: { id: true, slug: true, street: true, city: true, type: true, status: true, marketingPrice: true },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-        },
       },
       orderBy: { name: 'asc' },
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
+    const hasMore = owners.length > take;
+    const page = hasMore ? owners.slice(0, take) : owners;
+    const nextCursor = hasMore ? page[page.length - 1].id : null;
     return {
-      items: owners.map((o) => ({
+      items: page.map((o) => ({
         id: o.id,
         name: o.name,
         phone: o.phone,
@@ -36,9 +48,9 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
         notes: o.notes,
         relationship: o.relationship,
         propertyCount: o._count.properties,
-        properties: o.properties,
         createdAt: o.createdAt,
       })),
+      nextCursor,
     };
   });
 

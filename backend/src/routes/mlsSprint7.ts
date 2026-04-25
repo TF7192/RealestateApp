@@ -107,11 +107,76 @@ const favInput = z.object({
 export const registerFavoriteRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const uid = requireUser(req).id;
-    const { entityType } = req.query as { entityType?: string };
+    const { entityType, hydrated } = req.query as { entityType?: string; hydrated?: string };
     const where: any = { agentId: uid };
     if (['PROPERTY', 'LEAD', 'OWNER'].includes(String(entityType))) where.entityType = entityType;
     const items = await prisma.favorite.findMany({ where, orderBy: { createdAt: 'desc' } });
-    return { items };
+    // Default `hydrated=1` mode joins minimal display rows so Layout.jsx
+    // can render the sidebar from a single round-trip instead of fetching
+    // the whole property/lead/owner book per page-load (PERF-001).
+    if (hydrated !== '1' && hydrated !== 'true') {
+      return { items };
+    }
+    const propIds  = items.filter((f) => f.entityType === 'PROPERTY').map((f) => f.entityId);
+    const leadIds  = items.filter((f) => f.entityType === 'LEAD').map((f) => f.entityId);
+    const ownerIds = items.filter((f) => f.entityType === 'OWNER').map((f) => f.entityId);
+    const [props, leads, owners] = await Promise.all([
+      propIds.length
+        ? prisma.property.findMany({
+            where: { id: { in: propIds }, agentId: uid },
+            select: { id: true, slug: true, street: true, city: true },
+          })
+        : [],
+      leadIds.length
+        ? prisma.lead.findMany({
+            where: { id: { in: leadIds }, agentId: uid },
+            select: { id: true, name: true, city: true },
+          })
+        : [],
+      ownerIds.length
+        ? prisma.owner.findMany({
+            where: { id: { in: ownerIds }, agentId: uid },
+            select: { id: true, name: true },
+          })
+        : [],
+    ]);
+    const pById = new Map(props.map((p)  => [p.id, p]));
+    const lById = new Map(leads.map((l)  => [l.id, l]));
+    const oById = new Map(owners.map((o) => [o.id, o]));
+    const hydratedItems = items.map((f) => {
+      if (f.entityType === 'PROPERTY') {
+        const p = pById.get(f.entityId);
+        if (!p) return null;
+        return {
+          entityType: 'PROPERTY',
+          entityId: p.id,
+          label: [p.street, p.city].filter(Boolean).join(', ') || 'נכס',
+          to: `/properties/${p.id}`,
+        };
+      }
+      if (f.entityType === 'LEAD') {
+        const l = lById.get(f.entityId);
+        if (!l) return null;
+        return {
+          entityType: 'LEAD',
+          entityId: l.id,
+          label: l.name || 'ליד',
+          to: `/customers/${l.id}`,
+        };
+      }
+      if (f.entityType === 'OWNER') {
+        const o = oById.get(f.entityId);
+        if (!o) return null;
+        return {
+          entityType: 'OWNER',
+          entityId: o.id,
+          label: o.name || 'בעל נכס',
+          to: `/owners/${o.id}`,
+        };
+      }
+      return null;
+    }).filter(Boolean);
+    return { items: hydratedItems };
   });
 
   app.post('/', { onRequest: [app.requireAgent] }, async (req) => {

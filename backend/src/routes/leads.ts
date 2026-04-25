@@ -128,6 +128,14 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
     const q = req.query as any;
     const uid = requireUser(req).id;
     const where: any = { agentId: uid };
+    // PERF-002 — pagination. `take` defaults to 200 so the legacy FE
+    // (no pagination yet) keeps getting full pages. `cursor` is an
+    // id-based cursor: the id of the last lead from the previous page.
+    const takeRaw = q.take != null ? Number(q.take) : 200;
+    const take = Number.isFinite(takeRaw)
+      ? Math.max(1, Math.min(200, Math.floor(takeRaw)))
+      : 200;
+    const cursor = typeof q.cursor === 'string' && q.cursor ? q.cursor : null;
     // Legacy single-value filters.
     if (q.status) where.status = q.status;
     if (q.lookingFor) where.lookingFor = q.lookingFor;
@@ -197,10 +205,18 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       where.AND = [...(where.AND || []), { id: { in: leadIds.length ? leadIds : ['__none__'] } }];
     }
 
+    // PERF-002 — overfetch by 1 to detect a next page. When post-filter
+    // search-profile criteria are active we still apply them in JS (see
+    // hasProfileFilters block below); pagination is best-effort in that
+    // path — the cursor is still based on createdAt order so the
+    // worst-case is the FE asking for one extra page. The legacy FE
+    // doesn't pass `take`/`cursor` so this is purely additive today.
     const items = await prisma.lead.findMany({
       where,
       include: { viewings: true, agreements: true, searchProfiles: true },
       orderBy: { createdAt: 'desc' },
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
     // Post-filter on search-profile fields (rooms / floor / types / hoods)
@@ -237,16 +253,15 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
         return true;
       });
     });
-    // Decorate with computed heat suggestion + explanation
-    const withSuggest = filtered.map((l: any) => {
-      const suggestedStatus = suggestStatus(l);
-      return {
-        ...l,
-        suggestedStatus,
-        statusExplanation: explainStatus(l, suggestedStatus),
-      };
-    });
-    return { items: withSuggest };
+    // PERF-002 — slice off the +1 overfetch and emit a nextCursor.
+    const hasMore = filtered.length > take;
+    const page = hasMore ? filtered.slice(0, take) : filtered;
+    const nextCursor = hasMore ? page[page.length - 1].id : null;
+    // PERF-024 — list responses no longer carry `suggestedStatus` /
+    // `statusExplanation`; the heuristic + Hebrew prose is recomputed
+    // on the lead-detail endpoint where the UI actually renders it.
+    // Saves ~80-150 bytes per row × N leads on every list fetch.
+    return { items: page, nextCursor };
   });
 
   app.get('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
@@ -258,7 +273,17 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
     if (!lead || lead.agentId !== requireUser(req).id) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
-    return { lead };
+    // PERF-024 — keep the computed heat suggestion + Hebrew explanation
+    // on the detail endpoint (where the UI actually shows it). The list
+    // endpoint dropped these fields to keep payloads light.
+    const suggestedStatus = suggestStatus(lead);
+    return {
+      lead: {
+        ...lead,
+        suggestedStatus,
+        statusExplanation: explainStatus(lead, suggestedStatus),
+      },
+    };
   });
 
   app.post('/', { onRequest: [tryServiceTokenAuth, app.requireAgent] }, async (req) => {
@@ -323,6 +348,12 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
   // Sprint 2 / MLS parity — Task C3. Server-side matching: properties
   // this lead could be interested in. Owner-scoped — only returns
   // properties the signed-in agent owns.
+  //
+  // PERF-009 — push obvious filters (city, assetClass/category, price
+  // band, rooms band) into the SQL where clause so we don't pull every
+  // ACTIVE property into Node just to throw most of them away. The JS
+  // scorer still runs on the narrowed set so the return shape and the
+  // computed `score`/`reasons` are unchanged.
   app.get('/:id/matches', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const uid = requireUser(req).id;
@@ -331,8 +362,36 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       include: { searchProfiles: true },
     });
     if (!lead) return reply.code(404).send({ error: { message: 'Lead not found' } });
+
+    // Build the SQL pre-filter. Property is the more constrained side
+    // here — we know its concrete column values from the lead.
+    const where: any = { agentId: uid, status: 'ACTIVE' };
+    // assetClass: COMMERCIAL leads → COMMERCIAL props; everything else
+    // looks at RESIDENTIAL. Keep null-tolerant on legacy rows.
+    if (lead.interestType === 'COMMERCIAL') where.assetClass = 'COMMERCIAL';
+    else if (lead.interestType === 'PRIVATE') where.assetClass = 'RESIDENTIAL';
+    // category: BUY → SALE / RENT → RENT.
+    if (lead.lookingFor === 'BUY') where.category = 'SALE';
+    else if (lead.lookingFor === 'RENT') where.category = 'RENT';
+    // city: when the lead has a city filter, only match properties in it.
+    if (lead.city) where.city = lead.city;
+    // price band: ±15% of the lead's budget (matches the JS evaluator).
+    if (lead.budget) {
+      const lo = Math.round(lead.budget * 0.85);
+      const hi = Math.round(lead.budget * 1.15);
+      where.marketingPrice = { gte: lo, lte: hi };
+    }
+    // rooms ±1: parse the leading number out of the free-form string.
+    const roomsMatch = lead.rooms ? String(lead.rooms).match(/\d+(\.\d+)?/g) : null;
+    if (roomsMatch && roomsMatch.length) {
+      const nums = roomsMatch.map(Number);
+      const lo = Math.min(...nums) - 1;
+      const hi = Math.max(...nums) + 1;
+      where.rooms = { gte: lo, lte: hi };
+    }
+
     const props = await prisma.property.findMany({
-      where: { agentId: uid, status: 'ACTIVE' },
+      where,
       include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
     });
     const scored = props
