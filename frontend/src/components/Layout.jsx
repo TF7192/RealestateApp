@@ -34,6 +34,7 @@ import api from '../lib/api';
 import { isPopoutWindow } from '../lib/popout';
 import OfflineBanner from './OfflineBanner';
 import RouteProgressBar from './RouteProgressBar';
+import { preloadOn } from '../lib/routePreload';
 import Yad2ScanBanner from './Yad2ScanBanner';
 import MarketScanBanner from './MarketScanBanner';
 import QuickCreateFab from './QuickCreateFab';
@@ -626,6 +627,11 @@ function NavRow({ item, active, tight, collapsed }) {
     <NavLink
       to={item.to}
       title={collapsed ? item.label : undefined}
+      // Preload the destination route's lazy chunk on pointer-enter
+      // / focus / touch-start so the click commits to an already-
+      // hot module instead of waiting 200-800ms for the chunk to
+      // download. Instant-feel nav.
+      {...preloadOn(item.to)}
       style={{
         ...FONT,
         width: '100%',
@@ -787,6 +793,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
             <button
               type="button"
               onClick={onNewLead}
+              {...preloadOn('/customers/new')}
               style={{
                 ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
                 padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
@@ -797,6 +804,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
             <button
               type="button"
               onClick={onNewProperty}
+              {...preloadOn('/properties/new')}
               style={{
                 ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
                 padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
@@ -810,6 +818,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
             <button
               type="button"
               onClick={() => navigate('/voice-demo')}
+              {...preloadOn('/voice-demo')}
               aria-label="יצירה חכמה מהקלטה"
               title="דברו — ה-AI ימלא את הטופס"
               style={{
@@ -829,6 +838,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
             <button
               type="button"
               onClick={() => navigate('/public-matches')}
+              {...preloadOn('/public-matches')}
               aria-label="התאמות פומביות"
               style={{
                 ...FONT,
