@@ -12,7 +12,7 @@
 // OpenAI / Anthropic credits via this endpoint.
 
 import type { FastifyPluginAsync } from 'fastify';
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import { requirePremium } from '../middleware/requirePremium.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireUser } from '../middleware/auth.js';
@@ -66,15 +66,42 @@ export const registerVoiceIngestRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const audioBuf = await file.toBuffer();
-    const filename = file.filename || 'recording.webm';
-    const mimetype = file.mimetype || 'audio/webm';
+    // Whisper requires the filename's extension to match the container.
+    // MediaRecorder on Chrome emits `audio/webm;codecs=opus`; on Safari
+    // it's `audio/mp4` (AAC) — strip codec params and pick the right
+    // extension off the leading mime so the OpenAI sniffer doesn't
+    // bail with "could not be decoded".
+    const rawMime = (file.mimetype || 'audio/webm').toLowerCase();
+    const baseMime = rawMime.split(';')[0].trim();
+    const extByMime: Record<string, string> = {
+      'audio/webm': 'webm',
+      'audio/ogg':  'ogg',
+      'audio/mp4':  'm4a',
+      'audio/mpeg': 'mp3',
+      'audio/mp3':  'mp3',
+      'audio/wav':  'wav',
+      'audio/x-wav': 'wav',
+      'audio/flac': 'flac',
+    };
+    const ext = extByMime[baseMime] || 'webm';
+    const safeName = `recording.${ext}`;
 
-    // 1. Transcribe with Whisper. The OpenAI SDK's `file` field accepts
-    // a File / Blob-like; we build one from the buffer so we can hand
-    // over the filename + mime explicitly.
-    const audioFile = new File([new Uint8Array(audioBuf)], filename, { type: mimetype });
+    if (audioBuf.byteLength < 1024) {
+      // Anything under 1 KB isn't a real recording — stop here so we
+      // don't burn an OpenAI call to learn the same thing the hard way.
+      return reply.code(400).send({
+        error: { message: 'ההקלטה קצרה מדי — נסה/י שוב.', code: 'audio_too_short' },
+      });
+    }
 
     const u = requireUser(req);
+
+    // 1. Transcribe with Whisper. `toFile` is the OpenAI SDK's blessed
+    // helper for Node — wraps the buffer with the right Web-File-like
+    // shape so the SDK's content-type sniffer accepts it. The previous
+    // `new File([Uint8Array], ...)` path was producing a payload Whisper
+    // would 400 on with "format not supported" intermittently.
+    const audioFile = await toFile(audioBuf, safeName, { type: baseMime });
 
     let transcript = '';
     try {
@@ -90,7 +117,10 @@ export const registerVoiceIngestRoutes: FastifyPluginAsync = async (app) => {
       const approxSeconds = Math.max(1, Math.round(audioBuf.byteLength / 2000));
       recordWhisper({ userId: u.id, durationSec: approxSeconds });
     } catch (e: any) {
-      req.log.error({ err: e }, 'whisper failed');
+      req.log.error(
+        { err: e, mime: baseMime, name: safeName, bytes: audioBuf.byteLength },
+        'whisper failed',
+      );
       return reply.code(502).send({
         error: { message: 'תמלול נכשל', detail: e?.message || String(e) },
       });
