@@ -194,7 +194,7 @@ export default function Ai() {
       // feels like a real workspace, not a widget. Caps at 1020px
       // so it doesn't get absurd on 4K screens.
       height: 'min(85vh, 1020px)',
-      maxHeight: 'calc(100vh - 32px)',
+      maxHeight: 'calc(100dvh - 32px)',
       maxWidth: 980,
       marginInline: 'auto',
       width: '100%',
@@ -273,6 +273,7 @@ export default function Ai() {
             borderTop: `1px solid ${DT.border}`,
             background: DT.cream4,
             padding: 12,
+            paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
           }}
         >
           <div style={{
@@ -611,7 +612,7 @@ function Bubble({ role, content, loading }) {
         </div>
       )}
       <div style={{
-        maxWidth: '72%',
+        maxWidth: 'min(72%, 85vw)',
         padding: '10px 14px', borderRadius: 12,
         background: isUser ? DT.cream2 : DT.cream4,
         border: `1px solid ${DT.border}`,
@@ -665,11 +666,12 @@ function EmptyState({ onPick }) {
             onClick={() => onPick(p)}
             style={{
               ...FONT,
-              padding: '8px 12px', borderRadius: 99,
+              padding: '12px 16px', borderRadius: 99,
               border: `1px solid ${DT.border}`,
               background: DT.cream4, color: DT.ink,
               fontSize: 12, fontWeight: 600, cursor: 'pointer',
               textAlign: 'right',
+              minHeight: 44,
             }}
           >{p}</button>
         ))}

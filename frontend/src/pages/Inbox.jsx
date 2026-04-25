@@ -93,7 +93,7 @@ export default function Inbox() {
                 display: 'flex', alignItems: 'center', gap: 12,
                 background: DT.cream4,
                 border: `1px solid ${DT.border}`,
-                borderRadius: 12, padding: '12px 14px',
+                borderRadius: 12, padding: '14px 16px',
               }}>
                 <span style={{
                   width: 28, height: 28, borderRadius: 8, flexShrink: 0,

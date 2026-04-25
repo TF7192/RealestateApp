@@ -13,7 +13,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   HelpCircle, Search, ChevronDown, MessageCircle, Mail, Send,
-  Sparkles,
+  Sparkles, X as XIcon,
 } from 'lucide-react';
 import faqData from '../data/helpFaq.json';
 
@@ -88,7 +88,7 @@ export default function Help() {
       <div style={{
         background: `linear-gradient(160deg, ${DT.cream4}, ${DT.cream2})`,
         border: `1px solid ${DT.border}`,
-        borderRadius: 18, padding: '32px 28px', marginBottom: 20,
+        borderRadius: 18, padding: 'clamp(16px, 5vw, 32px)', marginBottom: 20,
         boxShadow: '0 20px 50px rgba(30,26,20,0.06)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -129,6 +129,22 @@ export default function Help() {
               fontSize: 14, color: DT.ink, minWidth: 0, textAlign: 'right',
             }}
           />
+          {q && (
+            <button
+              type="button"
+              onClick={() => setQ('')}
+              aria-label="נקה חיפוש"
+              style={{
+                ...FONT,
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: DT.muted, padding: 8, borderRadius: 8,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 44, minHeight: 44, flexShrink: 0,
+              }}
+            >
+              <XIcon size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -150,8 +166,9 @@ export default function Help() {
                 background: on ? DT.ink : DT.white,
                 color: on ? DT.cream : DT.ink,
                 border: `1px solid ${on ? DT.ink : DT.border}`,
-                padding: '8px 14px', borderRadius: 99,
+                padding: '12px 18px', borderRadius: 99,
                 fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                minHeight: 44,
               }}
             >{cat} · {count}</button>
           );
@@ -204,8 +221,9 @@ export default function Help() {
                   <div style={{
                     fontSize: 11, fontWeight: 700, color: DT.gold,
                     textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4,
+                    minWidth: 0,
                   }}>{item.category}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: DT.ink, textAlign: 'right' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: DT.ink, textAlign: 'right', minWidth: 0 }}>
                     {item.q}
                   </div>
                 </div>

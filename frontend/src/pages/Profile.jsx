@@ -188,6 +188,7 @@ export default function Profile() {
               display: 'inline-flex', alignItems: 'center', gap: 4,
               boxShadow: '0 2px 6px rgba(30,26,20,0.12)',
               opacity: uploading ? 0.6 : 1,
+              minWidth: 44, minHeight: 44, justifyContent: 'center',
             }}
           >
             <Camera size={12} />
@@ -533,7 +534,7 @@ function DeleteAccountDialogInner({ onClose, onConfirmed }) {
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(30,26,20,0.6)',
         display: 'grid', placeItems: 'center',
-        padding: 16,
+        padding: 'max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))',
       }}
     >
       <div

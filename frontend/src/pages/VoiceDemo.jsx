@@ -31,7 +31,7 @@ export default function VoiceDemo() {
 
   return (
     <div dir="rtl" style={{
-      ...FONT, color: DT.ink, minHeight: '100vh',
+      ...FONT, color: DT.ink, minHeight: '100dvh',
       background: DT.cream, padding: '28px 20px 60px',
     }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
@@ -71,7 +71,7 @@ function PremiumLockedTeaser() {
       background: `linear-gradient(160deg, ${DT.cream4} 0%, #fff 100%)`,
       border: `1px solid ${DT.gold}`,
       borderRadius: 18,
-      padding: 32,
+      padding: 'clamp(16px, 5vw, 32px)',
       textAlign: 'center',
       boxShadow: '0 4px 16px rgba(180,139,76,0.12)',
     }}>
@@ -83,7 +83,7 @@ function PremiumLockedTeaser() {
         margin: '0 auto 14px',
         boxShadow: '0 6px 18px rgba(180,139,76,0.32)',
       }}>
-        <Lock size={26} />
+        <Lock size={22} />
       </div>
       <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px', color: DT.ink }}>
         הקלטה חכמה זמינה למנויי Premium

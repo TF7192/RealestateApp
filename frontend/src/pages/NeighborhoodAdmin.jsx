@@ -230,18 +230,20 @@ export default function NeighborhoodAdmin() {
             סוכני המשרד, יש ליצור משרד או להצטרף לאחד קיים. לאחר יצירת משרד
             תשודרג אוטומטית לתפקיד OWNER.
           </p>
-          <Link
-            to="/office"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: 'linear-gradient(180deg, #d9b774, #b48b4c)',
-              color: '#1e1a14', padding: '9px 16px', borderRadius: 10,
-              fontWeight: 800, fontSize: 13, textDecoration: 'none',
-              boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
-            }}
-          >
-            לניהול המשרד
-          </Link>
+          <div style={{ paddingTop: 80 }}>
+            <Link
+              to="/office"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'linear-gradient(180deg, #d9b774, #b48b4c)',
+                color: '#1e1a14', padding: '9px 16px', borderRadius: 10,
+                fontWeight: 800, fontSize: 13, textDecoration: 'none',
+                boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+              }}
+            >
+              לניהול המשרד
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -277,7 +279,10 @@ export default function NeighborhoodAdmin() {
 
       <section className="nbhadmin-card" aria-label="קבוצה חדשה">
         <form className="nbhadmin-form" onSubmit={handleCreate}>
-          <label className="nbhadmin-field nbhadmin-field-grow">
+          <label
+            className="nbhadmin-field nbhadmin-field-grow"
+            style={{ flexBasis: 0, minWidth: 140 }}
+          >
             <span>שם הקבוצה</span>
             <input
               type="text"
@@ -288,7 +293,10 @@ export default function NeighborhoodAdmin() {
               required
             />
           </label>
-          <label className="nbhadmin-field nbhadmin-field-grow">
+          <label
+            className="nbhadmin-field nbhadmin-field-grow"
+            style={{ flexBasis: 0, minWidth: 140 }}
+          >
             <span>תיאור</span>
             <input
               type="text"
@@ -298,7 +306,10 @@ export default function NeighborhoodAdmin() {
               aria-label="תיאור הקבוצה"
             />
           </label>
-          <div className="nbhadmin-field nbhadmin-field-grow">
+          <div
+            className="nbhadmin-field nbhadmin-field-grow"
+            style={{ flexBasis: 0, minWidth: 140 }}
+          >
             <span>שכונות</span>
             {renderMemberPicker(
               idsToNames(form.memberIds),
@@ -367,6 +378,7 @@ export default function NeighborhoodAdmin() {
                         className="btn btn-primary"
                         onClick={handleSaveEdit}
                         aria-label="שמור"
+                        style={{ minWidth: 44, minHeight: 44 }}
                       >
                         <Check size={14} aria-hidden="true" />
                       </button>
@@ -375,6 +387,7 @@ export default function NeighborhoodAdmin() {
                         className="btn btn-ghost"
                         onClick={handleCancelEdit}
                         aria-label="בטל עריכה"
+                        style={{ minWidth: 44, minHeight: 44 }}
                       >
                         <XIcon size={14} aria-hidden="true" />
                       </button>

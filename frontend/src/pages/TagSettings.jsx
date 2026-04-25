@@ -195,7 +195,7 @@ export default function TagSettings() {
             flexWrap: 'wrap',
           }}
         >
-          <FormField label="שם התגית" style={{ flex: '1 1 220px', minWidth: 180 }}>
+          <FormField label="שם התגית" style={{ flex: '1 1 150px', minWidth: 180 }}>
             <input
               type="text"
               value={form.name}
@@ -505,7 +505,7 @@ function inputStyle() {
 }
 function colorInputStyle() {
   return {
-    width: 46, height: 42, padding: 2,
+    width: 44, height: 44, padding: 2,
     background: DT.white,
     border: `1px solid ${DT.border}`, borderRadius: 10,
     cursor: 'pointer',
@@ -560,6 +560,7 @@ function iconBtn(opts = {}) {
     color: danger ? DT.danger : DT.ink,
     display: 'inline-grid', placeItems: 'center',
     flexShrink: 0,
+    minWidth: 44, minHeight: 44,
   };
 }
 

@@ -153,11 +153,12 @@ export default function Notifications() {
               ...FONT,
               background: unreadCount > 0 ? DT.white : DT.cream2,
               border: `1px solid ${DT.border}`,
-              padding: '10px 16px', borderRadius: 10, cursor: unreadCount > 0 ? 'pointer' : 'default',
+              padding: '12px 18px', borderRadius: 10, cursor: unreadCount > 0 ? 'pointer' : 'default',
               color: unreadCount > 0 ? DT.ink : DT.muted,
               display: 'inline-flex', gap: 8, alignItems: 'center',
               fontSize: 13, fontWeight: 700,
               opacity: marking ? 0.6 : 1,
+              minHeight: 44,
             }}
           >
             <CheckCheck size={15} />
@@ -254,7 +255,7 @@ export default function Notifications() {
                     aria-label="חדש"
                     title="לא נקרא"
                     style={{
-                      width: 8, height: 8, borderRadius: 99,
+                      width: 10, height: 10, borderRadius: 99,
                       background: DT.gold, flexShrink: 0, marginTop: 10,
                     }}
                   />

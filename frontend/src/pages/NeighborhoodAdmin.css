@@ -141,7 +141,7 @@
   padding-inline: 8px;
   background: var(--chip-bg, #f5efe2);
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .nbhadmin-chip-empty {

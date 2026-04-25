@@ -322,10 +322,11 @@ function primaryBtn() {
     ...FONT,
     background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
     border: 'none', color: DT.ink,
-    padding: '7px 14px', borderRadius: 10, cursor: 'pointer',
+    padding: '12px 18px', borderRadius: 10, cursor: 'pointer',
     fontSize: 12, fontWeight: 800,
     display: 'inline-flex', gap: 5, alignItems: 'center',
     boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    minHeight: 44,
   };
 }
 function disabledBtn() {

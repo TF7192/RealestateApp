@@ -303,7 +303,11 @@ export default function AgentCard() {
               לחץ "שתף" כדי להעביר את הכרטיס ללקוח
             </span>
           </h3>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div style={{
+            display: 'flex', justifyContent: 'center',
+            width: 'min(180px, 60vw)', height: 'min(180px, 60vw)',
+            margin: '0 auto',
+          }}>
             <VCardQr agent={user} size={180} />
           </div>
           <div style={{

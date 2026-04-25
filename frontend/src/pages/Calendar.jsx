@@ -237,7 +237,7 @@ export default function Calendar() {
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(7, 1fr)',
-            gridAutoRows: '108px',
+            gridAutoRows: 'minmax(80px, 108px)',
           }}>
             {grid.map((d, idx) => {
               const inMonth  = d.getMonth() === viewDate.getMonth();
@@ -293,7 +293,7 @@ export default function Calendar() {
                     {shown.map((m) => (
                       <div key={m.id} style={goldChip()}>
                         <span style={{
-                          fontSize: 10, fontWeight: 700, color: DT.goldDark,
+                          fontSize: 11, fontWeight: 700, color: DT.goldDark,
                           flexShrink: 0, letterSpacing: 0.2,
                         }}>{formatTime(m.startsAt)}</span>
                         <span style={{
@@ -321,7 +321,7 @@ export default function Calendar() {
           borderRadius: 16,
           padding: 16,
           position: 'sticky',
-          top: 18,
+          top: 'calc(18px + env(safe-area-inset-top))',
           alignSelf: 'start',
         }} className="cal-side">
           <div style={{
@@ -433,6 +433,7 @@ function ghostBtn() {
     border: `1px solid ${DT.border}`,
     background: DT.white, color: DT.ink,
     fontSize: 13, fontWeight: 600, cursor: 'pointer',
+    minWidth: 44, minHeight: 44, justifyContent: 'center',
   };
 }
 
@@ -443,7 +444,7 @@ function primaryBtn() {
   return {
     ...FONT,
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '9px 16px',
+    padding: '12px 18px',
     borderRadius: 10,
     border: 'none',
     background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
@@ -451,13 +452,14 @@ function primaryBtn() {
     fontSize: 13, fontWeight: 800,
     cursor: 'pointer',
     boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    minHeight: 44,
   };
 }
 
 function iconBtn() {
   return {
     all: 'unset',
-    width: 28, height: 28,
+    minWidth: 44, minHeight: 44,
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     borderRadius: 8,
     cursor: 'pointer',
