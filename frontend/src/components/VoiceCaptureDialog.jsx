@@ -711,10 +711,14 @@ export default function VoiceCaptureDialog({
           style={{
             ...FONT, color: DT.ink, background: DT.white,
             borderRadius: 18,
-            maxWidth: 720, width: 'min(720px, calc(100vw - 48px))',
-            // Taller panel — user asked. 88vh on tall screens, cap at
-            // 900px so it stops growing on 4K displays.
-            maxHeight: 'min(900px, 88vh)',
+            // Roomier panel — user said the card was cut visually.
+            // Wider (820) + taller with a generous min-height so the
+            // cream record strip has breathing room before any
+            // extracted fields land below.
+            maxWidth: 820, width: 'min(820px, calc(100vw - 48px))',
+            minHeight: 'min(520px, calc(100vh - 80px))',
+            maxHeight: 'min(960px, calc(100vh - 48px))',
+            paddingBottom: 18,
             overflow: 'auto',
             boxSizing: 'border-box',
             border: `1px solid ${DT.border}`,
