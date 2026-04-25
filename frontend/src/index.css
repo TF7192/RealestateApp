@@ -570,6 +570,15 @@ a:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 24px rgba(201, 169, 110, 0.25);
 }
+/* Touch devices skip the hover lift entirely — `:hover` fires on tap
+   and then "sticks" until the next tap elsewhere on iOS. Keeping the
+   shadow constant on touch avoids a paint on every press. */
+@media (pointer: coarse) {
+  .btn-primary:hover {
+    transform: none;
+    box-shadow: var(--shadow-gold);
+  }
+}
 
 .btn-secondary {
   background: var(--bg-elevated);
@@ -696,7 +705,13 @@ textarea::-moz-placeholder {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 24px;
-  transition: all 0.3s ease;
+  /* Targeted transitions instead of `all` — `all` re-diffs every
+     computed property on every state flip, which on WKWebView is
+     visible as paint pauses when many cards are on screen. */
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+@media (pointer: coarse) {
+  .card { transition: none; }
 }
 
 .card:hover {
@@ -954,15 +969,34 @@ html, body {
   margin-inline: auto;
 }
 
-/* T6: content-visibility on list cards lets the browser skip rendering
-   offscreen items. Big win when flipping between tabs on long lists —
-   only the ~20 visible cards get painted instead of every one. */
-@media (min-width: 821px) {
+/* T6 — content-visibility on list cards lets the browser skip
+   rendering offscreen items. Big scroll-perf win on long lists,
+   especially on 120Hz iPhones where every dropped frame is visible.
+   Previously gated to ≥821px (desktop-only); removed the gate so
+   touch devices get the same benefit. The `contain-intrinsic-size`
+   is the placeholder height for offscreen rows so the scrollbar
+   doesn't jump as cards hydrate. */
+.customer-card,
+.owner-card,
+.property-card,
+.property-card-compact,
+.deal-card,
+.ap-card,
+.dk-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 240px;
+  /* `contain: layout` walls off internal layout: a card's hover or
+     state change won't trigger reflow on its siblings. Pairs well
+     with content-visibility for compositor-friendly long lists. */
+  contain: layout style;
+}
+@media (max-width: 720px) {
+  /* Phone compact card row is ~96px tall (.pc-compact-inner). Match
+     the placeholder so we don't reserve desktop-sized blank space. */
+  .property-card-compact,
   .customer-card,
-  .owner-card,
-  .property-card {
-    content-visibility: auto;
-    contain-intrinsic-size: 240px; /* keeps scrollbar stable */
+  .owner-card {
+    contain-intrinsic-size: 96px;
   }
 }
 
@@ -1007,6 +1041,17 @@ html, body {
   main { animation: none !important; }
 }
 
+/* Touch devices (iOS Capacitor + Android) — kill the route fade-in.
+   On WKWebView the per-route 180ms `estia-page-fade` animation made
+   every navigation feel like there was a hand-off lag before content
+   appeared, even though the route was rendered immediately. The fade
+   was nice on desktop; on phones the priority is "tap → instant
+   content." Reduced-motion users already get this; touch users now do
+   too. */
+@media (pointer: coarse) {
+  main { animation: none !important; }
+}
+
 /* Sprint 10 — card-level entry animation REMOVED.
    The previous rule animated every direct child of `main > *[dir=rtl]`
    on every render, which double-fired with pages that already have
@@ -1048,6 +1093,40 @@ main section > ul,
 main section > div > ul,
 main [data-grid] {
   animation: estia-content-fade 180ms ease-out both;
+}
+
+/* Same touch-device escape hatch as the route fade above. On iPhone
+   WKWebView every list/tbody/article remount fired a 180ms opacity
+   ramp; combined with the stagger of `.animate-in` cards inside, the
+   total on-screen settle time was 300–500ms per navigation, which
+   reads as "the app is laggy" even when the JS is already done. Strip
+   the fades on touch and let the content arrive instantly. */
+@media (pointer: coarse) {
+  main ul,
+  main ol,
+  main tbody,
+  main article,
+  main section > ul,
+  main section > div > ul,
+  main [data-grid] {
+    animation: none !important;
+  }
+
+  /* `.animate-in` is sprinkled across page-level cards (Dashboard
+     KPI tiles, Login pane, Properties grid, etc.). On touch we skip
+     the entrance animation and the staggered delays — show the card
+     immediately at full opacity. The keyframes themselves stay
+     defined for desktop. */
+  .animate-in,
+  .animate-in-delay-1,
+  .animate-in-delay-2,
+  .animate-in-delay-3,
+  .animate-in-delay-4,
+  .animate-in-delay-5 {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   main ul, main ol, main tbody, main article,

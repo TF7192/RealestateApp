@@ -297,12 +297,20 @@ export default function Dashboard() {
           Perf 2026-04-25: reserve a minHeight so the bottom pipeline +
           hot-leads grid doesn't jump when API data lands. Lighthouse
           flagged a CLS score of ~0.17 on this surface; the reserve
-          eliminates the visible push. */}
+          eliminates the visible push.
+          Mobile 2026-04-25: stack to single-column on phones — the
+          2:1 ratio crushed the right-column "today" panel into ~30%
+          of a 430px screen, wrapping the title and ellipsing the
+          time chips. The inline style won the cascade against the
+          .dashboard-grid CSS media query, so the conditional has to
+          live here. */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)',
+        gridTemplateColumns: isMobile
+          ? '1fr'
+          : 'minmax(0, 2fr) minmax(0, 1fr)',
         gap: 14, marginBottom: 14,
-        minHeight: 360,
+        minHeight: isMobile ? 0 : 360,
       }}>
         <DCard>
           <div style={{
@@ -447,9 +455,11 @@ export default function Dashboard() {
           doesn't shift this row either. */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+        gridTemplateColumns: isMobile
+          ? '1fr'
+          : 'minmax(0, 1fr) minmax(0, 1fr)',
         gap: 14,
-        minHeight: 320,
+        minHeight: isMobile ? 0 : 320,
       }}>
         <DCard>
           <div style={{
