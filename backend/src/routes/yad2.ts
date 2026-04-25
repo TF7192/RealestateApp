@@ -312,8 +312,15 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
   // async /agency/preview/start flow. The sync path still exists for
   // integration tests; prod traffic goes through the job queue so
   // Cloudflare's 100s edge timeout can't kill the long crawl.
-  async function runAgencyPreview(agencyId: string, agentId: string, log: any) {
-    const report = await crawlAgency(agencyId);
+  async function runAgencyPreview(
+    agencyId: string,
+    agentId: string,
+    log: any,
+    onProgress?: (p: Yad2JobProgress) => void,
+  ) {
+    const report = await crawlAgency(agencyId, onProgress
+      ? (e) => onProgress({ pct: e.pct, stage: e.stage })
+      : undefined);
     if (report.listings.length === 0) {
       const blocked = report.sections.find((s) => s.error?.includes('אימות-בוט'));
       const sectionErr = report.sections.find((s) => s.error)?.error;
@@ -385,32 +392,12 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     const log = req.log;
     const job = startJob('agency-preview', u.id, async (report) => {
       try {
-        // Time-based fallback progress: the scraper itself doesn't
-        // yet stream per-page reports, so we tick the bar every 2 s
-        // across the expected stages until the scraper resolves.
-        // Real per-stage/page reporting can replace this later
-        // without any API change since the report() surface stays.
-        report({ pct: 5, stage: 'מתחבר ל-Yad2' });
-        const stages: Array<{ at: number; pct: number; stage: string }> = [
-          { at: 2_000,  pct: 15, stage: 'טוען דף סוכנות' },
-          { at: 8_000,  pct: 30, stage: 'סורק נכסים למכירה' },
-          { at: 25_000, pct: 55, stage: 'סורק נכסים להשכרה' },
-          { at: 45_000, pct: 75, stage: 'סורק נכסים מסחריים' },
-          { at: 75_000, pct: 90, stage: 'מאחד תוצאות' },
-          { at: 110_000, pct: 95, stage: 'כמעט סיימתי…' },
-        ];
-        const startedAt = Date.now();
-        const ticker = setInterval(() => {
-          const elapsed = Date.now() - startedAt;
-          let pick = stages[0];
-          for (const s of stages) if (elapsed >= s.at) pick = s;
-          report(pick);
-        }, 2_000);
-        try {
-          return await runAgencyPreview(agencyId, u.id, log);
-        } finally {
-          clearInterval(ticker);
-        }
+        // Real per-page progress — the crawler now emits
+        // CrawlProgressEvents for each section page + each detail
+        // fetch, and we forward them to the job's reporter (which
+        // is monotonic, so out-of-order ticks won't regress the bar).
+        report({ pct: 2, stage: 'מכין סריקה' });
+        return await runAgencyPreview(agencyId, u.id, log, report);
       } catch (err: any) {
         if (err?.__yad2Envelope) throw err;
         log.warn({ err, agencyId }, 'yad2 agency crawl threw (async)');

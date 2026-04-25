@@ -96,6 +96,40 @@ export interface CrawlReport {
   truncated: boolean;
 }
 
+// ── Streaming progress ──────────────────────────────────────────
+// Real per-page progress reports emitted as the crawler walks
+// listings → details. Routes/yad2 maps these to the user-facing
+// {pct, stage} envelope; keeping the shape granular here so other
+// callers (smoke tests, future workers) can render their own UX.
+//
+// `phase` lifecycle:
+//   start          → before any network — agencyId is known
+//   section-start  → about to fetch the first page of a section
+//   section-page   → just fetched page N of M for a section
+//   section-end    → finished a section (or hit blocked/empty)
+//   detail-start   → entering the detail-enrichment phase
+//   detail-item    → just fetched detail page N of M
+//   done           → crawl finished successfully
+//
+// `pct` is the *crawler's* estimate; the route layer is free to
+// re-scale or pin it as needed.
+export type CrawlProgressEvent =
+  | { phase: 'start';         pct: number; stage: string }
+  | { phase: 'section-start'; pct: number; stage: string; section: Yad2Section }
+  | { phase: 'section-page';  pct: number; stage: string; section: Yad2Section; page: number; totalPages: number; listingsSoFar: number }
+  | { phase: 'section-end';   pct: number; stage: string; section: Yad2Section; listings: number; error?: string }
+  | { phase: 'detail-start';  pct: number; stage: string; total: number }
+  | { phase: 'detail-item';   pct: number; stage: string; index: number; total: number }
+  | { phase: 'done';          pct: number; stage: string; listings: number };
+
+export type CrawlProgressReport = (e: CrawlProgressEvent) => void;
+
+const SECTION_LABEL: Record<Yad2Section, string> = {
+  forsale:    'נכסים למכירה',
+  rent:       'נכסים להשכרה',
+  commercial: 'נכסים מסחריים',
+};
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // ── Browser lifecycle ────────────────────────────────────────────
@@ -299,6 +333,7 @@ async function crawlSection(
   agencyId: string,
   section: Yad2Section,
   limitRemaining: number,
+  onPage?: (info: { page: number; totalPages: number; listingsSoFar: number }) => void,
 ): Promise<{
   listings: Yad2Listing[];
   pagesFetched: number;
@@ -361,6 +396,10 @@ async function crawlSection(
       if (out.length >= limitRemaining) break;
     }
 
+    // Emit a real per-page progress event. `totalPages` is unknown
+    // before page 1 lands; once it's known we can render N/M.
+    onPage?.({ page, totalPages, listingsSoFar: out.length });
+
     // Stop when we've fetched all reported pages, or when this page
     // returned an empty feed (defensive).
     if (totalPages > 0 && page >= totalPages) break;
@@ -397,7 +436,10 @@ async function fetchListingDetails(ctx: BrowserContext, token: string): Promise<
 
 // ── Public API ───────────────────────────────────────────────────
 
-export async function crawlAgency(agencyId: string): Promise<CrawlReport> {
+export async function crawlAgency(
+  agencyId: string,
+  onProgress?: CrawlProgressReport,
+): Promise<CrawlReport> {
   ensureShutdownHook();
   const sections: Yad2Section[] = ['forsale', 'rent', 'commercial'];
   const allListings: Yad2Listing[] = [];
@@ -406,18 +448,71 @@ export async function crawlAgency(agencyId: string): Promise<CrawlReport> {
   let agencyPhone: string | undefined;
   let truncated = false;
 
+  // ── Progress budget ────────────────────────────────────────────
+  // The bar splits roughly:
+  //   0–5%   start / browser warmup
+  //   5–60%  three sections (~18% each)
+  //   60–95% detail enrichment (linear in MAX_DETAIL_FETCHES)
+  //   95–100% finalisation
+  const SECTION_BUDGET_START = 5;
+  const SECTION_BUDGET_END = 60;
+  const DETAIL_BUDGET_START = 60;
+  const DETAIL_BUDGET_END = 95;
+  const sectionSpan = (SECTION_BUDGET_END - SECTION_BUDGET_START) / sections.length;
+
+  // Helper — clamp + monotonic-friendly. Final monotonic guarantee
+  // lives in the route (job.report() already does Math.max), but
+  // applying it here keeps standalone callers (smoke test) honest.
+  let lastPct = 0;
+  const emit = (e: CrawlProgressEvent) => {
+    if (!onProgress) return;
+    const pct = Math.max(lastPct, Math.min(100, Math.round(e.pct)));
+    lastPct = pct;
+    onProgress({ ...e, pct });
+  };
+
+  emit({ phase: 'start', pct: 2, stage: 'מכין סריקה' });
+
   const ctx = await newCrawlContext();
   try {
+    emit({ phase: 'start', pct: 5, stage: 'מתחבר ל-Yad2' });
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i];
+      const sectionStart = SECTION_BUDGET_START + i * sectionSpan;
+      const sectionEnd = sectionStart + sectionSpan;
       const remaining = MAX_LISTINGS_TOTAL - allListings.length;
       if (remaining <= 0) {
         truncated = true;
         sectionReports.push({ section, pagesFetched: 0, totalPages: 0, totalListings: 0 });
+        emit({
+          phase: 'section-end', pct: sectionEnd,
+          stage: `דילגנו על ${SECTION_LABEL[section]}`,
+          section, listings: 0,
+        });
         continue;
       }
       if (i > 0) await sleep(POLITE_GAP_MS);
-      const r = await crawlSection(ctx, agencyId, section, remaining);
+      emit({
+        phase: 'section-start', pct: sectionStart,
+        stage: `סורק ${SECTION_LABEL[section]}`,
+        section,
+      });
+      const baseListings = allListings.length;
+      const r = await crawlSection(ctx, agencyId, section, remaining, ({ page, totalPages, listingsSoFar }) => {
+        // Linear interp inside the section's budget. If totalPages is
+        // unknown (page 1 hasn't reported it yet), assume one page so
+        // the bar still moves on the first tick.
+        const tp = totalPages > 0 ? totalPages : Math.max(page, 1);
+        const frac = Math.min(1, page / tp);
+        const pct = sectionStart + frac * sectionSpan;
+        const stage = totalPages > 0
+          ? `${SECTION_LABEL[section]} — דף ${page}/${tp} · ${baseListings + listingsSoFar} נכסים`
+          : `${SECTION_LABEL[section]} — דף ${page} · ${baseListings + listingsSoFar} נכסים`;
+        emit({
+          phase: 'section-page', pct, stage,
+          section, page, totalPages: tp, listingsSoFar: baseListings + listingsSoFar,
+        });
+      });
 
       // First section that succeeds in lifting agency identity wins.
       if (!agencyName && r.agencyName)  agencyName  = r.agencyName;
@@ -431,6 +526,13 @@ export async function crawlAgency(agencyId: string): Promise<CrawlReport> {
         totalListings: r.listings.length,
         error: r.error,
       });
+      emit({
+        phase: 'section-end', pct: sectionEnd,
+        stage: r.error
+          ? `${SECTION_LABEL[section]} — שגיאה`
+          : `${SECTION_LABEL[section]} — ${r.listings.length} נכסים`,
+        section, listings: r.listings.length, error: r.error,
+      });
     }
 
     if (allListings.length >= MAX_LISTINGS_TOTAL) truncated = true;
@@ -440,6 +542,14 @@ export async function crawlAgency(agencyId: string): Promise<CrawlReport> {
     // The cookies set by the listings phase carry over (same context),
     // so detail pages don't need to re-solve the JS challenge.
     const targets = allListings.slice(0, MAX_DETAIL_FETCHES);
+    if (targets.length > 0) {
+      emit({
+        phase: 'detail-start', pct: DETAIL_BUDGET_START,
+        stage: `מעשיר תמונות ל-${targets.length} נכסים`,
+        total: targets.length,
+      });
+    }
+    const detailSpan = DETAIL_BUDGET_END - DETAIL_BUDGET_START;
     for (let i = 0; i < targets.length; i++) {
       const l = targets[i];
       await sleep(POLITE_GAP_MS);
@@ -450,8 +560,20 @@ export async function crawlAgency(agencyId: string): Promise<CrawlReport> {
           if (details.description && !l.description) l.description = details.description;
         }
       } catch { /* keep cover-only */ }
+      const pct = DETAIL_BUDGET_START + ((i + 1) / targets.length) * detailSpan;
+      emit({
+        phase: 'detail-item', pct,
+        stage: `טוען תמונות ${i + 1}/${targets.length}`,
+        index: i + 1, total: targets.length,
+      });
     }
     if (allListings.length > MAX_DETAIL_FETCHES) truncated = true;
+
+    emit({
+      phase: 'done', pct: 100,
+      stage: `הושלם — ${allListings.length} נכסים`,
+      listings: allListings.length,
+    });
 
     return {
       agencyId,
