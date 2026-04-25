@@ -654,6 +654,10 @@ model Property {
 
   @@unique([agentId, slug])
   @@index([agentId])
+  // PERF-015 — covers `findMany({ where: { agentId }, orderBy:
+  // { createdAt: 'desc' } })` which is the dominant Property query
+  // (Properties list, Dashboard, sidebar favorites hydration).
+  @@index([agentId, createdAt(sort: Desc)])
   @@index([city])
   @@index([assetClass, category, status])
   @@index([propertyOwnerId])
@@ -738,7 +742,14 @@ model PropertyImage {
   id         String   @id @default(cuid())
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  // PERF-005 — variant URLs. `url` stays the canonical full-size
+  // (legacy callers read it directly) and the resize pipeline
+  // populates the two smaller URLs on new uploads. Both nullable so
+  // legacy rows imported before the variants pipeline (or via the
+  // Yad2 scrape) keep rendering through the legacy /uploads/* path.
   url        String
+  urlCard    String?
+  urlThumb   String?
   sortOrder  Int      @default(0)
   createdAt  DateTime @default(now())
 
@@ -907,6 +918,9 @@ model Lead {
   importBatchId   String?
 
   @@index([agentId])
+  // PERF-015 — same rationale as Property: the leads list /
+  // Customers page sorts by createdAt desc inside an agent scope.
+  @@index([agentId, createdAt(sort: Desc)])
   @@index([status])
   @@index([customerStatus])
   @@index([city])

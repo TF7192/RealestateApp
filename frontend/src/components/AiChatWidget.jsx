@@ -44,7 +44,13 @@ function loadPersistedMessages() {
 }
 function persistMessages(messages) {
   try {
-    const trimmed = messages.slice(-PERSIST_TURNS * 2);
+    // PERF-012 — same hygiene as Ai.jsx: drop empty streaming
+    // placeholders and the transient marker so reload doesn't bring
+    // back ghosts.
+    const cleaned = messages
+      .filter((m) => !(m.__streaming && !m.content))
+      .map(({ __streaming, ...rest }) => rest); // eslint-disable-line no-unused-vars
+    const trimmed = cleaned.slice(-PERSIST_TURNS * 2);
     localStorage.setItem(PERSIST_KEY, JSON.stringify(trimmed));
   } catch { /* quota errors etc. */ }
 }
@@ -107,7 +113,15 @@ function AiChatPanel({ onClose }) {
 
   useEffect(() => { persistMessages(messages); }, [messages]);
 
-  const handleSend = async (content) => {
+  // PERF-012 — keep a handle to the in-flight SSE so the panel can
+  // abort it if the user closes the widget mid-stream.
+  const streamRef = useRef(null);
+
+  useEffect(() => () => {
+    try { streamRef.current?.cancel(); } catch { /* noop */ }
+  }, []);
+
+  const handleSend = (content) => {
     const text = String(content ?? input).trim();
     if (!text || loading) return;
     setErr(null);
@@ -115,18 +129,55 @@ function AiChatPanel({ onClose }) {
     setMessages(next);
     setInput('');
     setLoading(true);
-    try {
-      const res = await api.aiChat(next);
-      const reply = res?.reply ?? '';
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply || 'אין תשובה.' }]);
-    } catch (e) {
-      const code = e?.data?.error?.code;
-      if (code === 'ai_not_configured') setErr('שירות ה-AI לא מוגדר בסביבה הזו');
-      else setErr(e?.message || 'שליחת ההודעה נכשלה');
-      setMessages((prev) => prev.slice(0, -1));
-    } finally {
-      setLoading(false);
-    }
+    setMessages((prev) => [...prev, { role: 'assistant', content: '', __streaming: true }]);
+
+    let gotAnyText = false;
+
+    const handle = api.aiChatStream(next, {
+      onText: (delta) => {
+        gotAnyText = true;
+        setMessages((prev) => {
+          const out = prev.slice();
+          const last = out[out.length - 1];
+          if (last && last.role === 'assistant') {
+            out[out.length - 1] = {
+              ...last,
+              content: (last.content || '') + delta,
+              __streaming: true,
+            };
+          }
+          return out;
+        });
+      },
+      onDone: () => {
+        setMessages((prev) => {
+          const out = prev.slice();
+          const last = out[out.length - 1];
+          if (last && last.role === 'assistant') {
+            out[out.length - 1] = { role: 'assistant', content: last.content || 'אין תשובה.' };
+          }
+          return out;
+        });
+        setLoading(false);
+      },
+      onError: (message, code) => {
+        if (code === 'ai_not_configured') setErr('שירות ה-AI לא מוגדר בסביבה הזו');
+        else setErr(message || 'שליחת ההודעה נכשלה');
+        setMessages((prev) => {
+          const out = prev.slice();
+          if (out.length && out[out.length - 1].__streaming && !gotAnyText) {
+            out.pop();
+            out.pop();
+          } else if (out.length && out[out.length - 1].__streaming) {
+            const last = out[out.length - 1];
+            out[out.length - 1] = { role: 'assistant', content: last.content };
+          }
+          return out;
+        });
+        setLoading(false);
+      },
+    });
+    streamRef.current = handle;
   };
 
   const handleKeyDown = (e) => {
@@ -215,9 +266,14 @@ function AiChatPanel({ onClose }) {
           ) : (
             <>
               {messages.map((m, i) => (
-                <Bubble key={`m-${i}`} role={m.role} content={m.content} />
+                // PERF-012 — see Ai.jsx; same render contract.
+                <Bubble
+                  key={`m-${i}`}
+                  role={m.role}
+                  content={m.content}
+                  loading={m.__streaming && !m.content}
+                />
               ))}
-              {loading && <Bubble role="assistant" loading />}
             </>
           )}
         </div>

@@ -896,6 +896,107 @@ export const api = {
       retries: 1,
     }),
 
+  // PERF-012 — streaming AI chat. Server emits SSE frames; we parse
+  // them off `response.body.getReader()` and call back per event:
+  //
+  //   • onText(delta)           — chunk of assistant text
+  //   • onToolUse({name,input}) — assistant requested a tool call
+  //   • onToolResult({name})    — server finished the tool call
+  //   • onDone()                — end_turn reached
+  //   • onError(message)        — server-side error
+  //
+  // Returns an object with `.cancel()` so the caller can abort
+  // mid-stream (e.g. when the chat panel closes). The handlers are
+  // best-effort: a thrown error inside one of them is swallowed so a
+  // single render-time bug can't kill the rest of the stream.
+  aiChatStream: (messages, handlers = {}) => {
+    const controller = new AbortController();
+    const url = `${BASE}/ai/chat/stream`;
+    const phId = posthogDistinctId();
+
+    const promise = (async () => {
+      let res;
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+            'X-Estia-Platform': platformHeader(),
+            ...(phId ? { 'X-PostHog-Distinct-Id': phId } : null),
+          },
+          body: JSON.stringify({ messages }),
+        });
+      } catch (e) {
+        // Network error / aborted before fetch completed.
+        if (e?.name === 'AbortError') return;
+        handlers.onError?.(hebrewFallbackMessage(0));
+        return;
+      }
+      if (!res.ok) {
+        // Mirror the JSON error envelope the rest of the API uses so
+        // the FE can show a Hebrew fallback. 503 → key missing; 401 →
+        // bounce; everything else → generic.
+        if (res.status === 401) {
+          broadcastUnauthorized();
+          return;
+        }
+        let body = null;
+        try { body = await res.json(); } catch { /* noop */ }
+        const msg = body?.error?.message || hebrewFallbackMessage(res.status);
+        handlers.onError?.(msg, body?.error?.code);
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        handlers.onError?.('הזרם לא זמין');
+        return;
+      }
+      const decoder = new TextDecoder('utf-8');
+      let buf = '';
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          // SSE frames are separated by blank lines. Each frame is
+          // one or more `data: <json>` lines; we only emit `data:`
+          // events here, so newline-handling stays simple.
+          let sep;
+          while ((sep = buf.indexOf('\n\n')) >= 0) {
+            const frame = buf.slice(0, sep);
+            buf = buf.slice(sep + 2);
+            const dataLine = frame.split('\n').find((l) => l.startsWith('data:'));
+            if (!dataLine) continue;
+            const json = dataLine.slice(5).trim();
+            if (!json) continue;
+            let evt;
+            try { evt = JSON.parse(json); } catch { continue; }
+            try {
+              if (evt.type === 'text') handlers.onText?.(evt.delta || '');
+              else if (evt.type === 'tool_use') handlers.onToolUse?.({ name: evt.name, input: evt.input });
+              else if (evt.type === 'tool_result') handlers.onToolResult?.({ name: evt.name, error: evt.error });
+              else if (evt.type === 'done') handlers.onDone?.();
+              else if (evt.type === 'error') handlers.onError?.(evt.message);
+            } catch { /* swallow handler errors */ }
+          }
+        }
+      } catch (e) {
+        if (e?.name !== 'AbortError') {
+          handlers.onError?.(hebrewFallbackMessage(0));
+        }
+      }
+    })();
+
+    return {
+      promise,
+      cancel: () => { try { controller.abort(); } catch { /* noop */ } },
+    };
+  },
+
   // Sprint 6 — Documents library. S3-backed /documents page (pdf/dwg/
   // zip/xlsx). `params` accepts `kind` (one of the mime families above)
   // and `tag` (repeatable). Response is { items: [{ id, originalName,

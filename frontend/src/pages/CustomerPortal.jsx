@@ -444,7 +444,8 @@ export default function CustomerPortal({ onLogout, isPublic }) {
               className={`cp-property-card animate-in animate-in-delay-${Math.min(i + 1, 5)}`}
             >
               <div className="cp-card-image">
-                <img src={prop.images[0]} alt={prop.street} loading="lazy" />
+                {/* PERF-005 — customer portal card grid: card-sized variant. */}
+                <img src={prop.imageList?.[0]?.urlCard || prop.imageThumbs?.[0] || prop.images?.[0]} alt={prop.street} loading="lazy" />
                 <div className="cp-card-badges">
                   <span className={`badge ${prop.assetClass === 'commercial' ? 'badge-warning' : 'badge-success'}`}>
                     {getAssetClassLabel(prop.assetClass)}

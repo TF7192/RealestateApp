@@ -378,7 +378,8 @@ export default function AgentPortal() {
               <div key={p.id} className="ap-card">
                 <Link to={propPath} className="ap-card-inner">
                   <div className="ap-card-image">
-                    <img src={p.images?.[0] || 'https://via.placeholder.com/800x450'} alt={p.street} loading="lazy" />
+                    {/* PERF-005 — public agent portal cards: card-sized variant. */}
+                    <img src={p.imageList?.[0]?.urlCard || p.imageThumbs?.[0] || p.images?.[0] || 'https://via.placeholder.com/800x450'} alt={p.street} loading="lazy" />
                     <div className="ap-card-badges">
                       <span className={`ap-badge ${p.assetClass === 'COMMERCIAL' ? 'commercial' : 'residential'}`}>
                         {p.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}

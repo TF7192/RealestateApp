@@ -1107,4 +1107,223 @@ ${compsText || '(אין נכסים להשוואה)'}
       return { reply: replyText };
     }
   );
+
+  // PERF-012 — SSE streaming variant of /chat. Same request body
+  // (`{ messages: [{role, content}] }`), same tool-use loop, same
+  // system prompt + cached tools — only the response shape differs:
+  // each text delta from Anthropic is forwarded as one
+  // `data: {"type":"text","delta":"..."}\n\n` SSE frame, with a
+  // terminal `{"type":"done"}` event when the assistant emits
+  // `end_turn`.
+  //
+  // Why a second route instead of replacing /chat: existing native
+  // clients (and the public-portal embed if/when it ships) keep
+  // calling /chat without modification; the web FE migrates to
+  // /chat/stream. We can drop /chat in a follow-up once the web is
+  // the only consumer.
+  //
+  // Wire format (one frame per blank-line-separated chunk):
+  //   data: {"type":"text","delta":"שלום "}
+  //   data: {"type":"tool_use","name":"list_leads","input":{...}}
+  //   data: {"type":"tool_result","name":"list_leads"}
+  //   data: {"type":"done"}
+  //   data: {"type":"error","message":"..."}
+  app.post(
+    '/chat/stream',
+    {
+      onRequest: [app.requireAgent, requirePremium({ feature: 'Estia AI' })],
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      const user = requireUser(req);
+      const { messages } = chatBody.parse(req.body);
+
+      const client = buildAnthropic();
+      if (!client) {
+        return reply.code(503).send({
+          error: {
+            message: 'שירות ה-AI לא מוגדר — חסר מפתח ANTHROPIC_API_KEY',
+            code: 'ai_not_configured',
+          },
+        });
+      }
+
+      // SSE handshake. We bypass Fastify's response serializer
+      // (`reply.raw`) because we're going to stream events ourselves;
+      // calling reply.send() afterwards would trigger
+      // ERR_HTTP_HEADERS_SENT.
+      reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-store',
+        'Connection': 'keep-alive',
+        // X-Accel-Buffering: no — disable nginx response buffering
+        // for SSE so each event flushes to the client as it's
+        // written. nginx.conf already has `proxy_buffering off`
+        // under /api/, but this header is the belt-and-braces.
+        'X-Accel-Buffering': 'no',
+      });
+      reply.hijack();
+
+      const send = (event: Record<string, unknown>) => {
+        try {
+          reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+        } catch {
+          // Client disconnected mid-stream — swallow the EPIPE.
+        }
+      };
+
+      // Same SYSTEM prompt as /chat (verbatim — kept duplicated for
+      // now so /chat can be deleted later without a chase).
+      const SYSTEM = [
+        'אתה Estia AI — עוזר אישי לסוכני נדל"ן ישראלים. חשוב/י על עצמך כעל יד-ימין של הסוכן/ת: ניסיון בשוק, היכרות עם תרבות העבודה המקומית, והבנה שאין שתי עיסקאות זהות.',
+        '',
+        '# שפה וטון',
+        '- ענה/י בעברית רהוטה וקצרה. בלי פראזות מנופחות ובלי הקדמות ארוכות.',
+        '- התייחס/י לסוכן/ת בגוף שני ("לך", "אצלך") כדי שהתשובה תישמע אישית.',
+        '- השתמש/י במונחים מקצועיים מהשוק הישראלי: "בלעדיות", "מ״ר", "ועד בית", "טאבו", "גוש/חלקה", "מדד תשומות", "מחיר שיווק / מחיר סגירה".',
+        '- כשמדובר במספרי טלפון או מחירים — הצג/י בפורמט קריא (₪2,850,000, 054-1234567).',
+        '',
+        '# גישה לנתונים',
+        '- יש לך גישת קריאה בלבד לנתוני הסוכן/ת המחובר/ת דרך הכלים (tools).',
+        '- השתמש/י בכלים כל פעם שהשאלה דורשת נתונים אמיתיים ("כמה לידים חמים יש לי", "מה הנכסים שלי בתל אביב", "מה התזכורות להיום").',
+        '- קודם תקרא/י את הנתונים, ורק אחר כך תנסח/י תשובה מבוססת. אל תמציא/י מספרים או שמות.',
+        '- אם הכלי החזיר רשימה ריקה — אמור/י זאת במפורש.',
+        '- לעולם אל תחזיר/י מזהים ארוכים (id). העדף/י שם + עיר + טלפון.',
+        '',
+        '# פורמט התשובה',
+        '- כשיש 3+ פריטים עם 2+ תכונות (לידים, נכסים, עסקאות, פגישות) — הצג/י כ-**טבלת Markdown** (`| עמודה | עמודה |`) עם כותרות ברורות בעברית. הטבלה קריאה יותר מרשימת bullet-ים.',
+        '- כשיש עד 3 פריטים פשוטים — רשימת bullet-ים (`- `) זה בסדר.',
+        '- השתמש/י ב-**מודגש** (כוכביות כפולות) כדי להדגיש מספרים, שמות עיר, סטטוסים חשובים.',
+        '- השתמש/י בכותרות `### ` כשאתה/את מחלק/ת תשובה לסקציות (לפי חום ליד, לפי עיר וכו׳).',
+        '- אימוג׳ים מותרים במידה וזה קריא: 🔥 חם · ☀️ פושר · ❄️ קר, 🏠 נכס, 📞 טלפון, 📅 פגישה. אל תגזים/י.',
+        '- סיים/י כל תשובה עם שורה של "רוצה ש…" כשיש המשך טבעי (להכין הודעה קבוצתית, לפתוח תזכורת, לחפש התאמות וכו׳).',
+        '',
+        '# מה לא לעשות',
+        '- אל תמציא/י עובדות, מספרים, שמות, או תאריכים.',
+        '- אל תחזיר/י JSON גולמי ללקוח — הסוכן/ת לא מפתח/ת.',
+        '- אל תסביר/י איך הכלים עובדים ("אני שולף/ת מ-database") — ענה/י מהבטן כאילו הכרת את הלקוחות שנים.',
+      ].join('\n');
+
+      type ContentBlock =
+        | { type: 'text'; text: string }
+        | { type: 'tool_use'; id: string; name: string; input: Record<string, any> };
+      type AssistantMsg = { role: 'assistant'; content: ContentBlock[] };
+      type UserMsg = { role: 'user'; content: string | Array<{ type: 'tool_result'; tool_use_id: string; content: string }> };
+
+      const convo: Array<AssistantMsg | UserMsg> =
+        messages.map((m) => ({ role: m.role, content: m.content } as any));
+
+      const systemCached = [
+        { type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } },
+      ];
+      const toolsCached = CHAT_TOOLS.map((t, i) => (
+        i === CHAT_TOOLS.length - 1
+          ? { ...t, cache_control: { type: 'ephemeral' as const } }
+          : t
+      ));
+
+      // Forward a client abort (browser closed the tab, navigated
+      // away, etc.) into the active stream. Without this the
+      // Anthropic request keeps running on our dime even though no
+      // one's listening.
+      let activeStream: ReturnType<typeof client.messages.stream> | null = null;
+      const onClientAbort = () => {
+        try { activeStream?.abort(); } catch { /* noop */ }
+      };
+      req.raw.on('close', onClientAbort);
+
+      try {
+        for (let iter = 0; iter < 6; iter += 1) {
+          const stream = client.messages.stream({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 1024,
+            system: systemCached as any,
+            tools: toolsCached as any,
+            messages: convo as any,
+          });
+          activeStream = stream;
+
+          // Forward each text delta as soon as it arrives. The first
+          // delta is what time-to-first-character measures —
+          // typically <800 ms once Anthropic has the prompt cache.
+          stream.on('text', (delta) => {
+            send({ type: 'text', delta });
+          });
+
+          // `finalMessage()` resolves once the stream end_turn / tool_use
+          // event has fired and the assistant blocks are assembled.
+          let finalMsg;
+          try {
+            finalMsg = await stream.finalMessage();
+          } catch (e: any) {
+            req.log.error({ err: e }, 'ai chat stream upstream error');
+            send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
+            return;
+          }
+
+          recordAnthropic({
+            userId: user.id,
+            feature: 'chat',
+            model: 'claude-sonnet-4-6',
+            usage: finalMsg.usage as any,
+          });
+
+          const assistantBlocks = finalMsg.content as ContentBlock[];
+          convo.push({ role: 'assistant', content: assistantBlocks });
+
+          if (finalMsg.stop_reason !== 'tool_use') {
+            // end_turn, max_tokens, stop_sequence, refusal — all
+            // mean "this turn is done"; no more loop iterations.
+            send({ type: 'done' });
+            return;
+          }
+
+          // Tool turn — surface every tool_use block so the FE can
+          // (optionally) show "Running tool…" affordances. We then
+          // execute every tool in parallel and feed the results back
+          // into the next stream iteration.
+          const toolUses = assistantBlocks.filter(
+            (b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use',
+          );
+          for (const tu of toolUses) {
+            send({ type: 'tool_use', name: tu.name, input: tu.input || {} });
+          }
+
+          const results = await Promise.all(
+            toolUses.map(async (tu) => {
+              try {
+                const out = await runChatTool(tu.name, tu.input || {}, { agentId: user.id });
+                send({ type: 'tool_result', name: tu.name });
+                return {
+                  type: 'tool_result' as const,
+                  tool_use_id: tu.id,
+                  content: JSON.stringify(out),
+                };
+              } catch (e: any) {
+                req.log.warn({ err: e, tool: tu.name }, 'chat tool failed');
+                send({ type: 'tool_result', name: tu.name, error: e?.message || 'tool failed' });
+                return {
+                  type: 'tool_result' as const,
+                  tool_use_id: tu.id,
+                  content: JSON.stringify({ error: e?.message || 'tool failed' }),
+                };
+              }
+            }),
+          );
+          convo.push({ role: 'user', content: results });
+        }
+
+        // 6-iteration cap — at this point the model is in a tool-use
+        // loop without making progress. Fall back to a polite punt.
+        send({ type: 'text', delta: 'לא הצלחתי להרכיב תשובה. נסו/י לנסח את השאלה שוב.' });
+        send({ type: 'done' });
+      } catch (e: any) {
+        req.log.error({ err: e }, 'ai chat stream fatal');
+        send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
+      } finally {
+        req.raw.off('close', onClientAbort);
+        try { reply.raw.end(); } catch { /* noop */ }
+      }
+    }
+  );
 };

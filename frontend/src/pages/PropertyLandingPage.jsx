@@ -144,7 +144,12 @@ export default function PropertyLandingPage() {
     );
   }
 
-  const hero = images[activePhoto]?.url || images[0]?.url;
+  // PERF-005 — hero uses the 768 px card variant when available; the
+  // landing-page hero element is ~1200 px wide on desktop and the
+  // card variant is sharp enough that the 2400 px full isn't worth
+  // the extra bytes. Falls back to `url` for legacy rows.
+  const heroPic = images[activePhoto] || images[0];
+  const hero = heroPic?.urlCard || heroPic?.url;
   const prev = () => setActivePhoto((i) => (i - 1 + images.length) % Math.max(images.length, 1));
   const next = () => setActivePhoto((i) => (i + 1) % Math.max(images.length, 1));
 
@@ -189,7 +194,7 @@ export default function PropertyLandingPage() {
                 className={`lp-thumb ${i === activePhoto ? 'lp-thumb-on' : ''}`}
                 onClick={() => setActivePhoto(i)}
                 aria-label={`תמונה ${i + 1}`}
-                style={{ backgroundImage: `url(${img.url})` }}
+                style={{ backgroundImage: `url(${img.urlThumb || img.url})` }}
               />
             ))}
           </div>

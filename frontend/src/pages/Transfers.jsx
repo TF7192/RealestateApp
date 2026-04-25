@@ -282,7 +282,9 @@ function TransferCard({ t, onAccept, onDecline, onCancel }) {
       >
         {t.property.images?.[0] ? (
           <img
-            src={t.property.images[0].url}
+            // PERF-005 — 56×56 thumbnail; prefer the small variant
+            // when present (legacy rows fall back to the full URL).
+            src={t.property.images[0].urlThumb || t.property.images[0].url}
             alt=""
             style={{
               width: 56, height: 56, borderRadius: 10,

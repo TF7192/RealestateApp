@@ -356,7 +356,8 @@ function PropertyRow({ prop, toast, navigate }) {
     >
       <div className="m-prop-card">
         <div className="m-prop-img">
-          <img src={prop.images[0]} alt={prop.street} loading="lazy" />
+          {/* PERF-005 — prefer the 256 px thumb on mobile lists. */}
+          <img src={prop.imageThumbs?.[0] || prop.images?.[0]} alt={prop.street} loading="lazy" />
           <div className="m-prop-img-badge">
             <span className="m-tiny-badge live">{getAssetClassLabel(prop.assetClass)}</span>
             {prop._distance != null && (

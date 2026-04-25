@@ -94,7 +94,7 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
     setPending((cur) => [...cur, ...seeded]);
     // Upload sequentially so the server stays happy and ordering is predictable
     for (let i = 0; i < files.length; i += 1) {
-      // eslint-disable-next-line no-await-in-loop
+       
       await uploadOne(files[i], seeded[i].id);
     }
     await refreshFromServer();
@@ -301,7 +301,10 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
                     onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
                   >
                     <img
-                      src={img.url}
+                      // PERF-005 — manager grid renders at 400×300; the
+                      // 768 px card variant covers retina without
+                      // pulling the 2400 px full-res original.
+                      src={img.urlCard || img.url}
                       alt={`תמונה ${i + 1}`}
                       width="400"
                       height="300"

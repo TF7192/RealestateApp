@@ -73,3 +73,31 @@ export function displayDateTime(value) {
   if (Number.isNaN(d.getTime())) return DASH;
   return dateTimeFmt.format(d);
 }
+
+// PERF-005 — pick the right image variant for a surface.
+//
+// Backend serializes properties with three parallel arrays:
+//   • `images`        → full-size URLs (legacy field, lightbox source)
+//   • `imageThumbs`   → 256 px URLs (list cards)
+//   • `imageList[i]`  → { url, urlCard, urlThumb } (gallery / photo manager)
+//
+// Legacy rows uploaded before the variants pipeline only have `url` —
+// `urlCard` / `urlThumb` are null and `imageThumbs[i]` falls back to
+// the full URL on the backend side. That means callers can use the
+// variant they want without crashing on older rows.
+
+/** First-image thumbnail (256 px) — list cards. Falls back to the
+ *  full-size URL when the row has no thumb yet. */
+export function pickThumbUrl(prop) {
+  if (!prop) return null;
+  return prop.imageThumbs?.[0] || prop.images?.[0] || null;
+}
+
+/** Per-image variant lookup — used by gallery thumbs (`'card'`) and
+ *  the lightbox (`'full'`). Pass an `imageList[i]` object. */
+export function pickVariant(img, variant) {
+  if (!img) return null;
+  if (variant === 'thumb') return img.urlThumb || img.urlCard || img.url || null;
+  if (variant === 'card')  return img.urlCard  || img.url      || img.urlThumb || null;
+  return img.url || img.urlCard || img.urlThumb || null;
+}

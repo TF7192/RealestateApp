@@ -495,9 +495,19 @@ export default function PropertyDetail() {
   const total = Object.keys(MARKETING_LABELS).length;
   const pct = Math.round((done / total) * 100);
 
-  const images = property.images?.length ? property.images : [
-    'https://via.placeholder.com/1200x675?text=Estia',
-  ];
+  // PERF-005 — gallery slides render in a ~1200 px viewport; the
+  // 768 px `urlCard` variant is plenty. The lightbox keeps the full
+  // URL so zooming-in is still sharp. Both arrays stay in lockstep so
+  // existing keyboard nav (`lightboxIdx`) just works.
+  const galleryImages = property.imageList?.length
+    ? property.imageList.map((i) => i.urlCard || i.url)
+    : (property.images?.length ? property.images : [
+        'https://via.placeholder.com/1200x675?text=Estia',
+      ]);
+  const images = galleryImages;
+  const lightboxImages = property.imageList?.length
+    ? property.imageList.map((i) => i.url)
+    : images;
 
   const mapsQuery = encodeURIComponent(`${property.street}, ${property.city}`);
   const mapsEmbed = `https://www.google.com/maps?q=${mapsQuery}&output=embed`;
@@ -1972,7 +1982,7 @@ export default function PropertyDetail() {
             <X size={22} />
           </button>
           <img
-            src={images[lightboxIdx]}
+            src={lightboxImages[lightboxIdx] || images[lightboxIdx]}
             alt={property.street}
             width="1600"
             height="1200"

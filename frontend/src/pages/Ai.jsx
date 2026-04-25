@@ -56,7 +56,13 @@ function loadPersistedMessages() {
 }
 function persistMessages(messages) {
   try {
-    const trimmed = messages.slice(-PERSIST_TURNS * 2);
+    // PERF-012 — strip the in-flight `__streaming` flag and skip
+    // empty placeholders. The trimmed transcript should look the
+    // same on a refresh as it does after the stream finishes.
+    const cleaned = messages
+      .filter((m) => !(m.__streaming && !m.content))
+      .map(({ __streaming, ...rest }) => rest); // eslint-disable-line no-unused-vars
+    const trimmed = cleaned.slice(-PERSIST_TURNS * 2);
     localStorage.setItem(PERSIST_KEY, JSON.stringify(trimmed));
   } catch { /* quota errors etc. — fine, non-critical */ }
 }
@@ -80,7 +86,19 @@ export default function Ai() {
   // doesn't wipe the conversation.
   useEffect(() => { persistMessages(messages); }, [messages]);
 
-  const handleSend = async (content) => {
+  // PERF-012 — keep a handle to the active stream so we can abort it
+  // if the user navigates away while a long answer is generating.
+  const streamRef = useRef(null);
+
+  // Cancel any in-flight stream when the page unmounts. Without this
+  // an aborted user (browser back) keeps the SSE connection open
+  // until the assistant finishes — wastes Anthropic credits and the
+  // backend's request slot.
+  useEffect(() => () => {
+    try { streamRef.current?.cancel(); } catch { /* noop */ }
+  }, []);
+
+  const handleSend = (content) => {
     const text = String(content ?? input).trim();
     if (!text || loading) return;
     setErr(null);
@@ -88,23 +106,69 @@ export default function Ai() {
     setMessages(next);
     setInput('');
     setLoading(true);
-    try {
-      const res = await api.aiChat(next);
-      const reply = res?.reply ?? '';
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply || 'אין תשובה.' }]);
-    } catch (e) {
-      const code = e?.data?.error?.code;
-      if (code === 'ai_not_configured') {
-        setErr('שירות ה-AI לא מוגדר בסביבה הזו');
-      } else {
-        setErr(e?.message || 'שליחת ההודעה נכשלה');
-      }
-      // Roll back the optimistic user message so they can retry without
-      // the previous turn showing as "sent but unanswered".
-      setMessages((prev) => prev.slice(0, -1));
-    } finally {
-      setLoading(false);
-    }
+
+    // Append a placeholder assistant bubble we can append text into
+    // as deltas arrive. `__streaming` is a transient flag the Bubble
+    // component reads to render the typing indicator (the very first
+    // delta swaps it off).
+    setMessages((prev) => [...prev, { role: 'assistant', content: '', __streaming: true }]);
+
+    let gotAnyText = false;
+
+    const handle = api.aiChatStream(next, {
+      onText: (delta) => {
+        gotAnyText = true;
+        setMessages((prev) => {
+          const out = prev.slice();
+          const last = out[out.length - 1];
+          if (last && last.role === 'assistant') {
+            out[out.length - 1] = {
+              ...last,
+              content: (last.content || '') + delta,
+              __streaming: true,
+            };
+          }
+          return out;
+        });
+      },
+      onDone: () => {
+        setMessages((prev) => {
+          const out = prev.slice();
+          const last = out[out.length - 1];
+          if (last && last.role === 'assistant') {
+            out[out.length - 1] = {
+              role: 'assistant',
+              content: last.content || 'אין תשובה.',
+            };
+          }
+          return out;
+        });
+        setLoading(false);
+      },
+      onError: (message, code) => {
+        if (code === 'ai_not_configured') setErr('שירות ה-AI לא מוגדר בסביבה הזו');
+        else setErr(message || 'שליחת ההודעה נכשלה');
+        // Roll back: drop the streaming-assistant placeholder *and*
+        // the user message so retry is clean.
+        setMessages((prev) => {
+          const out = prev.slice();
+          // Drop the streaming placeholder if no text arrived.
+          if (out.length && out[out.length - 1].__streaming && !gotAnyText) {
+            out.pop();
+            // Also drop the user message so the input feels like a
+            // failed send.
+            out.pop();
+          } else if (out.length && out[out.length - 1].__streaming) {
+            // Some text did arrive — keep it but strip the marker.
+            const last = out[out.length - 1];
+            out[out.length - 1] = { role: 'assistant', content: last.content };
+          }
+          return out;
+        });
+        setLoading(false);
+      },
+    });
+    streamRef.current = handle;
   };
 
   const handleKeyDown = (e) => {
@@ -181,11 +245,18 @@ export default function Ai() {
           ) : (
             <>
               {messages.map((m, i) => (
-                <Bubble key={`m-${i}`} role={m.role} content={m.content} />
+                // PERF-012 — when the assistant bubble is mid-stream
+                // and no text has landed yet, render the "thinking…"
+                // affordance instead of an empty bubble. As soon as
+                // the first delta arrives, the rendered content
+                // takes over without a layout jump.
+                <Bubble
+                  key={`m-${i}`}
+                  role={m.role}
+                  content={m.content}
+                  loading={m.__streaming && !m.content}
+                />
               ))}
-              {loading && (
-                <Bubble role="assistant" loading />
-              )}
             </>
           )}
         </div>

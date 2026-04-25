@@ -34,14 +34,29 @@ function client(): S3Client {
 export const storageBackend = BACKEND;
 
 /**
- * Write a file to storage. Returns the public URL prefix used by the
- * frontend (e.g. "/uploads/properties/abc.jpg") — same shape regardless
- * of backend so the database/JSON columns don't need migrating.
+ * Write a file to storage. Returns the URL the frontend will read —
+ * same shape regardless of backend so DB/JSON columns don't need
+ * migrating. Two modes:
+ *
+ *   • opts.public !== true (default): returns the relative
+ *     `/uploads/<key>` path. The backend's `/uploads/*` route then
+ *     resolves it to a presigned S3 URL on read.
+ *   • opts.public === true: PERF-016 — sets `ACL: public-read` on the
+ *     object and returns the absolute `https://<bucket>.s3.<region>
+ *     .amazonaws.com/uploads/<key>` URL so the browser can hit S3
+ *     directly (skipping the backend signing round-trip on every fetch).
+ *     Used by the property-image variant pipeline.
+ *
+ * The cache-control header is identical in both modes — `max-age=31536000,
+ * immutable` — but the public mode is the one where it actually takes
+ * effect: signed URLs change every hour so the browser cache misses
+ * anyway.
  */
 export async function putUpload(
   key: string,
   data: Buffer,
-  contentType?: string
+  contentType?: string,
+  opts?: { public?: boolean },
 ): Promise<string> {
   if (BACKEND === 's3') {
     await client().send(new PutObjectCommand({
@@ -50,7 +65,11 @@ export async function putUpload(
       Body: data,
       ContentType: contentType || 'application/octet-stream',
       CacheControl: 'public, max-age=31536000, immutable',
+      ...(opts?.public ? { ACL: 'public-read' as const } : null),
     }));
+    if (opts?.public) {
+      return `https://${BUCKET}.s3.${REGION}.amazonaws.com/uploads/${key}`;
+    }
     return `/uploads/${key}`;
   }
   const dest = path.join(LOCAL_DIR, key);
@@ -98,8 +117,44 @@ export async function deleteUpload(key: string): Promise<void> {
 
 /**
  * Strip a "/uploads/" prefix from a stored URL to get the storage key.
+ * Also handles the absolute public S3 URL form
+ * (`https://<bucket>.s3.<region>.amazonaws.com/uploads/<key>`) the new
+ * variant pipeline writes — strips the bucket host so callers like the
+ * legacy delete path keep working.
  */
 export function urlToKey(url: string): string | null {
-  if (!url || !url.startsWith('/uploads/')) return null;
-  return url.replace(/^\/uploads\//, '');
+  if (!url) return null;
+  if (url.startsWith('/uploads/')) return url.replace(/^\/uploads\//, '');
+  // Absolute public S3 URL — accept any bucket / region match against
+  // the configured one so we don't accidentally pick up cross-account
+  // links pasted into a row by hand.
+  const publicPrefix = `https://${BUCKET}.s3.${REGION}.amazonaws.com/uploads/`;
+  if (url.startsWith(publicPrefix)) return url.slice(publicPrefix.length);
+  return null;
+}
+
+/**
+ * Fetch the bytes of an existing object — used by the image-variant
+ * backfill to re-derive smaller variants from a legacy full-size row.
+ * Local mode reads from disk; S3 mode does a GetObject. Returns null if
+ * the object is missing.
+ */
+export async function getUploadBytes(key: string): Promise<Buffer | null> {
+  if (BACKEND === 's3') {
+    try {
+      const r = await client().send(new GetObjectCommand({
+        Bucket: BUCKET, Key: `uploads/${key}`,
+      }));
+      const body = r.Body as any;
+      // The SDK returns a stream; collect into a buffer.
+      const chunks: Buffer[] = [];
+      for await (const chunk of body) chunks.push(Buffer.from(chunk));
+      return Buffer.concat(chunks);
+    } catch (e: any) {
+      if (e?.$metadata?.httpStatusCode === 404 || e?.name === 'NoSuchKey') return null;
+      throw e;
+    }
+  }
+  try { return await fs.readFile(path.join(LOCAL_DIR, key)); }
+  catch (e: any) { if (e?.code === 'ENOENT') return null; throw e; }
 }

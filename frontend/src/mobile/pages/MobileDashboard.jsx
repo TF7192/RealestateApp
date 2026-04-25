@@ -90,7 +90,9 @@ export default function MobileDashboard() {
         {featured.map((p) => (
           <Link key={p.id} to={`/properties/${p.id}`} className="m-featured-card" onClick={() => haptics.tap()}>
             <div className="m-featured-img">
-              <img src={p.images[0]} alt={p.street} loading="lazy" />
+              {/* PERF-005 — featured cards are ~280 px wide so the 768 px
+                  card variant is the right one when present. */}
+              <img src={p.imageList?.[0]?.urlCard || p.imageThumbs?.[0] || p.images?.[0]} alt={p.street} loading="lazy" />
               <div className="m-featured-price">{formatPrice(p.marketingPrice)}</div>
             </div>
             <div className="m-featured-body">

@@ -1151,9 +1151,15 @@ export default function Properties() {
           columns={[
             {
               key: 'thumb', header: '', className: 'cell-thumb',
-              render: (p) => p.images?.[0]
-                ? <img src={p.images[0]} alt="" loading="lazy" decoding="async" />
-                : <div className="cell-thumb-placeholder" aria-hidden="true" />,
+              // PERF-005 — list thumbs render at 48×36 CSS px; prefer the
+              // 256 px variant when present so we don't ship a 2400 px
+              // JPEG just to paint a tiny cell.
+              render: (p) => {
+                const t = p.imageThumbs?.[0] || p.images?.[0];
+                return t
+                  ? <img src={t} alt="" loading="lazy" decoding="async" />
+                  : <div className="cell-thumb-placeholder" aria-hidden="true" />;
+              },
             },
             {
               key: 'address', header: 'כתובת', sortable: true,
@@ -1224,7 +1230,11 @@ export default function Properties() {
             const total = Object.values(actions).length || 22;
             const pct = Math.round((done / total) * 100);
             const delayClass = `animate-in-delay-${Math.min(i + 1, 5)}`;
-            const thumb = prop.images?.[0];
+            // PERF-005 — card view uses ~360 px wide images; the 768 px
+            // `imageThumbs[0]`/`imageList[0].urlCard` is plenty. We
+            // fall back to the full URL for legacy rows without the
+            // variants pipeline applied yet.
+            const thumb = prop.imageList?.[0]?.urlCard || prop.imageThumbs?.[0] || prop.images?.[0];
 
             const swipeActions = [
               {
@@ -1417,7 +1427,7 @@ export default function Properties() {
                 <Link to={`/properties/${prop.id}`} className="property-card-link" onClick={handleCardTap}>
                   <div className="property-image">
                     <img
-                      src={prop.images?.[0] || 'https://via.placeholder.com/800x450'}
+                      src={thumb || 'https://via.placeholder.com/800x450'}
                       alt={prop.street}
                       loading={isLcpCandidate ? 'eager' : 'lazy'}
                       fetchpriority={isLcpCandidate ? 'high' : undefined}

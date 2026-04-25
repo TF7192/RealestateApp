@@ -8,6 +8,7 @@ import { requireUser } from '../middleware/auth.js';
 import { tryServiceTokenAuth } from '../middleware/service-token.js';
 import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
+import { processPropertyImage } from '../lib/imageVariants.js';
 import { track as phTrack } from '../lib/analytics.js';
 import { assertAllowedMime } from '../lib/uploadGuards.js';
 import { evaluateLeadProperty } from '../lib/matching.js';
@@ -658,10 +659,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     if (!img || img.propertyId !== id) {
       return reply.code(404).send({ error: { message: 'Image not found' } });
     }
-    // Best-effort: remove the underlying file (S3 or disk) — DB row is
-    // dropped either way so a stale storage object is harmless.
-    const key = urlToKey(img.url);
-    if (key) { try { await deleteUpload(key); } catch { /* noop */ } }
+    // Best-effort: remove the underlying files (S3 or disk) — DB row
+    // is dropped either way so stale storage objects are harmless.
+    // PERF-005 — also clean up the new variants when present.
+    for (const u of [img.url, img.urlCard, img.urlThumb]) {
+      const key = u ? urlToKey(u) : null;
+      if (key) { try { await deleteUpload(key); } catch { /* noop */ } }
+    }
     await prisma.propertyImage.delete({ where: { id: imageId } });
     return { ok: true };
   });
@@ -823,11 +827,18 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Upload a property image
-  // S5: iPhones shoot HEIC by default. Browsers (Chrome, Firefox,
-  // Android WhatsApp previews) don't render HEIC, so an agent uploading
-  // straight from camera-roll ships photos their customers can't see.
-  // Detect HEIC/HEIF and transcode to JPEG before writing to S3. The
-  // rest of the pipeline never sees the HEIC.
+  // PERF-005 / PERF-016 — the upload pipeline now produces three
+  // public S3 variants (thumb/card/full) on every image instead of
+  // shipping the raw 2400 px JPEG to every list page. The thumb
+  // variant powers list cards (48×36 CSS px → 256 px source) and
+  // saves ~80% of the wire bytes vs the previous full-only column.
+  // All three variants are public-read with `Cache-Control:
+  // immutable` so the browser/CF can long-cache and skip the backend
+  // entirely on repeat fetches.
+  //
+  // S5 (HEIC): iPhones shoot HEIC by default; browsers don't render
+  // it. The variant pipeline decodes HEIC once via heic-convert and
+  // emits JPEG variants, so the rest of the app never sees it.
   app.post('/:id/images', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const property = await prisma.property.findUnique({ where: { id } });
@@ -842,47 +853,26 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     try { assertAllowedMime(file, 'image'); }
     catch { return reply.code(415).send({ error: { message: 'פורמט תמונה לא נתמך (jpg / png / webp / heic בלבד)' } }); }
 
-    let buffer = await file.toBuffer();
-    let mimetype = file.mimetype;
-    let ext = path.extname(file.filename) || '.jpg';
+    const buffer = await file.toBuffer();
 
-    const isHeic =
-      mimetype === 'image/heic' ||
-      mimetype === 'image/heif' ||
-      /\.(heic|heif)$/i.test(file.filename || '');
-
-    if (isHeic) {
-      try {
-        // heic-convert handles the container; sharp then normalizes the
-        // decoded buffer (orientation, reasonable size) and re-encodes
-        // as quality-82 JPEG (visually lossless for property photos).
-        const heicConvert = (await import('heic-convert')).default;
-        const sharp = (await import('sharp')).default;
-        const jpegIntermediate = await heicConvert({
-          buffer,
-          format: 'JPEG',
-          quality: 0.9,
-        });
-        buffer = await sharp(Buffer.from(jpegIntermediate))
-          .rotate() // honor EXIF orientation
-          .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
-          .jpeg({ quality: 82, mozjpeg: true })
-          .toBuffer();
-        mimetype = 'image/jpeg';
-        ext = '.jpg';
-      } catch (e) {
-        req.log.warn({ err: e }, 'heic conversion failed, aborting upload');
-        return reply.code(415).send({
-          error: { message: 'לא הצלחנו לעבד את התמונה. נסו לשלוח JPEG או PNG.' },
-        });
-      }
+    let variants;
+    try {
+      variants = await processPropertyImage(buffer, file.mimetype, file.filename, id);
+    } catch (e) {
+      req.log.warn({ err: e }, 'image variant processing failed');
+      return reply.code(415).send({
+        error: { message: 'לא הצלחנו לעבד את התמונה. נסו לשלוח JPEG או PNG.' },
+      });
     }
 
-    const name = `${crypto.randomUUID()}${ext}`;
-    const key = `properties/${id}/${name}`;
-    const url = await putUpload(key, buffer, mimetype);
     const image = await prisma.propertyImage.create({
-      data: { propertyId: id, url, sortOrder: 9999 },
+      data: {
+        propertyId: id,
+        url: variants.url,
+        urlCard: variants.urlCard,
+        urlThumb: variants.urlThumb,
+        sortOrder: 9999,
+      },
     });
     return { image };
   });
@@ -949,11 +939,21 @@ function serialize(prop: any, opts: { compact?: boolean } = {}) {
   }
   const out: any = {
     ...prop,
-    // Back-compat: `images` is the list of URLs (what most UI uses today).
-    // `imageList` is the full [{id, url, sortOrder}] for the photo manager.
+    // Back-compat: `images` is the list of full-size URLs (what most
+    // UI uses today). PERF-005 — `imageThumbs` is a parallel array of
+    // the small (256 px) variant URLs the FE list cards should
+    // prefer. Falls back to the full URL when a legacy row is missing
+    // a thumb. `imageList` carries every variant for the photo
+    // manager + lightbox so the detail page can pick `urlCard` for
+    // gallery thumbs and `url` for the lightbox.
     images: (prop.images || []).map((i: any) => i.url),
+    imageThumbs: (prop.images || []).map((i: any) => i.urlThumb || i.urlCard || i.url),
     imageList: (prop.images || []).map((i: any) => ({
-      id: i.id, url: i.url, sortOrder: i.sortOrder,
+      id: i.id,
+      url: i.url,
+      urlCard: i.urlCard ?? null,
+      urlThumb: i.urlThumb ?? null,
+      sortOrder: i.sortOrder,
     })),
     videos: prop.videos || [],
     marketingActions: actionsMap,
