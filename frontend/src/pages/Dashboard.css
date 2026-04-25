@@ -524,6 +524,7 @@
     gap: 10px;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
+    scroll-padding: 8px;
     padding: 4px 4px 8px;
     margin-bottom: 6px;
     -webkit-overflow-scrolling: touch;
@@ -618,7 +619,7 @@
   }
 
   .stat-label {
-    font-size: 11px;
+    font-size: 13px;
   }
 
   .stat-sub {

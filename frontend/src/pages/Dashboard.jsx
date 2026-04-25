@@ -223,6 +223,7 @@ export default function Dashboard() {
             letterSpacing: isMobile ? -0.5 : -0.8,
             margin: '4px 0 0',
             overflow: 'hidden', textOverflow: 'ellipsis',
+            wordBreak: 'break-word',
           }}>
             {greeting} {firstName} {greetingEmoji}
           </h1>

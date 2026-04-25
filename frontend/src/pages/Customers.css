@@ -283,7 +283,7 @@
   background: var(--success-bg);
   color: var(--success);
   font-size: 11px;
-  margin-right: 6px;
+  margin-inline-end: 6px;
 }
 
 .customer-notes {

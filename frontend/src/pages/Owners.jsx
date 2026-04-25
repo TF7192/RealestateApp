@@ -192,6 +192,7 @@ export default function Owners() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="חיפוש שם / טלפון / אימייל…"
+            aria-label="חפש בעלי נכסים"
             style={{
               ...FONT, padding: '8px 30px 8px 12px',
               border: `1px solid ${DT.border}`, borderRadius: 99,

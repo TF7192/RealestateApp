@@ -31,6 +31,7 @@ import { relLabel } from '../lib/relativeDate';
 import {
   inputPropsForName,
   inputPropsForCity,
+  inputPropsForEmail,
 } from '../lib/inputProps';
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
 // VoiceCaptureButton removed — feature hidden until voice-to-lead
@@ -1054,8 +1055,8 @@ export default function NewProperty() {
             )}
           </span>
           <div className="draft-banner-actions" style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft} style={NP_STY.secondaryBtn}>שחזר</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft} style={NP_STY.ghostBtn}>מחק</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft} style={{ ...NP_STY.secondaryBtn, minHeight: 44 }}>שחזר</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft} style={{ ...NP_STY.ghostBtn, minHeight: 44 }}>מחק</button>
           </div>
         </div>
       )}
@@ -1304,19 +1305,11 @@ export default function NewProperty() {
               <div className="form-group">
                 <label className="form-label">אימייל (אופציונלי)</label>
                 <input
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  enterKeyHint="next"
+                  {...inputPropsForEmail()}
                   className="form-input"
                   value={form.ownerEmail || ''}
                   onChange={(e) => update('ownerEmail', e.target.value)}
                   placeholder="owner@example.com"
-                  dir="ltr"
-                  style={{ textAlign: 'right' }}
                 />
               </div>
             </div>
@@ -1698,6 +1691,7 @@ export default function NewProperty() {
                   value={form.listingSource}
                   onChange={(e) => update('listingSource', e.target.value)}
                   placeholder="yad2 / referral / onmap"
+                  enterKeyHint="done"
                 />
               </div>
             </div>
@@ -1821,8 +1815,8 @@ export default function NewProperty() {
             <h3 className="form-section-title">בלעדיות והערות</h3>
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">תחילת בלעדיות</label>
-                <input type="date" className="form-input" value={form.exclusiveStart} onChange={(e) => update('exclusiveStart', e.target.value)} />
+                <label className="form-label" htmlFor="np-exclusive-start">תחילת בלעדיות</label>
+                <input id="np-exclusive-start" type="date" className="form-input" value={form.exclusiveStart} onChange={(e) => update('exclusiveStart', e.target.value)} />
                 <DateQuickChips
                   value={form.exclusiveStart}
                   onChange={(v) => update('exclusiveStart', v)}
@@ -1830,8 +1824,8 @@ export default function NewProperty() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">סיום בלעדיות</label>
-                <input type="date" className="form-input" value={form.exclusiveEnd} onChange={(e) => update('exclusiveEnd', e.target.value)} />
+                <label className="form-label" htmlFor="np-exclusive-end">סיום בלעדיות</label>
+                <input id="np-exclusive-end" type="date" className="form-input" value={form.exclusiveEnd} onChange={(e) => update('exclusiveEnd', e.target.value)} />
                 {/* 1.6 — chips now compute relative to exclusiveStart
                     (was: relative to today — produced incorrect end
                     dates whenever the start wasn't today). */}
@@ -1879,9 +1873,12 @@ export default function NewProperty() {
               onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); }}
             >
               <Upload size={28} />
-              <p>גרור תמונות או לחץ להעלאה</p>
-              <span>אפשר להעלות מספר קבצים</span>
+              <label htmlFor="np-photo-upload" style={{ cursor: 'pointer', margin: 0 }}>
+                <p>גרור תמונות או לחץ להעלאה</p>
+                <span>אפשר להעלות מספר קבצים</span>
+              </label>
               <input
+                id="np-photo-upload"
                 ref={fileInput}
                 type="file"
                 accept="image/*"

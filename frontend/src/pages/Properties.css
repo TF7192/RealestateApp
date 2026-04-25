@@ -95,7 +95,7 @@
   border-radius: 50%;
   background: var(--gold);
   display: inline-block;
-  margin-right: 2px;
+  margin-inline-end: 2px;
 }
 
 /* UX review F-7.2 — top-level "clear all" pill next to the filter
@@ -411,10 +411,12 @@
 
 /* WhatsApp quick-send button on each card */
 .property-wa-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 10px 16px;
   border: none;
   border-top: 1px solid var(--border);
@@ -605,6 +607,10 @@
     opacity: 1; /* always visible on mobile for the richer desktop card */
   }
 
+  .pc-compact-price {
+    font-size: 16px;
+  }
+
   /* Expand advanced-filter panel to full width on phone */
   .agent-filters-grid {
     grid-template-columns: 1fr 1fr !important;
@@ -781,7 +787,7 @@
   cursor: pointer;
   text-decoration: none;
   font-family: var(--font-body);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: -0.05px;
   line-height: 1;
