@@ -6,6 +6,7 @@ import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import { requireUser } from '../middleware/auth.js';
 import { putUpload } from '../lib/storage.js';
+import { assertAllowedMime } from '../lib/uploadGuards.js';
 
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAuth] }, async (req, reply) => {
@@ -163,9 +164,12 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
     const uid = requireUser(req).id;
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: { message: 'No file' } });
-    if (!file.mimetype.startsWith('image/')) {
-      return reply.code(400).send({ error: { message: 'Only image files allowed' } });
-    }
+    // SEC-007 — was `mimetype.startsWith('image/')` which let
+    // image/svg+xml through; SVG served same-origin can run script in
+    // the agent's auth context. Switch to the existing whitelist
+    // helper (jpg / png / webp / heic / heif), same as property images.
+    try { assertAllowedMime(file, 'image'); }
+    catch { return reply.code(415).send({ error: { message: 'פורמט תמונה לא נתמך (jpg / png / webp / heic בלבד)' } }); }
     const ext = path.extname(file.filename) || '.png';
     const name = `${crypto.randomUUID()}${ext}`;
     const key = `avatars/${uid}/${name}`;

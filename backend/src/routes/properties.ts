@@ -699,9 +699,17 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // ─── Videos ───────────────────────────────────────────────
-  // List videos for a property (public so customer view can watch them)
-  app.get('/:id/videos', async (req) => {
+  // SEC-009 — List videos for a property. Was registered with no
+  // auth + no ownership check, leaking the video list for any property
+  // by id. The public share page (/api/public/agents/:slug/properties/
+  // :propSlug) already returns videos, so this agent-side route is
+  // safe to gate behind requireAgent + an ownership check.
+  app.get('/:id/videos', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
+    const property = await prisma.property.findFirst({
+      where: { id, agentId: requireUser(req).id },
+    });
+    if (!property) return reply.code(404).send({ error: { message: 'Not found' } });
     const videos = await prisma.propertyVideo.findMany({
       where: { propertyId: id },
       orderBy: { sortOrder: 'asc' },
