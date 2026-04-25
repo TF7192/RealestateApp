@@ -1128,79 +1128,69 @@ ${compsText || '(אין נכסים להשוואה)'}
   //   data: {"type":"tool_result","name":"list_leads"}
   //   data: {"type":"done"}
   //   data: {"type":"error","message":"..."}
-  app.post(
-    '/chat/stream',
-    {
-      onRequest: [app.requireAgent, requirePremium({ feature: 'Estia AI' })],
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
-    },
-    async (req, reply) => {
+  // ── WebSocket — `/api/ai/chat/ws` ───────────────────────────────
+  //
+  // Replaces the SSE `/chat/stream` route. SSE behind Cloudflare's
+  // free tier was unworkable: the edge buffers small responses and
+  // gzip-rebuffers everything else, so each Anthropic delta arrived
+  // in batches even with no-transform / X-Accel-Buffering / 8 KB
+  // comment-line padding. WebSockets tunnel as raw TCP through CF
+  // (Upgrade: websocket bypasses the buffering layer entirely), so
+  // each delta hits the browser as it's emitted upstream.
+  //
+  // Wire format (one JSON frame per `socket.send`):
+  //   { type: "text",        delta: "..."                  }
+  //   { type: "tool_use",    name: "list_leads", input: {} }
+  //   { type: "tool_result", name: "list_leads"            }
+  //   { type: "done"                                       }
+  //   { type: "error",       message: "..."                }
+  //
+  // Auth: same JWT cookie the REST routes use. Premium check runs
+  // inside the handler since `requirePremium` can't easily gate the
+  // WS upgrade itself (the body isn't sent in the handshake).
+  app.get(
+    '/chat/ws',
+    { websocket: true, onRequest: [app.requireAgent] },
+    async (socket, req) => {
       const user = requireUser(req);
-      const { messages } = chatBody.parse(req.body);
+
+      // Premium gate — same Hebrew envelope the REST routes use, just
+      // delivered as a WS frame + a 1008 ("Policy Violation") close.
+      const u = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { isPremium: true },
+      });
+      if (!u?.isPremium) {
+        try {
+          socket.send(JSON.stringify({
+            type: 'error',
+            code: 'PREMIUM_REQUIRED',
+            message: 'Estia AI דורש מנוי פרימיום',
+          }));
+          socket.close(1008, 'premium required');
+        } catch { /* socket already gone */ }
+        return;
+      }
 
       const client = buildAnthropic();
       if (!client) {
-        return reply.code(503).send({
-          error: {
-            message: 'שירות ה-AI לא מוגדר — חסר מפתח ANTHROPIC_API_KEY',
+        try {
+          socket.send(JSON.stringify({
+            type: 'error',
             code: 'ai_not_configured',
-          },
-        });
+            message: 'שירות ה-AI לא מוגדר — חסר מפתח ANTHROPIC_API_KEY',
+          }));
+          socket.close(1011, 'not configured');
+        } catch { /* socket already gone */ }
+        return;
       }
-
-      // SSE handshake. We bypass Fastify's response serializer
-      // (`reply.raw`) because we're going to stream events ourselves;
-      // calling reply.send() afterwards would trigger
-      // ERR_HTTP_HEADERS_SENT.
-      reply.raw.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        // `no-transform` tells Cloudflare/any intermediary NOT to
-        // gzip-buffer the body. Cloudflare on free tier holds the
-        // entire response until it has enough bytes for compression
-        // unless we opt out via this header.
-        'Cache-Control': 'no-store, no-transform',
-        'Connection': 'keep-alive',
-        // X-Accel-Buffering: no — disable nginx response buffering
-        // for SSE so each event flushes to the client as it's
-        // written. nginx.conf already has `proxy_buffering off`
-        // under /api/, but this header is the belt-and-braces.
-        'X-Accel-Buffering': 'no',
-        // Explicitly identity to prevent any layer from re-compressing
-        // — Cloudflare in particular re-encodes responses when both
-        // sides advertise gzip support, which buffers the whole body
-        // until the encoder has enough data to flush.
-        'Content-Encoding': 'identity',
-      });
-      reply.hijack();
-
-      // Cloudflare's free-tier edge holds onto the first ~4-8 KB of
-      // any response before flushing to the client (true even with
-      // `no-transform`). Send an SSE comment line large enough to
-      // overflow that edge buffer immediately so subsequent token
-      // deltas flush in real time. SSE comments start with ":" and
-      // are ignored by every spec-compliant client; the FE parser
-      // only emits `data:` events.
-      try {
-        reply.raw.write(`: ${' '.repeat(8192)}\n\n`);
-        // Force a Node TCP flush — Nagle's algorithm can otherwise
-        // hold small writes for ~40 ms.
-        if (typeof (reply.raw as any).flushHeaders === 'function') {
-          (reply.raw as any).flushHeaders();
-        }
-      } catch { /* client gone already */ }
 
       const send = (event: Record<string, unknown>) => {
         try {
-          reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-          // Disable Nagle on the underlying TCP socket so each
-          // delta is pushed immediately. Without this, small writes
-          // queue ~40 ms in the kernel and Cloudflare receives them
-          // in batches. setNoDelay is idempotent — safe to call
-          // every event.
-          (reply.raw.socket as any)?.setNoDelay?.(true);
-        } catch {
-          // Client disconnected mid-stream — swallow the EPIPE.
-        }
+          if (socket.readyState === socket.OPEN) {
+            socket.send(JSON.stringify(event));
+          }
+        } catch { /* socket gone */ }
       };
 
       // Same SYSTEM prompt as /chat (verbatim — kept duplicated for
@@ -1241,9 +1231,6 @@ ${compsText || '(אין נכסים להשוואה)'}
       type AssistantMsg = { role: 'assistant'; content: ContentBlock[] };
       type UserMsg = { role: 'user'; content: string | Array<{ type: 'tool_result'; tool_use_id: string; content: string }> };
 
-      const convo: Array<AssistantMsg | UserMsg> =
-        messages.map((m) => ({ role: m.role, content: m.content } as any));
-
       const systemCached = [
         { type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } },
       ];
@@ -1253,116 +1240,141 @@ ${compsText || '(אין נכסים להשוואה)'}
           : t
       ));
 
-      // Forward a client abort (browser closed the tab, navigated
-      // away, etc.) into the active stream. Without this the
-      // Anthropic request keeps running on our dime even though no
-      // one's listening.
-      //
-      // CRITICAL: subscribe to `reply.raw` (the response stream), not
-      // `req.raw`. Node emits 'close' on the *request* stream as soon
-      // as the request body has been consumed — for a hijacked SSE
-      // reply that fires within milliseconds of entering the handler,
-      // which used to abort the Anthropic upstream before we'd even
-      // sent the first chunk back to the client. The response stream's
-      // 'close' event only fires when the client really hangs up.
+      // Forward a client disconnect into the active stream so the
+      // Anthropic request stops billing once the agent closes the
+      // chat tab.
       let activeStream: ReturnType<typeof client.messages.stream> | null = null;
-      const onClientAbort = () => {
+      let active = true;
+      const teardown = () => {
+        if (!active) return;
+        active = false;
         try { activeStream?.abort(); } catch { /* noop */ }
       };
-      reply.raw.on('close', onClientAbort);
+      socket.on('close', teardown);
+      socket.on('error', teardown);
 
-      try {
-        for (let iter = 0; iter < 6; iter += 1) {
-          const stream = client.messages.stream({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 1024,
-            system: systemCached as any,
-            tools: toolsCached as any,
-            messages: convo as any,
-          });
-          activeStream = stream;
+      // The client's first WebSocket message carries the chat
+      // payload: `{ messages: [{role, content}, ...] }`. Process it
+      // once and run the tool-use loop until end_turn — same shape
+      // the SSE route used. We deliberately accept only one prompt
+      // per socket so back-pressure / abort semantics stay simple;
+      // the FE opens a fresh socket per turn.
+      let started = false;
+      socket.on('message', async (raw) => {
+        if (!active) return;
+        if (started) return; // ignore extra frames
+        started = true;
 
-          // Forward each text delta as soon as it arrives. The first
-          // delta is what time-to-first-character measures —
-          // typically <800 ms once Anthropic has the prompt cache.
-          stream.on('text', (delta) => {
-            send({ type: 'text', delta });
-          });
-
-          // `finalMessage()` resolves once the stream end_turn / tool_use
-          // event has fired and the assistant blocks are assembled.
-          let finalMsg;
-          try {
-            finalMsg = await stream.finalMessage();
-          } catch (e: any) {
-            req.log.error({ err: e }, 'ai chat stream upstream error');
-            send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
-            return;
-          }
-
-          recordAnthropic({
-            userId: user.id,
-            feature: 'chat',
-            model: 'claude-sonnet-4-6',
-            usage: finalMsg.usage as any,
-          });
-
-          const assistantBlocks = finalMsg.content as ContentBlock[];
-          convo.push({ role: 'assistant', content: assistantBlocks });
-
-          if (finalMsg.stop_reason !== 'tool_use') {
-            // end_turn, max_tokens, stop_sequence, refusal — all
-            // mean "this turn is done"; no more loop iterations.
-            send({ type: 'done' });
-            return;
-          }
-
-          // Tool turn — surface every tool_use block so the FE can
-          // (optionally) show "Running tool…" affordances. We then
-          // execute every tool in parallel and feed the results back
-          // into the next stream iteration.
-          const toolUses = assistantBlocks.filter(
-            (b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use',
-          );
-          for (const tu of toolUses) {
-            send({ type: 'tool_use', name: tu.name, input: tu.input || {} });
-          }
-
-          const results = await Promise.all(
-            toolUses.map(async (tu) => {
-              try {
-                const out = await runChatTool(tu.name, tu.input || {}, { agentId: user.id });
-                send({ type: 'tool_result', name: tu.name });
-                return {
-                  type: 'tool_result' as const,
-                  tool_use_id: tu.id,
-                  content: JSON.stringify(out),
-                };
-              } catch (e: any) {
-                req.log.warn({ err: e, tool: tu.name }, 'chat tool failed');
-                send({ type: 'tool_result', name: tu.name, error: e?.message || 'tool failed' });
-                return {
-                  type: 'tool_result' as const,
-                  tool_use_id: tu.id,
-                  content: JSON.stringify({ error: e?.message || 'tool failed' }),
-                };
-              }
-            }),
-          );
-          convo.push({ role: 'user', content: results });
+        let payload: any;
+        try {
+          payload = JSON.parse(raw.toString());
+        } catch {
+          send({ type: 'error', message: 'הודעה לא תקינה' });
+          try { socket.close(1003, 'bad payload'); } catch { /* noop */ }
+          return;
         }
 
-        // 6-iteration cap — at this point the model is in a tool-use
-        // loop without making progress. Fall back to a polite punt.
-        send({ type: 'text', delta: 'לא הצלחתי להרכיב תשובה. נסו/י לנסח את השאלה שוב.' });
-        send({ type: 'done' });
-      } catch (e: any) {
-        req.log.error({ err: e }, 'ai chat stream fatal');
-        send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
-      } finally {
-        req.raw.off('close', onClientAbort);
-        try { reply.raw.end(); } catch { /* noop */ }
-      }
+        const parsed = chatBody.safeParse(payload);
+        if (!parsed.success) {
+          send({ type: 'error', message: 'מבנה הודעה לא נתמך' });
+          try { socket.close(1003, 'invalid messages'); } catch { /* noop */ }
+          return;
+        }
+
+        const convo: Array<AssistantMsg | UserMsg> =
+          parsed.data.messages.map((m) => ({ role: m.role, content: m.content } as any));
+
+        try {
+          for (let iter = 0; iter < 6; iter += 1) {
+            if (!active) return;
+            const stream = client.messages.stream({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 1024,
+              system: systemCached as any,
+              tools: toolsCached as any,
+              messages: convo as any,
+            });
+            activeStream = stream;
+
+            // Forward each text delta as soon as it arrives. WebSocket
+            // frames hit the browser without CF buffering — no padding
+            // tricks needed.
+            stream.on('text', (delta) => {
+              send({ type: 'text', delta });
+            });
+
+            let finalMsg;
+            try {
+              finalMsg = await stream.finalMessage();
+            } catch (e: any) {
+              req.log.error({ err: e }, 'ai chat ws upstream error');
+              send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
+              try { socket.close(1011, 'upstream'); } catch { /* noop */ }
+              return;
+            }
+
+            recordAnthropic({
+              userId: user.id,
+              feature: 'chat',
+              model: 'claude-sonnet-4-6',
+              usage: finalMsg.usage as any,
+            });
+
+            const assistantBlocks = finalMsg.content as ContentBlock[];
+            convo.push({ role: 'assistant', content: assistantBlocks });
+
+            if (finalMsg.stop_reason !== 'tool_use') {
+              send({ type: 'done' });
+              try { socket.close(1000, 'done'); } catch { /* noop */ }
+              return;
+            }
+
+            const toolUses = assistantBlocks.filter(
+              (b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use',
+            );
+            for (const tu of toolUses) {
+              send({ type: 'tool_use', name: tu.name, input: tu.input || {} });
+            }
+
+            const results = await Promise.all(
+              toolUses.map(async (tu) => {
+                try {
+                  const out = await runChatTool(tu.name, tu.input || {}, { agentId: user.id });
+                  send({ type: 'tool_result', name: tu.name });
+                  return {
+                    type: 'tool_result' as const,
+                    tool_use_id: tu.id,
+                    content: JSON.stringify(out),
+                  };
+                } catch (e: any) {
+                  req.log.warn({ err: e, tool: tu.name }, 'chat tool failed');
+                  send({ type: 'tool_result', name: tu.name, error: e?.message || 'tool failed' });
+                  return {
+                    type: 'tool_result' as const,
+                    tool_use_id: tu.id,
+                    content: JSON.stringify({ error: e?.message || 'tool failed' }),
+                  };
+                }
+              }),
+            );
+            convo.push({ role: 'user', content: results });
+          }
+
+          // 6-iteration cap — model is looping on tools without
+          // making progress. Polite punt + close.
+          send({ type: 'text', delta: 'לא הצלחתי להרכיב תשובה. נסו/י לנסח את השאלה שוב.' });
+          send({ type: 'done' });
+          try { socket.close(1000, 'cap'); } catch { /* noop */ }
+        } catch (e: any) {
+          req.log.error({ err: e }, 'ai chat ws fatal');
+          send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
+          try { socket.close(1011, 'fatal'); } catch { /* noop */ }
+        }
+      });
+
+      // Greeting frame — same pattern the support-chat WS uses. Lets
+      // the FE log "connected" before the user sends their prompt.
+      send({ type: 'hello' });
     }
   );
 };

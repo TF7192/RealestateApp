@@ -908,104 +908,103 @@ export const api = {
       retries: 1,
     }),
 
-  // PERF-012 — streaming AI chat. Server emits SSE frames; we parse
-  // them off `response.body.getReader()` and call back per event:
+  // PERF-012 — streaming AI chat over WebSocket. Replaces the SSE
+  // route because Cloudflare's free-tier edge buffers small responses
+  // and gzip-rebuffers everything else; deltas arrived in batches
+  // even with no-transform / X-Accel-Buffering / 8 KB padding.
+  // WebSockets tunnel as raw TCP through CF (Upgrade: websocket
+  // bypasses the buffering layer entirely), so each delta hits the
+  // browser as it's emitted upstream.
+  //
+  // Same handler interface as the old SSE function so callers in
+  // `Ai.jsx` / `AiChatWidget.jsx` don't need to change:
   //
   //   • onText(delta)           — chunk of assistant text
   //   • onToolUse({name,input}) — assistant requested a tool call
   //   • onToolResult({name})    — server finished the tool call
   //   • onDone()                — end_turn reached
-  //   • onError(message)        — server-side error
+  //   • onError(message, code)  — server-side error (PREMIUM_REQUIRED, …)
   //
-  // Returns an object with `.cancel()` so the caller can abort
-  // mid-stream (e.g. when the chat panel closes). The handlers are
-  // best-effort: a thrown error inside one of them is swallowed so a
-  // single render-time bug can't kill the rest of the stream.
+  // Returns `{ promise, cancel }`. `cancel()` closes the socket so
+  // the server-side abort handler stops the in-flight Anthropic call.
   aiChatStream: (messages, handlers = {}) => {
-    const controller = new AbortController();
-    const url = `${BASE}/ai/chat/stream`;
-    const phId = posthogDistinctId();
+    // Build the wss:// URL from window.location so we inherit the
+    // current TLS posture (estia.co.il → wss). Dev: vite proxies
+    // /api/* including upgrade headers per the existing /chat/ws
+    // route, so the relative /api path works there too.
+    const wsProto = (typeof window !== 'undefined' && window.location.protocol === 'https:')
+      ? 'wss' : 'ws';
+    const host = (typeof window !== 'undefined') ? window.location.host : '';
+    const url = `${wsProto}://${host}${BASE}/ai/chat/ws`;
 
-    const promise = (async () => {
-      let res;
-      try {
-        res = await fetch(url, {
-          method: 'POST',
-          credentials: 'include',
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'text/event-stream',
-            'X-Estia-Platform': platformHeader(),
-            ...(phId ? { 'X-PostHog-Distinct-Id': phId } : null),
-          },
-          body: JSON.stringify({ messages }),
-        });
-      } catch (e) {
-        // Network error / aborted before fetch completed.
-        if (e?.name === 'AbortError') return;
+    let socket;
+    let resolveDone;
+    const promise = new Promise((r) => { resolveDone = r; });
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      resolveDone();
+    };
+
+    try {
+      socket = new WebSocket(url);
+    } catch {
+      handlers.onError?.(hebrewFallbackMessage(0));
+      finish();
+      return { promise, cancel: () => {} };
+    }
+
+    socket.addEventListener('open', () => {
+      try { socket.send(JSON.stringify({ messages })); }
+      catch {
         handlers.onError?.(hebrewFallbackMessage(0));
-        return;
+        try { socket.close(); } catch { /* noop */ }
       }
-      if (!res.ok) {
-        // Mirror the JSON error envelope the rest of the API uses so
-        // the FE can show a Hebrew fallback. 503 → key missing; 401 →
-        // bounce; everything else → generic.
-        if (res.status === 401) {
-          broadcastUnauthorized();
-          return;
-        }
-        let body = null;
-        try { body = await res.json(); } catch { /* noop */ }
-        const msg = body?.error?.message || hebrewFallbackMessage(res.status);
-        handlers.onError?.(msg, body?.error?.code);
-        return;
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) {
-        handlers.onError?.('הזרם לא זמין');
-        return;
-      }
-      const decoder = new TextDecoder('utf-8');
-      let buf = '';
+    });
+    socket.addEventListener('message', (e) => {
+      let evt;
+      try { evt = JSON.parse(typeof e.data === 'string' ? e.data : ''); }
+      catch { return; }
       try {
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          // SSE frames are separated by blank lines. Each frame is
-          // one or more `data: <json>` lines; we only emit `data:`
-          // events here, so newline-handling stays simple.
-          let sep;
-          while ((sep = buf.indexOf('\n\n')) >= 0) {
-            const frame = buf.slice(0, sep);
-            buf = buf.slice(sep + 2);
-            const dataLine = frame.split('\n').find((l) => l.startsWith('data:'));
-            if (!dataLine) continue;
-            const json = dataLine.slice(5).trim();
-            if (!json) continue;
-            let evt;
-            try { evt = JSON.parse(json); } catch { continue; }
+        if (evt.type === 'hello') return; // greeting — no-op
+        if (evt.type === 'text') handlers.onText?.(evt.delta || '');
+        else if (evt.type === 'tool_use') handlers.onToolUse?.({ name: evt.name, input: evt.input });
+        else if (evt.type === 'tool_result') handlers.onToolResult?.({ name: evt.name, error: evt.error });
+        else if (evt.type === 'done') handlers.onDone?.();
+        else if (evt.type === 'error') {
+          if (evt.code === 'PREMIUM_REQUIRED') {
             try {
-              if (evt.type === 'text') handlers.onText?.(evt.delta || '');
-              else if (evt.type === 'tool_use') handlers.onToolUse?.({ name: evt.name, input: evt.input });
-              else if (evt.type === 'tool_result') handlers.onToolResult?.({ name: evt.name, error: evt.error });
-              else if (evt.type === 'done') handlers.onDone?.();
-              else if (evt.type === 'error') handlers.onError?.(evt.message);
-            } catch { /* swallow handler errors */ }
+              window.dispatchEvent(new CustomEvent('estia:premium-gate', {
+                detail: { feature: 'Estia AI' },
+              }));
+            } catch { /* non-browser env */ }
           }
+          handlers.onError?.(evt.message || hebrewFallbackMessage(0), evt.code);
         }
-      } catch (e) {
-        if (e?.name !== 'AbortError') {
-          handlers.onError?.(hebrewFallbackMessage(0));
-        }
+      } catch { /* swallow handler errors */ }
+    });
+    socket.addEventListener('close', (e) => {
+      // 1008 = policy (premium gate); 1011 = server error; 1000 = ok.
+      // The error frames already fired onError above for both 1008
+      // and 1011 paths; this only catches an abnormal close before
+      // any frame arrived (e.g. nginx 401 on the upgrade).
+      if (e.code !== 1000 && e.code !== 1005) {
+        if (e.code === 1006) handlers.onError?.(hebrewFallbackMessage(0));
       }
-    })();
+      finish();
+    });
+    socket.addEventListener('error', () => {
+      // The browser fires `error` then `close`; we let `close`
+      // resolve the promise so we don't double-emit.
+    });
 
     return {
       promise,
-      cancel: () => { try { controller.abort(); } catch { /* noop */ } },
+      cancel: () => {
+        try { socket.close(1000, 'cancel'); } catch { /* noop */ }
+        finish();
+      },
     };
   },
 
