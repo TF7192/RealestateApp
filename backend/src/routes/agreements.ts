@@ -17,11 +17,58 @@ const sendSchema = z.object({
   note: z.string().max(500).nullable().optional(),
 });
 
+// SEC-002 — Agreement has no denormalized agentId; ownership is derived
+// through lead.agentId OR property.agentId. Resolve the row + verify
+// ownership in one query so cross-agent reads/writes are blocked.
+// Returns null when missing OR not owned (caller treats both as 404 so
+// existence isn't leaked). Detail handlers that need the file/property/
+// lead includes do a second fetch after the ownership check passes.
+async function findOwnedAgreement(id: string, agentId: string) {
+  const ag = await prisma.agreement.findUnique({
+    where: { id },
+    include: {
+      lead: { select: { agentId: true } },
+      property: { select: { agentId: true } },
+    },
+  });
+  if (!ag) return null;
+  const ownerId = ag.lead?.agentId ?? ag.property?.agentId ?? null;
+  if (ownerId !== agentId) return null;
+  return ag;
+}
+
 export const registerAgreementRoutes: FastifyPluginAsync = async (app) => {
   // "Send agreement for digital signature"  — stubbed: records the request.
   // In production this would call DocuSign/Signwell; here we just mark it SENT.
-  app.post('/send', { onRequest: [app.requireAgent] }, async (req) => {
+  app.post('/send', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const body = sendSchema.parse(req.body);
+    const u = requireUser(req);
+
+    // SEC-002 — must reference a lead OR property the caller owns. The
+    // original handler accepted naked rows pointing at any leadId /
+    // propertyId in the DB. We verify ownership via findFirst with an
+    // agentId filter. Reject when neither is supplied — without an
+    // ownership anchor there's no way to scope the row later.
+    if (!body.leadId && !body.propertyId) {
+      return reply.code(400).send({
+        error: { message: 'Either leadId or propertyId is required' },
+      });
+    }
+    if (body.leadId) {
+      const lead = await prisma.lead.findFirst({
+        where: { id: body.leadId, agentId: u.id },
+        select: { id: true },
+      });
+      if (!lead) return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    if (body.propertyId) {
+      const property = await prisma.property.findFirst({
+        where: { id: body.propertyId, agentId: u.id },
+        select: { id: true },
+      });
+      if (!property) return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+
     const agreement = await prisma.agreement.create({
       data: {
         leadId: body.leadId ?? null,
@@ -37,10 +84,21 @@ export const registerAgreementRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
+    const u = requireUser(req);
     const q = req.query as any;
-    const where: any = {};
-    if (q.leadId) where.leadId = q.leadId;
-    if (q.propertyId) where.propertyId = q.propertyId;
+    // SEC-002 — scope every row by lead.agentId OR property.agentId.
+    // Optional leadId / propertyId query filters narrow the result set
+    // further; the AND[] keeps the Prisma OR-on-joins intact.
+    const where: any = {
+      OR: [
+        { lead: { agentId: u.id } },
+        { property: { agentId: u.id } },
+      ],
+    };
+    const ands: any[] = [];
+    if (q.leadId) ands.push({ leadId: q.leadId });
+    if (q.propertyId) ands.push({ propertyId: q.propertyId });
+    if (ands.length) where.AND = ands;
     const items = await prisma.agreement.findMany({
       where,
       include: { file: true },
@@ -52,8 +110,8 @@ export const registerAgreementRoutes: FastifyPluginAsync = async (app) => {
   // Upload the signed file (PDF) — gets attached to the agreement.
   app.post('/:id/upload', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const agreement = await prisma.agreement.findUnique({ where: { id } });
-    if (!agreement) return reply.code(404).send({ error: { message: 'Not found' } });
+    const owned = await findOwnedAgreement(id, requireUser(req).id);
+    if (!owned) return reply.code(404).send({ error: { message: 'Not found' } });
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: { message: 'No file' } });
     const ext = path.extname(file.filename) || '.pdf';
@@ -90,6 +148,13 @@ export const registerAgreementRoutes: FastifyPluginAsync = async (app) => {
   // Disposition: attachment` so browsers trigger a save.
   app.get('/:id/pdf', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
+    // SEC-002 — gate on ownership first (cheap join), then re-fetch with
+    // the richer includes the PDF renderer needs. Keeps the helper
+    // shape small and shared with /:id/upload.
+    const owned = await findOwnedAgreement(id, requireUser(req).id);
+    if (!owned) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
     const agreement = await prisma.agreement.findUnique({
       where: { id },
       include: {
