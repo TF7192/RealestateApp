@@ -506,7 +506,6 @@ function PropertyTable({ rows, navigate }) {
           }}>
             <Th>נכס</Th>
             <Th align="center">צפיות 30 יום</Th>
-            <Th align="center">מגמה 14 ימים</Th>
             <Th align="center">פניות 30 יום</Th>
             <Th align="center">הסכמים</Th>
             <Th align="center">המרה</Th>
@@ -565,11 +564,6 @@ function TableRow({ r, navigate }) {
         </span>
       </Td>
       <Td align="center">{displayNumber(r.views30d ?? 0)}</Td>
-      <Td align="center">
-        <span style={{ display: 'inline-flex' }}>
-          <Sparkline values={r.viewsTrend || []} />
-        </span>
-      </Td>
       <Td align="center">{displayNumber(r.inquiries30d ?? 0)}</Td>
       <Td align="center">{displayNumber(r.agreementsSigned ?? 0)}</Td>
       <Td align="center">

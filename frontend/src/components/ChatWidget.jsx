@@ -3,7 +3,6 @@ import { MessageCircle, X, Send } from 'lucide-react';
 import Portal from './Portal';
 import { useChat } from '../hooks/chat';
 import { useAuth } from '../lib/auth';
-import { useViewportMobile } from '../hooks/mobile';
 import { relativeTime } from '../lib/time';
 import useFocusTrap from '../hooks/useFocusTrap';
 import './ChatWidget.css';
@@ -16,7 +15,6 @@ const ADMIN_EMAILS = new Set([
 
 export default function ChatWidget() {
   const { user } = useAuth();
-  const isMobile = useViewportMobile(820);
   const [open, setOpen] = useState(false);
   const { messages, loading, unread, send, markRead } = useChat({ autoLoad: !!user });
   const [draft, setDraft] = useState('');
@@ -38,10 +36,24 @@ export default function ChatWidget() {
   // Task 1 · the mobile header's chat button dispatches this event since
   // the standalone .chatw-btn is hidden on mobile (it used to overlap
   // the profile pill in the header).
+  // 2026-04-25 — also listens to `estia:close-chat` from the AI chat
+  // widget so opening AI chat auto-closes this one (they share a
+  // fixed-position panel anchor; only one should ever be visible).
   useEffect(() => {
-    const onOpen = () => setOpen((o) => !o);
+    const onOpen = () => {
+      setOpen((o) => {
+        const next = !o;
+        if (next) window.dispatchEvent(new Event('estia:close-ai-chat'));
+        return next;
+      });
+    };
+    const onForceClose = () => setOpen(false);
     window.addEventListener('estia:open-chat', onOpen);
-    return () => window.removeEventListener('estia:open-chat', onOpen);
+    window.addEventListener('estia:close-chat', onForceClose);
+    return () => {
+      window.removeEventListener('estia:open-chat', onOpen);
+      window.removeEventListener('estia:close-chat', onForceClose);
+    };
   }, []);
 
   // Hide for logged-out users and admins (admins use /admin/chats).

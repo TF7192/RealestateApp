@@ -496,9 +496,10 @@ function SidebarInner({
         )}
       </nav>
 
-      {/* Upgrade card — hidden when collapsed AND hidden for agents
-          who are already premium (no point nagging a paying user). */}
-      {!collapsed && !user?.isPremium && (
+      {/* Upgrade card — hidden when collapsed, when the user is
+          already premium, or when they're the platform admin (the
+          admin user shouldn't see CTAs aimed at agents). */}
+      {!collapsed && !user?.isPremium && !isAdmin && (
         <div style={{ padding: '10px 12px' }}>
           <div style={{
             background: `linear-gradient(160deg, rgba(180,139,76,0.28), rgba(180,139,76,0.12))`,
@@ -841,7 +842,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
                 fontSize: 12, fontWeight: 800,
               }}
             >
-              <Sparkles size={13} /> AI
+              <Sparkles size={13} /> הקלטה חכמה
             </button>
             {/* AI chat popup launcher — toggles the floating AiChatWidget
                 via a global event. Sits next to the voice-ingest "AI"

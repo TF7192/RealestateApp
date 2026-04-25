@@ -413,6 +413,17 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
       summary: `הנכס שלך שוכפל על-ידי ${duplicatorName}: ${source.street}, ${source.city}`,
     });
 
+    // Auto-mark the source as "seen" for this viewer. Once they've
+    // cloned a row they're done with it — we don't want it to keep
+    // counting against their topbar badge. Idempotent upsert so a
+    // second duplicate of the same source (rare, but legal) is a
+    // no-op on the seen table.
+    await prisma.publicMatchSeen.upsert({
+      where: { viewerId_propertyId: { viewerId: u.id, propertyId: source.id } },
+      create: { viewerId: u.id, propertyId: source.id },
+      update: {},
+    });
+
     return { property: clone };
   });
 

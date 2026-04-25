@@ -52,11 +52,25 @@ export default function AiChatWidget() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
-  // Toggle-on-event lets the topbar button live as a one-liner.
+  // Toggle-on-event. When opening, dispatch `estia:close-chat` so the
+  // developer ChatWidget closes itself — the two share a fixed-position
+  // panel anchor (bottom-left in RTL) so showing both simultaneously
+  // would overlap perfectly. Mutually-exclusive is the right UX.
   useEffect(() => {
-    const onOpen = () => setOpen((o) => !o);
+    const onOpen = () => {
+      setOpen((o) => {
+        const next = !o;
+        if (next) window.dispatchEvent(new Event('estia:close-chat'));
+        return next;
+      });
+    };
+    const onForceClose = () => setOpen(false);
     window.addEventListener('estia:open-ai-chat', onOpen);
-    return () => window.removeEventListener('estia:open-ai-chat', onOpen);
+    window.addEventListener('estia:close-ai-chat', onForceClose);
+    return () => {
+      window.removeEventListener('estia:open-ai-chat', onOpen);
+      window.removeEventListener('estia:close-ai-chat', onForceClose);
+    };
   }, []);
 
   if (!user) return null;
@@ -122,12 +136,19 @@ function AiChatPanel({ onClose }) {
         aria-label="צ׳אט עם Estia AI"
         dir="rtl"
         style={{
+          // Match the developer ChatWidget's panel anchor exactly so
+          // the two surfaces share the same screen real estate. The
+          // mutual-exclusivity logic in the parent ensures only one
+          // shows at a time. Mobile (≤640) gets a near-full-bleed
+          // panel like the dev chat does.
           position: 'fixed',
-          bottom: 90,
-          insetInlineStart: 24,
-          width: 'min(420px, calc(100vw - 32px))',
-          maxHeight: 'min(640px, calc(100vh - 120px))',
-          zIndex: 1000,
+          bottom: 'calc(78px + env(safe-area-inset-bottom))',
+          insetInlineEnd: 18,
+          width: 360,
+          maxWidth: 'calc(100vw - 32px)',
+          height: 520,
+          maxHeight: 'calc(100dvh - 120px)',
+          zIndex: 950,
           display: 'flex', flexDirection: 'column',
           background: DT.white,
           borderRadius: 16,
