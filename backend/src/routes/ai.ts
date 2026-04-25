@@ -1226,11 +1226,19 @@ ${compsText || '(אין נכסים להשוואה)'}
       // away, etc.) into the active stream. Without this the
       // Anthropic request keeps running on our dime even though no
       // one's listening.
+      //
+      // CRITICAL: subscribe to `reply.raw` (the response stream), not
+      // `req.raw`. Node emits 'close' on the *request* stream as soon
+      // as the request body has been consumed — for a hijacked SSE
+      // reply that fires within milliseconds of entering the handler,
+      // which used to abort the Anthropic upstream before we'd even
+      // sent the first chunk back to the client. The response stream's
+      // 'close' event only fires when the client really hangs up.
       let activeStream: ReturnType<typeof client.messages.stream> | null = null;
       const onClientAbort = () => {
         try { activeStream?.abort(); } catch { /* noop */ }
       };
-      req.raw.on('close', onClientAbort);
+      reply.raw.on('close', onClientAbort);
 
       try {
         for (let iter = 0; iter < 6; iter += 1) {
