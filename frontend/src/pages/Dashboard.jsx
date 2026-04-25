@@ -109,9 +109,25 @@ export default function Dashboard() {
   const [meetings, setMeetings] = useState([]);
   const [premiumOpen, setPremiumOpen] = useState(false);
 
+  // PERF-007 — replaces a 4-way unbounded fan-out (listLeads,
+  // listProperties, listDeals, listReminders) with one aggregated
+  // /dashboard/summary call. The backend serves counts + ≤5-row
+  // top-lists from `count()` queries instead of marshaling the
+  // entire book. Falls back to the legacy fan-out if the new
+  // endpoint isn't available (older backend / native iOS clients
+  // hitting a stale build).
+  const [summary, setSummary] = useState(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      try {
+        const s = await api.dashboardSummary?.();
+        if (cancelled) return;
+        if (s && s.counts) {
+          setSummary(s);
+          return;
+        }
+      } catch { /* fall through to legacy */ }
       try {
         const [lRes, pRes, dRes, mRes] = await Promise.all([
           api.listLeads?.().catch(() => null),
@@ -128,6 +144,19 @@ export default function Dashboard() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // When the server-aggregated summary is available, surface its
+  // top-5 lists directly. Each setter still keeps an `items`-shaped
+  // array so the rest of the file (hotLeads memo, todaysReminders,
+  // computeAiPriorities, kpis) doesn't have to branch on which path
+  // populated it.
+  useEffect(() => {
+    if (!summary) return;
+    setLeads(summary.hotLeads || []);
+    setMeetings(summary.todayMeetings || []);
+    setProperties(summary.staleProperties || []);
+    setDeals(summary.stuckDeals || []);
+  }, [summary]);
 
   const hotLeads = useMemo(
     () => leads.filter((l) => (l.status || '').toUpperCase() === 'HOT').slice(0, 4),
@@ -154,12 +183,19 @@ export default function Dashboard() {
     () => computeAiPriorities({ leads, properties, deals, meetings }),
     [leads, properties, deals, meetings],
   );
-  const kpis = useMemo(() => [
-    { l: 'לידים פעילים',   v: leads.length,      i: Users },
-    { l: 'פגישות השבוע',   v: meetings.length,    i: CalendarIcon },
-    { l: 'עסקאות פתוחות', v: deals.length,        i: Banknote },
-    { l: 'נכסים פעילים',   v: properties.length,  i: BarChart2 },
-  ], [leads.length, meetings.length, deals.length, properties.length]);
+  // PERF-007 — when the aggregated /dashboard/summary is in play, the
+  // KPI numbers must come from `summary.counts`, NOT from the top-5
+  // arrays we now hold in `leads`/`properties`/etc. Falls back to
+  // `<list>.length` for the legacy fan-out path.
+  const kpis = useMemo(() => {
+    const c = summary?.counts;
+    return [
+      { l: 'לידים פעילים',   v: c?.leads ?? leads.length,           i: Users },
+      { l: 'פגישות השבוע',   v: c?.todayMeetings ?? meetings.length, i: CalendarIcon },
+      { l: 'עסקאות פתוחות', v: c?.deals ?? deals.length,             i: Banknote },
+      { l: 'נכסים פעילים',   v: c?.properties ?? properties.length,  i: BarChart2 },
+    ];
+  }, [summary, leads.length, meetings.length, deals.length, properties.length]);
 
   const firstName = (user?.displayName || user?.email?.split('@')[0] || 'אדם').split(' ')[0];
   const todayStr = new Intl.DateTimeFormat('he-IL', {

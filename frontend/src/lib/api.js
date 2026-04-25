@@ -583,6 +583,17 @@ export const api = {
   officeAiUsage:       (month) => request(`/office/ai-usage${month ? `?month=${encodeURIComponent(month)}` : ''}`),
   // Admin platform observability — gated on talfuks1234@gmail.com.
   adminOverview:       () => request('/admin/overview'),
+  // PERF-007 — single round-trip dashboard load. Returns:
+  //   { counts: {properties, leads, deals, reminders, hotLeadsCount, todayMeetings},
+  //     hotLeads, todayMeetings, stuckDeals, staleProperties }
+  // All lists are ≤5 rows, server-aggregated. Replaces the 4 unbounded
+  // list calls Dashboard.jsx used to fire on mount.
+  dashboardSummary:    () => request('/dashboard/summary'),
+  // PERF-019 — combined topbar counts. Returns
+  //   { unreadNotifications, publicMatches, hasOpenChat }
+  // Replaces the 3-way fan-out Layout.jsx used to do
+  // (/notifications?limit=1, /public-matches/count, /chat/me).
+  topbarCounts:        () => request('/topbar-counts'),
   adminUsersSummary:   () => request('/admin/users-summary'),
   // A1 fill-in — email-based invites. The server returns a surrogate
   // inviteUrl ({origin}/accept-invite?token=<id>) that the owner can

@@ -35,6 +35,13 @@ const PUBLIC_BASE = `https://${BUCKET}.s3.${REGION}.amazonaws.com`;
 // enough that an interrupt loses very little work and big enough that
 // the log doesn't drown the run.
 const BATCH = 50;
+// Concurrency — sharp + S3 both release the event loop on await, so
+// running multiple rows in parallel cuts wall-clock dramatically. 8
+// workers is the sweet spot on a t3.small (2 vCPU): sharp's libvips
+// thread pool absorbs the CPU overlap, and S3's per-connection limit
+// is far higher. Going higher than 8 starts to hurt due to memory
+// pressure on 1 GB instances.
+const CONCURRENCY = Number(process.env.BACKFILL_CONCURRENCY || 8);
 
 async function main() {
   const total = await prisma.propertyImage.count({
@@ -59,36 +66,42 @@ async function main() {
     });
     if (rows.length === 0) break;
 
-    for (const row of rows) {
-      const key = resolveStorageKey(row.url);
-      if (!key) {
-        // Remote URL (Yad2 etc.) — leave it. The list page fallback
-        // logic prefers `urlThumb` then `url`, so the row keeps
-        // rendering through the original remote source.
-        skippedRemote += 1;
-        await markBackfilled(row.id, row.url, null);
-        continue;
+    // Parallelise the per-row pipeline. Each row does S3 GET + sharp +
+    // 2× S3 PUT + DB PATCH; serial throughput was ~3-5 s/row, which
+    // for 372 rows meant ~25 min wall-clock. With 8 concurrent workers
+    // sharing the libvips thread pool we get ~3-5× speedup before
+    // memory pressure on a t3.small bites.
+    const queue = rows.slice();
+    const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+      for (;;) {
+        const row = queue.shift();
+        if (!row) return;
+        const key = resolveStorageKey(row.url);
+        if (!key) {
+          skippedRemote += 1;
+          await markBackfilled(row.id, row.url, null);
+          continue;
+        }
+        const buf = await getUploadBytes(key);
+        if (!buf) {
+          skippedMissing += 1;
+          console.warn(`[image-variants] missing object: ${key}`);
+          continue;
+        }
+        try {
+          const v = await processExistingFull(buf, row.propertyId);
+          await prisma.propertyImage.update({
+            where: { id: row.id },
+            data: { url: v.url, urlCard: v.urlCard, urlThumb: v.urlThumb },
+          });
+          processed += 1;
+        } catch (e) {
+          failed += 1;
+          console.error(`[image-variants] failed on ${row.id}:`, (e as Error)?.message);
+        }
       }
-
-      const buf = await getUploadBytes(key);
-      if (!buf) {
-        skippedMissing += 1;
-        console.warn(`[image-variants] missing object: ${key}`);
-        continue;
-      }
-
-      try {
-        const v = await processExistingFull(buf, row.propertyId);
-        await prisma.propertyImage.update({
-          where: { id: row.id },
-          data: { url: v.url, urlCard: v.urlCard, urlThumb: v.urlThumb },
-        });
-        processed += 1;
-      } catch (e) {
-        failed += 1;
-        console.error(`[image-variants] failed on ${row.id}:`, (e as Error)?.message);
-      }
-    }
+    });
+    await Promise.all(workers);
 
     console.log(`[image-variants] +${rows.length} (${processed} ok / ${skippedRemote} remote / ${skippedMissing} missing / ${failed} failed)`);
   }
