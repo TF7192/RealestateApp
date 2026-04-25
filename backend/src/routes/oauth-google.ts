@@ -21,6 +21,7 @@ import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { slugify, ensureUniqueSlug } from '../lib/slug.js';
 import { track as phTrack, identify as phIdentify } from '../lib/analytics.js';
+import { redactTokenExchangeError } from '../lib/oauthLog.js';
 
 const COOKIE_NAME = 'estia_token';
 const STATE_COOKIE = 'estia_oauth_state';
@@ -155,7 +156,10 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       });
       tokens = await resp.json();
       if (!resp.ok || !tokens.access_token) {
-        req.log.warn({ tokens, status: resp.status }, 'google token exchange failed');
+        // SEC-005 — never log the raw `tokens` body. On some failure
+        // modes Google returns access/refresh/id_token alongside the
+        // error envelope; logging it raw puts those tokens on disk.
+        req.log.warn(redactTokenExchangeError(tokens, resp.status), 'google token exchange failed');
         return reply.redirect('/?auth=google_token_failed');
       }
     } catch (e) {

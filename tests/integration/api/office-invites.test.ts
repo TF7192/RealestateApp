@@ -226,9 +226,11 @@ describe('auth auto-accept on login/signup', () => {
       payload: { email: target.email, password: target._plainPassword },
     });
     expect(res.statusCode).toBe(200);
-    // Response shape unchanged — {user, token}.
+    // SEC-031 — login response now returns just `{ user }`; the JWT
+    // rides in the httpOnly cookie. The cookie is what gates auth, so
+    // we assert on it instead of the (removed) body.token.
     expect(res.json().user.id).toBe(target.id);
-    expect(typeof res.json().token).toBe('string');
+    expect(String(res.headers['set-cookie'])).toMatch(/estia_token=/);
     const after = await prisma.user.findUnique({ where: { id: target.id } });
     expect(after?.officeId).toBe(office.id);
     const invite = await prisma.officeInvite.findUnique({

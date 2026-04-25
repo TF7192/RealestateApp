@@ -25,6 +25,7 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { getUser } from '../middleware/auth.js';
+import { redactTokenExchangeError } from '../lib/oauthLog.js';
 
 const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -224,7 +225,9 @@ export const registerCalendarRoutes: FastifyPluginAsync = async (app) => {
     });
     const tokens = await resp.json() as any;
     if (!resp.ok || !tokens.access_token) {
-      req.log.warn({ tokens }, 'calendar token exchange failed');
+      // SEC-005 — see oauth-google.ts; the raw `tokens` body can carry
+      // access/refresh/id_token even on failures.
+      req.log.warn(redactTokenExchangeError(tokens, resp.status), 'calendar token exchange failed');
       return reply.redirect('/profile?calendar=token_failed');
     }
     const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000);

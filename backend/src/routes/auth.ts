@@ -138,10 +138,12 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     phTrack('signup_completed', user.id, { role: user.role, provider: 'EMAIL' });
     // A1 fill-in — claim any pending OfficeInvite for this email.
     await claimOfficeInvites(user.id, user.email, user.role);
-    return {
-      user: publicUser(user),
-      token,
-    };
+    // SEC-031 — the JWT rides in the httpOnly cookie above. The web
+    // client never reads `token` from the body (no localStorage write
+    // for auth); leaving it here only widens the leak surface (logs,
+    // PostHog, error trackers). The native /google/native-exchange
+    // response keeps its `token` shape — the iOS app actively reads it.
+    return { user: publicUser(user) };
   });
 
   app.post('/login', { config: { rateLimit: LOGIN_LIMIT } }, async (req, reply) => {
@@ -170,7 +172,8 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     phTrack('login_completed', user.id, { role: user.role, provider: 'EMAIL' });
     // A1 fill-in — claim any pending OfficeInvite for this email.
     await claimOfficeInvites(user.id, user.email, user.role);
-    return { user: publicUser(user), token };
+    // SEC-031 — see signup above; cookie is the canonical session.
+    return { user: publicUser(user) };
   });
 
   // Mock Google OAuth — the frontend already has a "Login with Google" button
@@ -211,7 +214,8 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       reply.setCookie(COOKIE_NAME, token, COOKIE_OPTS);
       // A1 fill-in — claim any pending OfficeInvite for this email.
       await claimOfficeInvites(user.id, user.email, user.role);
-      return { user: publicUser(user), token };
+      // SEC-031 — cookie is the canonical session; body no longer carries the JWT.
+      return { user: publicUser(user) };
     });
   }
 
@@ -244,7 +248,12 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     await prisma.passwordResetToken.create({
       data: { userId: user.id, token, expiresAt },
     });
-    req.log.info({ userId: user.id, token }, 'password reset token issued');
+    // SEC-004 — never log the token itself. Anyone with read access to
+    // the log pipeline (CloudWatch, EC2 disk, GitHub Actions deploy
+    // logs) could otherwise take over the account during the 30-min
+    // TTL. The dev workflow still gets the token via the response
+    // body's `devToken` field below.
+    req.log.info({ userId: user.id }, 'password reset token issued');
     phTrack('password_reset_requested', user.id, {});
     const devToken = process.env.NODE_ENV === 'production' ? undefined : token;
     return reply.send({ ok: true, ...(devToken ? { devToken } : {}) });

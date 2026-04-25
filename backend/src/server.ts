@@ -98,15 +98,25 @@ const COOKIE_SECRET = process.env.COOKIE_SECRET || 'dev-only-cookie-secret';
 
 // Exported so tests can build an isolated app instance without
 // listening on a port — tests call app.inject() for integration cases.
-export async function build() {
+//
+// `opts.logger` lets a test substitute a capturing logger (e.g. to
+// assert sensitive values never reach the log pipeline). Anything that
+// `Fastify({ logger })` accepts works here — typically a pino instance
+// pointed at an in-memory writable stream.
+export interface BuildOptions {
+  logger?: any;
+}
+export async function build(opts: BuildOptions = {}) {
   const app = Fastify({
     logger:
-      NODE_ENV === 'production'
-        ? { level: 'info' }
-        : {
-            level: 'debug',
-            transport: { target: 'pino-pretty', options: { colorize: true } },
-          },
+      opts.logger !== undefined
+        ? opts.logger
+        : NODE_ENV === 'production'
+          ? { level: 'info' }
+          : {
+              level: 'debug',
+              transport: { target: 'pino-pretty', options: { colorize: true } },
+            },
     trustProxy: true,
     bodyLimit: 10 * 1024 * 1024,
   });
