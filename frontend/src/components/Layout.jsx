@@ -923,7 +923,12 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
               <span
                 aria-label={`${unreadCount} התראות חדשות`}
                 style={{
-                  position: 'absolute', top: -4, insetInlineStart: -4,
+                  // Anchor the badge to the LEFT side of the bell.
+                  // `insetInlineEnd` resolves to LEFT in RTL, RIGHT in
+                  // LTR, so the badge sits on the visual-left for
+                  // Hebrew users (which is what the user asked for)
+                  // without breaking any future LTR localisation.
+                  position: 'absolute', top: -4, insetInlineEnd: -4,
                   minWidth: 18, height: 18, padding: '0 5px',
                   borderRadius: 99, background: DT.gold, color: DT.white,
                   border: `2px solid ${DT.white}`,
@@ -937,7 +942,21 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
             )}
           </button>
           {notifOpen && (
-            <NotificationsPopover items={notifs} loading={loadingNotifs} onClose={() => setNotifOpen(false)} />
+            <NotificationsPopover
+              items={notifs}
+              loading={loadingNotifs}
+              unreadCount={unreadCount}
+              onClose={() => setNotifOpen(false)}
+              onClearAll={async () => {
+                // Optimistic — drop the badge to 0 immediately so the
+                // user gets the "cleared" feedback without waiting on
+                // the network. If the call fails we'll resync on next
+                // popover open.
+                setUnreadCount(0);
+                setNotifs((prev) => prev.map((n) => ({ ...n, readAt: new Date().toISOString() })));
+                try { await api.markAllNotificationsRead?.(); } catch { /* refetched on next open */ }
+              }}
+            />
           )}
         </div>
         {/* Chat launcher. The ChatWidget component intentionally
@@ -987,7 +1006,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
   );
 }
 
-function NotificationsPopover({ items, loading, onClose }) {
+function NotificationsPopover({ items, loading, unreadCount, onClose, onClearAll }) {
   return (
     <div style={{
       // Anchor to the bell's LEFT edge so the popover flows rightward
@@ -1004,9 +1023,27 @@ function NotificationsPopover({ items, loading, onClose }) {
       <div style={{
         padding: '12px 14px', borderBottom: `1px solid ${DT.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 8,
       }}>
         <div style={{ fontSize: 13, fontWeight: 800 }}>התראות</div>
-        <NavLink to="/notifications" onClick={onClose} style={{ fontSize: 11, color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>הכול ←</NavLink>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Clear-all only shows when there's something to clear so it
+              doesn't sit there as dead UI most of the time. */}
+          {unreadCount > 0 && onClearAll && (
+            <button
+              type="button"
+              onClick={onClearAll}
+              style={{
+                fontSize: 11, fontWeight: 700,
+                color: DT.muted,
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                padding: 0,
+              }}
+              title="סמן את כל ההתראות כנקראו"
+            >סמן הכול כנקרא</button>
+          )}
+          <NavLink to="/notifications" onClick={onClose} style={{ fontSize: 11, color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>הכול ←</NavLink>
+        </div>
       </div>
       <div style={{ maxHeight: 360, overflowY: 'auto' }}>
         {loading && <div style={{ padding: 16, color: DT.muted, fontSize: 12 }}>טוען…</div>}
