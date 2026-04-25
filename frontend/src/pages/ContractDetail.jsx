@@ -150,8 +150,15 @@ export default function ContractDetail() {
           <ArrowRight size={16} />
           חוזים
         </Link>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <a href={pdfUrl} target="_blank" rel="noopener noreferrer" style={secondaryBtn()}>
+        {/* CD-4 — share + download stretch to fill the row on phones, so
+         *  they don't end up tiny + lonely on the right edge. */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ ...secondaryBtn(), flex: '1 1 140px', justifyContent: 'center' }}
+          >
             <Download size={14} /> הורד PDF
           </a>
           {/* Sprint 7 — channel picker: WhatsApp / SMS / email / copy /
@@ -159,7 +166,7 @@ export default function ContractDetail() {
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            style={secondaryBtn()}
+            style={{ ...secondaryBtn(), flex: '1 1 140px', justifyContent: 'center' }}
           >
             <Share2 size={14} /> שתף
           </button>
@@ -239,8 +246,10 @@ export default function ContractDetail() {
             key={pdfNonce}
             title="חוזה — תצוגה מקדימה"
             src={pdfUrl}
+            // CD-1 — cap iframe height at 70vh on phones so the share/sign
+            // controls below remain reachable without long scrolls.
             style={{
-              width: '100%', height: 560, border: 'none',
+              width: '100%', height: 'min(70vh, 560px)', border: 'none',
               background: DT.cream,
             }}
           />
@@ -321,6 +330,7 @@ export default function ContractDetail() {
                       fontSize: 11,
                       wordBreak: 'break-all',
                       direction: 'ltr', display: 'inline-block',
+                      maxWidth: '100%',
                       background: DT.cream3,
                       padding: '3px 8px', borderRadius: 6,
                       color: DT.ink2,
@@ -363,7 +373,7 @@ function Row({ label, value }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 3,
-      paddingBottom: 8, borderBottom: `1px dashed ${DT.border}`,
+      padding: '8px 0', borderBottom: `1px dashed ${DT.border}`,
     }}>
       <span style={{
         fontSize: 11, fontWeight: 700, color: DT.muted,
@@ -403,8 +413,10 @@ function primaryBtn() {
 function secondaryBtn() {
   return {
     ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
-    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
-    fontSize: 12, fontWeight: 700,
+    // CD-6 — bumped from 7px 12px / no minHeight to a comfortable touch
+    // target on phones (still fine on desktop).
+    padding: '11px 14px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 700, minHeight: 40,
     display: 'inline-flex', gap: 5, alignItems: 'center', color: DT.ink,
     textDecoration: 'none',
   };

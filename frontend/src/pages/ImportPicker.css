@@ -48,7 +48,9 @@
   grid-template-columns: 1fr 1fr;
   gap: 18px;
 }
-@media (max-width: 680px) {
+/* IMP-3 — only the 375-500 range needs single column; tablet-sized
+ * phones (and tablets) can keep the 2-up grid comfortably. */
+@media (max-width: 500px) {
   .imp-pick-grid { grid-template-columns: 1fr; }
 }
 
@@ -81,6 +83,9 @@
   line-height: 1.55;
   color: var(--text-muted);
   margin: 0;
+  /* IMP-4 — long Hebrew descriptions shouldn't overflow on narrow phones. */
+  word-break: break-word;
+  hyphens: auto;
 }
 .imp-pick-cta {
   margin-top: auto;

@@ -614,3 +614,13 @@
     gap: 8px;
   }
 }
+
+/* DEAL-1 — single-column kanban + cards on narrow phones.
+ * Overrides inline gridTemplateColumns on DealsKanban / DealsCards
+ * (`!important` is required because the JSX uses inline styles). */
+@media (max-width: 600px) {
+  .deal-kanban-grid,
+  .deals-cards {
+    grid-template-columns: 1fr !important;
+  }
+}

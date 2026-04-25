@@ -39,7 +39,8 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 function statusAccent(s) {
   switch (s) {
     case 'PENDING':
-      return { bg: 'rgba(180,83,9,0.12)',  fg: DT.warning, Icon: Clock,         label: 'בהמתנה' };
+      // TRAN-2 — bumped bg alpha + darker fg for WCAG AA on cream4 cards.
+      return { bg: 'rgba(180,83,9,0.18)',  fg: '#92400e',  Icon: Clock,         label: 'בהמתנה' };
     case 'ACCEPTED':
       return { bg: 'rgba(21,128,61,0.12)', fg: DT.success, Icon: CheckCircle2, label: 'אושר' };
     case 'DECLINED':
@@ -386,12 +387,17 @@ function TransferCard({ t, onAccept, onDecline, onCancel }) {
         ) : null}
 
         {t.message && (
-          <p style={{
-            margin: 0, padding: '6px 10px',
-            background: DT.cream4, border: `1px solid ${DT.border}`,
-            borderRadius: 8, fontSize: 12, color: DT.ink2,
-            fontStyle: 'italic', lineHeight: 1.4,
-          }}>
+          <p
+            // TRAN-4 — agent-typed messages may be Hebrew or English;
+            // dir="auto" lets the browser pick the right direction.
+            dir="auto"
+            style={{
+              margin: 0, padding: '6px 10px',
+              background: DT.cream4, border: `1px solid ${DT.border}`,
+              borderRadius: 8, fontSize: 12, color: DT.ink2,
+              fontStyle: 'italic', lineHeight: 1.4,
+            }}
+          >
             “{t.message}”
           </p>
         )}
@@ -475,7 +481,9 @@ function primaryBtn() {
     ...FONT,
     background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
     border: 'none', color: DT.ink,
-    padding: '7px 12px',
+    // TRAN-3 — bumped from 7px 12px / no minHeight to a comfortable
+    // touch target on phones.
+    padding: '11px 14px', minHeight: 40,
     borderRadius: 8, cursor: 'pointer',
     fontSize: 12, fontWeight: 800,
     display: 'inline-flex', gap: 5, alignItems: 'center', justifyContent: 'center',
@@ -486,7 +494,9 @@ function primaryBtn() {
 function ghostBtn() {
   return {
     ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
-    padding: '7px 12px', borderRadius: 8, cursor: 'pointer',
+    // TRAN-3 — match primaryBtn touch target.
+    padding: '11px 14px', minHeight: 40,
+    borderRadius: 8, cursor: 'pointer',
     fontSize: 12, fontWeight: 700,
     display: 'inline-flex', gap: 5, alignItems: 'center', justifyContent: 'center',
     color: DT.ink, whiteSpace: 'nowrap',

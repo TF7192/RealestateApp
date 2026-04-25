@@ -285,6 +285,12 @@
   gap: 10px;
 }
 
+/* TPL-7 — three preset cards crowd the smallest phones; switch to a
+ * 2-up grid below 480px so each card has breathing room. */
+@media (max-width: 480px) {
+  .tpl-presets { grid-template-columns: 1fr 1fr; }
+}
+
 .tpl-preset {
   position: relative;
   display: flex;
@@ -423,7 +429,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 10px;
+  /* TPL-8 — bigger touch target (was 6px 10px). */
+  padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
@@ -479,6 +486,12 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+/* TPL-4 — collapse to single column on phones < 600px so each var
+ * group has room for its label + chips without truncation. */
+@media (max-width: 600px) {
+  .tpl-vars-groups { grid-template-columns: 1fr; }
 }
 
 .tpl-vars-group {
@@ -992,7 +1005,8 @@
 /* Account for existing MobileTabBar at bottom of app so save bar sits above it */
 @media (max-width: 900px) {
   .tpl-savebar {
-    bottom: calc(64px + env(safe-area-inset-bottom));
+    /* TPL-5 — match actual MobileTabBar height (72px). */
+    bottom: calc(72px + env(safe-area-inset-bottom));
     padding-bottom: 8px;
   }
 }
@@ -1385,6 +1399,9 @@
   border-radius: 16px;
   background: var(--bg-card);
   border: 1px solid var(--border);
+  /* TPL-6 — long template text shouldn't overflow the viewport horizontally. */
+  max-width: 100%;
+  word-wrap: break-word;
 }
 
 .tpl-fs-vars {

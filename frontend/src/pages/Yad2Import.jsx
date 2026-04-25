@@ -24,6 +24,7 @@ import {
   getScanState, subscribeScan, startScan, clearScan, setScanQuota, startImport,
 } from '../lib/yad2ScanStore';
 import { useViewportMobile } from '../hooks/mobile';
+import { inputPropsForUrl } from '../lib/inputProps';
 
 // ─── DT tokens (lifted from the bundle's shell.jsx) ──────────
 const DT = {
@@ -368,13 +369,7 @@ function PasteStep({
 
         <input
           id="y2-url"
-          type="url"
-          inputMode="url"
-          enterKeyHint="go"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          autoComplete="off"
+          {...inputPropsForUrl()}
           placeholder="https://www.yad2.co.il/realestate/agency/7098700/forsale"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
@@ -607,9 +602,12 @@ function ReviewStep({
               display: 'flex', flexDirection: 'column', gap: 10,
             }}
           >
+            {/* YAD-6 — sticky category header so the agent always sees
+             *  which section they're in while scrolling long lists. */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10,
               paddingBottom: 10, borderBottom: `1px dashed ${DT.border}`,
+              position: 'sticky', top: 0, background: DT.white, zIndex: 5,
             }}>
               <button
                 type="button"

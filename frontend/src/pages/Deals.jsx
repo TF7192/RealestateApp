@@ -228,7 +228,7 @@ function KpiChip({ label, value, valueColor }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
       <span style={{ fontSize: 10, color: DT.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 800, color: valueColor || DT.ink }}>{value}</span>
+      <span style={{ fontSize: 14, fontWeight: 800, color: valueColor || DT.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{value}</span>
     </div>
   );
 }
@@ -268,7 +268,7 @@ function DealsKanban({ deals, onEdit, onSign, onOpen }) {
     { key: 'FELL_THROUGH',     label: 'לא יצאו לפועל' },
   ];
   return (
-    <div style={{
+    <div className="deal-kanban-grid" style={{
       display: 'grid', gap: 14,
       gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
     }}>
@@ -358,12 +358,14 @@ function KanbanCard({ deal, onOpen, onEdit, onSign }) {
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onEdit(deal); }}
-          style={ghostBtn()}
+          // DEAL-3 — bigger touch target on phones
+          style={{ ...ghostBtn(), padding: '10px 14px' }}
         >עריכה</button>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onSign(deal); }}
-          style={primaryBtn({ small: true })}
+          // DEAL-3 — bigger touch target on phones
+          style={{ ...primaryBtn({ small: true }), padding: '10px 14px' }}
         >סמן כנחתם</button>
       </div>
     </div>
@@ -381,7 +383,7 @@ function DealsCards({ deals, onEdit, onOpen }) {
     );
   }
   return (
-    <div style={{
+    <div className="deals-cards" style={{
       display: 'grid', gap: 14,
       gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
     }}>
@@ -601,7 +603,8 @@ function PriceInput({ label, value, onChange }) {
       <label className="form-label">{label}</label>
       <input
         type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="next"
-        dir="ltr" style={{ textAlign: 'right' }}
+        dir="ltr"
+        style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace' }}
         className="form-input"
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ''))}

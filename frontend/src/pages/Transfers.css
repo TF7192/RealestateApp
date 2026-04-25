@@ -272,3 +272,9 @@
     min-width: auto;
   }
 }
+
+/* TRAN-1 — extra-tight phones (≤600px): force single column even if a
+ * future change reintroduces grid-template-columns at this breakpoint. */
+@media (max-width: 600px) {
+  .tr-card { grid-template-columns: 1fr !important; }
+}

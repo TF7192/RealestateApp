@@ -197,7 +197,7 @@ export default function DealDetail() {
 
         {/* Price strip */}
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
           gap: 8, marginTop: 16, padding: '12px 14px',
           background: DT.cream4, borderRadius: 12, border: `1px solid ${DT.border}`,
         }}>
@@ -299,7 +299,8 @@ function PartyBlock({ role, person, linkTo, fallback, freeText, freeTextLabel })
         }}
       >
         <span style={{ fontWeight: 800, fontSize: 14 }}>{person.name}</span>
-        <span style={{ fontSize: 12, color: DT.muted, display: 'inline-flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* DD-1 — phone+email row: flex-wrap so they stack on narrow phones. */}
+        <span className="party-contact-row" style={{ fontSize: 12, color: DT.muted, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {person.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Phone size={10} /> {formatPhone(person.phone)}</span>}
           {person.email && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MessageCircle size={10} /> {person.email}</span>}
         </span>

@@ -354,7 +354,8 @@
     margin-top: 2px;
   }
   .sc-breakdown { gap: 4px; }
-  .sc-line { padding: 5px 2px; font-size: 13.5px; }
+  /* CALC-4 — slightly larger label on mobile for legibility. */
+  .sc-line { padding: 5px 2px; font-size: 14px; }
   .sc-line-emphasis .sc-line-value { font-size: 16px; }
 
   /* Inputs: bigger padding + bigger hero amount input */
