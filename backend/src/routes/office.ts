@@ -136,6 +136,16 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     if (target.officeId === me.officeId) {
       return reply.code(409).send({ error: { message: 'User already a member of this office' } });
     }
+    // SEC-003 — refuse to silently yank a user out of a different office.
+    // The legitimate cross-office migration path is the invite flow:
+    // POST /api/office/invites → recipient explicitly accepts. Without
+    // this guard any OWNER could absorb agents from rival agencies just
+    // by knowing their email or userId.
+    if (target.officeId && target.officeId !== me.officeId) {
+      return reply.code(409).send({
+        error: { message: 'הסוכן/ית כבר חבר/ה במשרד אחר — שלח/י הזמנה במקום' },
+      });
+    }
     const updated = await prisma.user.update({
       where: { id: target.id },
       data: { officeId: me.officeId },
