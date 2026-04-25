@@ -41,11 +41,17 @@ export const storageBackend = BACKEND;
  *   • opts.public !== true (default): returns the relative
  *     `/uploads/<key>` path. The backend's `/uploads/*` route then
  *     resolves it to a presigned S3 URL on read.
- *   • opts.public === true: PERF-016 — sets `ACL: public-read` on the
- *     object and returns the absolute `https://<bucket>.s3.<region>
- *     .amazonaws.com/uploads/<key>` URL so the browser can hit S3
- *     directly (skipping the backend signing round-trip on every fetch).
- *     Used by the property-image variant pipeline.
+ *   • opts.public === true: PERF-016 — returns the absolute
+ *     `https://<bucket>.s3.<region>.amazonaws.com/uploads/<key>` URL so
+ *     the browser can hit S3 directly (skipping the backend signing
+ *     round-trip on every fetch). PUBLIC ACCESS IS GRANTED VIA THE
+ *     BUCKET POLICY, NOT PER-OBJECT ACLs — the `estia-prod` bucket has
+ *     Object Ownership = "Bucket owner enforced" (the modern AWS
+ *     default since 2023), which rejects PutObject calls with an `ACL`
+ *     param outright. The bucket policy must include
+ *       { "Effect": "Allow", "Principal": "*", "Action": "s3:GetObject",
+ *         "Resource": "arn:aws:s3:::estia-prod/uploads/properties/*" }
+ *     for these returned URLs to be reachable.
  *
  * The cache-control header is identical in both modes — `max-age=31536000,
  * immutable` — but the public mode is the one where it actually takes
@@ -65,7 +71,8 @@ export async function putUpload(
       Body: data,
       ContentType: contentType || 'application/octet-stream',
       CacheControl: 'public, max-age=31536000, immutable',
-      ...(opts?.public ? { ACL: 'public-read' as const } : null),
+      // No `ACL` param — see the JSDoc above. Public access is bucket-
+      // policy-driven; per-object ACLs are rejected on this bucket.
     }));
     if (opts?.public) {
       return `https://${BUCKET}.s3.${REGION}.amazonaws.com/uploads/${key}`;

@@ -153,8 +153,15 @@ export async function processExistingFull(
 
 /**
  * Internal helper — put a JPEG to S3 with the long-immutable
- * Cache-Control + public-read ACL. Centralized so every variant
- * writes the same metadata.
+ * Cache-Control. Centralized so every variant writes the same
+ * metadata.
+ *
+ * NO `ACL: public-read` — the `estia-prod` bucket runs with Object
+ * Ownership = "Bucket owner enforced" (the modern AWS default since
+ * 2023), which makes per-object ACLs an error. Public read access for
+ * `uploads/properties/*` keys is granted via the bucket policy
+ * applied separately. See `storage.ts` putUpload JSDoc for the policy
+ * statement.
  */
 async function putPublicJpeg(key: string, body: Buffer): Promise<void> {
   await client().send(new PutObjectCommand({
@@ -166,7 +173,6 @@ async function putPublicJpeg(key: string, body: Buffer): Promise<void> {
     Body: body,
     ContentType: 'image/jpeg',
     CacheControl: 'public, max-age=31536000, immutable',
-    ACL: 'public-read',
   }));
 }
 
