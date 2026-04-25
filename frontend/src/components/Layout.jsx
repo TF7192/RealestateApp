@@ -401,6 +401,11 @@ function SidebarInner({
   location, agentName, agentInitial, agentAvatarUrl = null,
   onLogout, collapsed = false, user = null,
 }) {
+  // Mirror the parent's admin check inside this scope so the JSX below
+  // can hide section labels / favorites placeholder for admin users.
+  // The parent's `isAdmin` lives in a different closure — referencing
+  // it here was a ReferenceError that crashed every render.
+  const isAdmin = !!(user && ADMIN_EMAILS.has((user.email || '').toLowerCase()));
   // Single-active resolver: of all items whose `to` is a prefix of the
   // current pathname, keep only the longest match. Without this,
   // /settings/tags lit BOTH /settings and /settings/tags because
