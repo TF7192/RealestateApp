@@ -176,6 +176,12 @@ export default function SearchResults() {
           }}><Search size={15} /></span>
           <input
             type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="חפש לקוח, נכס, בעלים, עסקה…"
@@ -314,11 +320,11 @@ export default function SearchResults() {
       {/* Scoped CSS: hide the desktop sidebar on narrow viewports so
           the mobile pills are the single entry point, and vice-versa. */}
       <style>{`
-        @media (max-width: 900px) {
+        @media (max-width: 600px) {
           .search-grid { grid-template-columns: minmax(0, 1fr) !important; }
           .search-sidebar { display: none !important; }
         }
-        @media (min-width: 901px) {
+        @media (min-width: 601px) {
           .search-mobile-pills { display: none !important; }
         }
       `}</style>

@@ -71,7 +71,8 @@
 }
 
 .office-field input {
-  padding: 8px 10px;
+  padding: 12px 14px;
+  min-height: 44px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-card);

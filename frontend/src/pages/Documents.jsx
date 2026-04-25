@@ -206,6 +206,7 @@ export default function Documents() {
           value={tagsInput}
           onChange={(e) => setTagsInput(e.target.value)}
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
           placeholder="תגיות (מופרדות בפסיקים) — למשל: חוזים, סקרים"
           style={{
             ...FONT,

@@ -546,7 +546,7 @@ function csvBtnStyle({ disabled }) {
   return {
     ...FONT,
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '9px 14px', borderRadius: 10,
+    padding: '12px 18px', minHeight: 44, borderRadius: 10,
     background: disabled ? DT.cream2 : DT.white,
     border: `1px solid ${DT.border}`,
     color: disabled ? DT.muted : DT.ink,

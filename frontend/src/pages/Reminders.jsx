@@ -283,6 +283,7 @@ export default function Reminders() {
                 value={form.dueAt}
                 onChange={(e) => update('dueAt', e.target.value)}
                 aria-label="תאריך יעד"
+                inputMode="numeric"
                 style={inputStyle()}
               />
             </FormField>
@@ -295,7 +296,7 @@ export default function Reminders() {
                 onChange={(e) => update('notes', e.target.value)}
                 placeholder="פרטים נוספים"
                 aria-label="הערות"
-                style={{ ...inputStyle(), resize: 'vertical', minHeight: 60 }}
+                style={{ ...inputStyle(), resize: isMobile ? 'none' : 'vertical', minHeight: 60 }}
               />
             </FormField>
           </div>
@@ -656,7 +657,7 @@ function primaryBtn() {
     ...FONT,
     background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
     border: 'none', color: DT.ink,
-    padding: '9px 14px', borderRadius: 10, cursor: 'pointer',
+    padding: '12px 18px', borderRadius: 10, cursor: 'pointer',
     fontSize: 13, fontWeight: 800,
     display: 'inline-flex', gap: 6, alignItems: 'center',
     boxShadow: '0 4px 10px rgba(180,139,76,0.28)',
@@ -681,7 +682,7 @@ function iconOnlyBtn(color) {
     ...FONT,
     background: 'transparent',
     border: `1px solid ${DT.border}`,
-    width: 34, height: 34, borderRadius: 10, cursor: 'pointer',
+    width: 44, height: 44, borderRadius: 10, cursor: 'pointer',
     color, display: 'grid', placeItems: 'center',
   };
 }

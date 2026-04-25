@@ -163,6 +163,7 @@ export default function PublicMatches() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="חיפוש עיר / סוכן / משרד"
+            aria-label="חיפוש עיר / סוכן / משרד"
             style={{
               ...FONT, width: '100%', padding: '8px 34px 8px 12px',
               border: `1px solid ${DT.border}`, borderRadius: 9,
@@ -284,7 +285,7 @@ function PoolCard({ row, busy, onDuplicate, onToggleSeen }) {
     }}>
       {/* Photo or placeholder */}
       <div style={{
-        height: 156, background: DT.cream3,
+        aspectRatio: '2 / 1.2', height: 'auto', background: DT.cream3,
         backgroundImage: row.image ? `url(${row.image})` : undefined,
         backgroundSize: 'cover', backgroundPosition: 'center',
         position: 'relative',
@@ -402,7 +403,7 @@ function PoolCard({ row, busy, onDuplicate, onToggleSeen }) {
                   ...FONT,
                   background: DT.white, border: `1px solid ${DT.border}`,
                   color: DT.muted,
-                  padding: '8px 10px', borderRadius: 10,
+                  padding: '11px 14px', borderRadius: 10,
                   fontSize: 11, fontWeight: 700, cursor: 'pointer',
                   display: 'inline-flex', gap: 4, alignItems: 'center',
                 }}
@@ -416,12 +417,14 @@ function PoolCard({ row, busy, onDuplicate, onToggleSeen }) {
               type="button"
               disabled={busy || isCloned}
               onClick={onDuplicate}
+              aria-label={isCloned ? 'כבר שוכפל' : undefined}
               style={{
                 ...FONT,
                 background: isCloned
-                  ? DT.cream2
+                  ? 'rgba(21, 128, 61, 0.08)'
                   : `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
-                border: 'none', color: isCloned ? DT.muted : DT.ink,
+                border: 'none',
+                color: isCloned ? (DT.success || '#15803d') : DT.ink,
                 padding: '9px 14px', borderRadius: 10,
                 fontSize: 12, fontWeight: 800,
                 cursor: isCloned ? 'default' : (busy ? 'wait' : 'pointer'),
@@ -505,7 +508,9 @@ function DuplicateSheet({ row, busy, onCancel, onConfirm }) {
           // by the <main> stacking context and left the app chrome
           // fully bright behind the modal.
           position: 'fixed', inset: 0, background: 'rgba(30,26,20,0.6)',
-          display: 'grid', placeItems: 'center', padding: 16, zIndex: 1000,
+          display: 'grid', placeItems: 'center',
+          padding: 'max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))',
+          zIndex: 1000,
           overflowY: 'auto',
         }}
         onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}

@@ -51,25 +51,27 @@ function priceChipIcon(label, highlighted = false) {
   // The inline HTML is fine here — `label` comes from displayPriceShort
   // which strips to "₪2.5M" style; no user-controlled free text.
   const html = `
-    <div style="
-      display:inline-flex;align-items:center;gap:4px;
-      background:linear-gradient(180deg, ${DT.goldLight}, ${bg});
-      color:${fg};
-      border:1.5px solid ${DT.goldDark};
-      padding:4px 9px;border-radius:14px;
-      font-family:Assistant, Heebo, -apple-system, sans-serif;
-      font-weight:800;font-size:12px;line-height:1;
-      white-space:nowrap;
-      box-shadow:0 2px 8px rgba(30,26,20,0.25);
-      transform:translateY(-4px);
-    ">${label}</div>
-    <div style="
-      width:0;height:0;margin:0 auto;
-      border-left:5px solid transparent;
-      border-right:5px solid transparent;
-      border-top:6px solid ${DT.goldDark};
-      transform:translateY(-5px);
-    "></div>
+    <div style="padding:8px;margin:-8px;">
+      <div style="
+        display:inline-flex;align-items:center;gap:4px;
+        background:linear-gradient(180deg, ${DT.goldLight}, ${bg});
+        color:${fg};
+        border:1.5px solid ${DT.goldDark};
+        padding:4px 9px;border-radius:14px;
+        font-family:Assistant, Heebo, -apple-system, sans-serif;
+        font-weight:800;font-size:12px;line-height:1;
+        white-space:nowrap;
+        box-shadow:0 2px 8px rgba(30,26,20,0.25);
+        transform:translateY(-4px);
+      ">${label}</div>
+      <div style="
+        width:0;height:0;margin:0 auto;
+        border-left:5px solid transparent;
+        border-right:5px solid transparent;
+        border-top:6px solid ${DT.goldDark};
+        transform:translateY(-5px);
+      "></div>
+    </div>
   `;
   return L.divIcon({
     html,
@@ -139,7 +141,7 @@ export default function MapPage() {
   return (
     <div dir="rtl" style={{
       ...FONT, display: 'flex', flexDirection: 'column',
-      height: 'calc(100vh - 61px)', // below the sticky topbar
+      height: 'calc(100dvh - 61px - env(safe-area-inset-top))', // below the sticky topbar
       background: DT.cream, color: DT.ink,
     }}>
       {/* ─── Filter bar ─────────────────────────────────────────── */}

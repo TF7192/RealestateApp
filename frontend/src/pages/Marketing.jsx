@@ -1209,7 +1209,7 @@ function goldBtnStyle(disabled) {
       : `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
     color: disabled ? DT.muted : DT.ink,
     border: 'none',
-    padding: '6px 12px', borderRadius: 8,
+    padding: '10px 14px', minHeight: 40, borderRadius: 8,
     fontSize: 11, fontWeight: 800,
     cursor: disabled ? 'not-allowed' : 'pointer',
     whiteSpace: 'nowrap',

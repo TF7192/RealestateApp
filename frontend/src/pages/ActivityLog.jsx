@@ -276,6 +276,7 @@ export default function ActivityLog() {
           type="button"
           onClick={load}
           aria-label="רענן"
+          aria-busy={loading}
           style={secondaryBtn()}
         >
           <RefreshCw size={14} aria-hidden="true" />
