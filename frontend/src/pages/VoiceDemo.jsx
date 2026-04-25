@@ -14,6 +14,7 @@
 import { Sparkles, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import VoiceCaptureDialog from '../components/VoiceCaptureDialog';
+import AiQuotaChips from '../components/AiQuotaChips';
 import { useAuth } from '../lib/auth';
 
 const DT = {
@@ -34,9 +35,15 @@ export default function VoiceDemo() {
       background: DT.cream, padding: '28px 20px 60px',
     }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.6, margin: '8px 0 4px' }}>
-          הקלטה חכמה
-        </h1>
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          gap: 12, flexWrap: 'wrap', marginBottom: 4,
+        }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.6, margin: '8px 0 0' }}>
+            הקלטה חכמה
+          </h1>
+          {isPremium && <AiQuotaChips kind="voice" />}
+        </div>
         <p style={{ color: DT.muted, margin: '0 0 20px', fontSize: 14, lineHeight: 1.6 }}>
           תארו/י ליד או נכס בקול חופשי (עד 2 דקות). השרת מתמלל (Whisper)
           ושולף שדות (Claude Haiku), ואפשר לערוך הכל לפני שיוצרים את הרשומה.

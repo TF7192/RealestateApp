@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sparkles, Send, Loader2, AlertCircle, Bot, User } from 'lucide-react';
 import api from '../lib/api';
+import AiQuotaChips from '../components/AiQuotaChips';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -220,7 +221,7 @@ export default function Ai() {
             עוזר מקצועי לסוכני נדל"ן — מבוסס Claude Haiku 4.5
           </div>
         </div>
-        <QuotaChips />
+        <AiQuotaChips kind="chat" />
       </header>
 
       {/* Chat area — flex child with its own scrollable message list,
@@ -336,46 +337,10 @@ export default function Ai() {
 // [links](href) (http/https only). No `dangerouslySetInnerHTML`, no
 // external dep — every node is a regular React element so XSS can't
 // slip through.
-// QuotaChips — small Hebrew chips on the /ai header showing how
-// many of today's recording minutes and this hour's chat questions
-// the agent has used. Only voice + chat are surfaced; the monthly
-// $30 budget is admin-only (returned only when role=ADMIN; the FE
-// just renders whichever blocks the API gives it).
-function QuotaChips() {
-  const [q, setQ] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    api.aiQuota?.()
-      .then((r) => { if (!cancelled) setQ(r); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-  if (!q) return null;
-  const voiceUsedMin = Math.floor((q.voice?.usedSec ?? 0) / 60);
-  const voiceLimitMin = Math.floor((q.voice?.limitSec ?? 0) / 60);
-  const chatUsed = q.chat?.usedCount ?? 0;
-  const chatLimit = q.chat?.limitCount ?? 0;
-  const voiceWarn = q.voice && q.voice.remainingSec / Math.max(1, q.voice.limitSec) < 0.2;
-  const chatWarn = q.chat && q.chat.remainingCount / Math.max(1, q.chat.limitCount) < 0.2;
-  return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-      <span style={{
-        padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700,
-        background: chatWarn ? 'rgba(180,83,9,0.10)' : DT.cream2,
-        color: chatWarn ? '#b45309' : DT.muted,
-      }} title="שאלות בשעה האחרונה">
-        💬 <bdi dir="ltr">{chatUsed}/{chatLimit}</bdi> שאלות בשעה
-      </span>
-      <span style={{
-        padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700,
-        background: voiceWarn ? 'rgba(180,83,9,0.10)' : DT.cream2,
-        color: voiceWarn ? '#b45309' : DT.muted,
-      }} title="דקות הקלטה היום">
-        🎙️ <bdi dir="ltr">{voiceUsedMin}/{voiceLimitMin}</bdi> דק׳ ביום
-      </span>
-    </div>
-  );
-}
+// QuotaChips were inlined here originally; the shared component now
+// lives at frontend/src/components/AiQuotaChips.jsx so /voice-demo
+// can render the voice-minute chip and /ai renders the chat-questions
+// chip. See <AiQuotaChips kind="chat" /> in the header above.
 
 // Phone-number / large-integer pattern. Wrapped in <bdi dir="ltr">
 // so the digits render in their natural order even inside an RTL

@@ -111,17 +111,26 @@ export const registerVoiceIngestRoutes: FastifyPluginAsync = async (app) => {
 
     let transcript = '';
     try {
+      // `verbose_json` makes Whisper return the precise audio duration
+      // alongside the transcript text. The previous "approximate from
+      // buffer bytes / 2000" guess assumed 16 kbps but Chrome's
+      // MediaRecorder emits 64-128 kbps WebM/Opus, so the quota chip
+      // was reporting 4-8× more minutes than the agent actually
+      // recorded.
       const whisper = await openai.audio.transcriptions.create({
         file: audioFile,
         model: 'whisper-1',
         language: 'he',
+        response_format: 'verbose_json',
       });
       transcript = (whisper as any).text || '';
-      // Whisper is billed per-minute (rounded up). Audio length isn't
-      // in the response; approximate from the buffer size + typical
-      // webm/opus bitrate (~16 kbps) so the number is within ~20%.
-      const approxSeconds = Math.max(1, Math.round(audioBuf.byteLength / 2000));
-      recordWhisper({ userId: u.id, durationSec: approxSeconds });
+      const reportedSeconds = (whisper as any).duration;
+      const durationSec = typeof reportedSeconds === 'number' && reportedSeconds > 0
+        ? Math.max(1, Math.ceil(reportedSeconds))
+        // Fallback only for the case Whisper somehow doesn't include
+        // duration (shouldn't happen with verbose_json, but defensive).
+        : Math.max(1, Math.round(audioBuf.byteLength / 12000));
+      recordWhisper({ userId: u.id, durationSec });
     } catch (e: any) {
       req.log.error(
         { err: e, mime: baseMime, name: safeName, bytes: audioBuf.byteLength },
