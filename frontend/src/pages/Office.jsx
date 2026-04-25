@@ -82,21 +82,27 @@ export default function Office() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.getOffice();
-      setOffice(res?.office || null);
+      // PERF-018 — fire getOffice + listOfficeInvites in parallel for
+      // OWNER. The previous implementation awaited getOffice first then
+      // serially awaited invites, costing the OWNER an extra RTT. The
+      // invites endpoint is OWNER-only on the server so non-OWNER
+      // sessions skip the call entirely (avoids noisy 403s).
+      const [officeRes, invitesRes] = await Promise.all([
+        api.getOffice(),
+        user?.role === 'OWNER'
+          ? api.listOfficeInvites().catch(() => null)
+          : Promise.resolve(null),
+      ]);
+      setOffice(officeRes?.office || null);
       // Members come back nested inside `office.members` (the Prisma
       // include), not as a sibling `res.members`. Regressing this
       // blanks the members table — don't.
-      setMembers(res?.office?.members || []);
-      // Invites are OWNER-only on the server; skip the request for
-      // non-OWNER sessions to avoid a noisy 403 in the network panel.
-      if (user?.role === 'OWNER' && res?.office) {
-        try {
-          const inv = await api.listOfficeInvites();
-          setInvites(inv?.items || []);
-        } catch {
-          setInvites([]);
-        }
+      setMembers(officeRes?.office?.members || []);
+      // If the office row is missing the invites response is moot; the
+      // server would have 404'd getOffice anyway. Otherwise surface
+      // whatever invitesRes returned (null = error or non-OWNER).
+      if (user?.role === 'OWNER' && officeRes?.office && invitesRes) {
+        setInvites(invitesRes?.items || []);
       } else {
         setInvites([]);
       }

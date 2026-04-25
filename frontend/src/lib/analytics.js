@@ -77,6 +77,12 @@ export async function initAnalytics() {
       autocapture: true,
       // Frontend exception autocapture (errors + promise rejections)
       capture_exceptions: true,
+      // PERF-022 — RUM web-vitals. PostHog auto-collects LCP / CLS /
+      // INP / FCP via the web-vitals JS package; without this flag the
+      // SDK ignores those metrics. Enabling it gives us real-user LCP /
+      // INP percentiles per route, which are otherwise invisible
+      // outside synthetic Lighthouse runs.
+      capture_performance: true,
       disable_session_recording: false,
       persistence: 'localStorage+cookie',
       loaded: (p) => {
@@ -93,7 +99,7 @@ export async function initAnalytics() {
     }
   } catch (e) {
     // Never crash the app if PostHog fails to init
-    // eslint-disable-next-line no-console
+     
     console.warn('PostHog init failed:', e);
   }
 }

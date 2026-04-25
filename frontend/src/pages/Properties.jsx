@@ -486,9 +486,20 @@ export default function Properties() {
   // toggle. Empty set on failure is fine; the star just starts inactive.
   const [favoriteIds, setFavoriteIds] = useState(() => new Set());
 
-  useEffect(() => {
+  // PERF-020 — `templates` + `leads` are only consulted from the
+  // WhatsApp share / lead-picker dialogs. They were previously fetched
+  // on mount, dragging ~200 KB of unrelated data into the critical
+  // path. We now lazy-load them the first time the agent opens the
+  // share dialog (`ensureSharePrereqs()`), and seed favorites — which
+  // IS used on every card render — eagerly here.
+  const [sharePrereqsLoaded, setSharePrereqsLoaded] = useState(false);
+  const ensureSharePrereqs = useCallback(() => {
+    if (sharePrereqsLoaded) return;
+    setSharePrereqsLoaded(true);
     api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
     api.listLeads().then((r) => setLeads(r.items || r.leads || [])).catch(() => {});
+  }, [sharePrereqsLoaded]);
+  useEffect(() => {
     api.listFavorites('PROPERTY')
       .then((r) => {
         const ids = new Set((r?.items || []).map((f) => f.entityId));
@@ -700,6 +711,8 @@ export default function Properties() {
       e.stopPropagation();
     }
     haptics.tap();
+    // PERF-020 — fetch templates + leads lazily on first share open.
+    ensureSharePrereqs();
     setLeadPickerFor(prop);
   };
 
@@ -1309,6 +1322,8 @@ export default function Properties() {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 haptics.tap();
+                                // PERF-020 — lazy-load templates + leads.
+                                ensureSharePrereqs();
                                 setMatchesPickerFor(prop);
                               }}
                               aria-label={`${matchCount} לידים תואמים — ${prop.street}`}
@@ -1423,6 +1438,8 @@ export default function Properties() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                          // PERF-020 — lazy-load templates + leads.
+                          ensureSharePrereqs();
                           setMatchesPickerFor(prop);
                         }}
                         aria-label={`${matchCount} לידים תואמים — ${prop.street}`}

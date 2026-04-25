@@ -171,41 +171,26 @@ export default function Layout({ onLogout }) {
     const token = { cancelled: false };
     if (favCancelRef.current) favCancelRef.current.cancelled = true;
     favCancelRef.current = token;
+    // PERF-001 — single hydrated round-trip. The previous code path
+    // pulled `/favorites` then chained `listProperties` + `listLeads` +
+    // `listOwners` (each unbounded — see PERF-002) just to look up the
+    // label + city for ≤5 sidebar rows. The new endpoint server-joins
+    // and returns rows of `{ entityType, entityId, label, to }` in one
+    // shot, so we render directly from the response.
     try {
-      const favRes = await api.listFavorites();
-      const favItems = (favRes?.items || []).slice(0, 5);
-      if (!favItems.length) { if (!token.cancelled) setFavorites([]); return; }
-      const [propsRes, leadsRes, ownersRes] = await Promise.all([
-        api.listProperties({ mine: '1' }).catch(() => ({ items: [] })),
-        api.listLeads().catch(() => ({ items: [] })),
-        api.listOwners().catch(() => ({ items: [] })),
-      ]);
-      const byId = {
-        PROPERTY: new Map((propsRes?.items || []).map((p) => [p.id, p])),
-        LEAD:     new Map((leadsRes?.items || []).map((l) => [l.id, l])),
-        OWNER:    new Map((ownersRes?.items || []).map((o) => [o.id, o])),
-      };
-      const hydrated = favItems.map((fav) => {
-        const entity = byId[fav.entityType]?.get(fav.entityId);
-        if (!entity) return null;
-        if (fav.entityType === 'PROPERTY') {
-          const street = [entity.street, entity.number].filter(Boolean).join(' ').trim();
-          const label = [street || entity.address || 'נכס', entity.city].filter(Boolean).join(', ');
-          return { key: `P-${fav.entityId}`, label, to: `/properties/${fav.entityId}` };
-        }
-        if (fav.entityType === 'LEAD') {
-          // Direct link to the lead detail — the previous
-          // /customers?selected=<id> query just opened the list and
-          // highlighted the row, which meant the sidebar favorite
-          // didn't actually drop you into the lead record.
-          return { key: `L-${fav.entityId}`, label: entity.name || 'ליד', to: `/customers/${fav.entityId}` };
-        }
-        if (fav.entityType === 'OWNER') {
-          return { key: `O-${fav.entityId}`, label: entity.name || 'בעלים', to: `/owners/${fav.entityId}` };
-        }
-        return null;
-      }).filter(Boolean);
-      if (!token.cancelled) setFavorites(hydrated);
+      const favRes = await api.listFavorites({ hydrated: '1' });
+      const items = (favRes?.items || []).slice(0, 5).map((fav) => {
+        const prefix = fav.entityType === 'PROPERTY' ? 'P'
+          : fav.entityType === 'LEAD' ? 'L'
+          : fav.entityType === 'OWNER' ? 'O'
+          : 'X';
+        return {
+          key: `${prefix}-${fav.entityId}`,
+          label: fav.label || '',
+          to: fav.to || '#',
+        };
+      }).filter((it) => it.label && it.to !== '#');
+      if (!token.cancelled) setFavorites(items);
     } catch { /* favorites are best-effort */ }
   }, [user?.id]);
 

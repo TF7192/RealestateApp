@@ -10,7 +10,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Phone, MessageCircle, MessageSquare, Calendar, FileText,
   AlertCircle, History, Flame, Thermometer, Snowflake, Building2,
@@ -56,7 +55,9 @@ function statusMeta(status) {
 }
 
 export default function CustomerDetail() {
-  const { t } = useTranslation('customers');
+  // Inline Hebrew strings — i18n was dropped (PERF-004); the Hebrew JSON
+  // copy now lives directly in the JSX since the app is Hebrew-only and
+  // the English locale files were empty stubs.
   const { id } = useParams();
   const toast = useToast();
   const [lead, setLead] = useState(null);
@@ -92,14 +93,14 @@ export default function CustomerDetail() {
         const list = await api.listLeads();
         fetched = (list?.items || []).find((l) => String(l.id) === String(id)) || null;
       }
-      if (!fetched) throw new Error(t('detail.notFound'));
+      if (!fetched) throw new Error('הלקוח לא נמצא');
       setLead(fetched);
     } catch (e) {
-      setError(e.message || t('detail.loadError'));
+      setError(e.message || 'שגיאה בטעינה');
     } finally {
       setLoading(false);
     }
-  }, [id, t]);
+  }, [id]);
 
   useEffect(() => { loadLead(); }, [loadLead]);
 
@@ -136,7 +137,7 @@ export default function CustomerDetail() {
   if (loading) {
     return (
       <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.muted, fontSize: 14 }}>
-        {t('detail.loading')}
+        טוען…
       </div>
     );
   }
@@ -152,10 +153,10 @@ export default function CustomerDetail() {
           background: 'rgba(185,28,28,0.08)', color: DT.hot,
           padding: '10px 14px', borderRadius: 10, fontSize: 13,
         }}>
-          <AlertCircle size={16} /> {error || t('detail.notFound')}
+          <AlertCircle size={16} /> {error || 'הלקוח לא נמצא'}
         </div>
         <Link to="/customers" style={ghostBtn()}>
-          <ArrowRight size={14} /> {t('detail.backToCustomers')}
+          <ArrowRight size={14} /> חזור ללקוחות
         </Link>
       </div>
     );
@@ -178,11 +179,11 @@ export default function CustomerDetail() {
           color: DT.muted, textDecoration: 'none', fontSize: 13, fontWeight: 700,
         }}>
           <ArrowRight size={16} />
-          {t('detail.crumbCustomers')}
+          לקוחות
         </Link>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <Link to="/templates" style={secondaryBtn()} title={t('detail.toolbar.templatesTitle')}>
-            <FileText size={14} /> {t('detail.toolbar.templates')}
+          <Link to="/templates" style={secondaryBtn()} title="ערוך תבניות הודעה">
+            <FileText size={14} /> ערוך תבניות הודעה
           </Link>
           {lead.phone && (
             <>
@@ -192,24 +193,24 @@ export default function CustomerDetail() {
                 style={secondaryBtn()}
                 title={lead.phone}
               >
-                <Phone size={14} /> {t('detail.toolbar.call')}
+                <Phone size={14} /> התקשר
               </a>
               <a
-                href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(t('detail.toolbar.whatsappHello', { name: lead.name }))}`}
+                href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`שלום ${lead.name}`)}`}
                 target="_blank" rel="noopener noreferrer"
                 onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
                 style={secondaryBtn()}
-                title={t('detail.toolbar.whatsappTitle')}
+                title="וואטסאפ"
               >
-                <MessageCircle size={14} /> {t('detail.toolbar.whatsapp')}
+                <MessageCircle size={14} /> וואטסאפ
               </a>
               <a
                 href={`sms:${lead.phone}`}
                 onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
                 style={secondaryBtn()}
-                title={t('detail.toolbar.smsTitle')}
+                title="הודעת SMS"
               >
-                <MessageSquare size={14} /> {t('detail.toolbar.sms')}
+                <MessageSquare size={14} /> SMS
               </a>
             </>
           )}
@@ -217,9 +218,9 @@ export default function CustomerDetail() {
             type="button"
             onClick={() => { haptics.tap(); setMeetingOpen(true); }}
             style={primaryBtn()}
-            title={t('detail.toolbar.scheduleMeetingTitle')}
+            title="קבע פגישה"
           >
-            <Calendar size={14} /> {t('detail.toolbar.scheduleMeeting')}
+            <Calendar size={14} /> קבע פגישה
           </button>
           {/* Sprint 5 — AI-backed smart matcher. Distinct gold-gradient
               pill so it visually reads as "premium / magic" and doesn't
@@ -246,10 +247,10 @@ export default function CustomerDetail() {
           <button type="button" onClick={() => { haptics.tap(); setEditOpen(true); }} style={secondaryBtn()} title="ערוך פרטי לקוח">
             <Edit3 size={14} /> ערוך
           </button>
-          <button type="button" onClick={() => printPage()} style={ghostBtn()} title={t('detail.toolbar.printTitle')}>
+          <button type="button" onClick={() => printPage()} style={ghostBtn()} title="הדפס">
             <Printer size={14} />
           </button>
-          <button type="button" onClick={() => popoutCurrentRoute()} style={ghostBtn()} title={t('detail.toolbar.popoutTitle')}>
+          <button type="button" onClick={() => popoutCurrentRoute()} style={ghostBtn()} title="פתח בחלון חדש">
             <Maximize2 size={14} />
           </button>
         </div>
@@ -286,7 +287,7 @@ export default function CustomerDetail() {
             {matchCount > 0 && (
               <Link
                 to={`/properties${lead.city ? `?city=${encodeURIComponent(lead.city)}` : ''}`}
-                title={t('detail.matchingTitle')}
+                title="נכסים תואמים בקריטריונים שלך"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
                   background: DT.goldSoft, color: DT.goldDark,
@@ -296,7 +297,7 @@ export default function CustomerDetail() {
               >
                 <Sparkles size={12} />
                 <strong>{matchCount}</strong>
-                {t('detail.matchLabel')}
+                נכסים תואמים
               </Link>
             )}
           </div>
@@ -322,8 +323,8 @@ export default function CustomerDetail() {
             <MatchingList leadId={lead.id} title="נכסים תואמים" />
           </section>
           <LeadSummaryPanel lead={lead} onEdit={() => setEditOpen(true)} />
-          <section style={sectionCard()} aria-label={t('detail.sections.tagsAria')}>
-            <h3 style={sectionTitle()}>{t('detail.sections.tags')}</h3>
+          <section style={sectionCard()} aria-label="תגי לקוח">
+            <h3 style={sectionTitle()}>תגים</h3>
             <TagPicker entityType="LEAD" entityId={lead.id} />
           </section>
         </div>
@@ -357,7 +358,7 @@ export default function CustomerDetail() {
           onClose={() => setEditOpen(false)}
           onSaved={async () => {
             setEditOpen(false);
-            toast.success(t('detail.saved'));
+            toast.success('הפרטים נשמרו');
             try { await loadLead(); } catch { /* ignore */ }
           }}
         />
@@ -376,8 +377,6 @@ export default function CustomerDetail() {
 // LeadSummaryPanel — read-only snapshot of the lead's profile.
 // ──────────────────────────────────────────────────────────────────
 function LeadSummaryPanel({ lead, onEdit }) {
-  const { t } = useTranslation('customers');
-
   const fmtPrice = (n) => {
     if (!Number.isFinite(n) || n === 0) return null;
     if (n >= 1_000_000) return `₪${(n / 1_000_000).toFixed(1)}M`;
@@ -429,7 +428,7 @@ function LeadSummaryPanel({ lead, onEdit }) {
       </header>
       {rows.length === 0 ? (
         <p style={{ fontSize: 13, color: DT.muted, margin: 0 }}>
-          {t('detail.notes.emptyLead', { defaultValue: 'עוד לא מולאו פרטים על הלקוח הזה.' })}
+          עוד לא מולאו פרטים על הלקוח הזה.
         </p>
       ) : (
         <dl style={{
@@ -470,15 +469,14 @@ function ReadRow({ label, value }) {
 // ActivityTimeline — events derived from the lead's fields.
 // ──────────────────────────────────────────────────────────────────
 function ActivityTimeline({ lead }) {
-  const { t } = useTranslation('customers');
   const events = useMemo(() => {
     const items = [];
     if (lead.lastContact) {
       const rel = relativeDate(lead.lastContact);
       const days = Math.round((Date.now() - new Date(lead.lastContact).getTime()) / 86400000);
       const title = days >= 0
-        ? t('detail.timeline.lastContactDaysAgo', { days })
-        : t('detail.timeline.lastContactPlanned');
+        ? `קשר אחרון לפני ${days} ימים`
+        : 'קשר אחרון מתוכנן';
       items.push({
         kind: 'contact', ts: new Date(lead.lastContact).getTime(),
         icon: Phone, title, sub: rel.label, absolute: absoluteTime(lead.lastContact),
@@ -489,7 +487,7 @@ function ActivityTimeline({ lead }) {
       items.push({
         kind: 'status', ts: new Date(lead.statusUpdatedAt).getTime(),
         icon: Sparkles,
-        title: t('detail.timeline.statusUpdatedTo', { status: s?.label || lead.status }),
+        title: `סטטוס עודכן ל${s?.label || lead.status}`,
         sub: relativeTime(lead.statusUpdatedAt),
         absolute: absoluteTime(lead.statusUpdatedAt),
       });
@@ -498,22 +496,22 @@ function ActivityTimeline({ lead }) {
       items.push({
         kind: 'created', ts: new Date(lead.createdAt).getTime(),
         icon: Building2,
-        title: t('detail.timeline.created'),
+        title: 'הליד נוצר',
         sub: relativeTime(lead.createdAt),
         absolute: absoluteTime(lead.createdAt),
       });
     }
     items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
     return items;
-  }, [lead, t]);
+  }, [lead]);
 
   return (
-    <section style={sectionCard()} aria-label={t('detail.timeline.title')}>
+    <section style={sectionCard()} aria-label="ציר פעילות">
       <h3 style={sectionTitle()}>
-        <History size={16} /> {t('detail.timeline.title')}
+        <History size={16} /> ציר פעילות
       </h3>
       {events.length === 0 ? (
-        <p style={{ fontSize: 13, color: DT.muted, margin: 0 }}>{t('detail.timeline.empty')}</p>
+        <p style={{ fontSize: 13, color: DT.muted, margin: 0 }}>עדיין אין פעילות לתצוגה. עדכן קשר או חתום הסכם כדי להתחיל לעקוב.</p>
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {events.map((ev, idx) => {

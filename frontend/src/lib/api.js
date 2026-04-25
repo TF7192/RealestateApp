@@ -922,9 +922,25 @@ export const api = {
   },
   deleteDocument: (id) => request(`/documents/${id}`, { method: 'DELETE' }),
 
-  // Favorites (B4)
-  listFavorites:       (entityType) => {
-    const qs = entityType ? `?${new URLSearchParams({ entityType }).toString()}` : '';
+  // Favorites (B4). The legacy signature passed an `entityType` string
+  // directly; the new signature accepts an options object that also
+  // surfaces `hydrated` (PERF-001) so the sidebar can request
+  // server-joined `{ entityType, entityId, label, to }` rows in a
+  // single round-trip instead of issuing 3 follow-up list calls. The
+  // string overload is preserved for the existing callers in
+  // Properties.jsx / Customers.jsx / Owners.jsx.
+  listFavorites:       (opts) => {
+    const params = {};
+    if (typeof opts === 'string') {
+      // legacy: listFavorites('PROPERTY')
+      if (opts) params.entityType = opts;
+    } else if (opts && typeof opts === 'object') {
+      if (opts.entityType) params.entityType = opts.entityType;
+      if (opts.hydrated) params.hydrated = String(opts.hydrated);
+    }
+    const qs = Object.keys(params).length
+      ? `?${new URLSearchParams(params).toString()}`
+      : '';
     return request(`/favorites${qs}`);
   },
   addFavorite:         (body) => request('/favorites', { method: 'POST', body }),

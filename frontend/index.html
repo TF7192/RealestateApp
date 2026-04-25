@@ -25,32 +25,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=gd1" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=gd1" />
 
-    <!-- Fonts — single family across the entire app.
-         Lighthouse flagged the stylesheet link as render-blocking (~290ms
-         savings). Use the preload+swap pattern so the CSS fetches in
-         parallel with HTML parsing but doesn't block the first paint.
-         Browsers without JS fall back to the inline <noscript> stylesheet. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- Perf 2026-04-25: preload the first Hebrew font weight Lighthouse
-         identified as the highest-impact woff2 in the dashboard run
-         (~22 KB, 'Assistant' regular). This issues the request next to
-         the CSS preload above instead of waiting for the CSS to parse. -->
+    <!-- Fonts — Assistant 400/500/700 self-hosted (PERF-017).
+         Previously we hit fonts.googleapis.com for 6 weights (300-800)
+         which forced a TLS+TCP hop on every cold load. The CDN was
+         flagged by Lighthouse as render-blocking and we never used the
+         300/600/800 weights in the design system. The @font-face rules
+         live in index.css; we preload just the 400 woff2 here so the
+         first paint has the regular weight in flight before the CSS
+         parses. font-display: swap keeps text visible while the woff2
+         downloads. -->
     <link rel="preload" as="font" type="font/woff2"
-          href="https://fonts.gstatic.com/s/assistant/v24/2sDcZGJYnIjSi6H75xkzaGW5Kb8VZA.woff2"
-          crossorigin>
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap"
-      onload="this.onload=null;this.rel='stylesheet'"
-    >
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap"
-      >
-    </noscript>
+          href="/fonts/assistant-400.woff2" crossorigin>
 
     <title>Estia — ניהול נכסים ולידים</title>
   </head>

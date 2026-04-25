@@ -5,11 +5,9 @@ import { ThemeProvider } from './lib/theme.jsx';
 import { ToastProvider } from './lib/toast.jsx';
 import './index.css';
 import './styles/print.css';
-// i18n must init before the first React render so useTranslation() has
-// resources on the initial paint. The module is side-effecty — importing
-// it calls i18n.init(). Default language is Hebrew; English stubs load
-// alongside. See frontend/src/i18n/index.js for the resource map.
-import './i18n';
+// i18n was removed (PERF-004): the app is Hebrew-only and the English
+// locale JSON files were empty stubs. All Hebrew strings now live
+// inline in the JSX, matching the convention from CLAUDE.md.
 import App from './App.jsx';
 import { initAnalytics } from './lib/analytics.js';
 

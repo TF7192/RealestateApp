@@ -5,7 +5,6 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Save, Clipboard, X, Check, Loader2,
   UserCircle, Search, Home, SlidersHorizontal, StickyNote, Shield,
@@ -155,7 +154,8 @@ const INITIAL_FORM = {
 };
 
 export default function NewLead() {
-  const { t } = useTranslation('customers');
+  // Inline Hebrew strings — i18n was dropped (PERF-004) since the app
+  // is Hebrew-only and the English JSON locales were empty stubs.
   const navigate = useNavigate();
   const toast = useToast();
   const [form, setForm] = useState(INITIAL_FORM);
@@ -168,7 +168,7 @@ export default function NewLead() {
 
   const hasContent = !!(form.name || form.phone || form.email || form.city || form.notes);
   const isDirty = hasContent && !savedRef.current;
-  useBeforeUnload(isDirty, t('new.unsavedWarning'));
+  useBeforeUnload(isDirty, 'יש שינויים שלא נשמרו בליד — לעזוב?');
   const [clipboardSuggestion, setClipboardSuggestion] = useState(null);
   const [clipboardDismissed, setClipboardDismissed] = useState(false);
   const peekedRef = useRef(false);
@@ -207,13 +207,13 @@ export default function NewLead() {
       const { __savedAt, ...formData } = draftBanner;
       setForm({ ...INITIAL_FORM, ...formData });
       setDraftBanner(null);
-      toast.info(t('new.toasts.draftRestored'));
+      toast.info('הטיוטה שוחזרה');
     }
   };
   const discardDraft = () => {
     clearDraft();
     setDraftBanner(null);
-    toast.info(t('new.toasts.draftDiscarded'));
+    toast.info('הטיוטה נמחקה');
   };
 
   // ── Clipboard phone auto-paste ─────────────────────────────────────
@@ -244,7 +244,7 @@ export default function NewLead() {
     if (clipboardSuggestion) {
       update('phone', clipboardSuggestion);
       setClipboardSuggestion(null);
-      toast.success(t('new.toasts.phonePasted'));
+      toast.success('טלפון הודבק');
     }
   };
   const dismissClipboard = () => {
@@ -262,7 +262,7 @@ export default function NewLead() {
     e.preventDefault();
     if (submitting) return;
     if (!form.name?.trim()) {
-      toast.error(t('new.nameRequired'));
+      toast.error('שם הלקוח הוא שדה חובה');
       return;
     }
     setSubmitting(true);
@@ -337,12 +337,12 @@ export default function NewLead() {
       const res = await api.createLead(body);
       savedRef.current = true;
       clearDraft();
-      toast.success(t('new.toasts.saved'));
+      toast.success('הליד נשמר');
       const newId = res?.id || res?.lead?.id;
       if (newId) navigate(`/customers/${newId}`);
       else navigate('/customers');
     } catch (err) {
-      toast.error(err?.message || t('new.errors.saveFailed'));
+      toast.error(err?.message || 'שמירת הליד נכשלה');
       setSubmitting(false);
     }
   };
@@ -371,7 +371,7 @@ export default function NewLead() {
         fontSize: 13, fontWeight: 700, marginBottom: 14,
       }}>
         <ArrowRight size={16} />
-        {t('new.back')}
+        חזרה ללידים
       </Link>
 
       {/* Page header card */}
@@ -389,10 +389,10 @@ export default function NewLead() {
         </div>
         <div style={{ flex: 1, minWidth: 220 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: 0 }}>
-            {t('new.title')}
+            ליד חדש
           </h1>
           <p style={{ fontSize: 13, color: DT.muted, margin: '4px 0 0' }}>
-            {t('new.subtitle')}
+            הזן פרטי לקוח מתעניין
           </p>
         </div>
         <button
@@ -434,7 +434,7 @@ export default function NewLead() {
           gap: 12, flexWrap: 'wrap',
         }}>
           <span style={{ fontSize: 13, color: DT.ink }}>
-            {t('new.draft.found')}
+            נמצאה טיוטה שנשמרה
             {draftBanner.__savedAt && (
               <span style={{ color: DT.muted, marginInlineStart: 6 }}>
                 · {relLabel(draftBanner.__savedAt)}
@@ -443,10 +443,10 @@ export default function NewLead() {
           </span>
           <div style={{ display: 'flex', gap: 6 }}>
             <button type="button" onClick={restoreDraft} style={secondaryBtn()}>
-              {t('new.draft.restore')}
+              שחזר
             </button>
             <button type="button" onClick={discardDraft} style={ghostBtn()}>
-              {t('new.draft.discard')}
+              מחק
             </button>
           </div>
         </div>
@@ -474,17 +474,17 @@ export default function NewLead() {
             }}
           >
             <Clipboard size={14} />
-            <span>{t('new.clipboard.suggestion', { phone: clipboardSuggestion })}</span>
+            <span>{`${clipboardSuggestion} מהלוח — הוסף`}</span>
           </button>
           <span id="clip-chip-desc" style={{
             position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
             overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0,
           }}>
-            {t('new.clipboard.srDetected')}
+            מספר טלפון זוהה בלוח העתקה
           </span>
           <button
             type="button"
-            aria-label={t('new.clipboard.close')}
+            aria-label="סגור"
             onClick={dismissClipboard}
             style={{
               background: DT.white, border: `1px solid ${DT.border}`,
@@ -502,21 +502,21 @@ export default function NewLead() {
         display: 'flex', flexDirection: 'column', gap: 14,
       }}>
         {/* Section 1 — פרטי לקוח (identity + contact) */}
-        <section style={sectionCard()} aria-label={t('new.sections.personal')}>
+        <section style={sectionCard()} aria-label="פרטים אישיים">
           <h3 style={sectionTitle()}>
-            <UserCircle size={16} /> {t('new.sections.personal')}
+            <UserCircle size={16} /> פרטים אישיים
           </h3>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.customerName')}>
+            <Field label="שם הלקוח">
               <input
                 {...inputPropsForName()}
                 className="form-input"
-                placeholder={t('new.fields.customerNamePlaceholder')}
+                placeholder="שם מלא"
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
               />
             </Field>
-            <Field label={t('new.fields.phone')}>
+            <Field label="טלפון">
               <PhoneField
                 value={form.phone}
                 onChange={(v) => update('phone', v)}
@@ -524,69 +524,69 @@ export default function NewLead() {
             </Field>
           </div>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.source')}>
+            <Field label="מקור הליד">
               {/* F-5 — grouped sources. Flat 9-option dropdown hurt
                   scanning; "הפניה" vs "הפניה מלקוח" adjacency cost real
                   agent seconds and polluted the funnel report. */}
               <SelectField
                 value={form.source}
                 onChange={(v) => update('source', v)}
-                placeholder={t('new.fields.sourcePlaceholder')}
+                placeholder="בחר מקור..."
                 groups={[
-                  { label: t('new.options.sourceGroups.online'), options: [t('new.options.sources.facebook'), t('new.options.sources.yad2'), t('new.options.sources.website')] },
-                  { label: t('new.options.sourceGroups.referrals'),   options: [t('new.options.sources.referral'), t('new.options.sources.customerReferral')] },
-                  { label: t('new.options.sourceGroups.physical'),    options: [t('new.options.sources.openHouse'), t('new.options.sources.sign'), t('new.options.sources.agentTour')] },
-                  { label: t('new.options.sourceGroups.other'),     options: [t('new.options.sources.other')] },
+                  { label: 'אונליין', options: ['פייסבוק', 'יד 2', 'אתר'] },
+                  { label: 'מכרים',   options: ['הפניה', 'הפניה מלקוח'] },
+                  { label: 'פיזי',    options: ['בית פתוח', 'שלט', 'סיור סוכנים'] },
+                  { label: 'אחר',     options: ['אחר'] },
                 ]}
               />
             </Field>
-            <Field label={t('new.fields.interestType')}>
+            <Field label="סוג התעניינות">
               <Segmented
                 value={form.interestType}
                 onChange={(v) => update('interestType', v)}
                 options={[
-                  { value: 'פרטי', label: t('new.options.interestType.private') },
-                  { value: 'מסחרי', label: t('new.options.interestType.commercial') },
+                  { value: 'פרטי', label: 'פרטי' },
+                  { value: 'מסחרי', label: 'מסחרי' },
                 ]}
-                ariaLabel={t('new.fields.interestTypeAria')}
+                ariaLabel="סוג התעניינות"
               />
             </Field>
           </div>
         </section>
 
         {/* Section 2 — מה הוא מחפש (search preferences: purpose, type, city/street) */}
-        <section style={sectionCard()} aria-label={t('new.sections.searchPreferences')}>
+        <section style={sectionCard()} aria-label="העדפות חיפוש">
           <h3 style={sectionTitle()}>
-            <Search size={16} /> {t('new.sections.searchPreferences')}
+            <Search size={16} /> העדפות חיפוש
           </h3>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.lookingFor')}>
+            <Field label="קנייה / שכירות">
               <Segmented
                 value={form.lookingFor}
                 onChange={(v) => update('lookingFor', v)}
                 options={[
-                  { value: 'buy', label: t('new.options.lookingFor.buy') },
-                  { value: 'rent', label: t('new.options.lookingFor.rent') },
+                  { value: 'buy', label: 'קנייה' },
+                  { value: 'rent', label: 'שכירות' },
                 ]}
-                ariaLabel={t('new.fields.lookingForAria')}
+                ariaLabel="קנייה או שכירות"
               />
             </Field>
-            <Field label={t('new.fields.sector')}>
+            <Field label="מגזר">
               <SelectField
                 value={form.sector}
                 onChange={(v) => update('sector', v)}
-                options={[t('new.options.sectors.general'), t('new.options.sectors.religious'), t('new.options.sectors.haredi'), t('new.options.sectors.arab')]}
+                options={['כללי', 'דתי', 'חרדי', 'ערבי']}
               />
             </Field>
           </div>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.city')}>
+            <Field label="עיר מבוקשת">
               <SuggestPicker
                 options={cityNames}
                 value={form.city}
                 onChange={(v) => update('city', v)}
-                placeholder={t('new.fields.cityPlaceholder')}
-                label={t('new.fields.cityLabel')}
+                placeholder="תל אביב, ירושלים, חיפה…"
+                label="עיר"
                 inputProps={{ ...inputPropsForCity(), autoComplete: 'off' }}
                 asyncFetch={async (q) => {
                   // Backend caps `limit` at 15 (zod rejects anything
@@ -600,13 +600,13 @@ export default function NewLead() {
                 }}
               />
             </Field>
-            <Field label={t('new.fields.street')}>
+            <Field label="רחוב (אופציונלי)">
               <SuggestPicker
                 options={streetOptions}
                 value={form.street}
                 onChange={(v) => update('street', v)}
-                placeholder={t('new.fields.streetPlaceholder')}
-                label={t('new.fields.streetLabel')}
+                placeholder="רוטשילד, אלנבי…"
+                label="רחוב"
                 inputProps={{ ...inputPropsForAddress(), autoComplete: 'off' }}
                 asyncFetch={async (q) => {
                   const res = await api.geoSearch({ q, city: form.city, limit: 12 });
@@ -617,40 +617,40 @@ export default function NewLead() {
               />
             </Field>
           </div>
-          <Field label={t('new.fields.schoolProximity')}>
+          <Field label="קירבה לבית ספר">
             <SelectField
               value={form.schoolProximity}
               onChange={(v) => update('schoolProximity', v)}
-              placeholder={t('new.fields.schoolProximityNotImportant')}
-              options={[t('new.options.school.m200'), t('new.options.school.m500'), t('new.options.school.walk'), t('new.options.school.km')]}
+              placeholder="לא חשוב"
+              options={['עד 200 מטר', 'עד 500 מטר', 'הליכה', 'עד ק״מ']}
             />
           </Field>
         </section>
 
         {/* Section 3 — תקציב וחדרים */}
-        <section style={sectionCard()} aria-label={t('new.fields.priceRange')}>
+        <section style={sectionCard()} aria-label="טווח מחיר">
           <h3 style={sectionTitle()}>
-            <Home size={16} /> {t('new.fields.roomsRange')} · {t('new.fields.priceRange')}
+            <Home size={16} /> טווח חדרים · טווח מחיר
           </h3>
           {/* UX review F-5.3 — one labeled "טווח חדרים" group instead
               of two stacked selectors with literal-translation labels
               ("חדרים: מ" / "חדרים: עד"). Mirrors the PriceRange pattern
               right below this. */}
-          <Field label={t('new.fields.roomsRange')}>
+          <Field label="טווח חדרים">
             <div style={gridRow2()}>
               <RoomsChips
                 value={form.roomsMin}
                 onChange={(v) => update('roomsMin', v)}
-                label={t('new.fields.roomsFrom')}
+                label="מ"
               />
               <RoomsChips
                 value={form.roomsMax}
                 onChange={(v) => update('roomsMax', v)}
-                label={t('new.fields.roomsTo')}
+                label="עד"
               />
             </div>
           </Field>
-          <Field label={t('new.fields.priceRange')}>
+          <Field label="טווח מחיר">
             <PriceRange
               minVal={form.priceMin}
               maxVal={form.priceMax}
@@ -662,7 +662,7 @@ export default function NewLead() {
         </section>
 
         {/* Section 4 — דרישות נוספות (amenities) */}
-        <section style={sectionCard()} aria-label={t('new.amenities.balcony')}>
+        <section style={sectionCard()} aria-label="מרפסת">
           <h3 style={sectionTitle()}>
             <SlidersHorizontal size={16} /> דרישות נוספות
           </h3>
@@ -673,37 +673,37 @@ export default function NewLead() {
             <CheckboxItem
               checked={form.preApproval}
               onChange={(v) => update('preApproval', v)}
-              label={t('new.amenities.preApproval')}
+              label="אישור עקרוני למשכנתא"
             />
             <CheckboxItem
               checked={form.balconyRequired}
               onChange={(v) => update('balconyRequired', v)}
-              label={t('new.amenities.balcony')}
+              label="מרפסת"
             />
             <CheckboxItem
               checked={form.parkingRequired}
               onChange={(v) => update('parkingRequired', v)}
-              label={t('new.amenities.parking')}
+              label="חניה"
             />
             <CheckboxItem
               checked={form.elevatorRequired}
               onChange={(v) => update('elevatorRequired', v)}
-              label={t('new.amenities.elevator')}
+              label="מעלית"
             />
             <CheckboxItem
               checked={form.safeRoomRequired}
               onChange={(v) => update('safeRoomRequired', v)}
-              label={t('new.amenities.safeRoom')}
+              label="ממ״ד"
             />
             <CheckboxItem
               checked={form.acRequired}
               onChange={(v) => update('acRequired', v)}
-              label={t('new.amenities.ac')}
+              label="מזגנים"
             />
             <CheckboxItem
               checked={form.storageRequired}
               onChange={(v) => update('storageRequired', v)}
-              label={t('new.amenities.storage')}
+              label="מחסן"
             />
           </div>
         </section>
@@ -798,17 +798,17 @@ export default function NewLead() {
         )}
 
         {/* Section 5 — K1 contact / identity extended (optional) */}
-        <section style={sectionCard()} aria-label={t('new.sections.extended')}>
+        <section style={sectionCard()} aria-label="פרטים מורחבים">
           {/* K1 — contact / identity block. Optional: agents who only
               have a phone number can leave the whole section blank.
               L-4 — firstName / lastName removed here; the single "שם
               מלא" at the top of the form is the canonical name and the
               duplicate pair was causing confusion + split saves. */}
           <h3 style={sectionTitle()}>
-            <UserCircle size={16} /> {t('new.sections.extended')}
+            <UserCircle size={16} /> פרטים מורחבים
           </h3>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.companyName')}>
+            <Field label="שם חברה">
               <input
                 id="k1-company"
                 className="form-input"
@@ -818,7 +818,7 @@ export default function NewLead() {
                 onChange={(e) => update('companyName', e.target.value)}
               />
             </Field>
-            <Field label={t('new.fields.personalId')}>
+            <Field label="ת.ז / ח.פ">
               <input
                 id="k1-pid"
                 className="form-input"
@@ -830,7 +830,7 @@ export default function NewLead() {
             </Field>
           </div>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.address')}>
+            <Field label="כתובת">
               <input
                 id="k1-address"
                 className="form-input"
@@ -840,7 +840,7 @@ export default function NewLead() {
                 onChange={(e) => update('address', e.target.value)}
               />
             </Field>
-            <Field label={t('new.fields.cityFree')}>
+            <Field label="עיר (חופשי)">
               <input
                 id="k1-city"
                 className="form-input"
@@ -852,7 +852,7 @@ export default function NewLead() {
             </Field>
           </div>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.zip')}>
+            <Field label="מיקוד">
               <input
                 id="k1-zip"
                 className="form-input"
@@ -862,7 +862,7 @@ export default function NewLead() {
                 onChange={(e) => update('zip', e.target.value)}
               />
             </Field>
-            <Field label={t('new.fields.primaryPhone')}>
+            <Field label="טלפון עיקרי">
               <PhoneField
                 value={form.primaryPhone}
                 onChange={(v) => update('primaryPhone', v)}
@@ -870,15 +870,15 @@ export default function NewLead() {
             </Field>
           </div>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.phone1')}>
+            <Field label="טלפון נוסף 1">
               <PhoneField value={form.phone1} onChange={(v) => update('phone1', v)} />
             </Field>
-            <Field label={t('new.fields.phone2')}>
+            <Field label="טלפון נוסף 2">
               <PhoneField value={form.phone2} onChange={(v) => update('phone2', v)} />
             </Field>
           </div>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.fax')}>
+            <Field label="פקס">
               <input
                 id="k1-fax"
                 className="form-input"
@@ -895,34 +895,34 @@ export default function NewLead() {
         </section>
 
         {/* Section 6 — K2 + L1 admin block */}
-        <section style={sectionCard()} aria-label={t('new.sections.admin')}>
+        <section style={sectionCard()} aria-label="ניהול ולקוח">
           {/* K2 + L1 — admin block. Lives in its own section so agents
               can skip it entirely on quick-capture. */}
           <h3 style={sectionTitle()}>
-            <Shield size={16} /> {t('new.sections.admin')}
+            <Shield size={16} /> ניהול ולקוח
           </h3>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.customerStatus')}>
+            <Field label="סטטוס לקוח">
               <SelectField
                 value={form.customerStatus}
                 onChange={(v) => update('customerStatus', v)}
                 options={labelsToOptions(CUSTOMER_STATUS_LABELS)}
-                aria-label={t('new.fields.customerStatus')}
+                aria-label="סטטוס לקוח"
                 id="k2-cs"
               />
             </Field>
-            <Field label={t('new.fields.leadStatus')}>
+            <Field label="סטטוס ליד">
               <SelectField
                 value={form.leadStatus}
                 onChange={(v) => update('leadStatus', v)}
                 options={labelsToOptions(QUICK_LEAD_STATUS_LABELS)}
-                aria-label={t('new.fields.leadStatus')}
+                aria-label="סטטוס ליד"
                 id="k2-ls"
               />
             </Field>
           </div>
           <div style={gridRow2()}>
-            <Field label={t('new.fields.commissionPct')}>
+            <Field label="אחוז עמלה">
               <NumberField
                 value={form.commissionPct}
                 onChange={(n) => update('commissionPct', n)}
@@ -930,23 +930,23 @@ export default function NewLead() {
                 min={0}
                 max={100}
                 placeholder="2"
-                aria-label={t('new.fields.commissionPct')}
+                aria-label="אחוז עמלה"
               />
             </Field>
-            <Field label={t('new.fields.seriousness')}>
+            <Field label="רצינות">
               <Segmented
                 value={form.seriousnessOverride}
                 onChange={(v) => update('seriousnessOverride', v)}
                 options={labelsToOptions(SERIOUSNESS_LABELS)}
-                ariaLabel={t('new.fields.seriousness')}
+                ariaLabel="רצינות"
               />
             </Field>
           </div>
           <div style={{ marginTop: 8 }}>
-            <div style={labelStyle()}>{t('new.fields.purposes')}</div>
+            <div style={labelStyle()}>מטרת הרכישה</div>
             <div
               role="group"
-              aria-label={t('new.fields.purposes')}
+              aria-label="מטרת הרכישה"
               style={{
                 display: 'grid', gap: 8, marginTop: 6,
                 gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
@@ -974,19 +974,19 @@ export default function NewLead() {
             <CheckboxItem
               checked={!!form.isPrivate}
               onChange={(v) => update('isPrivate', v)}
-              label={t('new.fields.privateCustomer')}
+              label="לקוח פרטי (לא חשוף לשותפי משרד)"
             />
           </div>
         </section>
 
         {/* Section 7 — הערות */}
-        <section style={sectionCard()} aria-label={t('new.sections.notes')}>
+        <section style={sectionCard()} aria-label="הערות">
           <h3 style={sectionTitle()}>
-            <StickyNote size={16} /> {t('new.sections.notes')}
+            <StickyNote size={16} /> הערות
           </h3>
           <textarea
             className="form-textarea"
-            placeholder={t('new.fields.notesPlaceholder')}
+            placeholder="הערות נוספות על הלקוח..."
             rows={4}
             dir="auto"
             autoCapitalize="sentences"
@@ -1005,10 +1005,10 @@ export default function NewLead() {
         }}>
           <button type="submit" disabled={submitting} style={primaryBtn(submitting)}>
             {submitting ? <Loader2 size={16} className="y2-spin" /> : <Save size={16} />}
-            {submitting ? t('new.actions.saving') : t('new.actions.save')}
+            {submitting ? 'שומר…' : 'שמור ליד'}
           </button>
           <Link to="/customers" style={ghostBtn()}>
-            {t('new.actions.cancel')}
+            ביטול
           </Link>
           {/* F-15 — honest autosave chip. During the debounce window
               (draftPending) we say "pending"; after the flush we show the
@@ -1026,8 +1026,8 @@ export default function NewLead() {
               }}
             >
               {draftPending
-                ? (<><Loader2 size={12} className="y2-spin" /> {t('new.autosave.saving')}</>)
-                : (<><Check size={12} /> {draftSavedAt ? t('new.autosave.savedAt', { time: relLabel(draftSavedAt) }) : t('new.autosave.saved')}</>)
+                ? (<><Loader2 size={12} className="y2-spin" /> שומר טיוטה…</>)
+                : (<><Check size={12} /> {draftSavedAt ? `טיוטה נשמרה ${relLabel(draftSavedAt)}` : 'טיוטה נשמרה'}</>)
               }
             </span>
           )}
@@ -1038,9 +1038,9 @@ export default function NewLead() {
       <StickyActionBar visible>
         <button type="submit" form="lead-form" disabled={submitting} style={primaryBtn(submitting)}>
           {submitting ? <Loader2 size={16} className="y2-spin" /> : <Save size={16} />}
-          {submitting ? t('new.actions.saving') : t('new.actions.save')}
+          {submitting ? 'שומר…' : 'שמור ליד'}
         </button>
-        <Link to="/customers" style={ghostBtn()}>{t('new.actions.cancel')}</Link>
+        <Link to="/customers" style={ghostBtn()}>ביטול</Link>
       </StickyActionBar>
     </div>
   );
