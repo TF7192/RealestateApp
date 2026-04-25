@@ -298,8 +298,15 @@ button, a, [role="button"] {
   .property-card:active,
   .customer-card:active,
   .owner-card:active {
-    transform: scale(0.97);
-    transition: transform 80ms cubic-bezier(0.22, 1, 0.36, 1);
+    /* Bumped from scale(0.97) → scale(0.94). On a 120Hz iPhone the
+       3% squish was so subtle it read as "no feedback". 6% is the
+       sweet spot — visibly springs back without feeling cartoony.
+       Matches the iOS UIControl default press feedback magnitude. */
+    transform: scale(0.94);
+    /* 110ms with iOS spring curve — slightly longer than 80ms so the
+       eye actually catches the press at 120Hz (8.3ms/frame ≈ 13
+       frames). Compositor-only animation, no main-thread cost. */
+    transition: transform 110ms cubic-bezier(0.32, 0.72, 0, 1);
   }
 }
 
@@ -1044,12 +1051,44 @@ html, body {
 /* Touch devices (iOS Capacitor + Android) — kill the route fade-in.
    On WKWebView the per-route 180ms `estia-page-fade` animation made
    every navigation feel like there was a hand-off lag before content
-   appeared, even though the route was rendered immediately. The fade
-   was nice on desktop; on phones the priority is "tap → instant
-   content." Reduced-motion users already get this; touch users now do
-   too. */
+   appeared, even though the route was rendered immediately. */
 @media (pointer: coarse) {
   main { animation: none !important; }
+}
+
+/* View Transitions API — runs on the iOS compositor (Metal-backed,
+   not the React main thread) so transitions cost ~zero main-thread
+   time and hit ProMotion 120Hz cleanly. WebKit added SPA support in
+   Safari 18 / iOS 18; iOS 26 (this app's deployment target) is
+   solidly supported. The previous CSS keyframe fades had to repaint
+   document content on the main thread and competed with React
+   rendering — the new approach takes a snapshot before the route
+   change, then crossfades the snapshot with the new render on a
+   GPU layer.
+
+   `navigation: auto` opts every same-document navigation in. React
+   Router v7 uses pushState, which qualifies. Reduced-motion + the
+   `(pointer: coarse)` carve-outs above don't apply here because
+   View Transitions respect reduced-motion natively. */
+@view-transition {
+  navigation: auto;
+}
+
+/* Snappy, iOS-native crossfade — 140ms with the iOS spring curve.
+   Short enough to feel instant ("the screen just changed"), long
+   enough to mask the React render flash. The curve matches UIKit's
+   default UIViewAnimationCurveEaseOut. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 140ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0ms;
+  }
 }
 
 /* Sprint 10 — card-level entry animation REMOVED.

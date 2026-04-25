@@ -58,12 +58,25 @@ export default function MobileTabBar({
         style={{
           ...FONT,
           position: 'fixed', insetInline: 0, bottom: 0, zIndex: 40,
-          background: 'rgba(247,243,236,0.94)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          /* Solid cream background — was rgba+backdropFilter:blur(12px),
+             which forced WKWebView to recomposite the bar on every
+             scroll frame (the blurred content under it changes every
+             frame). The ongoing recompositing also captured pointer
+             events, blocking taps during momentum scroll. Solid bg
+             promotes the bar to a static GPU layer that never repaints. */
+          background: T.cream,
           borderTop: `1px solid ${T.border}`,
           padding: '8px 8px calc(4px + env(safe-area-inset-bottom, 0px))',
           display: 'flex', justifyContent: 'space-around',
+          /* Force this element onto its own GPU layer so scroll under it
+             never marks it as "needs repaint" — taps register
+             instantly even during momentum scroll. */
+          transform: 'translateZ(0)',
+          willChange: 'transform',
+          /* Explicit touch-action: manipulation kills any inherited
+             touch-action from the scrolling parent that would
+             otherwise delay taps until the scroll settles. */
+          touchAction: 'manipulation',
         }}
       >
         {QUICK_TABS.map((tab) => {
@@ -72,13 +85,19 @@ export default function MobileTabBar({
             <NavLink
               key={tab.to}
               to={tab.to}
-              onClick={() => haptics.tap()}
+              onPointerUp={() => haptics.tap()}
               style={{
                 ...FONT, textDecoration: 'none',
                 padding: '6px 8px',
                 display: 'flex', flexDirection: 'column',
                 alignItems: 'center', gap: 2,
                 color: on ? T.gold : T.muted, flex: 1,
+                touchAction: 'manipulation',
+                /* iOS click is canceled when its preceding touchstart
+                   was followed by a touchmove (= scroll). Using
+                   pointer events above + this CSS makes the tab bar
+                   feel like a native iOS tab bar — taps at any time. */
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
               <tab.Icon size={22} strokeWidth={on ? 2.2 : 1.8} aria-hidden="true" />
@@ -88,12 +107,14 @@ export default function MobileTabBar({
         })}
         <button
           type="button"
-          onClick={() => { haptics.press(); setSheetOpen(true); }}
+          onPointerUp={() => { haptics.press(); setSheetOpen(true); }}
           aria-label="עוד"
           style={{
             ...FONT, border: 'none', background: 'transparent', cursor: 'pointer',
             padding: '6px 8px', display: 'flex', flexDirection: 'column',
             alignItems: 'center', gap: 2, color: T.muted, flex: 1,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
           }}
         >
           <MoreHorizontal size={22} strokeWidth={1.8} aria-hidden="true" />
