@@ -96,8 +96,26 @@ function extractAgencyId(input: { url?: string; agencyId?: string }): string | n
 // The window is computed against the OLDEST attempt in the bucket: if
 // you've used your 3 and the oldest was 12min ago, you get one slot
 // back at +48min. The frontend renders a countdown to that timestamp.
-const YAD2_QUOTA_LIMIT = 3;
+const YAD2_QUOTA_LIMIT_DEFAULT = 3;
 const YAD2_QUOTA_WINDOW_MS = 60 * 60 * 1000;
+
+// Platform-owner emails get a much higher cap so internal QA isn't
+// blocked by the 3/hour residential cap. Mirrors the ADMIN_EMAILS
+// allowlist used in routes/chat.ts and frontend Layout.jsx — keeping
+// it inline here so this file doesn't pick up a cross-route import.
+const YAD2_ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
+const YAD2_QUOTA_LIMIT_ADMIN = 50;
+
+async function quotaLimitFor(agentId: string): Promise<number> {
+  const u = await prisma.user.findUnique({
+    where: { id: agentId },
+    select: { email: true },
+  });
+  if (u?.email && YAD2_ADMIN_EMAILS.has(u.email.toLowerCase())) {
+    return YAD2_QUOTA_LIMIT_ADMIN;
+  }
+  return YAD2_QUOTA_LIMIT_DEFAULT;
+}
 
 interface QuotaSnapshot {
   limit: number;
@@ -112,21 +130,22 @@ interface QuotaSnapshot {
 
 async function getYad2Quota(agentId: string): Promise<QuotaSnapshot> {
   const since = new Date(Date.now() - YAD2_QUOTA_WINDOW_MS);
+  const limit = await quotaLimitFor(agentId);
   const attempts = await prisma.yad2ImportAttempt.findMany({
     where: { agentId, attemptedAt: { gt: since } },
     orderBy: { attemptedAt: 'asc' },
     select: { attemptedAt: true },
-    take: YAD2_QUOTA_LIMIT + 1, // +1 so we know if the bucket is over
+    take: limit + 1, // +1 so we know if the bucket is over
   });
   const used = attempts.length;
-  const remaining = Math.max(0, YAD2_QUOTA_LIMIT - used);
+  const remaining = Math.max(0, limit - used);
   // Reset = the moment the OLDEST attempt falls out of the window.
   // Only meaningful when the agent has hit the cap.
   const oldest = attempts[0]?.attemptedAt;
   const resetAtMs = oldest ? oldest.getTime() + YAD2_QUOTA_WINDOW_MS : 0;
   const msUntilReset = remaining === 0 ? Math.max(0, resetAtMs - Date.now()) : 0;
   return {
-    limit: YAD2_QUOTA_LIMIT,
+    limit,
     remaining,
     used,
     resetAt: remaining === 0 ? new Date(resetAtMs).toISOString() : null,

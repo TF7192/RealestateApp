@@ -124,12 +124,25 @@ export default function Yad2Import() {
   };
 
   const beginScan = () => {
-    if (!url.trim()) return;
-    if (quota && quota.remaining === 0) return;
+    const trimmed = url.trim();
+    if (!trimmed) {
+      toast.error?.('נא להדביק כתובת של סוכנות מ-Yad2');
+      return;
+    }
+    if (quota && quota.remaining === 0) {
+      // Quota chip already shows the countdown but the user just
+      // clicked the (briefly enabled) primary CTA — surface the reason
+      // explicitly so the click doesn't appear silently swallowed.
+      const minutesLeft = quota?.resetAt
+        ? Math.max(0, Math.ceil((new Date(quota.resetAt).getTime() - Date.now()) / 60_000))
+        : 0;
+      toast.error?.(`הגעת למכסה השעתית (${quota.limit}). מתחדשת בעוד ${minutesLeft} דק׳.`);
+      return;
+    }
     initPickedRef.current = false;
     // F-24 — do NOT reset step to 'paste' here; the component already
     // renders the paste step and re-setting causes a flash.
-    startScan(url.trim()).catch(() => { /* handled via store */ });
+    startScan(trimmed).catch(() => { /* handled via store */ });
     toast.info?.('הסריקה החלה — תוכל/י להמשיך לעבוד. תקבל/י התראה בסיום.');
   };
 
