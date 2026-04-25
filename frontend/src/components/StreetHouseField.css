@@ -1,0 +1,49 @@
+/* StreetHouseField — split street/house-number address widget. Leans
+   on AddressField.css for the autocomplete dropdown styling so the
+   picker looks identical to the legacy combined widget. */
+
+.shf-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.shf-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.shf-street {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.shf-house {
+  flex: 0 0 96px;
+  display: flex;
+}
+
+.shf-house-input {
+  width: 100%;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4px;
+}
+
+/* Stack the two controls on narrow screens so neither gets too cramped
+   to type into. 540 px matches the breakpoint used elsewhere in the
+   form layout. */
+@media (max-width: 540px) {
+  .shf-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .shf-house {
+    flex-basis: auto;
+    width: 100%;
+  }
+  .shf-house-input {
+    text-align: start;
+  }
+}

@@ -18,6 +18,7 @@ import { requireAiQuota } from '../middleware/aiQuota.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireUser } from '../middleware/auth.js';
 import { recordAnthropic, recordWhisper } from '../lib/aiUsage.js';
+import { normalizeStreet, normalizeCity } from '../lib/addressNormalize.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -172,11 +173,37 @@ export const registerVoiceIngestRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
+    // Auto-normalize the address fields so the FE doesn't need to show a
+    // "did you mean…?" confirmation step — agents complained that the
+    // extra click defeated the purpose of "speak the address". For
+    // properties, snap city + street to their canonical population-
+    // authority spelling when normalizeStreet returns a confident match
+    // (its built-in ratio cap ≈ Levenshtein ≤ 2 on short street names).
+    // The same code-path runs for `kind === 'lead'` since leads also
+    // carry city/street fields.
+    const fields = (extracted.fields && typeof extracted.fields === 'object')
+      ? { ...extracted.fields }
+      : {};
+    if (extracted.kind === 'property' || extracted.kind === 'lead') {
+      const cityRaw = typeof fields.city === 'string' ? fields.city : null;
+      const streetRaw = typeof fields.street === 'string' ? fields.street : null;
+      const cityNorm = normalizeCity(cityRaw);
+      if (cityNorm) fields.city = cityNorm.value;
+      // Use the just-snapped city as the disambiguation hint so streets
+      // with the same name in multiple municipalities resolve to the
+      // right one.
+      const cityHint = cityNorm?.value ?? cityRaw;
+      if (streetRaw && cityHint) {
+        const streetNorm = normalizeStreet(streetRaw, cityHint);
+        if (streetNorm) fields.street = streetNorm.value;
+      }
+    }
+
     return {
       transcript,
       kind: extracted.kind || 'unclear',
       confidence: typeof extracted.confidence === 'number' ? extracted.confidence : null,
-      fields: extracted.fields || {},
+      fields,
       missing: extracted.missing || [],
       notes_he: extracted.notes_he || '',
     };

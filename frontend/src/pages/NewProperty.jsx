@@ -24,7 +24,7 @@ import useBeforeUnload from '../hooks/useBeforeUnload';
 import { cityNames } from '../data/mockData';
 import StickyActionBar from '../components/StickyActionBar';
 import OwnerPicker from '../components/OwnerPicker';
-import AddressField from '../components/AddressField';
+import StreetHouseField from '../components/StreetHouseField';
 import { RoomsChips, DateQuickChips, SuggestPicker } from '../components/MobilePickers';
 import { useDraftAutosave, readDraft } from '../hooks/mobile';
 import { relLabel } from '../lib/relativeDate';
@@ -52,6 +52,22 @@ const HEATING_TYPES = Object.keys(HEATING_TYPE_LABELS);
 const DRAFT_KEY = 'estia-draft:new-property';
 const VOICE_PREFILL_KEY = 'estia-voice-prefill';
 
+// Pull the trailing house number off a combined "street + number"
+// string (the legacy single-field shape). The Property table still
+// stores the combined value, so when we hydrate the form for edit
+// mode — or restore a draft saved before the split — we want the
+// house number visible in the new dedicated input. Mirror the regex
+// in backend/src/lib/addressNormalize.ts so both ends agree on the
+// split. Returns { name, house } where `name` is always present and
+// `house` is null when no trailing number is detected.
+function splitStreetAndHouse(combined) {
+  const trimmed = String(combined || '').trim();
+  if (!trimmed) return { name: '', house: '' };
+  const m = trimmed.match(/^(.*?)\s+(\d+[א-ת]?(?:[/-]\d+[א-ת]?)?)\s*$/);
+  if (!m) return { name: trimmed, house: '' };
+  return { name: m[1].trim(), house: m[2] };
+}
+
 // Map the Haiku extraction shape onto the NewProperty form schema. The
 // extractor emits flat, nullable keys — we only copy whatever it saw
 // and leave the rest untouched.
@@ -60,7 +76,15 @@ function applyVoicePrefillProperty(setForm, fields) {
   setForm((prev) => {
     const next = { ...prev };
     if (fields.type) next.type = fields.type;
-    if (fields.street) next.street = fields.street;
+    if (fields.street) {
+      // Voice extraction frequently emits "street + number" as one
+      // string ("הרצל 15"). Split it back so the new dedicated house
+      // number input shows the digits separately. The backend already
+      // canonicalises the street name itself before sending to us.
+      const split = splitStreetAndHouse(fields.street);
+      next.street = split.name || fields.street;
+      if (split.house) next.houseNumber = split.house;
+    }
     if (fields.city) next.city = fields.city;
     if (fields.neighborhood) next.neighborhood = fields.neighborhood;
     if (fields.rooms != null && fields.rooms !== '') next.rooms = String(fields.rooms);
@@ -117,6 +141,11 @@ const INITIAL_FORM = {
   assetClass: 'RESIDENTIAL',
   category: 'SALE',
   street: '',
+  // Separate house-number input. Persisted alongside `street` only on
+  // the form — at save time we concatenate `street` + ` ` + houseNumber
+  // because the Property schema still has a single combined `street`
+  // column. Splitting is purely a UX win on the input side.
+  houseNumber: '',
   city: '',
   // Task 3 · validated structured address — populated by AddressField when
   // the agent picks from the Photon autocomplete. Nullable throughout so
@@ -125,6 +154,12 @@ const INITIAL_FORM = {
   formattedAddress: null,
   lat: null,
   lng: null,
+  // Population-authority street code captured when the agent picks a
+  // canonical street from the StreetHouseField autocomplete. Used as
+  // a "validated address" signal alongside placeId / lat-lng so the
+  // hasValidatedAddress guard on save passes after a registry pick
+  // even though the registry doesn't carry coordinates.
+  streetCode: null,
   owner: '',
   ownerPhone: '',
   ownerEmail: '',
@@ -462,11 +497,15 @@ export default function NewProperty() {
         const p = res?.property || res;
         if (!p || !p.id) throw new Error('נכס לא נמצא');
         const dateOnly = (v) => (v ? String(v).slice(0, 10) : '');
+        // Split the combined "street + number" value the schema persists
+        // back into the two-input shape used by the new StreetHouseField.
+        const splitAddr = splitStreetAndHouse(p.street);
         setForm({
           ...INITIAL_FORM,
           assetClass: p.assetClass || 'RESIDENTIAL',
           category: p.category || 'SALE',
-          street: p.street || '',
+          street: splitAddr.name || p.street || '',
+          houseNumber: splitAddr.house || '',
           city: p.city || '',
           // Task 3 · hydrate structured-address fields from the server so
           // edit-mode doesn't lose what was previously validated and the
@@ -645,10 +684,16 @@ export default function NewProperty() {
       // reverse-geocode confirms a real street + coordinates. Stamp lat/lng
       // onto the form alongside street/city so hasValidatedAddress passes
       // without making the agent re-pick from the typeahead.
+      // Reverse-geocode often returns the street with the house number
+      // appended ("הרצל 15"); split it so the dedicated house number
+      // input shows the digits and the street typeahead shows the
+      // canonical name on its own.
+      const splitGeo = splitStreetAndHouse(street);
       setForm((p) => ({
         ...p,
         city: city || p.city,
-        street: street || p.street,
+        street: splitGeo.name || street || p.street,
+        houseNumber: splitGeo.house || p.houseNumber,
         lat: latitude,
         lng: longitude,
         // placeId stays null — reverse-geocode doesn't return an OSM id.
@@ -685,11 +730,18 @@ export default function NewProperty() {
   // the initial insert fast-paths.
   const numOrNull = (v) => (v === '' || v == null ? null : Number(v));
   const buildStep1Body = () => {
+    // The Property schema still stores `street` as a single combined
+    // value ("הרצל 15"). The form keeps the two parts separate purely
+    // for input UX, so concatenate at submit time. Trim defensively in
+    // case the agent typed leading/trailing spaces.
+    const streetTrim = String(form.street || '').trim();
+    const houseTrim = String(form.houseNumber || '').trim();
+    const combinedStreet = houseTrim ? `${streetTrim} ${houseTrim}` : streetTrim;
     const body = {
       assetClass: form.assetClass,
       category: form.category,
       type: form.type,
-      street: form.street,
+      street: combinedStreet,
       city: form.city,
       // Task 3 · structured address components — null for legacy / non-
       // picker flows is fine, the backend schema treats them as optional.
@@ -801,12 +853,15 @@ export default function NewProperty() {
     setError(null);
     try {
       if (!form.street || !form.city) throw new Error('חסר רחוב ועיר');
-      // Task 3 · the street must come from the AddressField autocomplete.
-      // `placeId` is stamped only when the agent picks from the list (or the
-      // property was already saved with one — edit mode fall-through below).
-      // Legacy properties without a placeId can re-save because we fall back
-      // to their existing lat/lng when present.
-      const hasValidatedAddress = !!form.placeId
+      // Task 3 · the street must come from the StreetHouseField (or the
+      // legacy AddressField) autocomplete. Any of these are accepted:
+      //   - `streetCode`  — picked from the population-authority list
+      //   - `placeId`     — picked from the legacy Photon autocomplete
+      //   - lat/lng pair  — captured by "use current location"
+      //   - edit-mode fall-through when the existing row has lat/lng
+      const hasValidatedAddress =
+        !!form.streetCode
+        || !!form.placeId
         || (form.lat != null && form.lng != null)
         || (isEdit && existingMeta?.lat != null);
       if (!hasValidatedAddress) {
@@ -1117,45 +1172,37 @@ export default function NewProperty() {
             <div className="form-row form-row-3">
               <div className="form-group">
                 <label className="form-label">רחוב ומספר</label>
-                {/* Task 3 · Photon-backed autocomplete; only a picked
-                    suggestion stamps lat/lng/placeId/formattedAddress onto
-                    the form. Raw typing leaves placeId=null — form save
-                    blocks with a Hebrew validation message below. */}
-                <AddressField
-                  value={form.street}
-                  // Plain street-text edits — DON'T blow away the pick on
-                  // every keystroke. Many Israeli streets have no per-house
-                  // OSM record, so the agent legitimately needs to add a
-                  // house number after picking the street row. AddressField
-                  // tracks the picked label and only fires onClear when the
-                  // typed text actually diverges from it.
-                  onChange={(v) => setForm((p) => ({ ...p, street: v }))}
+                {/* Split into two inputs — street autocomplete on the
+                    population-authority registry + a short numeric house-
+                    number input. Picking a street stamps `streetCode`
+                    onto the form so hasValidatedAddress passes; typing
+                    past the pick clears the validated metadata. */}
+                <StreetHouseField
+                  street={form.street}
+                  houseNumber={form.houseNumber}
+                  city={form.city}
+                  onStreetChange={(v) => setForm((p) => ({ ...p, street: v }))}
+                  onHouseNumberChange={(v) => setForm((p) => ({ ...p, houseNumber: v }))}
                   onPick={(r) => {
                     setForm((p) => ({
                       ...p,
                       street: r.street || p.street,
-                      city: r.city || p.city,
-                      placeId: r.placeId,
-                      formattedAddress: r.formattedAddress,
-                      lat: r.lat,
-                      lng: r.lng,
+                      streetCode: r.code ?? null,
                     }));
                   }}
                   onClear={() => {
-                    // Fired only when the agent diverges from the picked
-                    // label — invalidate the validated metadata so save
-                    // blocks until they pick (or use-current-location).
+                    // Diverged from the picked street — invalidate the
+                    // streetCode so save blocks until they re-pick or
+                    // use-current-location stamps lat/lng.
                     setForm((p) => ({
                       ...p,
+                      streetCode: null,
                       placeId: null,
                       formattedAddress: null,
                       lat: null,
                       lng: null,
                     }));
                   }}
-                  city={form.city}
-                  placeholder="לדוגמה: הרצל 15"
-                  aria-label="רחוב ומספר"
                 />
               </div>
               <div className="form-group">
