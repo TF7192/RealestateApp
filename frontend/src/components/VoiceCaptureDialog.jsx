@@ -716,8 +716,8 @@ export default function VoiceCaptureDialog({
             // cream record strip has breathing room before any
             // extracted fields land below.
             maxWidth: 820, width: 'min(820px, calc(100vw - 48px))',
-            minHeight: 'min(520px, calc(100vh - 80px))',
-            maxHeight: 'min(960px, calc(100vh - 48px))',
+            minHeight: 'min(520px, calc(100dvh - 80px))',
+            maxHeight: 'min(960px, calc(100dvh - 48px))',
             paddingBottom: 18,
             overflow: 'auto',
             boxSizing: 'border-box',

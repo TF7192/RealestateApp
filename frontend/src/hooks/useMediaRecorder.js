@@ -46,6 +46,10 @@ export function useMediaRecorder({ maxDurationMs = MAX_DURATION_MS } = {}) {
   const [state, setState] = useState('idle');
   const [blob, setBlob] = useState(null);
   const [error, setError] = useState(null);
+  // VC-3 — info-level signal (not an error) for benign events like the
+  // 3-minute max-duration auto-stop. Consumers can show a toast without
+  // confusing it with a recording failure.
+  const [notice, setNotice] = useState(null);
   const [durationMs, setDurationMs] = useState(0);
   const [permission, setPermission] = useState('unknown');
 
@@ -74,6 +78,7 @@ export function useMediaRecorder({ maxDurationMs = MAX_DURATION_MS } = {}) {
     if (state === 'recording' || state === 'requesting' || state === 'stopping') return;
     setBlob(null);
     setError(null);
+    setNotice(null);
     setDurationMs(0);
 
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -98,7 +103,13 @@ export function useMediaRecorder({ maxDurationMs = MAX_DURATION_MS } = {}) {
       const name = e?.name || '';
       if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'PermissionDeniedError') {
         setPermission('denied');
-        setError({ code: 'PERMISSION_DENIED', message: 'אין גישה למיקרופון — יש לאשר את ההרשאה בדפדפן' });
+        // VC-1 — explicit guidance for both surfaces. iOS users in the
+        // Capacitor shell can't grant permission from the in-page
+        // dialog (system-level), so we point them at iOS Settings.
+        setError({
+          code: 'PERMISSION_DENIED',
+          message: 'אין גישה למיקרופון. באפליקציה: הגדרות → Estia → מיקרופון. בדפדפן: אשר/י את ההרשאה.',
+        });
       } else {
         setError({ code: 'CAPTURE_FAILED', message: 'לא הצלחנו לגשת למיקרופון — נסה/י שוב' });
       }
@@ -160,6 +171,10 @@ export function useMediaRecorder({ maxDurationMs = MAX_DURATION_MS } = {}) {
     // Hard cap — auto-stop when the budget runs out.
     capTimeoutRef.current = setTimeout(() => {
       try { rec.state !== 'inactive' && rec.stop(); } catch { /* ignore */ }
+      // VC-3 — surface a Hebrew info-level notice so the UI can toast
+      // "ההקלטה הגיעה למקסימום של 3 דקות" instead of leaving the agent
+      // wondering why recording stopped on its own.
+      setNotice({ code: 'MAX_DURATION', message: 'ההקלטה הגיעה למקסימום של 3 דקות' });
     }, maxDurationMs);
   }, [state, maxDurationMs, cleanup]);
 
@@ -178,11 +193,12 @@ export function useMediaRecorder({ maxDurationMs = MAX_DURATION_MS } = {}) {
   const reset = useCallback(() => {
     setBlob(null);
     setError(null);
+    setNotice(null);
     setDurationMs(0);
     setState('idle');
   }, []);
 
-  return { state, blob, error, durationMs, permission, start, stop, reset };
+  return { state, blob, error, notice, durationMs, permission, start, stop, reset };
 }
 
 export default useMediaRecorder;

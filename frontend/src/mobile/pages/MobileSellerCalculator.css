@@ -21,6 +21,7 @@
   --msc-radius: 18px;
 
   min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(900px 500px at 50% -8%, rgba(182, 138, 68, 0.08), transparent 60%),
     linear-gradient(180deg, #faf8f3 0%, #f3efe6 100%);

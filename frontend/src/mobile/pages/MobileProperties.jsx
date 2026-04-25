@@ -423,7 +423,7 @@ function MapView({ list }) {
       </div>
       <style>{`
         .m-map-canvas {
-          margin: 14px -20px 0; height: calc(100vh - 350px);
+          margin: 14px -20px 0; height: calc(100dvh - 350px);
           min-height: 420px; position: relative;
           border-radius: var(--m-radius-md);
           background:

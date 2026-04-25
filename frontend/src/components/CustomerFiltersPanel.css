@@ -22,6 +22,7 @@
   width: min(420px, 100vw);
   max-width: 100vw;
   height: 100vh;
+  height: 100dvh;
   background: var(--surface, #fff);
   color: inherit;
   box-shadow: -12px 0 24px rgba(0, 0, 0, 0.14);

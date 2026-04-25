@@ -254,7 +254,7 @@ export default function Layout({ onLogout }) {
 
   return (
     <div dir="rtl" style={{
-      ...FONT, width: '100%', minHeight: '100vh', background: DT.cream,
+      ...FONT, width: '100%', minHeight: '100dvh', background: DT.cream,
       display: 'flex', color: DT.ink,
     }}>
       <OfflineBanner />
@@ -908,7 +908,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
             aria-expanded={notifOpen}
             style={{
               background: DT.white, border: `1px solid ${DT.border}`,
-              width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
+              width: 44, height: 44, borderRadius: 9, cursor: 'pointer',
               color: DT.ink, display: 'grid', placeItems: 'center', position: 'relative',
             }}
           >
@@ -976,7 +976,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
           title="שיחה עם הצוות"
           style={{
             background: DT.white, border: `1px solid ${DT.border}`,
-            width: 38, height: 38, borderRadius: 9, cursor: 'pointer',
+            width: 44, height: 44, borderRadius: 9, cursor: 'pointer',
             color: DT.ink, display: 'grid', placeItems: 'center',
           }}
         >

@@ -103,7 +103,7 @@ export default function OwnerEditDialog({ owner, onClose, onSaved }) {
           onClick={(e) => e.stopPropagation()}
           style={{
             width: '100%', maxWidth: 520,
-            maxHeight: 'calc(100vh - 32px)',
+            maxHeight: 'calc(100dvh - 32px)',
             overflow: 'auto',
             background: DT.cream4,
             color: DT.ink,

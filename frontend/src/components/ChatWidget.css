@@ -254,3 +254,13 @@ body:has(.react-joyride__tooltip) .chatw-btn {
   opacity: 0.3;
   pointer-events: none;
 }
+
+/* DT-4 — bound bubble width so a long unbroken token (URL, file name)
+   never blows the chat panel out horizontally. The wrapper already
+   caps at 82%, but bubbles with no spaces could otherwise force the
+   parent flex item past its share. word-break covers languages /
+   tokens that lack natural break opportunities (e.g. long URLs). */
+.chatw-bubble {
+  max-width: 85%;
+  word-break: break-word;
+}

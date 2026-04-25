@@ -155,3 +155,23 @@
   border: 1px dashed var(--border, rgba(30, 26, 20, 0.14));
   border-radius: 14px;
 }
+
+/* DT-3 — sticky thead on small viewports so column labels stay visible
+   while the agent scrolls long tables on mobile. */
+@media (max-width: 900px) {
+  .data-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-elevated, #f1ebe0);
+  }
+}
+
+/* DT-5 — tighter cell padding on phones — desktop's 12px 14px is too
+   roomy for a 375px screen and pushes critical columns off-screen. */
+@media (max-width: 600px) {
+  .data-table th,
+  .data-table td {
+    padding: 10px 8px;
+  }
+}

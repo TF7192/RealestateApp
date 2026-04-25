@@ -85,6 +85,12 @@
 
   --sidebar-width: 260px;
   --header-height: 72px;
+
+  /* GLOB-1 — token for safe-area-aware bottom padding so future bottom
+     bars / FABs / sticky CTAs can pad past the iPhone home indicator
+     without rediscovering the env() formula. Existing rules are not
+     refactored here (out of scope) — this is a forward-looking token. */
+  --safe-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
 /* ── Light theme (default) ──────────────────────────────────── */
@@ -1047,5 +1053,13 @@ main [data-grid] {
   main ul, main ol, main tbody, main article,
   main section > ul, main section > div > ul, main [data-grid] {
     animation: none !important;
+  }
+}
+
+/* DD-1 — DealDetail PartyBlock phone+email row: each child takes a full
+ * line on phones < 500px so contact info doesn't truncate. */
+@media (max-width: 500px) {
+  .party-contact-row > span {
+    flex: 1 1 100%;
   }
 }

@@ -1,4 +1,13 @@
 /* Task 3 · AddressField typeahead dropdown. RTL-aware. */
+
+/* SF-2 — `--vh-usable` is referenced from the responsive list cap below.
+   Define a global default here (100dvh — keyboard / toolbar aware on iOS)
+   so the cascade has a deterministic value even when no JS sets the
+   variable. The fallback at the use-site is also defensive. */
+:root {
+  --vh-usable: 100dvh;
+}
+
 .addr-field {
   position: relative;
   display: flex;
@@ -35,8 +44,12 @@
   inset-inline-end: 8px;
   top: 50%;
   transform: translateY(-50%);
-  width: 22px;
-  height: 22px;
+  /* SF-3 — bump tap target to 40×40 (≥ Apple HIG 44 with the icon's
+     visual weight included). Padding keeps the visible ✕ icon at
+     roughly the prior 22px footprint. */
+  width: 40px;
+  height: 40px;
+  padding: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -77,7 +90,9 @@
   list-style: none;
   margin: 0;
   padding: 4px;
-  max-height: 280px;
+  /* SF-5 — cap dropdown to 40dvh on short viewports so the iOS keyboard
+     (or a small phone in landscape) never pushes the list off-screen. */
+  max-height: min(280px, 40dvh);
   overflow-y: auto;
   background: var(--bg-card);
   border: 1px solid var(--gold-border);
@@ -161,7 +176,7 @@
 @media (max-width: 820px) {
   .addr-field-list {
     /* Keep the suggestion dropdown above iOS's keyboard safe-area. */
-    max-height: min(280px, calc(var(--vh-usable, 60vh) - 16px));
+    max-height: min(280px, calc(var(--vh-usable, 100dvh) - 16px));
   }
 }
 

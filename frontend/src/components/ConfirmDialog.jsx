@@ -42,7 +42,7 @@ export default function ConfirmDialog({
           <header className="confirm-header">
             <div className="confirm-title">
               {danger && <AlertTriangle size={18} className="confirm-danger-icon" />}
-              <h3 id={titleId}>{title}</h3>
+              <h3 id={titleId} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</h3>
             </div>
             <button
               type="button"

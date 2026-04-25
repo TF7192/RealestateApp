@@ -141,7 +141,14 @@ export default function VoiceCaptureFab() {
           confirmLabel="צור קשר עם התמיכה"
           cancelLabel="סגור"
           onConfirm={handleContactSupport}
-          onClose={() => setPremiumOpen(false)}
+          onClose={() => {
+            setPremiumOpen(false);
+            // VC-6 — without a toast the FAB just snaps back to idle and
+            // the agent can be left wondering what happened to their
+            // recording. A short hint ties the close action to the
+            // upgrade path.
+            toast.info('הקלטה שמורה — שדרג ל-Premium להוצאת פרטים');
+          }}
         />
       )}
     </>

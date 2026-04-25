@@ -166,7 +166,7 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
           onClick={(e) => e.stopPropagation()}
           style={{
             width: '100%', maxWidth: 640,
-            maxHeight: 'calc(100vh - 60px)',
+            maxHeight: 'calc(100dvh - 60px)',
             display: 'flex', flexDirection: 'column',
             background: DT.cream,
             color: DT.ink,

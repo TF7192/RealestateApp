@@ -165,7 +165,7 @@ export default function Onboarding() {
 
   return (
     <div dir="rtl" lang="he" style={{
-      ...FONT, background: T.cream, color: T.ink, minHeight: '100vh',
+      ...FONT, background: T.cream, color: T.ink, minHeight: '100dvh',
       display: 'flex', justifyContent: 'center', padding: 0,
       opacity: exiting ? 0 : 1,
       transform: exiting ? 'translateY(-8px)' : 'translateY(0)',
