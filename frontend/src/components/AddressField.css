@@ -27,7 +27,11 @@
 .addr-field-input {
   width: 100%;
   padding-inline-start: 34px;
-  padding-inline-end: 36px;
+  /* SF-3-fix — clear button is now 40×40 sitting at inset-inline-end: 8px,
+     so it occupies 8..48px from the end. Bump padding-end to 52px so the
+     input's typeable area never overlaps the button's hit zone — earlier
+     36px caused taps near the end of the input to clear instead of typing. */
+  padding-inline-end: 52px;
 }
 
 .addr-picked .addr-field-icon {
@@ -67,7 +71,8 @@
 
 .addr-field-loader {
   position: absolute;
-  inset-inline-end: 38px;
+  /* sit just inside the (now larger) clear button */
+  inset-inline-end: 54px;
   top: 50%;
   transform: translateY(-50%);
   width: 14px;
