@@ -38,31 +38,24 @@ export const storageBackend = BACKEND;
  * same shape regardless of backend so DB/JSON columns don't need
  * migrating. Two modes:
  *
- *   • opts.public !== true (default): returns the relative
- *     `/uploads/<key>` path. The backend's `/uploads/*` route then
- *     resolves it to a presigned S3 URL on read.
- *   • opts.public === true: PERF-016 — returns the absolute
- *     `https://<bucket>.s3.<region>.amazonaws.com/uploads/<key>` URL so
- *     the browser can hit S3 directly (skipping the backend signing
- *     round-trip on every fetch). PUBLIC ACCESS IS GRANTED VIA THE
- *     BUCKET POLICY, NOT PER-OBJECT ACLs — the `estia-prod` bucket has
- *     Object Ownership = "Bucket owner enforced" (the modern AWS
- *     default since 2023), which rejects PutObject calls with an `ACL`
- *     param outright. The bucket policy must include
- *       { "Effect": "Allow", "Principal": "*", "Action": "s3:GetObject",
- *         "Resource": "arn:aws:s3:::estia-prod/uploads/properties/*" }
- *     for these returned URLs to be reachable.
+ * Returns the relative `/uploads/<key>` path. The backend's
+ * `/uploads/*` route resolves it to a presigned S3 URL on read.
  *
- * The cache-control header is identical in both modes — `max-age=31536000,
- * immutable` — but the public mode is the one where it actually takes
- * effect: signed URLs change every hour so the browser cache misses
- * anyway.
+ * The CacheControl header is set on every PUT — it doesn't help on
+ * the presigned URL (which rotates hourly) but it makes the underlying
+ * object cacheable if anything else ever fronts the bucket directly
+ * (e.g. a future CDN swap).
+ *
+ * The `opts` object is reserved for future use (was previously the
+ * public-mode toggle for the rolled-back PERF-016 attempt). Kept on
+ * the signature so callers don't need an immediate refactor.
  */
 export async function putUpload(
   key: string,
   data: Buffer,
   contentType?: string,
-  opts?: { public?: boolean },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _opts?: { public?: boolean },
 ): Promise<string> {
   if (BACKEND === 's3') {
     await client().send(new PutObjectCommand({
@@ -71,12 +64,7 @@ export async function putUpload(
       Body: data,
       ContentType: contentType || 'application/octet-stream',
       CacheControl: 'public, max-age=31536000, immutable',
-      // No `ACL` param — see the JSDoc above. Public access is bucket-
-      // policy-driven; per-object ACLs are rejected on this bucket.
     }));
-    if (opts?.public) {
-      return `https://${BUCKET}.s3.${REGION}.amazonaws.com/uploads/${key}`;
-    }
     return `/uploads/${key}`;
   }
   const dest = path.join(LOCAL_DIR, key);
