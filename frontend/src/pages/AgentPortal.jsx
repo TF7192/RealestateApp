@@ -177,7 +177,7 @@ export default function AgentPortal() {
                 {agent.phone}
               </a>
               {waLink && (
-                <a href={waLink} target="_blank" rel="noreferrer" className="ap-contact-chip whatsapp">
+                <a href={waLink} target="_blank" rel="noopener noreferrer" className="ap-contact-chip whatsapp">
                   <MessageCircle size={14} />
                   וואטסאפ
                 </a>

@@ -167,7 +167,15 @@ export const registerCalendarRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.get('/connect', { onRequest: [app.requireAuth] }, async (req, reply) => {
+  // SEC-032 — rate-limit the OAuth init step. Each /connect mints a state
+  // cookie and enqueues a redirect to Google; an unbounded loop here can
+  // burn JWKS lookups + cookie writes at the rate-limit ceiling. 10/min
+  // is comfortably above any human flow (the user clicks "connect" once)
+  // and well below scripted abuse.
+  app.get('/connect', {
+    onRequest: [app.requireAuth],
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+  }, async (req, reply) => {
     if (!isConfigured()) {
       return reply.code(500).send({ error: { message: 'Google Calendar not configured' } });
     }

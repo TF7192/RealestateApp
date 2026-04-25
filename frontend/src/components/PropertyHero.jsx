@@ -252,6 +252,7 @@ export default function PropertyHero({
             <Link
               to={`/p/${property.id}`}
               target="_blank"
+              rel="noopener noreferrer"
               className="ph-cta-ghost"
               aria-label="View as customer"
             >

@@ -168,8 +168,10 @@ describe('Documents — S3-backed library', () => {
     const all = await app.inject({ method: 'GET', url: '/api/documents', headers: { cookie } });
     expect(all.statusCode).toBe(200);
     expect(all.json().items).toHaveLength(3);
-    // Each row carries a presigned URL from resolveUpload.
-    expect(all.json().items[0].url).toContain('https://s3.example/');
+    // SEC-034 — list rows no longer carry a presigned URL; each row
+    // points at the dedicated /download endpoint instead.
+    expect(all.json().items[0].url).toBeUndefined();
+    expect(all.json().items[0].downloadUrl).toMatch(/^\/api\/documents\/[^/]+\/download$/);
 
     // Kind filter → only pdf.
     const pdfOnly = await app.inject({

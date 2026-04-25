@@ -498,10 +498,10 @@ export default function CustomerPropertyView() {
                 <MapPin size={16} /> מיקום
               </h3>
               <div className="cpv-section-head-actions">
-                <a href={wazeOpen} target="_blank" rel="noreferrer" className="cpv-linkbtn">
+                <a href={wazeOpen} target="_blank" rel="noopener noreferrer" className="cpv-linkbtn">
                   <Route size={14} /> ווייז
                 </a>
-                <a href={mapsOpen} target="_blank" rel="noreferrer" className="cpv-linkbtn">
+                <a href={mapsOpen} target="_blank" rel="noopener noreferrer" className="cpv-linkbtn">
                   <ExternalLink size={14} /> Google Maps
                 </a>
               </div>
@@ -655,7 +655,7 @@ function CpvVideo({ video }) {
     );
   }
   return (
-    <a className="cpv-video-link" href={video.url} target="_blank" rel="noreferrer">
+    <a className="cpv-video-link" href={video.url} target="_blank" rel="noopener noreferrer">
       ▶ צפה בסרטון
     </a>
   );

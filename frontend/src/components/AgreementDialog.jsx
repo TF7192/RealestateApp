@@ -164,7 +164,7 @@ export default function AgreementDialog({ lead, onClose, onChange }) {
                             className="btn btn-ghost btn-sm"
                             href={a.file.path.startsWith('/') ? a.file.path : `/uploads/${a.file.path}`}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                           >
                             <Download size={13} />
                             הורד PDF

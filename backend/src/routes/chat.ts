@@ -37,6 +37,14 @@ function allowSend(userId: string): boolean {
 // horizontally we switch to Redis pub/sub.
 type Sub = { userId: string; isAdmin: boolean; send: (data: string) => void };
 const subs = new Set<Sub>();
+
+// SEC-016 — bound the per-user WS connection count. Without this, an
+// authenticated agent could open thousands of sockets (each one a Sub
+// row + an open file descriptor) and exhaust the process. 5 is a soft
+// cap that comfortably handles "old tab still open + new tab + iPhone"
+// but rejects scripted abuse. 1013 = "Try Again Later".
+const WS_PER_USER_CAP = 5;
+const userSubCount = new Map<string, number>();
 export function broadcastMessage(conversation: { id: string; userId: string }, messagePayload: any) {
   const event = JSON.stringify({ type: 'message:new', conversationId: conversation.id, message: messagePayload });
   for (const s of subs) {
@@ -220,6 +228,13 @@ export const registerChatRoutes: FastifyPluginAsync = async (app) => {
   app.get('/ws', { websocket: true, onRequest: [app.requireAuth] }, (socket, req) => {
     const u = getUser(req);
     if (!u) { socket.close(); return; }
+    // SEC-016 — refuse to add the socket once this user is at the cap.
+    // 1013 ("Try Again Later") prompts well-behaved clients to back off
+    // rather than reconnect immediately.
+    if ((userSubCount.get(u.id) || 0) >= WS_PER_USER_CAP) {
+      try { socket.close(1013, 'too many connections'); } catch { /* ignore */ }
+      return;
+    }
     const sub: Sub = {
       userId: u.id,
       // SEC-010 — admin bucket reads role off the JWT, not email.
@@ -227,8 +242,19 @@ export const registerChatRoutes: FastifyPluginAsync = async (app) => {
       send: (data) => socket.send(data),
     };
     subs.add(sub);
-    socket.on('close', () => subs.delete(sub));
-    socket.on('error', () => subs.delete(sub));
+    userSubCount.set(u.id, (userSubCount.get(u.id) || 0) + 1);
+    const release = () => {
+      subs.delete(sub);
+      // Decrement only once even if both close + error fire. The Map
+      // floors at 0 so a stray double-decrement can't go negative.
+      const next = Math.max(0, (userSubCount.get(u.id) || 0) - 1);
+      if (next === 0) userSubCount.delete(u.id);
+      else userSubCount.set(u.id, next);
+    };
+    let released = false;
+    const onTeardown = () => { if (!released) { released = true; release(); } };
+    socket.on('close', onTeardown);
+    socket.on('error', onTeardown);
     // Sanity ping so the client knows the socket is alive
     try { socket.send(JSON.stringify({ type: 'hello', isAdmin: sub.isAdmin })); } catch { /* ignore */ }
   });

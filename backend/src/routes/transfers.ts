@@ -11,7 +11,14 @@ import { requireUser } from '../middleware/auth.js';
 export const registerTransferRoutes: FastifyPluginAsync = async (app) => {
   // Search for another agent by email (exact match) — used by the transfer
   // dialog so the sender can look up the receiver.
-  app.get('/transfers/agents/search', { onRequest: [app.requireAgent] }, async (req) => {
+  // SEC-037 — rate-limit the lookup. A loose loop here (1 req per email
+  // tested) lets an authenticated agent enumerate the entire User table
+  // by email. 20/min stays well above the dialog's natural pace (user
+  // types email + clicks search) and below scripted enumeration speeds.
+  app.get('/transfers/agents/search', {
+    onRequest: [app.requireAgent],
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+  }, async (req) => {
     const { email } = req.query as { email?: string };
     if (!email) return { agent: null };
     const norm = email.trim().toLowerCase();

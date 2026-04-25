@@ -43,6 +43,14 @@ async function claimOfficeInvites(userId: string, email: string, role: string): 
 }
 
 const COOKIE_NAME = 'estia_token';
+// SEC-017 — cookie scoping. We deliberately omit the `Domain` attribute
+// so the browser stores this as a HOST-ONLY cookie scoped to the exact
+// origin that set it (estia.co.il). Adding `Domain: 'estia.co.il'` would
+// widen the scope to every subdomain (api.estia.co.il, dev.estia.co.il,
+// any future preview deployment) — including ones we don't fully control.
+// Do NOT add a Domain attribute here unless you've audited every
+// subdomain that would inherit the session. The Capacitor iOS app loads
+// the prod URL directly so it shares this same host-only cookie jar.
 const COOKIE_OPTS = {
   httpOnly: true,
   sameSite: 'lax' as const,

@@ -1975,7 +1975,7 @@ function ExclusivityAgreementUpload({ propertyId, initialUrl, onChange, toast })
       </div>
       {url ? (
         <div className="np-agreement-row np-agreement-has">
-          <a href={url} target="_blank" rel="noreferrer" className="np-agreement-link">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="np-agreement-link">
             פתח את ההסכם
           </a>
           <div className="np-agreement-actions">

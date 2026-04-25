@@ -284,6 +284,12 @@ model OfficeInvite {
 }
 
 // ─── Users ─────────────────────────────────────────────────────────────────
+// SEC-039 — TODO: switch User.email + OfficeInvite.email to Postgres
+// `citext` so case-folding lives at the DB level instead of every
+// caller having to remember `.toLowerCase()` / `mode: 'insensitive'`.
+// Requires `CREATE EXTENSION citext` in a migration; the schema doesn't
+// currently use citext anywhere so this is a larger migration sweep,
+// deferred from the SEC hardening pass.
 model User {
   id                    String       @id @default(cuid())
   email                 String       @unique

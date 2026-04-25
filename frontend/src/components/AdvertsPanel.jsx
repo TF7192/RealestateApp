@@ -265,7 +265,7 @@ export default function AdvertsPanel({ propertyId, toast }) {
                   <a
                     href={a.externalUrl}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="adp-item-link"
                     aria-label="פתח מודעה בערוץ החיצוני"
                   >

@@ -358,7 +358,11 @@ function DocumentCard({ doc, onDelete }) {
 
       <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
         <a
-          href={doc.url}
+          // SEC-034 — backend list response no longer mints a presigned
+          // URL per row. We hit the dedicated /api/documents/:id/download
+          // endpoint which 302s to a freshly-presigned URL each time;
+          // legacy `doc.url` is kept as a fallback for any stale cache.
+          href={doc.downloadUrl || doc.url}
           target="_blank"
           rel="noopener noreferrer"
           download={doc.originalName}

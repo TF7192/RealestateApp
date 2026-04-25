@@ -116,16 +116,30 @@ export async function deleteUpload(key: string): Promise<void> {
  * (`https://<bucket>.s3.<region>.amazonaws.com/uploads/<key>`) the new
  * variant pipeline writes — strips the bucket host so callers like the
  * legacy delete path keep working.
+ *
+ * SEC-028 — defensively reject any '..' segment or absolute path. Real
+ * keys are server-generated UUIDs, so an attacker-controlled traversal
+ * here is a sign of corruption / tampering. Cheap to check, prevents a
+ * future caller from accidentally piping urlToKey() output into a
+ * filesystem path.
  */
 export function urlToKey(url: string): string | null {
   if (!url) return null;
-  if (url.startsWith('/uploads/')) return url.replace(/^\/uploads\//, '');
-  // Absolute public S3 URL — accept any bucket / region match against
-  // the configured one so we don't accidentally pick up cross-account
-  // links pasted into a row by hand.
-  const publicPrefix = `https://${BUCKET}.s3.${REGION}.amazonaws.com/uploads/`;
-  if (url.startsWith(publicPrefix)) return url.slice(publicPrefix.length);
-  return null;
+  let key: string | null = null;
+  if (url.startsWith('/uploads/')) {
+    key = url.replace(/^\/uploads\//, '');
+  } else {
+    // Absolute public S3 URL — accept any bucket / region match against
+    // the configured one so we don't accidentally pick up cross-account
+    // links pasted into a row by hand.
+    const publicPrefix = `https://${BUCKET}.s3.${REGION}.amazonaws.com/uploads/`;
+    if (url.startsWith(publicPrefix)) key = url.slice(publicPrefix.length);
+  }
+  if (key === null) return null;
+  // Reject traversal + absolute paths. Belt-and-suspenders check — keys
+  // emitted by `putUpload` are uuid-shaped and never contain '..'.
+  if (key.includes('..') || path.isAbsolute(key)) return null;
+  return key;
 }
 
 /**

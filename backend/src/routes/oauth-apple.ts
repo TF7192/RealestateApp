@@ -132,6 +132,11 @@ export const registerAppleOAuthRoutes: FastifyPluginAsync = async (app) => {
       { sub: user.id, role: user.role, email: user.email },
       { expiresIn: '30d' }
     );
+    // SEC-017 — host-only cookie (no `domain` attr). The Apple flow
+    // is invoked from the iOS app which loads the prod origin directly,
+    // so this scoping matches the Google + email/password flows. See
+    // routes/auth.ts COOKIE_OPTS for the long-form reasoning; do NOT
+    // widen by adding a `domain:` field here.
     reply.setCookie(COOKIE_NAME, token, {
       httpOnly: true,
       sameSite: 'lax',

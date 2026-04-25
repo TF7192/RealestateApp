@@ -43,10 +43,21 @@ const NATIVE_SCHEME = 'com.estia.agent';
 // horizontally, move this to Redis or a short-lived DB row.
 type PendingExchange = { userId: string; expires: number };
 const pendingCodes = new Map<string, PendingExchange>();
+// SEC-021 — hard cap so a misbehaving / hostile caller burning native
+// flow attempts can't unboundedly grow this Map. Map iteration order is
+// insertion order, so evicting the first key drops the oldest entry.
+const MAX_PENDING = 10_000;
 function issueNativeCode(userId: string): string {
   // Purge expired entries opportunistically (cheap, bounded map size).
   const now = Date.now();
   for (const [k, v] of pendingCodes) if (v.expires < now) pendingCodes.delete(k);
+  // After expiry-sweep, if we're still at the cap, evict the oldest entry.
+  // The 2-minute TTL means we shouldn't normally reach here in practice;
+  // the cap is a backstop against pathological burst traffic.
+  if (pendingCodes.size >= MAX_PENDING) {
+    const oldest = pendingCodes.keys().next().value;
+    if (oldest) pendingCodes.delete(oldest);
+  }
   const code = crypto.randomBytes(24).toString('base64url');
   pendingCodes.set(code, { userId, expires: now + 120_000 });
   return code;
@@ -262,6 +273,10 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       { sub: user.id, role: user.role, email: user.email },
       { expiresIn: '30d' }
     );
+    // SEC-017 — host-only cookie. No `domain` attribute → the browser
+    // scopes the cookie to estia.co.il only, never to subdomains we
+    // might not control. See routes/auth.ts COOKIE_OPTS for the longer
+    // note; do NOT add `domain:` here without auditing every subdomain.
     reply.setCookie(COOKIE_NAME, token, {
       httpOnly: true,
       sameSite: 'lax',
@@ -292,6 +307,8 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       { sub: user.id, role: user.role, email: user.email },
       { expiresIn: '30d' }
     );
+    // SEC-017 — host-only cookie (no `domain` attr). See COOKIE_OPTS in
+    // routes/auth.ts for the detailed reasoning.
     reply.setCookie(COOKIE_NAME, token, {
       httpOnly: true,
       sameSite: 'lax',

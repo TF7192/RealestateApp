@@ -208,7 +208,7 @@ export default function MarketingActionDialog({
                     <a
                       href={link}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="btn btn-ghost btn-sm"
                     >
                       <ExternalLink size={14} />
@@ -285,7 +285,7 @@ export default function MarketingActionDialog({
                 {initial.link && (
                   <div className="ma-saved-row">
                     <Link2 size={14} />
-                    <a href={initial.link} target="_blank" rel="noreferrer">
+                    <a href={initial.link} target="_blank" rel="noopener noreferrer">
                       {initial.link}
                     </a>
                   </div>

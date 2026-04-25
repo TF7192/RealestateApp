@@ -1298,7 +1298,7 @@ export default function PropertyDetail() {
             <a
               href={mapsOpen}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="dc-cta"
             >
               <ExternalLink size={13} />
@@ -2093,7 +2093,7 @@ export function VideoTile({ video }) {
     );
   }
   return (
-    <a className="video-tile link-fallback" href={video.url} target="_blank" rel="noreferrer">
+    <a className="video-tile link-fallback" href={video.url} target="_blank" rel="noopener noreferrer">
       <span>▶ צפה בסרטון</span>
       <small>{video.title || video.url}</small>
     </a>

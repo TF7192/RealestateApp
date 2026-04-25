@@ -11,9 +11,15 @@
 //
 // Listing is filterable by ?kind=pdf|dwg|zip|xlsx (mime family, not
 // the UploadedFile.kind column) and ?tag=<label> (any-of match when
-// repeated). Each listed row comes with a presigned `url` so the
-// frontend card can link straight to S3 without routing through
-// /uploads/* (saves a 302 + keeps the browser download dialog snappy).
+// repeated).
+//
+// SEC-034 — the list response no longer carries a presigned download
+// URL per row. A presigned URL leaks the document for ~1h to anyone
+// who can read the JSON (e.g. via a future shoulder-surf, error log
+// in PostHog/Sentry, or a logged screenshot). Instead callers ask for
+// `GET /api/documents/:id/download`, which 302s to a freshly-minted
+// presigned URL — short window, owner-scoped, no caching of the
+// pre-signed link in client logs.
 
 import type { FastifyPluginAsync } from 'fastify';
 import crypto from 'node:crypto';
@@ -100,28 +106,45 @@ export const registerDocumentRoutes: FastifyPluginAsync = async (app) => {
       ? rows.filter((r) => classifyKind(r.mimeType, r.originalName) === q.kind)
       : rows;
 
-    // Presign a short-lived download URL per row. For the local dev
-    // backend `resolveUpload` returns a `file://` path; we fall back
-    // to the legacy /uploads/<key> URL in that case.
-    const items = await Promise.all(filtered.map(async (r) => {
-      let url = `/uploads/${r.path}`;
-      try {
-        const resolved = await resolveUpload(r.path);
-        if (resolved.kind === 'redirect') url = resolved.url;
-      } catch { /* fall back to the /uploads/ path */ }
-      return {
-        id:           r.id,
-        originalName: r.originalName,
-        mimeType:     r.mimeType,
-        sizeBytes:    r.sizeBytes,
-        tags:         r.tags,
-        kind:         classifyKind(r.mimeType, r.originalName),
-        createdAt:    r.createdAt,
-        url,
-      };
+    // SEC-034 — return a stable per-row download path. Callers fetch
+    // the actual file via `GET /api/documents/:id/download`, which
+    // 302s to a freshly-presigned URL. We no longer mint one per row
+    // here so the JSON list (which can be cached/logged/screenshotted)
+    // doesn't leak hour-long S3 grants.
+    const items = filtered.map((r) => ({
+      id:           r.id,
+      originalName: r.originalName,
+      mimeType:     r.mimeType,
+      sizeBytes:    r.sizeBytes,
+      tags:         r.tags,
+      kind:         classifyKind(r.mimeType, r.originalName),
+      createdAt:    r.createdAt,
+      downloadUrl:  `/api/documents/${r.id}/download`,
     }));
 
     return { items };
+  });
+
+  // SEC-034 — owner-scoped download endpoint. 302s to the storage
+  // backend's URL (presigned in S3 mode; legacy /uploads/<key> in dev
+  // where the static handler serves the file). Owner check stops a
+  // cross-agent enumeration attempt cold — we only resolve the file if
+  // the row's ownerId matches the caller.
+  app.get('/documents/:id/download', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const row = await prisma.uploadedFile.findFirst({
+      where: { id, ownerId: uid, kind: 'document' },
+    });
+    if (!row) return reply.code(404).send({ error: { message: 'Not found' } });
+    try {
+      const resolved = await resolveUpload(row.path);
+      if (resolved.kind === 'redirect') return reply.redirect(resolved.url);
+    } catch { /* fall through to local /uploads/ redirect */ }
+    // Local dev — fall back to the legacy /uploads route which the
+    // static handler serves. (Production paths always hit the redirect
+    // branch above.)
+    return reply.redirect(`/uploads/${row.path}`);
   });
 
   // POST /api/documents — multipart upload. Accepts one `file` field

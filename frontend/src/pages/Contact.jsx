@@ -8,6 +8,11 @@
 // inline Cream & Gold tokens, Assistant/Heebo font, gold primary
 // submit, success state that replaces the form after a successful
 // send.
+//
+// SEC-044 — captcha is not yet wired on this form. Abuse is mitigated
+// by the per-IP sliding-window rate limit on the backend (5 / hour, see
+// SEC-033 in backend/src/routes/contact.ts). Add hCaptcha or a
+// honeypot field if SES bounces start indicating bot traffic.
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';

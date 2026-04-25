@@ -51,4 +51,15 @@ export async function tryServiceTokenAuth(
   if (!user) return; // unknown actor id — leave request unauthenticated
 
   setUser(req, { id: user.id, role: user.role, email: user.email });
+  // SEC-023 — provenance flag + audit log. We don't import logActivity
+  // here (it lives in lib/activity.js, which itself imports prisma —
+  // pulling that in creates a circular risk during module init). A
+  // pino info-level line is enough: it goes to CloudWatch, surfaces
+  // in `journalctl`-style log scans, and lets future code distinguish
+  // service-token actors from JWT-cookie actors via `__authVia`.
+  (req as unknown as { __authVia?: string }).__authVia = 'service-token';
+  req.log.info(
+    { userId: user.id, actorRoute: req.url },
+    'service-token auth',
+  );
 }

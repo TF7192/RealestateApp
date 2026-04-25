@@ -31,6 +31,12 @@ const contactBody = z.object({
 });
 
 // Per-IP sliding window. Array of timestamps → prune on each lookup.
+// SEC-033 — this Map is per-process. With multiple Fastify replicas
+// behind a load balancer (we currently run a single instance, but the
+// docker-compose is set up to fan out), an attacker can hit each
+// replica's window separately — effectively multiplying their quota
+// by replica count. Acceptable for now; a Redis-backed limiter is
+// tracked under SEC-018.
 const WINDOW_MS = 60 * 60 * 1_000; // 1 hour
 const MAX_PER_WINDOW = 5;
 const hits: Map<string, number[]> = new Map();

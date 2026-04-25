@@ -275,7 +275,7 @@ export default function Profile() {
           <a
             href={catalogUrl}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             style={secondaryBtn()}
           >
             <Building2 size={14} />

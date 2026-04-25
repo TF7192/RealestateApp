@@ -337,7 +337,7 @@ export default function AgentCard() {
               <a
                 href={waUrl(user.phone, '')}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 style={channelBtn()}
               >
                 <MessageCircle size={14} /> וואטסאפ
@@ -364,7 +364,7 @@ export default function AgentCard() {
             <a
               href={publicUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               style={secondaryBtn()}
             >
               <Building2 size={14} /> תצוגה מקדימה

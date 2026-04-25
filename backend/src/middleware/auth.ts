@@ -66,9 +66,13 @@ const plugin: FastifyPluginAsync = async (app) => {
     }
   });
 
+  // SEC-019 — every reply.send() in these decorators is preceded by
+  // `return` so the handler chain short-circuits cleanly. Inconsistency
+  // here lets a downstream handler run after a 401/403, which can leak
+  // resources or surprise log lines.
   app.decorate('requireAuth', async (req: FastifyRequest, reply: FastifyReply) => {
     if (!getUser(req)) {
-      reply.code(401).send({ error: { message: 'Unauthorized' } });
+      return reply.code(401).send({ error: { message: 'Unauthorized' } });
     }
   });
 
@@ -80,7 +84,7 @@ const plugin: FastifyPluginAsync = async (app) => {
     // OWNER is a superset of AGENT for the purpose of accessing the
     // agent-facing CRM.
     if (u.role !== 'AGENT' && u.role !== 'OWNER') {
-      reply.code(403).send({ error: { message: 'Agent role required' } });
+      return reply.code(403).send({ error: { message: 'Agent role required' } });
     }
   });
 
@@ -90,7 +94,7 @@ const plugin: FastifyPluginAsync = async (app) => {
       return reply.code(401).send({ error: { message: 'Unauthorized' } });
     }
     if (u.role !== 'OWNER') {
-      reply.code(403).send({ error: { message: 'Office owner role required' } });
+      return reply.code(403).send({ error: { message: 'Office owner role required' } });
     }
   });
 
@@ -105,7 +109,7 @@ const plugin: FastifyPluginAsync = async (app) => {
       return reply.code(401).send({ error: { message: 'Unauthorized' } });
     }
     if (u.role !== 'ADMIN') {
-      reply.code(403).send({ error: { message: 'Admin only' } });
+      return reply.code(403).send({ error: { message: 'Admin only' } });
     }
   });
 };
