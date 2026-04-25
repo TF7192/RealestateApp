@@ -42,6 +42,26 @@ const MAX_LISTINGS_TOTAL = 100;
 // 80 listings we won't hold the request open for 16 minutes.
 const MAX_DETAIL_FETCHES = 50;
 
+// In-process concurrency cap. A single Playwright Chromium peaks at
+// ~800MB RSS during enrichment; the prod EC2 box has 2GB total, so a
+// second concurrent crawl risks OOM-killing the API. We refuse the
+// second caller with a friendly 429 — the job runner already knows
+// how to surface __yad2Envelope verbatim to the client.
+const MAX_CONCURRENT_CRAWLS = 1;
+let activeCrawls = 0;
+
+class Yad2BusyError extends Error {
+  statusCode = 429;
+  __yad2Envelope = {
+    status: 429,
+    message: 'ייבוא Yad2 אחר פעיל כרגע — נסו שוב בעוד דקה',
+  };
+  constructor() {
+    super('ייבוא Yad2 אחר פעיל כרגע — נסו שוב בעוד דקה');
+    this.name = 'Yad2BusyError';
+  }
+}
+
 // Per-page timings. Reblaze's challenge typically resolves in ~1-2s;
 // padded for slow-day variance.
 const NAV_TIMEOUT_MS = 30_000;
@@ -454,6 +474,11 @@ export async function crawlAgency(
   agencyId: string,
   onProgress?: CrawlProgressReport,
 ): Promise<CrawlReport> {
+  if (activeCrawls >= MAX_CONCURRENT_CRAWLS) {
+    throw new Yad2BusyError();
+  }
+  activeCrawls++;
+  try {
   ensureShutdownHook();
   const sections: Yad2Section[] = ['forsale', 'rent', 'commercial'];
   const allListings: Yad2Listing[] = [];
@@ -649,6 +674,9 @@ export async function crawlAgency(
   } finally {
     // Always close the per-crawl context — the singleton browser stays.
     await ctx.close().catch(() => {});
+  }
+  } finally {
+    activeCrawls--;
   }
 }
 
