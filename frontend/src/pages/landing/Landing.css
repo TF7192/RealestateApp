@@ -107,6 +107,9 @@
   -webkit-backdrop-filter: saturate(150%) blur(12px);
   border-block-end: 1px solid transparent;
   transition: border-color 160ms ease, background 160ms ease;
+  /* iPhone Dynamic Island clearance — sticky nav sits under the
+     notch otherwise. Desktop is unaffected (env() resolves to 0). */
+  padding-top: env(safe-area-inset-top);
 }
 .lp-nav.is-scrolled { border-block-end-color: var(--border); background: var(--bg-primary); }
 .lp-nav-inner {

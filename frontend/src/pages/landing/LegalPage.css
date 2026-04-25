@@ -3,7 +3,7 @@
 .legal-head { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 24px; }
 .legal-h1 {
   font-family: var(--font-display);
-  font-size: 32px; font-weight: 800;
+  font-size: clamp(24px, 5vw, 32px); font-weight: 800;
   margin: 12px 0 8px;
   color: var(--text-primary);
 }

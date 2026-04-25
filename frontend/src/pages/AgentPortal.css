@@ -171,6 +171,11 @@
   color: var(--gold);
 }
 
+.ap-contact-chip:focus-visible {
+  outline: 2px solid var(--gold, #b48b4c);
+  outline-offset: 2px;
+}
+
 .ap-contact-chip.whatsapp:hover {
   border-color: rgba(37, 211, 102, 0.4);
   background: rgba(37, 211, 102, 0.1);
@@ -211,6 +216,8 @@
   font-size: 14px;
   width: 100%;
   direction: rtl;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .ap-tabs {
@@ -481,7 +488,11 @@
   .ap-agent-avatar { width: 64px; height: 64px; }
   .ap-agent-avatar.placeholder { font-size: 24px; }
   .ap-filters { padding: 0 14px; gap: 8px; }
-  .ap-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .ap-tabs {
+    overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ap-tabs::-webkit-scrollbar { display: none; }
   .ap-results { padding: 0 14px; }
   .ap-grid { grid-template-columns: 1fr; gap: 14px; }
   .ap-card-image { aspect-ratio: 4 / 3; }

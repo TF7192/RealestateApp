@@ -89,8 +89,9 @@ export default function Contact() {
 
   return (
     <div dir="rtl" lang="he" style={{
-      ...FONT, background: DT.cream, color: DT.ink, minHeight: '100vh',
+      ...FONT, background: DT.cream, color: DT.ink, minHeight: '100dvh',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      paddingTop: 'calc(24px + env(safe-area-inset-top))',
     }}>
       <div style={{
         width: '100%', maxWidth: 520,
@@ -173,7 +174,7 @@ export default function Contact() {
                     ...FONT, width: '100%', padding: '12px 14px',
                     background: DT.white, border: `1px solid ${DT.border}`,
                     borderRadius: 10, fontSize: 15, color: DT.ink,
-                    resize: 'vertical', minHeight: 140, outline: 'none',
+                    resize: 'vertical', minHeight: 100, outline: 'none',
                   }}
                 />
               </label>
@@ -219,7 +220,7 @@ export default function Contact() {
 
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: DT.muted }}>
           <Link to="/" style={{ color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>
-            <ArrowLeft size={13} style={{ display: 'inline', verticalAlign: 'middle' }} aria-hidden="true" />
+            <ArrowLeft size={13} style={{ display: 'inline-flex', verticalAlign: 'middle' }} aria-hidden="true" />
             {' '}חזרה לדף הבית
           </Link>
         </div>

@@ -27,7 +27,8 @@ export default function ResetPassword() {
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [show, setShow] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -57,8 +58,9 @@ export default function ResetPassword() {
 
   return (
     <div dir="rtl" lang="he" style={{
-      ...FONT, background: DT.cream, color: DT.ink, minHeight: '100vh',
+      ...FONT, background: DT.cream, color: DT.ink, minHeight: '100dvh',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      paddingTop: 'calc(24px + env(safe-area-inset-top))',
     }}>
       <div style={{
         width: '100%', maxWidth: 420,
@@ -84,13 +86,13 @@ export default function ResetPassword() {
               <PasswordField
                 label="סיסמה חדשה" icon={<Lock size={16} />}
                 value={password} onChange={setPassword}
-                show={show} onToggleShow={() => setShow((s) => !s)}
+                show={showPass} onToggleShow={() => setShowPass((s) => !s)}
                 autoFocus
               />
               <PasswordField
                 label="אימות סיסמה" icon={<Lock size={16} />}
                 value={confirm} onChange={setConfirm}
-                show={show} onToggleShow={() => setShow((s) => !s)}
+                show={showConfirm} onToggleShow={() => setShowConfirm((s) => !s)}
               />
               {error && (
                 <div role="alert" style={{
@@ -165,7 +167,7 @@ function PasswordField({ label, icon, value, onChange, show, onToggleShow, autoF
           aria-label={show ? 'הסתר סיסמה' : 'הצג סיסמה'}
           style={{
             background: 'transparent', border: 'none', color: DT.muted,
-            cursor: 'pointer', padding: 4, display: 'inline-flex',
+            cursor: 'pointer', padding: 8, display: 'inline-flex',
           }}
         >
           {show ? <EyeOff size={17} /> : <Eye size={17} />}

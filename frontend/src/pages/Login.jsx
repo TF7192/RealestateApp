@@ -165,7 +165,7 @@ function DesktopLogin(p) {
     handleSubmit, handleGoogle, handleApple, setMode, setError } = p;
   return (
     <div dir="rtl" style={{
-      ...FONT, width: '100%', minHeight: '100vh', display: 'flex', background: DT.cream,
+      ...FONT, width: '100%', minHeight: '100dvh', display: 'flex', background: DT.cream,
     }}>
       {/* Left: brand panel */}
       <div style={{
@@ -242,7 +242,7 @@ function DesktopLogin(p) {
               value={form.password} onChange={(v) => update('password', v)} icon={<Lock size={15} />}
               adornment={(
                 <button type="button" onClick={() => setShowPass((s) => !s)}
-                  style={{ background: 'transparent', border: 'none', color: DT.muted, cursor: 'pointer', padding: 4, display: 'inline-flex' }}
+                  style={{ background: 'transparent', border: 'none', color: DT.muted, cursor: 'pointer', padding: 8, display: 'inline-flex' }}
                   aria-label={showPass ? 'הסתר סיסמה' : 'הצג סיסמה'}>
                   {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
@@ -250,7 +250,7 @@ function DesktopLogin(p) {
             />
             {!isSignup && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.muted }}>
+                <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: DT.muted, cursor: 'pointer', minHeight: 40 }}>
                   <input type="checkbox" defaultChecked /> זכור אותי
                 </label>
                 <a href="/forgot-password"
@@ -302,8 +302,9 @@ function MobileLogin(p) {
     handleSubmit, handleGoogle, handleApple, setMode, setError } = p;
   return (
     <div dir="rtl" style={{
-      ...FONT, background: DT.cream, color: DT.ink, minHeight: '100vh',
+      ...FONT, background: DT.cream, color: DT.ink, minHeight: '100dvh',
       display: 'flex', flexDirection: 'column', padding: '22px 22px 22px',
+      paddingBottom: 'calc(22px + env(safe-area-inset-bottom))',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
         {/* Mobile login sits on the cream background → ink tile with
@@ -330,7 +331,7 @@ function MobileLogin(p) {
           value={form.password} onChange={(v) => update('password', v)} icon={<Lock size={16} />}
           rightAdorn={(
             <button type="button" onClick={() => setShowPass((s) => !s)}
-              style={{ background: 'transparent', border: 'none', color: DT.muted, cursor: 'pointer', padding: 4, display: 'inline-flex' }}
+              style={{ background: 'transparent', border: 'none', color: DT.muted, cursor: 'pointer', padding: 8, display: 'inline-flex' }}
               aria-label={showPass ? 'הסתר סיסמה' : 'הצג סיסמה'}>
               {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
@@ -410,7 +411,7 @@ function MField({ label, value, onChange, icon, rightAdorn, hint, ...rest }) {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         background: DT.white,
-        border: `1.5px solid ${focus ? DT.gold : DT.border}`,
+        border: `2px solid ${focus ? DT.gold : DT.border}`,
         borderRadius: 12, padding: '0 14px',
         transition: 'border-color 150ms, box-shadow 150ms',
         boxShadow: focus ? '0 0 0 4px rgba(180,139,76,0.12)' : 'none',

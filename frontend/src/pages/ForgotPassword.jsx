@@ -51,8 +51,9 @@ export default function ForgotPassword() {
 
   return (
     <div dir="rtl" lang="he" style={{
-      ...FONT, background: DT.cream, color: DT.ink, minHeight: '100vh',
+      ...FONT, background: DT.cream, color: DT.ink, minHeight: '100dvh',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      paddingTop: 'calc(24px + env(safe-area-inset-top))',
     }}>
       <div style={{
         width: '100%', maxWidth: 420,
@@ -102,7 +103,7 @@ export default function ForgotPassword() {
               {error && (
                 <div role="alert" style={{
                   background: 'rgba(185,28,28,0.08)', color: DT.danger,
-                  padding: '10px 12px', borderRadius: 10, fontSize: 13, marginBottom: 12,
+                  padding: '10px 12px', borderRadius: 10, fontSize: 13, marginTop: 12, marginBottom: 12,
                 }}>{error}</div>
               )}
               <button
