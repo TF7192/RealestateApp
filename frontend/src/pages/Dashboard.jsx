@@ -109,54 +109,33 @@ export default function Dashboard() {
   const [meetings, setMeetings] = useState([]);
   const [premiumOpen, setPremiumOpen] = useState(false);
 
-  // PERF-007 — replaces a 4-way unbounded fan-out (listLeads,
-  // listProperties, listDeals, listReminders) with one aggregated
-  // /dashboard/summary call. The backend serves counts + ≤5-row
-  // top-lists from `count()` queries instead of marshaling the
-  // entire book. Falls back to the legacy fan-out if the new
-  // endpoint isn't available (older backend / native iOS clients
-  // hitting a stale build).
+  // PERF-007 — pull the aggregated summary in parallel with the four
+  // list endpoints. The summary is used ONLY for the KPI counts (its
+  // count() queries don't bloat the wire); the lists themselves still
+  // come from the legacy endpoints because the page renders a deals
+  // pipeline (needs every deal, not just stuck ones) and a reminders
+  // panel (Reminder rows, not LeadMeeting calendar rows the summary
+  // returns under `todayMeetings`). Mixing the two domains caused
+  // "0 תזכורות" + a broken pipeline on the prior wiring.
   const [summary, setSummary] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const s = await api.dashboardSummary?.();
-        if (cancelled) return;
-        if (s && s.counts) {
-          setSummary(s);
-          return;
-        }
-      } catch { /* fall through to legacy */ }
-      try {
-        const [lRes, pRes, dRes, mRes] = await Promise.all([
-          api.listLeads?.().catch(() => null),
-          api.listProperties?.({ mine: '1' }).catch(() => null),
-          api.listDeals?.().catch(() => null),
-          (api.listReminders?.({ upcoming: '1' }) || Promise.resolve(null)).catch(() => null),
-        ]);
-        if (cancelled) return;
-        setLeads(lRes?.items || []);
-        setProperties(pRes?.items || []);
-        setDeals(dRes?.items || []);
-        setMeetings(mRes?.items || []);
-      } catch { /* leave empty */ }
-    })();
+    Promise.all([
+      api.dashboardSummary?.().catch(() => null),
+      api.listLeads?.().catch(() => null),
+      api.listProperties?.({ mine: '1' }).catch(() => null),
+      api.listDeals?.().catch(() => null),
+      (api.listReminders?.({ upcoming: '1' }) || Promise.resolve(null)).catch(() => null),
+    ]).then(([s, lRes, pRes, dRes, mRes]) => {
+      if (cancelled) return;
+      if (s?.counts) setSummary(s);
+      setLeads(lRes?.items || []);
+      setProperties(pRes?.items || []);
+      setDeals(dRes?.items || []);
+      setMeetings(mRes?.items || []);
+    });
     return () => { cancelled = true; };
   }, []);
-
-  // When the server-aggregated summary is available, surface its
-  // top-5 lists directly. Each setter still keeps an `items`-shaped
-  // array so the rest of the file (hotLeads memo, todaysReminders,
-  // computeAiPriorities, kpis) doesn't have to branch on which path
-  // populated it.
-  useEffect(() => {
-    if (!summary) return;
-    setLeads(summary.hotLeads || []);
-    setMeetings(summary.todayMeetings || []);
-    setProperties(summary.staleProperties || []);
-    setDeals(summary.stuckDeals || []);
-  }, [summary]);
 
   const hotLeads = useMemo(
     () => leads.filter((l) => (l.status || '').toUpperCase() === 'HOT').slice(0, 4),

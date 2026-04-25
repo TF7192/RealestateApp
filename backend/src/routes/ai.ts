@@ -1173,14 +1173,15 @@ ${compsText || '(אין נכסים להשוואה)'}
       });
       reply.hijack();
 
-      // Cloudflare's edge holds onto the first ~1-2 KB of any response
-      // before flushing to the client (this is true even with
-      // `no-transform`). Send a long comment line up front so the
-      // edge's buffer fills immediately and subsequent token-deltas
-      // flush in real time. SSE comment lines start with ":" and are
-      // ignored by every spec-compliant client.
+      // Cloudflare's free-tier edge holds onto the first ~4-8 KB of
+      // any response before flushing to the client (true even with
+      // `no-transform`). Send an SSE comment line large enough to
+      // overflow that edge buffer immediately so subsequent token
+      // deltas flush in real time. SSE comments start with ":" and
+      // are ignored by every spec-compliant client; the FE parser
+      // only emits `data:` events.
       try {
-        reply.raw.write(`: ${' '.repeat(2049)}\n\n`);
+        reply.raw.write(`: ${' '.repeat(8192)}\n\n`);
         // Force a Node TCP flush — Nagle's algorithm can otherwise
         // hold small writes for ~40 ms.
         if (typeof (reply.raw as any).flushHeaders === 'function') {
@@ -1191,6 +1192,12 @@ ${compsText || '(אין נכסים להשוואה)'}
       const send = (event: Record<string, unknown>) => {
         try {
           reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+          // Disable Nagle on the underlying TCP socket so each
+          // delta is pushed immediately. Without this, small writes
+          // queue ~40 ms in the kernel and Cloudflare receives them
+          // in batches. setNoDelay is idempotent — safe to call
+          // every event.
+          (reply.raw.socket as any)?.setNoDelay?.(true);
         } catch {
           // Client disconnected mid-stream — swallow the EPIPE.
         }
