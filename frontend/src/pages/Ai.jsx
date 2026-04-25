@@ -212,14 +212,15 @@ export default function Ai() {
         }}>
           <Sparkles size={20} aria-hidden="true" />
         </div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.6, margin: 0 }}>
             Estia AI
           </h1>
           <div style={{ fontSize: 13, color: DT.muted, marginTop: 2 }}>
-            עוזר מקצועי לסוכני נדל"ן — מבוסס Claude Sonnet 4.6
+            עוזר מקצועי לסוכני נדל"ן — מבוסס Claude Haiku 4.5
           </div>
         </div>
+        <QuotaChips />
       </header>
 
       {/* Chat area — flex child with its own scrollable message list,
@@ -335,6 +336,58 @@ export default function Ai() {
 // [links](href) (http/https only). No `dangerouslySetInnerHTML`, no
 // external dep — every node is a regular React element so XSS can't
 // slip through.
+// QuotaChips — small Hebrew chips on the /ai header showing how
+// many of today's recording minutes and this hour's chat questions
+// the agent has used. Only voice + chat are surfaced; the monthly
+// $30 budget is admin-only (returned only when role=ADMIN; the FE
+// just renders whichever blocks the API gives it).
+function QuotaChips() {
+  const [q, setQ] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.aiQuota?.()
+      .then((r) => { if (!cancelled) setQ(r); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  if (!q) return null;
+  const voiceUsedMin = Math.floor((q.voice?.usedSec ?? 0) / 60);
+  const voiceLimitMin = Math.floor((q.voice?.limitSec ?? 0) / 60);
+  const chatUsed = q.chat?.usedCount ?? 0;
+  const chatLimit = q.chat?.limitCount ?? 0;
+  const voiceWarn = q.voice && q.voice.remainingSec / Math.max(1, q.voice.limitSec) < 0.2;
+  const chatWarn = q.chat && q.chat.remainingCount / Math.max(1, q.chat.limitCount) < 0.2;
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <span style={{
+        padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700,
+        background: chatWarn ? 'rgba(180,83,9,0.10)' : DT.cream2,
+        color: chatWarn ? '#b45309' : DT.muted,
+      }} title="שאלות בשעה האחרונה">
+        💬 <bdi dir="ltr">{chatUsed}/{chatLimit}</bdi> שאלות בשעה
+      </span>
+      <span style={{
+        padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700,
+        background: voiceWarn ? 'rgba(180,83,9,0.10)' : DT.cream2,
+        color: voiceWarn ? '#b45309' : DT.muted,
+      }} title="דקות הקלטה היום">
+        🎙️ <bdi dir="ltr">{voiceUsedMin}/{voiceLimitMin}</bdi> דק׳ ביום
+      </span>
+    </div>
+  );
+}
+
+// Phone-number / large-integer pattern. Wrapped in <bdi dir="ltr">
+// so the digits render in their natural order even inside an RTL
+// paragraph — without this, "0 5 4 1 2 3 4 5 6 7" reads right-to-left
+// and the agent sees "7 6 5 4 3 2 1 4 5 0".
+//
+// Matches Israeli mobiles (`054-1234567`, `05X-XXXXXXX`, `+972…`),
+// landlines (`02-1234567`), and bare 7+ digit runs that look like
+// price/large numbers (`1,250,000`, `2500000`). Leaves single small
+// numbers ("3 חד׳", "4.5 מ״ר") alone — those don't need bidi help.
+const PHONE_NUMBER_RE = /(\+?972[-\s]?\d[\d\-\s]{6,}|0\d[\d\-\s]{6,}|\d{1,3}(?:[,.]\d{3})+(?:\.\d+)?|\d{7,})/;
+
 function renderInline(text, keyPrefix) {
   // Tokenise inline styling with one pass. Order matters: code first
   // so backticks don't get eaten by the bold/italic passes.
@@ -356,6 +409,21 @@ function renderInline(text, keyPrefix) {
     // [label](href)
     m = rest.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
     if (m) { push(<a key={`${keyPrefix}-l-${idx}`} href={m[2]} target="_blank" rel="noopener noreferrer" style={{ color: '#b48b4c', textDecoration: 'underline' }}>{m[1]}</a>); i += m[0].length; continue; }
+    // Phone numbers / large numerics — wrap in <bdi dir="ltr"> to
+    // force LTR rendering inside RTL paragraphs.
+    m = rest.match(PHONE_NUMBER_RE);
+    if (m && m.index !== undefined) {
+      if (m.index > 0) {
+        push(rest.slice(0, m.index));
+        i += m.index;
+        continue;
+      }
+      push(
+        <bdi key={`${keyPrefix}-n-${idx}`} dir="ltr" style={{ unicodeBidi: 'isolate' }}>{m[0]}</bdi>
+      );
+      i += m[0].length;
+      continue;
+    }
     // Plain char — coalesce runs of plain text into one node.
     const stopAt = rest.search(/`|\*\*|\*|\[[^\]]+\]\(https?/);
     const chunkEnd = stopAt === -1 ? rest.length : Math.max(1, stopAt);

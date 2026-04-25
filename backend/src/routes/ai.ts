@@ -20,6 +20,7 @@ import { prisma } from '../lib/prisma.js';
 import { buildAnthropic } from '../lib/anthropic.js';
 import { CHAT_TOOLS, runChatTool } from '../lib/aiChatTools.js';
 import { recordAnthropic } from '../lib/aiUsage.js';
+import { requireAiQuota, loadQuota, publicQuota } from '../middleware/aiQuota.js';
 
 const AI_AGENT_URL = (process.env.AI_AGENT_URL || 'http://estia-ai-agent:8080').replace(/\/$/, '');
 
@@ -40,7 +41,14 @@ export const registerAiRoutes: FastifyPluginAsync = async (app) => {
       // free-tier user can't bypass the client check by hitting the
       // endpoint directly. The 402 envelope here surfaces the same
       // upgrade dialog as the other premium-gated endpoints.
-      onRequest: [app.requireAgent, requirePremium({ feature: 'הקלטה חכמה' })],
+      // The aiQuota guard fires after auth/premium and refuses
+      // recording if the agent is past 45 min/day or the platform
+      // budget cap (admin-only signal).
+      onRequest: [
+        app.requireAgent,
+        requirePremium({ feature: 'הקלטה חכמה' }),
+        requireAiQuota({ kind: 'voice' }),
+      ],
       config: { rateLimit: VOICE_RATE_LIMIT },
     },
     async (req, reply) => {
@@ -247,13 +255,13 @@ ${facts.join('\n')}
         // handles Hebrew prose + 5 bullets at the same quality for
         // ~20% of the price.
         const response = await client.messages.create({
-          model: 'claude-sonnet-4-6',
+          model: 'claude-haiku-4-5',
           max_tokens: 1024,
           system:
             'אתה כותב תוכן שיווקי מומחה בנדל"ן ישראלי. אתה כותב בעברית טבעית, תקנית, וזורמת. אל תמציא עובדות.',
           messages: [{ role: 'user', content: userPrompt }],
         });
-        recordAnthropic({ userId: user.id, feature: 'describe-property', model: 'claude-sonnet-4-6', usage: response.usage as any });
+        recordAnthropic({ userId: user.id, feature: 'describe-property', model: 'claude-haiku-4-5', usage: response.usage as any });
 
         // Narrow to the first text block. The SDK's ContentBlock union
         // includes `text`, `thinking`, `tool_use` — we only care about
@@ -733,13 +741,13 @@ ${propertySummaries || '(אין נכסים פעילים)'}
       try {
         // Sprint 10 — meeting brief: structured output, short. Sonnet.
         const response = await client.messages.create({
-          model: 'claude-sonnet-4-6',
+          model: 'claude-haiku-4-5',
           max_tokens: 1024,
           system:
             'אתה יועץ מכירות בכיר בתחום הנדל"ן הישראלי. אתה מכין briefs מקצועיים, קצרים ופרקטיים, בעברית טבעית. אל תמציא עובדות.',
           messages: [{ role: 'user', content: userPrompt }],
         });
-        recordAnthropic({ userId: user.id, feature: 'meeting-brief', model: 'claude-sonnet-4-6', usage: response.usage as any });
+        recordAnthropic({ userId: user.id, feature: 'meeting-brief', model: 'claude-haiku-4-5', usage: response.usage as any });
         const textBlock = response.content.find((b) => b.type === 'text');
         const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
 
@@ -874,13 +882,13 @@ ${compsText || '(אין נכסים להשוואה)'}
         // Sprint 10 — offer-review: price reasoning, needs some
         // nuance. Sonnet is the right tier (not Haiku).
         const response = await client.messages.create({
-          model: 'claude-sonnet-4-6',
+          model: 'claude-haiku-4-5',
           max_tokens: 512,
           system:
             'אתה יועץ מחיר לסוכני נדל"ן בישראל. אתה מדייק, מחושב, ולא ממציא עובדות. אתה מחזיר תשובות בפורמט XML מדויק.',
           messages: [{ role: 'user', content: userPrompt }],
         });
-        recordAnthropic({ userId: user.id, feature: 'offer-review', model: 'claude-sonnet-4-6', usage: response.usage as any });
+        recordAnthropic({ userId: user.id, feature: 'offer-review', model: 'claude-haiku-4-5', usage: response.usage as any });
         const textBlock = response.content.find((b) => b.type === 'text');
         const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
 
@@ -938,7 +946,11 @@ ${compsText || '(אין נכסים להשוואה)'}
   app.post(
     '/chat',
     {
-      onRequest: [app.requireAgent, requirePremium({ feature: 'Estia AI' })],
+      onRequest: [
+        app.requireAgent,
+        requirePremium({ feature: 'Estia AI' }),
+        requireAiQuota({ kind: 'chat' }),
+      ],
       // Chat is the most-used surface; allow a little more headroom than
       // the one-shot analysis endpoints. 30/min per agent is enough for
       // an active conversation but cuts off scripted abuse.
@@ -1030,7 +1042,7 @@ ${compsText || '(אין נכסים להשוואה)'}
           // surface: tool-use + Hebrew writing + CRM Q&A don't need
           // Opus-level reasoning, and it's 5× cheaper per call.
           const response = await client.messages.create({
-            model: 'claude-sonnet-4-6',
+            model: 'claude-haiku-4-5',
             // Tightened from 2048 → 1024. The chat replies that hit
             // the previous ceiling were almost always runaway table
             // regens; capping halves the worst-case output cost
@@ -1045,7 +1057,7 @@ ${compsText || '(אין נכסים להשוואה)'}
           recordAnthropic({
             userId: user.id,
             feature: 'chat',
-            model: 'claude-sonnet-4-6',
+            model: 'claude-haiku-4-5',
             usage: response.usage as any,
           });
 
@@ -1158,7 +1170,7 @@ ${compsText || '(אין נכסים להשוואה)'}
       // delivered as a WS frame + a 1008 ("Policy Violation") close.
       const u = await prisma.user.findUnique({
         where: { id: user.id },
-        select: { isPremium: true },
+        select: { isPremium: true, role: true },
       });
       if (!u?.isPremium) {
         try {
@@ -1170,6 +1182,37 @@ ${compsText || '(אין נכסים להשוואה)'}
           socket.close(1008, 'premium required');
         } catch { /* socket already gone */ }
         return;
+      }
+
+      // Per-agent quota check. ADMIN role bypasses; everyone else gets
+      // gated on (a) hourly chat count and (b) monthly platform budget.
+      // Voice cap doesn't apply here. Same WS frame + 1008 close as
+      // the premium gate so the FE handles them through one path.
+      if (u.role !== 'ADMIN') {
+        const snap = await loadQuota(user.id);
+        if (snap.spend.usedUsd >= snap.spend.limitUsd) {
+          try {
+            socket.send(JSON.stringify({
+              type: 'error',
+              code: 'ai_unavailable',
+              message: 'שירות ה-AI אינו זמין כרגע. נסה/י שוב בחודש הבא.',
+            }));
+            socket.close(1008, 'budget exceeded');
+          } catch { /* noop */ }
+          return;
+        }
+        if (snap.chat.usedCount >= snap.chat.limitCount) {
+          try {
+            socket.send(JSON.stringify({
+              type: 'error',
+              code: 'chat_quota_exceeded',
+              message: `הגעת למכסה השעתית של ${snap.chat.limitCount} שאלות. נסה/י שוב בעוד שעה.`,
+              quota: { used: snap.chat.usedCount, limit: snap.chat.limitCount },
+            }));
+            socket.close(1008, 'chat quota');
+          } catch { /* noop */ }
+          return;
+        }
       }
 
       const client = buildAnthropic();
@@ -1288,7 +1331,7 @@ ${compsText || '(אין נכסים להשוואה)'}
           for (let iter = 0; iter < 6; iter += 1) {
             if (!active) return;
             const stream = client.messages.stream({
-              model: 'claude-sonnet-4-6',
+              model: 'claude-haiku-4-5',
               max_tokens: 1024,
               system: systemCached as any,
               tools: toolsCached as any,
@@ -1316,7 +1359,7 @@ ${compsText || '(אין נכסים להשוואה)'}
             recordAnthropic({
               userId: user.id,
               feature: 'chat',
-              model: 'claude-sonnet-4-6',
+              model: 'claude-haiku-4-5',
               usage: finalMsg.usage as any,
             });
 
@@ -1377,4 +1420,20 @@ ${compsText || '(אין נכסים להשוואה)'}
       send({ type: 'hello' });
     }
   );
+
+  // ── GET /api/ai/quota ──────────────────────────────────────────
+  // Snapshot of the agent's three rolling caps (voice/day, chat/hr,
+  // spend/month). The `spend` block is stripped for non-admins —
+  // platform owners see the dollar figure on the admin dashboards;
+  // agents only see voice + chat. The FE surfaces the two visible
+  // chips on the /ai page header.
+  app.get('/quota', { onRequest: [app.requireAgent] }, async (req) => {
+    const user = requireUser(req);
+    const u = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { role: true },
+    });
+    const snap = await loadQuota(user.id);
+    return publicQuota(snap, u?.role === 'ADMIN');
+  });
 };

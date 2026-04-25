@@ -908,6 +908,13 @@ export const api = {
       retries: 1,
     }),
 
+  // Per-agent AI quota — see backend/middleware/aiQuota.ts.
+  // Returns { voice: {usedSec, limitSec, remainingSec, resetAt},
+  //           chat:  {usedCount, limitCount, remainingCount, resetAt} }
+  // Admins additionally get a `spend` block with the monthly budget;
+  // the FE just renders whatever's present.
+  aiQuota: () => request('/ai/quota'),
+
   // PERF-012 — streaming AI chat over WebSocket. Replaces the SSE
   // route because Cloudflare's free-tier edge buffers small responses
   // and gzip-rebuffers everything else; deltas arrived in batches

@@ -14,6 +14,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import OpenAI, { toFile } from 'openai';
 import { requirePremium } from '../middleware/requirePremium.js';
+import { requireAiQuota } from '../middleware/aiQuota.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireUser } from '../middleware/auth.js';
 import { recordAnthropic, recordWhisper } from '../lib/aiUsage.js';
@@ -54,7 +55,11 @@ Rules:
 
 export const registerVoiceIngestRoutes: FastifyPluginAsync = async (app) => {
   app.post('/demo-ingest', {
-    onRequest: [app.requireAgent, requirePremium({ feature: 'הקלטה חכמה' })],
+    onRequest: [
+      app.requireAgent,
+      requirePremium({ feature: 'הקלטה חכמה' }),
+      requireAiQuota({ kind: 'voice' }),
+    ],
   }, async (req, reply) => {
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: { message: 'No file' } });

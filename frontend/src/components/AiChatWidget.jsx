@@ -346,6 +346,9 @@ function AiChatPanel({ onClose }) {
 //    formatting code, not load-bearing logic. If we ever drift, the
 //    /ai page is the source of truth.
 
+// See Ai.jsx renderInline — same phone/large-number bidi fix.
+const PHONE_NUMBER_RE = /(\+?972[-\s]?\d[\d\-\s]{6,}|0\d[\d\-\s]{6,}|\d{1,3}(?:[,.]\d{3})+(?:\.\d+)?|\d{7,})/;
+
 function renderInline(text, keyPrefix) {
   const out = [];
   let i = 0;
@@ -361,6 +364,19 @@ function renderInline(text, keyPrefix) {
     if (m) { push(<em key={`${keyPrefix}-i-${idx}`}>{renderInline(m[1], `${keyPrefix}-i-${idx}`)}</em>); i += m[0].length; continue; }
     m = rest.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
     if (m) { push(<a key={`${keyPrefix}-l-${idx}`} href={m[2]} target="_blank" rel="noopener noreferrer" style={{ color: '#b48b4c', textDecoration: 'underline' }}>{m[1]}</a>); i += m[0].length; continue; }
+    m = rest.match(PHONE_NUMBER_RE);
+    if (m && m.index !== undefined) {
+      if (m.index > 0) {
+        push(rest.slice(0, m.index));
+        i += m.index;
+        continue;
+      }
+      push(
+        <bdi key={`${keyPrefix}-n-${idx}`} dir="ltr" style={{ unicodeBidi: 'isolate' }}>{m[0]}</bdi>
+      );
+      i += m[0].length;
+      continue;
+    }
     const stopAt = rest.search(/`|\*\*|\*|\[[^\]]+\]\(https?/);
     const chunkEnd = stopAt === -1 ? rest.length : Math.max(1, stopAt);
     push(rest.slice(0, chunkEnd));
