@@ -123,7 +123,12 @@ export function subscribeScan(fn) {
 // Polling cadence for the jobId → result flow. 2.5s is a sweet spot:
 // fast enough that an ~75s scan finishes within one extra poll, slow
 // enough that a 5-minute crawl only burns ~120 GET /jobs/:id hits.
-const POLL_INTERVAL_MS = 2500;
+// 1.2 s is the sweet spot now that the backend streams real per-page
+// progress: page navigations are POLITE_GAP_MS=600ms apart, plus
+// ~700ms for the page itself, so 1.2 s catches most pages directly.
+// The previous 2.5 s skipped over fast pages and made the bar feel
+// stuck on the first event the poll happened to land on.
+const POLL_INTERVAL_MS = 1200;
 // Hard ceiling on polling — if a job hasn't resolved in 15 minutes
 // something's wrong; give up and surface a real error rather than
 // polling forever.
@@ -165,6 +170,13 @@ export function startScan(url) {
     finishedAt: null,
     result: null,
     error: null,
+    // Reset progress so the bar starts from zero. Without this, a
+    // fresh scan inherited the stale `progress` from sessionStorage
+    // (or the last completed scan) and the user saw the previous
+    // run's "דף 1/3 · 5 נכסים" stuck on screen until the new scan's
+    // first poll caught up — which on a small/fast agency is most
+    // of the run.
+    progress: null,
   });
   inflight = (async () => {
     try {

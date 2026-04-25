@@ -475,7 +475,13 @@ export const api = {
   }),
   // Job status — polled by the scan store until status !== 'running'.
   // Returns { status, kind, result?, error?, startedAt, finishedAt? }.
-  yad2JobStatus: (jobId) => request(`/integrations/yad2/jobs/${encodeURIComponent(jobId)}`),
+  yad2JobStatus: (jobId) =>
+    // Cache-busting `_t` because the same URL is polled every 2.5 s
+    // and any intermediary (browser disk cache, CDN, nginx proxy)
+    // caching the 200 response — even briefly — pins the progress
+    // bar on whichever stage was first observed. Per-poll timestamp
+    // guarantees a unique URL each time.
+    request(`/integrations/yad2/jobs/${encodeURIComponent(jobId)}?_t=${Date.now()}`),
   // Sliding-window quota — { limit, remaining, used, resetAt, msUntilReset }.
   // The Yad2 import screen calls this on mount + after each preview to
   // render the "X/3 left this hour, resets in Y min" chip.

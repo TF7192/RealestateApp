@@ -525,6 +525,12 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     const job = jobs.get(id);
     if (!job) return reply.code(404).send({ error: { message: 'Job not found or expired' } });
     if (job.agentId !== u.id) return reply.code(403).send({ error: { message: 'Forbidden' } });
+    // Explicit no-store so neither the browser disk cache nor any
+    // intermediary (CloudFront, nginx, corporate proxies) returns a
+    // stale snapshot during the 1-2 s polling cadence. The frontend
+    // also cache-busts via `?_t=`; this is belt-and-braces.
+    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    reply.header('Pragma', 'no-cache');
     // The caller sees { status, result?, error?, progress? } — same
     // envelope for both job kinds so the client can reuse one polling
     // helper. `progress` is present while the job is running so the
