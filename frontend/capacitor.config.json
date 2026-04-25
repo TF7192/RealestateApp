@@ -55,8 +55,8 @@
       "overlaysWebView": false
     },
     "Keyboard": {
-      "resize": "native",
-      "resizeOnFullScreen": true,
+      "resize": "none",
+      "resizeOnFullScreen": false,
       "style": "DEFAULT"
     },
     "Haptics": {},
