@@ -34,6 +34,23 @@
   justify-content: center;
   cursor: pointer;
   transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+  /* GPU layer promotion — same defense as MobileTabBar, so scroll
+     under the FAB never marks it dirty (= taps register instantly,
+     mid-scroll). Pairs with `transform: translateZ(0)` below. */
+  transform: translateZ(0);
+  will-change: transform;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (pointer: coarse) {
+  /* Mirror the MobileTabBar's hover-disable: on iOS, `:hover` sticks
+     after a tap until the next tap elsewhere, so the lift+box-shadow
+     bump would fire on tap and repaint a colored shadow each time. */
+  .qcfab-trigger:hover {
+    transform: translateZ(0);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  }
 }
 
 .qcfab-trigger:hover {

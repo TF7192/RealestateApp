@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Building2, UserPlus } from 'lucide-react';
 import Portal from './Portal';
 import useFocusTrap from '../hooks/useFocusTrap';
+import haptics from '../lib/haptics';
 import './QuickCreateFab.css';
 
 // H2 — Quick-create FAB.
@@ -119,7 +120,7 @@ export default function QuickCreateFab() {
         aria-label="יצירה מהירה"
         aria-haspopup="menu"
         aria-expanded={open ? 'true' : 'false'}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { haptics.press(); setOpen((v) => !v); }}
       >
         <Plus size={26} aria-hidden="true" />
       </button>
@@ -149,7 +150,7 @@ export default function QuickCreateFab() {
                 role="menuitem"
                 className="qcfab-menu-item"
                 tabIndex={i === focusIndex ? 0 : -1}
-                onClick={() => go(item.to)}
+                onClick={() => { haptics.tap(); go(item.to); }}
               >
                 <item.icon size={18} aria-hidden="true" />
                 <span>{item.label}</span>

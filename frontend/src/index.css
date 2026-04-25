@@ -976,6 +976,21 @@ html, body {
   margin-inline: auto;
 }
 
+/* GPU-layer promotion for fixed-position chrome. The mobile header
+   (Layout topbar) lives at top:0 with z-index:20; without an
+   explicit transform it can be lifted into the same compositor
+   layer as the scrolling document, which on WKWebView causes
+   intermittent tap drops mid-scroll (same root cause we hit on
+   MobileTabBar — the bar's bg + border get re-rasterized as the
+   under-content scrolls past). Promoting it to its own layer pins
+   it; the GPU never re-rasterizes. */
+.mobile-header,
+.mh-bar,
+.layout-mobile-header {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
 /* T6 — content-visibility on list cards lets the browser skip
    rendering offscreen items. Big scroll-perf win on long lists,
    especially on 120Hz iPhones where every dropped frame is visible.

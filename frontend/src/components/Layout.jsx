@@ -41,6 +41,7 @@ import QuickCreateFab from './QuickCreateFab';
 import MobileTabBar from './MobileTabBar';
 import LogoMark from './LogoMark';
 import haptics from '../lib/haptics';
+import useEdgeSwipeBack from '../hooks/useEdgeSwipeBack';
 
 // ─── Tokens (shell.jsx / DT verbatim) ──────────────────────
 const DT = {
@@ -159,6 +160,11 @@ export default function Layout({ onLogout }) {
   const { user } = useAuth();
   const narrow = useIsNarrow();
   const isAdmin = isAdminUser(user);
+
+  // iOS-native edge-swipe-back gesture. Touch-only; safe on desktop
+  // (early-returns when ontouchstart is unavailable). Honours opt-outs
+  // via [data-allow-x-scroll] on horizontal-scroll containers.
+  useEdgeSwipeBack();
 
   // ─── Favorites (restored from the previous layout) ─────────────
   // The list is also re-fetched on the global `estia:favorites-changed`

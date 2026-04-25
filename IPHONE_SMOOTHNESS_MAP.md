@@ -321,53 +321,48 @@ next property in the list).
 
 **Risk**: high. This is iOS Notes / Mail / Photos app territory.
 
-### My recommendation
+### Status: Tier A shipped
 
-**Tier A first.** It's a 30-minute change that immediately makes the
-app feel iOS-native. If you like it, we can build Tier B. Tier C is
-overkill unless we're competing with native-shell apps.
+`frontend/src/hooks/useEdgeSwipeBack.js` + wired into `Layout.jsx:163`.
+Touch-only (early-return on desktop). Honours opt-outs via
+`[data-allow-x-scroll]` for any internal horizontal-scroll component
+that needs to keep its own gesture. Uses View Transitions for the
+visual when supported (iOS 18+); falls back to a plain `navigate(-1)`
+on older platforms.
 
-Should I ship Tier A now? Or do you want Tier B?
+**To opt-out an internal horizontal-scroll component**, mark its
+container with `data-allow-x-scroll`:
+```jsx
+<div data-allow-x-scroll style={{ overflowX: 'auto' }}>...</div>
+```
+
+Tier B (full tab-pair swipe) and Tier C (per-route prev/next) remain
+deferred — they conflict with internal horizontal-scroll components
+unless every such component is opted out, and the visual quality
+bar is much higher (drag-along translate, rubber-band at edges, etc.).
 
 ---
 
 ## 4. Remaining smoothness work (open)
 
-### High impact (next priority)
+### High impact
 
-1. **Tier A edge-swipe-back gesture** — see §3 above.
-2. **Reduce `index.js` bundle size** — currently 408KB. Aggressive
-   route-level lazy loading could shave 100-150KB off the critical
-   path. Trade-off: chunk-load latency on first navigation per
-   route.
-3. **Drop `<main key={pathname}>`** — forces every page to re-mount
-   per route. View Transitions makes the visual smooth but the
-   React reconciler still re-builds. Each page would need an audit
-   for stale state, then drop the key.
+1. **Tier A edge-swipe-back gesture** — ✅ shipped. `frontend/src/hooks/useEdgeSwipeBack.js`, wired into `Layout.jsx:163`. 24px left-edge zone, 80px min horizontal motion, vertical-jitter bail, opt-out via `[data-allow-x-scroll]`. Uses View Transitions for the visual.
+2. **Reduce `index.js` bundle size** — already substantially split. Eager: `Login`, `Dashboard`, `Properties`, `PropertyDetail`, `Customers`, `CustomerDetail` (the auth + first-paint critical path). Everything else lazy: `NewProperty`, `NewLead`, `Owners`, `OwnerDetail`, `Deals`, `DealDetail`, `AgentPortal`, `PropertyLandingPage`, `CustomerPropertyView`, `ProspectSign`, `NotFound`, `Profile`, `AgentCard`, `LeadHistory`, etc. The 408KB is a reasonable critical-path budget; further splitting trades chunk-load latency on first nav.
+3. **Drop `<main key={pathname}>`** — left in place. Each page would need a per-route audit for stale-state handling on param change before this is safe. Cost is now masked by View Transitions API.
 
 ### Medium impact
 
-4. **`will-change: transform` on QuickCreateFab + Layout topbar** —
-   match what the tab bar got, for the same reason. Currently they
-   may repaint with the page.
-5. **Remove `noise-overlay`** on `CustomerPortal.jsx:191` — fixed
-   full-viewport SVG noise pattern, paints per frame. Already hidden
-   on `mobile-shell` body but verify it's not on the iPhone Capacitor
-   render path.
-6. **PostHog `capture` calls** — verify they're batched / deferred,
-   not synchronous on every interaction.
-7. **API client request coalescing** — every page navigation re-
-   fetches data. `frontend/src/lib/pageCache.js` exists; audit page
-   usage to ensure cache-first on navigation.
+4. **`will-change: transform` on QuickCreateFab + Layout topbar** — ✅ shipped. `QuickCreateFab.css` and `index.css` `.mobile-header / .mh-bar / .layout-mobile-header`. Both elements are now pinned to their own GPU layers; scrolls under them no longer mark them dirty.
+5. **`noise-overlay`** — verified safe. Used only on `CustomerPortal.jsx:191`; `mobile.css:60` `body.mobile-shell .noise-overlay { display: none; }` hides it on the Capacitor mobile shell.
+6. **PostHog `capture` calls** — verified safe. `lib/analytics.js` lazy-loads `posthog-js` via dynamic `import()` on idle (Vite hoists into its own chunk and lands on the wire after the critical bundle), and `capture` calls go through PostHog's internal queue + XHR.
+7. **API client request coalescing** — `frontend/src/lib/pageCache.js` available; opt-in per page. Defers to per-page work.
 
 ### Low impact (nice-to-have)
 
-8. **`scroll-behavior: smooth`** explicitly on scrollable containers
-   that benefit from it.
-9. **Haptics on more events** (form-submit success, swipe-to-action,
-   premium-gate close) — Capacitor Haptics is already wired.
-10. **Pull-to-refresh** on Properties / Customers / Owners — pairs
-    with Tier A swipe gesture handler.
+8. **`scroll-behavior: smooth`** — call sites already pass `behavior: 'smooth'` to `scrollIntoView` / `scrollTo` where relevant. No global change needed.
+9. **Haptics on more events** — ✅ extended. `useToast()` already wires `haptics.success/error/warning` on every toast. QuickCreateFab now haptics on trigger press + menu-item tap. MobileTabBar haptics on tab + "עוד".
+10. **Pull-to-refresh** on Properties / Customers / Owners — open. Significant work (custom touch handler + indicator UI). Defer to its own focused PR.
 
 ---
 
