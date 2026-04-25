@@ -1154,15 +1154,39 @@ ${compsText || '(אין נכסים להשוואה)'}
       // ERR_HTTP_HEADERS_SENT.
       reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-store',
+        // `no-transform` tells Cloudflare/any intermediary NOT to
+        // gzip-buffer the body. Cloudflare on free tier holds the
+        // entire response until it has enough bytes for compression
+        // unless we opt out via this header.
+        'Cache-Control': 'no-store, no-transform',
         'Connection': 'keep-alive',
         // X-Accel-Buffering: no — disable nginx response buffering
         // for SSE so each event flushes to the client as it's
         // written. nginx.conf already has `proxy_buffering off`
         // under /api/, but this header is the belt-and-braces.
         'X-Accel-Buffering': 'no',
+        // Explicitly identity to prevent any layer from re-compressing
+        // — Cloudflare in particular re-encodes responses when both
+        // sides advertise gzip support, which buffers the whole body
+        // until the encoder has enough data to flush.
+        'Content-Encoding': 'identity',
       });
       reply.hijack();
+
+      // Cloudflare's edge holds onto the first ~1-2 KB of any response
+      // before flushing to the client (this is true even with
+      // `no-transform`). Send a long comment line up front so the
+      // edge's buffer fills immediately and subsequent token-deltas
+      // flush in real time. SSE comment lines start with ":" and are
+      // ignored by every spec-compliant client.
+      try {
+        reply.raw.write(`: ${' '.repeat(2049)}\n\n`);
+        // Force a Node TCP flush — Nagle's algorithm can otherwise
+        // hold small writes for ~40 ms.
+        if (typeof (reply.raw as any).flushHeaders === 'function') {
+          (reply.raw as any).flushHeaders();
+        }
+      } catch { /* client gone already */ }
 
       const send = (event: Record<string, unknown>) => {
         try {
