@@ -102,21 +102,17 @@ function Shell({ children }) {
 
 function AgentHeader({ agent }) {
   if (!agent) return null;
+  // SEC-036 — Public-token GET no longer returns the agent's broker
+  // license, national ID, or business address (the URL travels over
+  // unencrypted channels). The signed PDF, rendered server-side after
+  // sign, still includes those fields for legal compliance.
   return (
     <div className="psn-agent-head">
       <div className="psn-agent-name">
         {agent.displayName || 'המתווך/ת'}
         {agent.agency && <span className="psn-agent-agency"> · {agent.agency}</span>}
       </div>
-      {agent.businessAddress && <div className="psn-agent-line">{agent.businessAddress}</div>}
       {agent.phone && <div className="psn-agent-line" dir="ltr">{agent.phone}</div>}
-      {(agent.license || agent.personalId) && (
-        <div className="psn-agent-line psn-agent-meta">
-          {agent.license && <span>מ.ר. {agent.license}</span>}
-          {agent.license && agent.personalId && <span aria-hidden="true"> · </span>}
-          {agent.personalId && <span>ת.ז. {agent.personalId}</span>}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,11 +1,26 @@
 // Sprint 7 / MLS parity — Task G2. Marketable-area grouping on top of
-// the G1 Neighborhood dictionary. OWNERs curate groups; agents
-// consume them read-only. Keeps the public GET consistent with the
-// G1 /api/neighborhoods shape so the frontend can pair them freely.
+// the G1 Neighborhood dictionary. SEC-035 — admins (via the
+// ADMIN_EMAILS allowlist) curate groups; everyone else reads only.
+// Keeps the public GET consistent with the G1 /api/neighborhoods
+// shape so the frontend can pair them freely.
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { normalizeCity } from '../lib/addressNormalize.js';
+import { getUser } from '../middleware/auth.js';
+import { isAdminUser } from './chat.js';
+
+// SEC-035 — Same rationale as in mlsSprint7.ts: NeighborhoodGroup is
+// platform-global, so an OWNER alone is too permissive. Until SEC-010
+// lands a real ADMIN role we gate writes on the existing email
+// allowlist.
+async function requireAdmin(req: any, reply: any) {
+  const u = getUser(req);
+  if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+  if (!isAdminUser(u.email)) {
+    return reply.code(403).send({ error: { message: 'Admin only' } });
+  }
+}
 
 // Include shape reused by every responder so callers always get the
 // same payload. `sortOrder` lets the admin UI preserve the agent-
@@ -60,9 +75,9 @@ export const registerNeighborhoodGroupRoutes: FastifyPluginAsync = async (app) =
     return { items };
   });
 
-  // OWNER-gated writes. Same stance as the G1 write path — the lookup
-  // is office-global, so agents don't mutate it.
-  app.post('/', { onRequest: [app.requireOwner] }, async (req, reply) => {
+  // SEC-035 — Admin-only writes. Same stance as the G1 write path —
+  // the lookup is platform-global, so OWNER alone is too permissive.
+  app.post('/', { onRequest: [app.requireAuth, requireAdmin] }, async (req, reply) => {
     const body = createInput.parse(req.body);
     try {
       const created = await prisma.neighborhoodGroup.create({
@@ -93,7 +108,7 @@ export const registerNeighborhoodGroupRoutes: FastifyPluginAsync = async (app) =
     }
   });
 
-  app.patch('/:id', { onRequest: [app.requireOwner] }, async (req, reply) => {
+  app.patch('/:id', { onRequest: [app.requireAuth, requireAdmin] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const existing = await prisma.neighborhoodGroup.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: { message: 'Not found' } });
@@ -141,7 +156,7 @@ export const registerNeighborhoodGroupRoutes: FastifyPluginAsync = async (app) =
     }
   });
 
-  app.delete('/:id', { onRequest: [app.requireOwner] }, async (req, reply) => {
+  app.delete('/:id', { onRequest: [app.requireAuth, requireAdmin] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const existing = await prisma.neighborhoodGroup.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: { message: 'Not found' } });

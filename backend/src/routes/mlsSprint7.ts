@@ -4,7 +4,21 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { requireUser } from '../middleware/auth.js';
+import { getUser, requireUser } from '../middleware/auth.js';
+import { isAdminUser } from './chat.js';
+
+// SEC-035 — Neighborhoods is a platform-global lookup (no
+// agentId/officeId on the row), so an OWNER from any office could
+// otherwise poison every other office's autocomplete dropdown. Until
+// SEC-010 introduces a real ADMIN role we gate writes on the existing
+// email allowlist. Reads stay public — autocomplete needs them.
+async function requireAdmin(req: any, reply: any) {
+  const u = getUser(req);
+  if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+  if (!isAdminUser(u.email)) {
+    return reply.code(403).send({ error: { message: 'Admin only' } });
+  }
+}
 
 // ────────────────────────── Neighborhoods (G1) ──────────────────────────
 const neighborhoodQuery = z.object({
@@ -33,15 +47,15 @@ export const registerNeighborhoodRoutes: FastifyPluginAsync = async (app) => {
     return { items };
   });
 
-  // Admin-only write path: not agent-scoped because the lookup is
-  // global. In the absence of a real admin check we gate on requireOwner
-  // — office owners can seed; plain agents can read only.
+  // SEC-035 — Admin-only write path. The Neighborhood table is
+  // platform-global; OWNER alone is too permissive (any office's
+  // OWNER can poison every other office's autocomplete).
   const input = z.object({
     city:    z.string().min(1).max(80),
     name:    z.string().min(1).max(120),
     aliases: z.array(z.string().max(120)).optional(),
   });
-  app.post('/', { onRequest: [app.requireOwner] }, async (req) => {
+  app.post('/', { onRequest: [app.requireAuth, requireAdmin] }, async (req) => {
     const body = input.parse(req.body);
     const created = await prisma.neighborhood.upsert({
       where:  { city_name: { city: body.city, name: body.name } },

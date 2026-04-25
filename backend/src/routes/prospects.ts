@@ -167,6 +167,13 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
       where: { id: prospect.propertyId },
       select: { street: true, city: true, type: true, marketingPrice: true, neighborhood: true },
     });
+    // SEC-036 — Public token is shared via WhatsApp / email (i.e.
+    // unencrypted channels), so anyone holding the URL must not be
+    // able to harvest the agent's PII. The signed PDF (rendered
+    // server-side via prospect-pdf.ts AFTER the prospect signs) still
+    // has full access to license / personalId / businessAddress, so
+    // the legal output is unaffected. The sign UI only needs
+    // displayName / phone / agency / brokerageTermsHtml.
     const agent = await prisma.user.findUnique({
       where: { id: prospect.agentId },
       select: {
@@ -175,9 +182,6 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
         agentProfile: {
           select: {
             agency: true,
-            license: true,
-            personalId: true,
-            businessAddress: true,
             brokerageTermsHtml: true,
           },
         },
@@ -196,10 +200,7 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
         ? {
             displayName:        agent.displayName,
             phone:              agent.phone,
-            agency:             agent.agentProfile?.agency          || null,
-            license:            agent.agentProfile?.license         || null,
-            personalId:         agent.agentProfile?.personalId      || null,
-            businessAddress:    agent.agentProfile?.businessAddress || null,
+            agency:             agent.agentProfile?.agency             || null,
             brokerageTermsHtml: agent.agentProfile?.brokerageTermsHtml || null,
           }
         : null,
