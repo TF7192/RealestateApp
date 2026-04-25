@@ -27,7 +27,7 @@ import {
   Bell, Search, Plus, MessageCircle, LogOut, Menu, X,
   ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
   Activity as ActivityIcon, Tag, Download as DownloadIcon, Heart,
-  Star, FolderOpen, HelpCircle, IdCard, Megaphone,
+  Star, FolderOpen, HelpCircle, IdCard, Megaphone, ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
@@ -248,7 +248,17 @@ export default function Layout({ onLogout }) {
     window.dispatchEvent(new Event('estia:open-palette'));
   };
 
-  const primary = PRIMARY_NAV.filter((it) => !it.adminOnly || isAdmin);
+  // Admin gets a stripped-down nav — no CRM, no tools, just the
+  // platform-admin surfaces (overview, chats, users). Everyone else
+  // sees the regular agent nav with `adminOnly` items hidden.
+  const primary = isAdmin
+    ? [
+        { k: 'admin',       to: '/admin',        label: 'סקירה כוללת', Icon: ShieldCheck },
+        { k: 'admin-users', to: '/admin/users',  label: 'משתמשים',     Icon: UsersRound },
+        { k: 'admin-chats', to: '/admin/chats',  label: 'שיחות תמיכה', Icon: MessageSquare },
+      ]
+    : PRIMARY_NAV.filter((it) => !it.adminOnly || isAdmin);
+  const tools = isAdmin ? [] : TOOL_NAV;
   const agentName = user?.displayName || user?.email?.split('@')[0] || 'סוכן';
   const agentInitial = (agentName || 'א').slice(0, 1);
   const agentSub = user?.agentProfile?.agency || 'נדל״ן';
@@ -265,7 +275,7 @@ export default function Layout({ onLogout }) {
 
       {!narrow && (
         <Sidebar
-          primary={primary} tools={TOOL_NAV} favorites={favorites}
+          primary={primary} tools={tools} favorites={favorites}
           location={location}
           agentName={agentName} agentInitial={agentInitial} agentSub={agentSub}
           agentAvatarUrl={agentAvatarUrl}
@@ -292,6 +302,7 @@ export default function Layout({ onLogout }) {
           onNewProperty={() => navigate('/properties/new')}
           onOpenChat={() => window.dispatchEvent(new Event('estia:open-chat'))}
           user={user}
+          isAdmin={isAdmin}
         />
         {/* Route-content fade-in: keying on pathname triggers a fresh
             mount of the inner wrapper on each navigation, and the
@@ -313,7 +324,7 @@ export default function Layout({ onLogout }) {
       {narrow && (
         <MobileTabBar
           primary={primary}
-          tools={TOOL_NAV}
+          tools={tools}
           favorites={favorites}
           onLogout={onLogout}
           agentName={agentName}
@@ -677,7 +688,7 @@ function NavRow({ item, active, tight, collapsed }) {
 }
 
 // ═══ Topbar ══════════════════════════════════════════════════════
-function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, user }) {
+function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, user, isAdmin }) {
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
@@ -788,7 +799,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
         {narrow ? 'חיפוש…' : 'חיפוש לידים, נכסים, פגישות…  (⌘K)'}
       </button>
       <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-        {!narrow && (
+        {!narrow && !isAdmin && (
           <>
             <button
               type="button"
@@ -831,6 +842,28 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
               }}
             >
               <Sparkles size={13} /> AI
+            </button>
+            {/* AI chat popup launcher — toggles the floating AiChatWidget
+                via a global event. Sits next to the voice-ingest "AI"
+                button so both AI surfaces are reachable from one place;
+                this one is for free-form Q&A while the other is for
+                creating a lead/asset from a recording. Shares state with
+                /ai so transcripts survive a switch to the full page. */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event('estia:open-ai-chat'))}
+              aria-label="צ׳אט עם Estia AI"
+              title="פתח/סגור צ׳אט עם Estia AI"
+              style={{
+                ...FONT,
+                background: 'rgba(180,139,76,0.08)',
+                border: `1px solid ${DT.gold}`,
+                padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
+                color: DT.goldDark, display: 'inline-flex', gap: 6, alignItems: 'center',
+                fontSize: 12, fontWeight: 800,
+              }}
+            >
+              <MessageCircle size={13} /> צ׳אט AI
             </button>
             {/* Sprint 10 — התאמות פומביות CTA with red badge counting pool
                 properties that match *this* agent's leads. Gold-on-cream

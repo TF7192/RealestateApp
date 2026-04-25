@@ -572,8 +572,12 @@ export const api = {
   acceptOfficeInvite:  (id) => request(`/office/invites/${id}/accept`, { method: 'POST' }),
   // Promote a member to OWNER without closing the office.
   promoteOfficeMember: (id) => request(`/office/members/${id}/promote`, { method: 'POST' }),
-  // OWNER-scoped AI spend observability for the office.
+  // OWNER-scoped AI spend observability for the office (now also
+  // admin-only — see backend route).
   officeAiUsage:       (month) => request(`/office/ai-usage${month ? `?month=${encodeURIComponent(month)}` : ''}`),
+  // Admin platform observability — gated on talfuks1234@gmail.com.
+  adminOverview:       () => request('/admin/overview'),
+  adminUsersSummary:   () => request('/admin/users-summary'),
   // A1 fill-in — email-based invites. The server returns a surrogate
   // inviteUrl ({origin}/accept-invite?token=<id>) that the owner can
   // copy/share manually; the invite resolves automatically when the

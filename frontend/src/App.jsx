@@ -59,6 +59,7 @@ import PremiumGateDialog from './components/PremiumGateDialog';
 const Templates = lazy(() => import('./pages/Templates'));
 const AdminChats = lazy(() => import('./pages/AdminChats'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
+const Admin = lazy(() => import('./pages/Admin'));
 const SellerCalculator = lazy(() => import('./pages/SellerCalculator'));
 const Yad2Import = lazy(() => import('./pages/Yad2Import'));
 // Excel / CSV import wizard — shared between /import/leads and
@@ -131,6 +132,11 @@ const LegalPage = lazy(() => import('./pages/landing/LegalPage'));
 // Headless ChatWidget — topbar chat button dispatches `estia:open-chat`
 // to summon its panel. The old floating bubble is permanently hidden.
 import ChatWidget from './components/ChatWidget';
+// Headless AiChatWidget — twin of ChatWidget for the Estia AI chat
+// surface. The topbar's "AI Chat" button dispatches `estia:open-ai-chat`
+// to toggle the floating panel. Shares the `estia-ai-chat-v1` localStorage
+// key with /ai so the conversation survives switching surfaces.
+import AiChatWidget from './components/AiChatWidget';
 import Yad2ScanBanner from './components/Yad2ScanBanner';
 import MarketScanBanner from './components/MarketScanBanner';
 import { useScrollRestore } from './hooks/mobile';
@@ -345,13 +351,20 @@ function AppRoutes() {
       )}>
         <Routes>
           <Route element={<Layout onLogout={logout} />}>
-            <Route path="/" element={<Dashboard />} />
-            {/* `/dashboard` is an alias for the authenticated Dashboard.
-                Needed because `/` is served by the static landing.html in
-                nginx — authenticated post-login redirects target this
-                path so they land in the SPA instead of the marketing
-                page. */}
-            <Route path="/dashboard" element={<Dashboard />} />
+            {/* Admin user — talfuks1234@gmail.com — sees the admin
+                console at / and /dashboard, not the agent dashboard. */}
+            <Route
+              path="/"
+              element={user?.email?.toLowerCase() === 'talfuks1234@gmail.com'
+                ? <Navigate to="/admin" replace />
+                : <Dashboard />}
+            />
+            <Route
+              path="/dashboard"
+              element={user?.email?.toLowerCase() === 'talfuks1234@gmail.com'
+                ? <Navigate to="/admin" replace />
+                : <Dashboard />}
+            />
             <Route path="/properties" element={<Properties />} />
             <Route path="/properties/new" element={<NewProperty />} />
             <Route path="/properties/:id/edit" element={<NewProperty />} />
@@ -372,6 +385,7 @@ function AppRoutes() {
             <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
             <Route path="/transfers" element={<Transfers />} />
             <Route path="/templates" element={<Templates />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="/admin/chats" element={<AdminChats />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/calculator" element={<SellerCalculator />} />
@@ -492,6 +506,11 @@ function AppRoutes() {
           topbar chat button dispatches `estia:open-chat`. The floating
           launcher is gone; the topbar is the single entry point. */}
       <ChatWidget />
+      {/* Headless — renders the Estia AI floating chat when the topbar
+          AI-chat button dispatches `estia:open-ai-chat`. Shares the
+          `estia-ai-chat-v1` localStorage key with /ai so the conversation
+          continues across surfaces. */}
+      <AiChatWidget />
       <Yad2ScanBanner />
       <MarketScanBanner />
       {/* Sprint 5.1 — premium gate. Mounted at the authed root so any

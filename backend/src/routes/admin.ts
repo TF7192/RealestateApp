@@ -117,4 +117,114 @@ export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
 
     return { items, total, page, pageSize };
   });
+
+  // ── GET /api/admin/overview ─────────────────────────────────────
+  // Platform-wide counts + month-to-date AI spend. Single endpoint
+  // so the /admin page lands in one round-trip.
+  app.get('/overview', { onRequest: [app.requireAuth, requireAdmin] }, async () => {
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [
+      users, agents, owners, premiumAgents,
+      properties, leads, deals, offices,
+      reminders, aiRowsAll, aiRowsMonth,
+      newUsersWeek, newPropertiesWeek, newLeadsWeek,
+      activeOfficesMonth,
+    ] = await Promise.all([
+      prisma.user.count({ where: { deletedAt: null } }),
+      prisma.user.count({ where: { deletedAt: null, role: 'AGENT' } }),
+      prisma.user.count({ where: { deletedAt: null, role: 'OWNER' } }),
+      prisma.user.count({ where: { deletedAt: null, isPremium: true } }),
+      prisma.property.count(),
+      prisma.lead.count(),
+      prisma.deal.count(),
+      prisma.office.count(),
+      prisma.reminder.count(),
+      prisma.aiUsage.aggregate({ _sum: { costUsd: true }, _count: true }),
+      prisma.aiUsage.aggregate({ where: { createdAt: { gte: monthStart } }, _sum: { costUsd: true }, _count: true }),
+      prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      prisma.property.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      prisma.lead.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      prisma.aiUsage.findMany({
+        where: { createdAt: { gte: monthStart } },
+        select: { user: { select: { officeId: true } } },
+      }),
+    ]);
+    const officesWithSpend = new Set<string>();
+    for (const r of activeOfficesMonth) {
+      if (r.user?.officeId) officesWithSpend.add(r.user.officeId);
+    }
+    return {
+      users: { total: users, agents, owners, premium: premiumAgents },
+      properties, leads, deals, reminders, offices,
+      newThisWeek: { users: newUsersWeek, properties: newPropertiesWeek, leads: newLeadsWeek },
+      ai: {
+        allTime: {
+          callCount: aiRowsAll._count,
+          costUsd: Number((aiRowsAll._sum.costUsd || 0).toFixed(4)),
+        },
+        thisMonth: {
+          callCount: aiRowsMonth._count,
+          costUsd: Number((aiRowsMonth._sum.costUsd || 0).toFixed(4)),
+          activeOffices: officesWithSpend.size,
+        },
+      },
+    };
+  });
+
+  // ── GET /api/admin/users-summary ────────────────────────────────
+  // Per-user roll-up — assets, leads, deals, AI spend MTD. Used by
+  // the admin dashboard's user table. Bigger than /users (which is
+  // paginated for the existing AdminUsers page); this one gives a
+  // small fixed slice (top 50 by recent activity).
+  app.get('/users-summary', { onRequest: [app.requireAuth, requireAdmin] }, async () => {
+    const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const users = await prisma.user.findMany({
+      where: { deletedAt: null },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+      select: {
+        id: true, email: true, displayName: true, role: true,
+        isPremium: true, createdAt: true, updatedAt: true,
+        office: { select: { name: true } },
+        _count: {
+          select: { properties: true, leads: true, deals: true, reminders: true },
+        },
+      },
+    });
+    const aiSums = users.length
+      ? await prisma.aiUsage.groupBy({
+          by: ['userId'],
+          where: { userId: { in: users.map((u) => u.id) }, createdAt: { gte: monthStart } },
+          _sum: { costUsd: true },
+          _count: true,
+        })
+      : [];
+    const spendByUser = new Map<string, { costUsd: number; calls: number }>();
+    for (const r of aiSums) {
+      spendByUser.set(r.userId, {
+        costUsd: Number((r._sum.costUsd || 0).toFixed(4)),
+        calls: r._count,
+      });
+    }
+    return {
+      items: users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        displayName: u.displayName,
+        role: u.role,
+        isPremium: !!u.isPremium,
+        officeName: u.office?.name ?? null,
+        properties: u._count.properties,
+        leads: u._count.leads,
+        deals: u._count.deals,
+        reminders: u._count.reminders,
+        aiCostUsd: spendByUser.get(u.id)?.costUsd || 0,
+        aiCalls: spendByUser.get(u.id)?.calls || 0,
+        createdAt: u.createdAt.toISOString(),
+        updatedAt: u.updatedAt.toISOString(),
+      })),
+    };
+  });
 };

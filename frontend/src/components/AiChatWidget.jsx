@@ -1,0 +1,527 @@
+// AiChatWidget — floating popup version of /ai. Sits next to the
+// developer ChatWidget in the topbar pair, dispatched via the global
+// `estia:open-ai-chat` event so the topbar button stays a single
+// onClick line. Uses the same `estia-ai-chat-v1` localStorage key as
+// the /ai page, so a conversation started in the popup shows up on
+// the full page (and vice-versa) on the next mount.
+//
+// Inline DT palette to match the rest of the app's chat surfaces;
+// no new CSS file (one less moving part for this drop-in).
+
+import { useEffect, useRef, useState } from 'react';
+import { Sparkles, Send, X, Loader2, AlertCircle, Bot, User } from 'lucide-react';
+import Portal from './Portal';
+import useFocusTrap from '../hooks/useFocusTrap';
+import { useAuth } from '../lib/auth';
+import api from '../lib/api';
+
+const DT = {
+  cream: '#f7f3ec', cream2: '#efe9df', cream4: '#fbf7f0',
+  white: '#ffffff',
+  ink: '#1e1a14',
+  muted: '#6b6356',
+  gold: '#b48b4c', goldLight: '#d9b774', goldDark: '#7a5c2c',
+  goldSoft: 'rgba(180,139,76,0.12)',
+  border: 'rgba(30,26,20,0.08)',
+  danger: '#b91c1c',
+};
+const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
+
+const PERSIST_KEY = 'estia-ai-chat-v1';
+const PERSIST_TURNS = 5;
+
+function loadPersistedMessages() {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .slice(-PERSIST_TURNS * 2);
+  } catch { return []; }
+}
+function persistMessages(messages) {
+  try {
+    const trimmed = messages.slice(-PERSIST_TURNS * 2);
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(trimmed));
+  } catch { /* quota errors etc. */ }
+}
+
+export default function AiChatWidget() {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+
+  // Toggle-on-event lets the topbar button live as a one-liner.
+  useEffect(() => {
+    const onOpen = () => setOpen((o) => !o);
+    window.addEventListener('estia:open-ai-chat', onOpen);
+    return () => window.removeEventListener('estia:open-ai-chat', onOpen);
+  }, []);
+
+  if (!user) return null;
+
+  return open ? <AiChatPanel onClose={() => setOpen(false)} /> : null;
+}
+
+function AiChatPanel({ onClose }) {
+  const panelRef = useRef(null);
+  useFocusTrap(panelRef, { onEscape: onClose });
+
+  // Mirror the /ai page's state shape so transcripts roundtrip cleanly.
+  const [messages, setMessages] = useState(() => loadPersistedMessages());
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, loading]);
+
+  useEffect(() => { persistMessages(messages); }, [messages]);
+
+  const handleSend = async (content) => {
+    const text = String(content ?? input).trim();
+    if (!text || loading) return;
+    setErr(null);
+    const next = [...messages, { role: 'user', content: text }];
+    setMessages(next);
+    setInput('');
+    setLoading(true);
+    try {
+      const res = await api.aiChat(next);
+      const reply = res?.reply ?? '';
+      setMessages((prev) => [...prev, { role: 'assistant', content: reply || 'אין תשובה.' }]);
+    } catch (e) {
+      const code = e?.data?.error?.code;
+      if (code === 'ai_not_configured') setErr('שירות ה-AI לא מוגדר בסביבה הזו');
+      else setErr(e?.message || 'שליחת ההודעה נכשלה');
+      setMessages((prev) => prev.slice(0, -1));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const empty = messages.length === 0 && !loading;
+
+  return (
+    <Portal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="צ׳אט עם Estia AI"
+        dir="rtl"
+        style={{
+          position: 'fixed',
+          bottom: 90,
+          insetInlineStart: 24,
+          width: 'min(420px, calc(100vw - 32px))',
+          maxHeight: 'min(640px, calc(100vh - 120px))',
+          zIndex: 1000,
+          display: 'flex', flexDirection: 'column',
+          background: DT.white,
+          borderRadius: 16,
+          border: `1px solid ${DT.border}`,
+          boxShadow: '0 18px 48px rgba(30,26,20,0.20)',
+          overflow: 'hidden',
+          ...FONT,
+        }}
+        ref={panelRef}
+      >
+        <header style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '12px 14px',
+          background: `linear-gradient(180deg, ${DT.cream} 0%, ${DT.cream4} 100%)`,
+          borderBottom: `1px solid ${DT.border}`,
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 9,
+            background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+            display: 'grid', placeItems: 'center', color: DT.ink,
+            boxShadow: '0 4px 12px rgba(180,139,76,0.25)',
+          }}>
+            <Sparkles size={15} aria-hidden="true" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: DT.ink, lineHeight: 1.2 }}>Estia AI</div>
+            <div style={{ fontSize: 11, color: DT.muted, marginTop: 1 }}>עוזר מקצועי לסוכני נדל"ן</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="סגור"
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              width: 32, height: 32, borderRadius: 8,
+              display: 'grid', placeItems: 'center', color: DT.muted,
+            }}
+          >
+            <X size={16} />
+          </button>
+        </header>
+
+        <div
+          ref={listRef}
+          style={{
+            flex: 1, overflowY: 'auto',
+            padding: 14,
+            display: 'flex', flexDirection: 'column', gap: 10,
+            background: DT.cream4,
+          }}
+        >
+          {empty ? (
+            <EmptyState onPick={(p) => handleSend(p)} />
+          ) : (
+            <>
+              {messages.map((m, i) => (
+                <Bubble key={`m-${i}`} role={m.role} content={m.content} />
+              ))}
+              {loading && <Bubble role="assistant" loading />}
+            </>
+          )}
+        </div>
+
+        <form
+          onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+          style={{
+            padding: 10,
+            background: DT.white,
+            borderTop: `1px solid ${DT.border}`,
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: DT.white, border: `1px solid ${DT.border}`,
+            borderRadius: 12,
+            padding: '4px 4px 4px 12px',
+          }}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="שאל/י כל דבר…"
+              rows={1}
+              style={{
+                ...FONT,
+                flex: 1, resize: 'none',
+                padding: '6px 2px',
+                border: 'none', background: 'transparent', color: DT.ink,
+                fontSize: 14, lineHeight: 1.55, outline: 'none',
+                textAlign: 'right', maxHeight: 120, minHeight: 32,
+              }}
+            />
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              aria-label="שלח"
+              style={(loading || !input.trim()) ? disabledBtn() : primaryBtn()}
+            >
+              {loading ? <Loader2 size={14} className="estia-spin" /> : <Send size={14} />}
+            </button>
+          </div>
+          {err && (
+            <div style={{
+              marginTop: 8,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '6px 10px', borderRadius: 8,
+              background: 'rgba(185,28,28,0.08)', border: '1px solid rgba(185,28,28,0.2)',
+              color: DT.danger, fontSize: 12,
+            }}>
+              <AlertCircle size={12} /> {err}
+            </div>
+          )}
+        </form>
+
+        <style>{`
+          .estia-spin { animation: estia-spin 0.9s linear infinite; }
+          @keyframes estia-spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    </Portal>
+  );
+}
+
+// ── Markdown subset renderer (mirrors Ai.jsx). Kept here so the widget
+//    is self-contained — duplication is a few hundred lines of pure
+//    formatting code, not load-bearing logic. If we ever drift, the
+//    /ai page is the source of truth.
+
+function renderInline(text, keyPrefix) {
+  const out = [];
+  let i = 0;
+  let idx = 0;
+  const push = (node) => { out.push(node); idx += 1; };
+  while (i < text.length) {
+    const rest = text.slice(i);
+    let m = rest.match(/^`([^`]+)`/);
+    if (m) { push(<code key={`${keyPrefix}-c-${idx}`} style={{ background: '#efe9df', padding: '1px 5px', borderRadius: 4, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.92em' }}>{m[1]}</code>); i += m[0].length; continue; }
+    m = rest.match(/^\*\*([^*]+)\*\*/);
+    if (m) { push(<strong key={`${keyPrefix}-b-${idx}`} style={{ fontWeight: 800 }}>{renderInline(m[1], `${keyPrefix}-b-${idx}`)}</strong>); i += m[0].length; continue; }
+    m = rest.match(/^\*(\S[^*]*)\*/);
+    if (m) { push(<em key={`${keyPrefix}-i-${idx}`}>{renderInline(m[1], `${keyPrefix}-i-${idx}`)}</em>); i += m[0].length; continue; }
+    m = rest.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+    if (m) { push(<a key={`${keyPrefix}-l-${idx}`} href={m[2]} target="_blank" rel="noopener noreferrer" style={{ color: '#b48b4c', textDecoration: 'underline' }}>{m[1]}</a>); i += m[0].length; continue; }
+    const stopAt = rest.search(/`|\*\*|\*|\[[^\]]+\]\(https?/);
+    const chunkEnd = stopAt === -1 ? rest.length : Math.max(1, stopAt);
+    push(rest.slice(0, chunkEnd));
+    i += chunkEnd;
+  }
+  return out;
+}
+
+function parseTableBlock(block) {
+  const lines = block.split(/\n/).filter(Boolean);
+  if (lines.length < 2) return null;
+  const sep = lines[1].trim();
+  if (!/^\|?[\s:\-|]+\|?$/.test(sep) || !sep.includes('-')) return null;
+  const split = (line) => line.replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+  const header = split(lines[0]);
+  const body = lines.slice(2).map(split);
+  const clean = body.filter((r) => r.length === header.length);
+  if (header.length < 2) return null;
+  return { header, body: clean };
+}
+
+function renderTable(table, key) {
+  return (
+    <div key={key} style={{ overflowX: 'auto', margin: '4px 0' }}>
+      <table style={{
+        width: '100%', borderCollapse: 'collapse', fontSize: 12,
+        background: '#ffffff', border: '1px solid rgba(30,26,20,0.08)',
+        borderRadius: 8, overflow: 'hidden',
+      }}>
+        <thead>
+          <tr>
+            {table.header.map((h, hi) => (
+              <th key={hi} style={{
+                padding: '6px 8px',
+                background: 'rgba(180,139,76,0.12)',
+                color: '#1e1a14', fontWeight: 800,
+                fontSize: 11,
+                textAlign: 'right',
+                borderBottom: '1px solid rgba(30,26,20,0.08)',
+              }}>{renderInline(h, `${key}-h-${hi}`)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.body.map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? '#ffffff' : '#fbf7f0' }}>
+              {row.map((cell, ci) => (
+                <td key={ci} style={{
+                  padding: '5px 8px',
+                  borderTop: '1px solid rgba(30,26,20,0.06)',
+                  color: '#1e1a14',
+                  fontWeight: ci === 0 ? 600 : 500,
+                }}>{renderInline(cell, `${key}-${ri}-${ci}`)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function renderMarkdown(raw) {
+  const blocks = String(raw || '').split(/\n{2,}/);
+  const nodes = [];
+  blocks.forEach((block, bi) => {
+    const key = `b-${bi}`;
+    const table = parseTableBlock(block);
+    if (table) { nodes.push(renderTable(table, key)); return; }
+    renderBlockNonTable(block, key, nodes);
+  });
+  return nodes;
+}
+
+function renderBlockNonTable(block, key, nodes) {
+  const qLines = block.split(/\n/);
+  if (qLines.length > 0 && qLines.every((l) => /^\s*>/.test(l))) {
+    const inner = qLines.map((l) => l.replace(/^\s*>\s?/, '')).join('\n');
+    const innerLines = inner.split(/\n/);
+    nodes.push(
+      <blockquote key={key} style={{
+        margin: '4px 0', padding: '8px 12px',
+        background: '#fbf7f0',
+        borderInlineStart: '3px solid #b48b4c',
+        borderRadius: 6,
+        color: '#1e1a14', lineHeight: 1.6, fontSize: 13,
+      }}>
+        {innerLines.map((l, li) => (
+          <span key={`${key}-q-${li}`}>
+            {renderInline(l, `${key}-q-${li}`)}
+            {li < innerLines.length - 1 ? <br /> : null}
+          </span>
+        ))}
+      </blockquote>
+    );
+    return;
+  }
+  const h = block.match(/^(#{1,3})\s+(.*)$/);
+  if (h) {
+    const level = h[1].length;
+    const Tag = level === 1 ? 'h3' : level === 2 ? 'h4' : 'h5';
+    const fontSize = level === 1 ? 15 : level === 2 ? 14 : 13;
+    nodes.push(
+      <Tag key={key} style={{ fontWeight: 800, fontSize, margin: '6px 0 3px', color: '#1e1a14' }}>
+        {renderInline(h[2].trim(), key)}
+      </Tag>
+    );
+    return;
+  }
+  const lines = block.split(/\n/).filter(Boolean);
+  const isBullet = lines.every((l) => /^(\s*[-*]\s+|\s*\d+[.)]\s+)/.test(l));
+  if (isBullet && lines.length > 0) {
+    const numbered = /^\s*\d+[.)]/.test(lines[0]);
+    const Tag = numbered ? 'ol' : 'ul';
+    nodes.push(
+      <Tag key={key} style={{ margin: '3px 0', paddingInlineStart: 20 }}>
+        {lines.map((l, li) => {
+          const txt = l.replace(/^(\s*[-*]\s+|\s*\d+[.)]\s+)/, '');
+          return (
+            <li key={`${key}-${li}`} style={{ margin: '1px 0', lineHeight: 1.55, fontSize: 13 }}>
+              {renderInline(txt, `${key}-${li}`)}
+            </li>
+          );
+        })}
+      </Tag>
+    );
+    return;
+  }
+  const plainLines = block.split(/\n/);
+  nodes.push(
+    <p key={key} style={{ margin: '3px 0', lineHeight: 1.6, fontSize: 13 }}>
+      {plainLines.map((l, li) => (
+        <span key={`${key}-${li}`}>
+          {renderInline(l, `${key}-${li}`)}
+          {li < plainLines.length - 1 ? <br /> : null}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+function Bubble({ role, content, loading }) {
+  const isUser = role === 'user';
+  return (
+    <div style={{
+      display: 'flex', gap: 8,
+      justifyContent: isUser ? 'flex-start' : 'flex-end',
+      alignItems: 'flex-start',
+    }}>
+      {!isUser && (
+        <div style={avatar(DT.goldSoft, DT.goldDark)}>
+          <Bot size={12} aria-hidden="true" />
+        </div>
+      )}
+      <div style={{
+        maxWidth: '82%',
+        padding: '8px 12px', borderRadius: 11,
+        background: isUser ? DT.cream2 : DT.white,
+        border: `1px solid ${DT.border}`,
+        color: DT.ink,
+        fontSize: 13, lineHeight: 1.6,
+        whiteSpace: isUser ? 'pre-wrap' : 'normal',
+      }}>
+        {loading ? (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, color: DT.muted, fontSize: 12,
+          }}>
+            <Loader2 size={12} className="estia-spin" /> חושב…
+          </span>
+        ) : isUser ? content : renderMarkdown(content)}
+      </div>
+      {isUser && (
+        <div style={avatar(DT.cream2, DT.ink)}>
+          <User size={12} aria-hidden="true" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ onPick }) {
+  // A few starter prompts — abridged from /ai because the panel is
+  // narrower; keep the brokerage-flavor though.
+  const starters = [
+    'תכתוב תזכורת לליד שמחפש דירת 4 חדרים בראשון לציון',
+    'איזה ליד לא קיבל מענה בשבוע האחרון?',
+    'סכם את העסקאות שנסגרו החודש',
+  ];
+  return (
+    <div style={{
+      margin: 'auto', textAlign: 'center', padding: 8,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+    }}>
+      <Sparkles size={26} style={{ color: DT.goldDark }} aria-hidden="true" />
+      <h2 style={{ fontSize: 14, fontWeight: 800, margin: 0, color: DT.ink }}>
+        איך אפשר לעזור?
+      </h2>
+      <p style={{ fontSize: 12, color: DT.muted, lineHeight: 1.6, margin: 0 }}>
+        שאל/י על ניסוח הודעות, סטטוס לידים, או כל דבר אחר.
+      </p>
+      <div style={{
+        display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center',
+        marginTop: 4,
+      }}>
+        {starters.map((p, i) => (
+          <button
+            key={`s-${i}`}
+            type="button"
+            onClick={() => onPick(p)}
+            style={{
+              ...FONT,
+              padding: '6px 10px', borderRadius: 99,
+              border: `1px solid ${DT.border}`,
+              background: DT.white, color: DT.ink,
+              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              textAlign: 'right',
+            }}
+          >{p}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function avatar(bg, color) {
+  return {
+    width: 24, height: 24, borderRadius: 99,
+    background: bg, color,
+    display: 'grid', placeItems: 'center',
+    flexShrink: 0,
+    border: `1px solid ${DT.border}`,
+  };
+}
+function primaryBtn() {
+  return {
+    ...FONT,
+    background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+    border: 'none', color: DT.ink,
+    width: 32, height: 32, borderRadius: 9, cursor: 'pointer',
+    display: 'grid', placeItems: 'center', flexShrink: 0,
+  };
+}
+function disabledBtn() {
+  return {
+    ...primaryBtn(),
+    background: DT.cream2,
+    color: DT.muted,
+    cursor: 'not-allowed',
+    boxShadow: 'none',
+  };
+}
