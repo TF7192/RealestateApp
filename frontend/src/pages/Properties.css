@@ -832,15 +832,17 @@
   border-color: rgba(108, 152, 255, 0.35);
 }
 
-/* Drop the rail label across all iPhone widths (≤ 480px) so the
-   three action buttons + price + thumb don't overflow on 375–430px
-   devices. Earlier the breakpoint was 360px which left iPhone 13 mini
-   / 16 Pro Max with text-bearing 54×56 buttons that pushed the price
-   off the line. Icon-only buttons keep the 44×44 HIG tap target while
-   freeing ~30px per button for the meta column. */
-@media (max-width: 480px) {
-  .pc-rail-btn { min-width: 44px; padding: 9px 6px; font-size: 0; gap: 0; }
-  .pc-rail-btn svg { width: 20px; height: 20px; }
+/* Even icon-only, three rail buttons + the overflow `...` + share
+   button + thumb + favorite-star left no breathing room for the meta
+   column on iPhone widths — title was rendering as "ג…" and price as
+   "…00". Hide the rail entirely on phone: the whole card already
+   navigates to /properties/:id on tap (via the `.pc-compact-link`
+   stretched ::after), and SwipeRow exposes call / WhatsApp via
+   left-swipe — so the rail's actions are reachable, just not
+   eye-fixedly cluttered into a 410px row. The full text-bearing
+   rail comes back at ≥ 721px (iPad portrait+), where it has room. */
+@media (max-width: 720px) {
+  .pc-rail { display: none; }
 }
 
 /* Belt-and-braces: ellipsis the price on narrow phones so a long

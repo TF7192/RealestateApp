@@ -204,7 +204,13 @@ export default function StreetHouseField({
             onFocus={() => { if (results.length) setOpen(true); }}
             onBlur={() => setTimeout(() => setOpen(false), 150)}
             onKeyDown={handleStreetKey}
-            placeholder={streetPlaceholder}
+            // When no city is picked the street autocomplete has no
+            // namespace to query against, so the field is disabled.
+            // Surface that state in the placeholder explicitly — silent
+            // `disabled` reads as "the input is broken" on a mobile
+            // touch device since you can't tap into it to discover the
+            // dropdown's "בחר/י עיר תחילה" message.
+            placeholder={!city ? 'בחר/י עיר תחילה' : streetPlaceholder}
             autoComplete="address-line1"
             inputMode="search"
             enterKeyHint="search"
