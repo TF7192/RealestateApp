@@ -121,7 +121,24 @@ export async function build(opts: BuildOptions = {}) {
     bodyLimit: 10 * 1024 * 1024,
   });
 
-  await app.register(helmet, { contentSecurityPolicy: false });
+  // SEC-011 — JSON API responses don't render in a browser context, so
+  // the strict "default-src 'none'" denies absolutely everything by
+  // default; combined with frameAncestors 'none', the API surface is
+  // fully locked down even if an HTML response sneaks in. Edge-level
+  // CSP for the SPA itself lives in `frontend/nginx.conf`.
+  // The /api/public/og/property/* endpoint returns HTML for social
+  // bots; it overrides this header per-route inside the handler.
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    // Pin the X-Frame-Options to DENY (helmet's default is SAMEORIGIN)
+    // — nothing should ever embed the JSON API in a frame.
+    frameguard: { action: 'deny' },
+  });
   await app.register(cors, {
     origin: (origin, cb) => {
       // Allow same-origin (no origin), the configured public URL, and dev localhost

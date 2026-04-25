@@ -20,7 +20,13 @@ export default defineWorkspace([
     test: {
       name: 'unit',
       environment: 'node',
-      include: ['tests/unit/backend/**/*.test.ts'],
+      include: [
+        'tests/unit/backend/**/*.test.ts',
+        // SEC-011 — infra-level config tests (nginx string assertions).
+        // Cheap to run, no DB required, slot in alongside the backend
+        // unit pool because they're plain Node + fs.
+        'tests/unit/infra/**/*.test.ts',
+      ],
       setupFiles: ['tests/setup/unit.setup.ts'],
     },
   },

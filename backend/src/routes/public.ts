@@ -173,6 +173,15 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
 </head><body><a href="${esc(url)}">${esc(title)}</a></body></html>`;
     reply.header('Content-Type', 'text/html; charset=utf-8');
     reply.header('Cache-Control', 'public, max-age=300');
+    // SEC-011 — server-wide helmet CSP is "default-src 'none'", which
+    // is right for the JSON API but would block this HTML page's
+    // og:image (loaded by the social-bot crawler) and its meta-refresh
+    // navigation in some clients. Override with a minimal HTML CSP:
+    // images allowed over https, no scripts at all, framing forbidden.
+    reply.header(
+      'Content-Security-Policy',
+      "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none';",
+    );
     return reply.send(html);
   });
 
