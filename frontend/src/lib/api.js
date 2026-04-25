@@ -581,7 +581,8 @@ export const api = {
   // OWNER-scoped AI spend observability for the office (now also
   // admin-only — see backend route).
   officeAiUsage:       (month) => request(`/office/ai-usage${month ? `?month=${encodeURIComponent(month)}` : ''}`),
-  // Admin platform observability — gated on talfuks1234@gmail.com.
+  // Admin platform observability — gated on role=ADMIN server-side
+  // (SEC-010; was an email allowlist).
   adminOverview:       () => request('/admin/overview'),
   // PERF-007 — single round-trip dashboard load. Returns:
   //   { counts: {properties, leads, deals, reminders, hotLeadsCount, todayMeetings},

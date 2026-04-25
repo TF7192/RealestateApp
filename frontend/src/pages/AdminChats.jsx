@@ -7,9 +7,8 @@ import { relativeTime } from '../lib/time';
 import { useViewportMobile } from '../hooks/mobile';
 import './AdminChats.css';
 
-const ADMIN_EMAILS = new Set([
-  'talfuks1234@gmail.com',
-]);
+// SEC-010 — admin gate now reads role off the user object.
+const isAdminUser = (u) => !!u && u.role === 'ADMIN';
 
 // Admin inbox — list left, thread right (RTL inverts visually).
 // Reuses the same WebSocket so replies appear instantly on the user's
@@ -32,7 +31,7 @@ export default function AdminChats() {
   // Admin gate — if not admin, kick out.
   useEffect(() => {
     if (authLoading) return;
-    if (!user || !ADMIN_EMAILS.has((user.email || '').toLowerCase())) {
+    if (!isAdminUser(user)) {
       navigate('/dashboard', { replace: true });
     }
   }, [user, authLoading, navigate]);

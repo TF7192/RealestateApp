@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, UserCircle, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield, Calculator, Download as DownloadIcon, BarChart2, Activity as ActivityIcon, Bell, Tag, Building2 } from 'lucide-react';
 
-const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
+// SEC-010 — admin status reads off user.role, not the email allowlist.
+const isAdminUser = (u) => !!u && u.role === 'ADMIN';
 import { useAuth } from '../lib/auth';
 import haptics from '../lib/haptics';
 import Portal from './Portal';
@@ -154,7 +155,7 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
                 {copied ? <Check size={16} color="var(--success)" /> : <span className="mms-arrow">›</span>}
               </span>
             </button>
-            {ADMIN_EMAILS.has((user?.email || '').toLowerCase()) && (
+            {isAdminUser(user) && (
               <>
                 <button className="mms-row" onClick={() => go('/admin/chats')}>
                   <span className="mms-row-icon"><Shield size={18} /></span>

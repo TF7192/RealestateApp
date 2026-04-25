@@ -351,17 +351,17 @@ function AppRoutes() {
       )}>
         <Routes>
           <Route element={<Layout onLogout={logout} />}>
-            {/* Admin user — talfuks1234@gmail.com — sees the admin
-                console at / and /dashboard, not the agent dashboard. */}
+            {/* SEC-010 — admin (role=ADMIN) sees the admin console at
+                / and /dashboard instead of the agent dashboard. */}
             <Route
               path="/"
-              element={user?.email?.toLowerCase() === 'talfuks1234@gmail.com'
+              element={user?.role === 'ADMIN'
                 ? <Navigate to="/admin" replace />
                 : <Dashboard />}
             />
             <Route
               path="/dashboard"
-              element={user?.email?.toLowerCase() === 'talfuks1234@gmail.com'
+              element={user?.role === 'ADMIN'
                 ? <Navigate to="/admin" replace />
                 : <Dashboard />}
             />

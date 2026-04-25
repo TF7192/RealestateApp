@@ -6,11 +6,9 @@ import { useAuth } from '../lib/auth';
 import { relativeTime } from '../lib/time';
 import './AdminUsers.css';
 
-// Mirror of backend ADMIN_EMAILS so non-admins get bounced before the
-// API call returns 403.
-const ADMIN_EMAILS = new Set([
-  'talfuks1234@gmail.com',
-]);
+// SEC-010 — bounces non-admins client-side before the backend's
+// app.requireAdmin would 403. Reads role off the user object.
+const isAdminUser = (u) => !!u && u.role === 'ADMIN';
 
 const PAGE_SIZE = 50;
 
@@ -50,7 +48,7 @@ export default function AdminUsers() {
   // Admin gate
   useEffect(() => {
     if (authLoading) return;
-    if (!user || !ADMIN_EMAILS.has((user.email || '').toLowerCase())) {
+    if (!isAdminUser(user)) {
       navigate('/dashboard', { replace: true });
     }
   }, [user, authLoading, navigate]);

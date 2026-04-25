@@ -3,20 +3,16 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser, getUser } from '../middleware/auth.js';
 
-// ─── Admin allowlist ────────────────────────────────────────────
-// Simple env-driven allowlist. Any comma-separated email in
-// ADMIN_EMAILS (lowercased) gets chat admin access. Small set, no
-// new Role needed — avoids a DB migration for a handful of people.
-function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS || 'talfuks1234@gmail.com')
-    .toLowerCase()
-    .split(',')
-    .map((e) => e.trim())
-    .filter(Boolean);
-}
-export function isAdminUser(email: string | null | undefined): boolean {
-  if (!email) return false;
-  return adminEmails().includes(email.toLowerCase());
+// SEC-010 — admin gate is now role-based via `app.requireAdmin`. The
+// previous ADMIN_EMAILS env allowlist is retired.
+//
+// `isAdminUser` stays exported as a no-op for one release so any stray
+// caller doesn't crash the build before next deploy. New code must
+// read `u.role === 'ADMIN'` directly. Marked deprecated; remove on
+// the cleanup-after-deploy follow-up.
+/** @deprecated SEC-010 — use `app.requireAdmin` or `u.role === 'ADMIN'`. */
+export function isAdminUser(_email: string | null | undefined): boolean {
+  return false;
 }
 
 // ─── Simple per-user send rate limit: 30 messages / minute ─────
@@ -119,13 +115,8 @@ export const registerChatRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // ── admin routes ─────────────────────────────────────────────
-  const requireAdmin = async (req: any, reply: any) => {
-    const u = getUser(req);
-    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
-    if (!isAdminUser(u.email)) return reply.code(403).send({ error: { message: 'Admin only' } });
-  };
-
-  app.get('/admin/conversations', { onRequest: [app.requireAuth, requireAdmin] }, async (req) => {
+  // SEC-010 — gate on app.requireAdmin (role=ADMIN check on JWT).
+  app.get('/admin/conversations', { onRequest: [app.requireAdmin] }, async (req) => {
     const { filter = 'open', search } = req.query as { filter?: string; search?: string };
     const where: any = {};
     if (filter === 'open')     where.status = 'OPEN';
@@ -166,7 +157,7 @@ export const registerChatRoutes: FastifyPluginAsync = async (app) => {
     return { items };
   });
 
-  app.get('/admin/conversations/:id', { onRequest: [app.requireAuth, requireAdmin] }, async (req, reply) => {
+  app.get('/admin/conversations/:id', { onRequest: [app.requireAdmin] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const convo = await prisma.conversation.findUnique({
       where: { id },
@@ -181,7 +172,7 @@ export const registerChatRoutes: FastifyPluginAsync = async (app) => {
     return { conversation: convo, messages };
   });
 
-  app.post('/admin/conversations/:id/messages', { onRequest: [app.requireAuth, requireAdmin] }, async (req) => {
+  app.post('/admin/conversations/:id/messages', { onRequest: [app.requireAdmin] }, async (req) => {
     const { id } = req.params as { id: string };
     const { body } = sendSchema.parse(req.body);
     const admin = requireUser(req);
@@ -198,7 +189,7 @@ export const registerChatRoutes: FastifyPluginAsync = async (app) => {
     return { message };
   });
 
-  app.post('/admin/conversations/:id/read', { onRequest: [app.requireAuth, requireAdmin] }, async (req) => {
+  app.post('/admin/conversations/:id/read', { onRequest: [app.requireAdmin] }, async (req) => {
     const { id } = req.params as { id: string };
     const convo = await prisma.conversation.findUnique({ where: { id } });
     if (!convo) return { ok: false };
@@ -211,12 +202,12 @@ export const registerChatRoutes: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
-  app.post('/admin/conversations/:id/archive', { onRequest: [app.requireAuth, requireAdmin] }, async (req) => {
+  app.post('/admin/conversations/:id/archive', { onRequest: [app.requireAdmin] }, async (req) => {
     const { id } = req.params as { id: string };
     await prisma.conversation.update({ where: { id }, data: { status: 'ARCHIVED' } });
     return { ok: true };
   });
-  app.post('/admin/conversations/:id/unarchive', { onRequest: [app.requireAuth, requireAdmin] }, async (req) => {
+  app.post('/admin/conversations/:id/unarchive', { onRequest: [app.requireAdmin] }, async (req) => {
     const { id } = req.params as { id: string };
     await prisma.conversation.update({ where: { id }, data: { status: 'OPEN' } });
     return { ok: true };
@@ -231,7 +222,8 @@ export const registerChatRoutes: FastifyPluginAsync = async (app) => {
     if (!u) { socket.close(); return; }
     const sub: Sub = {
       userId: u.id,
-      isAdmin: isAdminUser(u.email),
+      // SEC-010 — admin bucket reads role off the JWT, not email.
+      isAdmin: u.role === 'ADMIN',
       send: (data) => socket.send(data),
     };
     subs.add(sub);

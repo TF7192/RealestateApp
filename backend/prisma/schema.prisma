@@ -17,6 +17,12 @@ enum UserRole {
   // sees every agent in their `Office`. Defaults to AGENT-scoped
   // visibility when no office is attached.
   OWNER
+  // SEC-010 — platform-wide administrator. Replaces the brittle
+  // ADMIN_EMAILS env allowlist. The single existing platform admin
+  // (talfuks1234@gmail.com) is migrated to role=ADMIN by the follow-up
+  // backfill migration; all admin-gated routes read the role off the
+  // JWT instead of comparing email strings.
+  ADMIN
 }
 
 enum AuthProvider {

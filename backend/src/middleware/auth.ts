@@ -30,6 +30,10 @@ declare module 'fastify' {
     // only an office owner can use (e.g. listing every agent in the
     // office). AGENT-role users are rejected with 403.
     requireOwner: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    // SEC-010 — platform-wide admin gate. Reads `role === 'ADMIN'` off
+    // the JWT (set on login from the User row). Replaces the legacy
+    // ADMIN_EMAILS allowlist; OWNER and AGENT roles are not admins.
+    requireAdmin: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
@@ -87,6 +91,21 @@ const plugin: FastifyPluginAsync = async (app) => {
     }
     if (u.role !== 'OWNER') {
       reply.code(403).send({ error: { message: 'Office owner role required' } });
+    }
+  });
+
+  // SEC-010 — admin gate. The JWT carries `role` from the User row at
+  // login time, so a re-login is required for a freshly-promoted user
+  // to gain access. The previous email-allowlist gate relied on the
+  // (mutable) `email` claim, which produced surprises when an agent
+  // changed their primary email.
+  app.decorate('requireAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
+    const u = getUser(req);
+    if (!u) {
+      return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    }
+    if (u.role !== 'ADMIN') {
+      reply.code(403).send({ error: { message: 'Admin only' } });
     }
   });
 };

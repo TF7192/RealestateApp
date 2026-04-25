@@ -10,13 +10,11 @@ beforeAll(async () => { app = await build(); await app.ready(); });
 afterAll(async () => { await app.close(); });
 
 /**
- * Admin is gated by the hard-coded ADMIN_EMAILS list in the backend
- * (see /backend/src/routes/admin.ts). The default list contains
- * 'talfuks1234@gmail.com'; tests create a user with that email to
- * exercise the admin path, and a fresh random agent to verify the
- * deny path.
+ * SEC-010 — admin is gated by `role === 'ADMIN'` on the JWT (see
+ * `app.requireAdmin` in backend/src/middleware/auth.ts). Tests promote
+ * the seeded user to ADMIN via a raw UPDATE so the JWT carries the
+ * new role on the subsequent login.
  */
-const ADMIN_EMAIL = 'talfuks1234@gmail.com';
 
 describe('GET /api/admin/users', () => {
   it('Az — 403 for a non-admin agent', async () => {
@@ -42,8 +40,11 @@ describe('GET /api/admin/users', () => {
     expect([401, 403]).toContain(res.statusCode);
   });
 
-  it('H — admin email sees the users list', async () => {
-    const admin = await createAgent(prisma, { email: ADMIN_EMAIL });
+  it('H — ADMIN-role user sees the users list', async () => {
+    const admin = await createAgent(prisma);
+    // Promote to ADMIN. Raw SQL because the factory only knows the
+    // legacy three roles; the JWT then carries role='ADMIN' on login.
+    await prisma.$executeRaw`UPDATE "User" SET role = 'ADMIN' WHERE id = ${admin.id}`;
     // Seed a couple users so the list isn't just the admin
     await createAgent(prisma);
     await createAgent(prisma);

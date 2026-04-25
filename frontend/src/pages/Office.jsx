@@ -608,10 +608,10 @@ export default function Office() {
         </section>
 
         {/* AI usage (OWNER-only) — per-member monthly spend. */}
-        {/* Admin-only observability tile — visible to the platform
-            admin (talfuks1234@gmail.com) on every office, not to
-            office OWNERs. */}
-        {user?.email?.toLowerCase() === 'talfuks1234@gmail.com' && <AiUsageBlock />}
+        {/* SEC-010 — admin-only observability tile, visible to any
+            user with role=ADMIN on every office (was a hardcoded
+            email match against talfuks1234@gmail.com). */}
+        {user?.role === 'ADMIN' && <AiUsageBlock />}
 
         {/* Pending invites (OWNER-only) */}
         {isOwner && pendingCount > 0 && (

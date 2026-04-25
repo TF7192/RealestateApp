@@ -1,4 +1,5 @@
-// Admin platform overview — visible only to talfuks1234@gmail.com.
+// Admin platform overview — visible only to users with role=ADMIN
+// (SEC-010 replaced the prior email-allowlist gate).
 //
 // Single landing page for the platform admin. Replaces the simple-table
 // version with a charts-and-cards dashboard:

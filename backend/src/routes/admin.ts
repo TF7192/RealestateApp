@@ -1,24 +1,15 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { getUser } from '../middleware/auth.js';
-import { isAdminUser } from './chat.js';
 
 /**
- * Admin-only routes. Mirrors the per-route admin gate pattern from
- * routes/chat.ts (no app-wide hook — each route opts in via the
- * `requireAdmin` onRequest entry).
+ * Admin-only routes. SEC-010 — every route gates on the role-based
+ * `app.requireAdmin` decorator (defined in middleware/auth.ts). The
+ * previous email-allowlist gate is gone.
  *
  * Mounted at /api/admin in server.ts.
  */
 export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
-  const requireAdmin = async (req: any, reply: any) => {
-    const u = getUser(req);
-    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
-    if (!isAdminUser(u.email)) {
-      return reply.code(403).send({ error: { message: 'Admin only' } });
-    }
-  };
 
   // ── GET /api/admin/users ────────────────────────────────────────
   // Single round-trip: every user with their owned-property count and
@@ -34,7 +25,7 @@ export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
     role:    z.enum(['AGENT', 'ADMIN', 'CUSTOMER']).optional(),
   });
 
-  app.get('/users', { onRequest: [app.requireAuth, requireAdmin] }, async (req) => {
+  app.get('/users', { onRequest: [app.requireAdmin] }, async (req) => {
     const q = ListQ.parse(req.query);
     const page     = q.page     ?? 1;
     const pageSize = q.pageSize ?? 50;
@@ -121,7 +112,7 @@ export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
   // ── GET /api/admin/overview ─────────────────────────────────────
   // Platform-wide counts + month-to-date AI spend. Single endpoint
   // so the /admin page lands in one round-trip.
-  app.get('/overview', { onRequest: [app.requireAuth, requireAdmin] }, async () => {
+  app.get('/overview', { onRequest: [app.requireAdmin] }, async () => {
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -178,7 +169,7 @@ export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
   // the admin dashboard's user table. Bigger than /users (which is
   // paginated for the existing AdminUsers page); this one gives a
   // small fixed slice (top 50 by recent activity).
-  app.get('/users-summary', { onRequest: [app.requireAuth, requireAdmin] }, async () => {
+  app.get('/users-summary', { onRequest: [app.requireAdmin] }, async () => {
     const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
     const users = await prisma.user.findMany({
       where: { deletedAt: null },

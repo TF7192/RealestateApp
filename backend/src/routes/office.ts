@@ -325,15 +325,11 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
 
   // GET /api/office/ai-usage?month=YYYY-MM (defaults to current month)
   // Admin-only observability surface. Returns AI spend across every
-  // user in the system for the given month — not office-scoped. Gated
-  // on the platform-admin email so only `talfuks1234@gmail.com` can
-  // see per-user cost; everyone else (including office OWNERs) gets
-  // 403.
-  app.get('/ai-usage', { onRequest: [app.requireAuth] }, async (req, reply) => {
-    const u = requireUser(req);
-    if (u.email?.toLowerCase() !== 'talfuks1234@gmail.com') {
-      return reply.code(403).send({ error: { message: 'Admin only' } });
-    }
+  // user in the system for the given month — not office-scoped.
+  // SEC-010 — gated on role='ADMIN' via app.requireAdmin; was an
+  // email-literal compare against talfuks1234@gmail.com which had the
+  // same brittleness as the chat-admin allowlist.
+  app.get('/ai-usage', { onRequest: [app.requireAdmin] }, async (req) => {
     const q = req.query as { month?: string };
     const today = new Date();
     const [yStr, mStr] = (q.month || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`).split('-');

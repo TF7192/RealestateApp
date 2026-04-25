@@ -9,7 +9,12 @@ let app: FastifyInstance;
 beforeAll(async () => { app = await build(); await app.ready(); });
 afterAll(async () => { await app.close(); });
 
-const ADMIN_EMAIL = 'talfuks1234@gmail.com';
+// SEC-010 — admin is now role-based. Helper promotes a User row to
+// role='ADMIN' so the next login mints a JWT that satisfies
+// app.requireAdmin.
+async function promoteToAdmin(userId: string) {
+  await prisma.$executeRaw`UPDATE "User" SET role = 'ADMIN' WHERE id = ${userId}`;
+}
 
 describe('GET /api/chat/me', () => {
   it('H — upserts a conversation for the authed user and returns it + empty messages', async () => {
@@ -74,7 +79,9 @@ describe('POST /api/chat/me/messages', () => {
 describe('POST /api/chat/me/read', () => {
   it('H — marks admin-sent messages as read', async () => {
     const agent = await createAgent(prisma);
-    const admin = await createAgent(prisma, { email: ADMIN_EMAIL });
+    // The admin user here only needs to exist as a sender; the test
+    // doesn't pass through the admin gate so no role bump is needed.
+    const admin = await createAgent(prisma);
     const convo = await prisma.conversation.create({
       data: { userId: agent.id, status: 'OPEN' },
     });
@@ -111,7 +118,8 @@ describe('GET /api/chat/admin/conversations', () => {
   });
 
   it('H — admin sees OPEN conversations and unread counts', async () => {
-    const admin = await createAgent(prisma, { email: ADMIN_EMAIL });
+    const admin = await createAgent(prisma);
+    await promoteToAdmin(admin.id);
     const user = await createAgent(prisma);
     const convo = await prisma.conversation.create({
       data: { userId: user.id, status: 'OPEN', lastMessageAt: new Date() },
@@ -140,7 +148,8 @@ describe('GET /api/chat/admin/conversations', () => {
 
 describe('POST /api/chat/admin/conversations/:id/messages', () => {
   it('H — admin can send a message into a user\'s conversation', async () => {
-    const admin = await createAgent(prisma, { email: ADMIN_EMAIL });
+    const admin = await createAgent(prisma);
+    await promoteToAdmin(admin.id);
     const user = await createAgent(prisma);
     const convo = await prisma.conversation.create({
       data: { userId: user.id, status: 'OPEN' },
@@ -174,7 +183,8 @@ describe('POST /api/chat/admin/conversations/:id/messages', () => {
 
 describe('POST /api/chat/admin/conversations/:id/archive + unarchive', () => {
   it('H — archive then unarchive round-trip', async () => {
-    const admin = await createAgent(prisma, { email: ADMIN_EMAIL });
+    const admin = await createAgent(prisma);
+    await promoteToAdmin(admin.id);
     const user = await createAgent(prisma);
     const convo = await prisma.conversation.create({
       data: { userId: user.id, status: 'OPEN' },

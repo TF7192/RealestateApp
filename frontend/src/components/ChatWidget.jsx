@@ -7,11 +7,10 @@ import { relativeTime } from '../lib/time';
 import useFocusTrap from '../hooks/useFocusTrap';
 import './ChatWidget.css';
 
-// Admin allowlist is mirrored on the client so the admin user sees the
-// regular widget hidden (they use /admin/chats instead).
-const ADMIN_EMAILS = new Set([
-  'talfuks1234@gmail.com',
-]);
+// SEC-010 — admin uses /admin/chats, so the regular widget is hidden
+// for them. Reads role off the publicUser; the legacy email allowlist
+// is gone.
+const isAdminUser = (u) => !!u && u.role === 'ADMIN';
 
 export default function ChatWidget() {
   const { user } = useAuth();
@@ -59,7 +58,7 @@ export default function ChatWidget() {
   // Hide for logged-out users and admins (admins use /admin/chats).
   // Placed AFTER hooks so rules-of-hooks holds.
   if (!user) return null;
-  if (ADMIN_EMAILS.has((user.email || '').toLowerCase())) return null;
+  if (isAdminUser(user)) return null;
 
   const onSubmit = async (e) => {
     e.preventDefault();

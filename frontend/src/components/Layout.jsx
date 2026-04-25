@@ -62,7 +62,10 @@ const SIDEBAR_W = 240;
 const SIDEBAR_W_COLLAPSED = 72;
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
-const ADMIN_EMAILS = new Set(['talfuks1234@gmail.com']);
+// SEC-010 — admin status now lives on user.role. Helper kept as a
+// single shared predicate so the sidebar / topbar / admin-only
+// affordances all read the same field.
+const isAdminUser = (u) => !!u && u.role === 'ADMIN';
 
 const PRIMARY_NAV = [
   { k: 'dashboard',   to: '/dashboard',  label: 'לוח בקרה', Icon: Home },
@@ -155,7 +158,7 @@ export default function Layout({ onLogout }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const narrow = useIsNarrow();
-  const isAdmin = user && ADMIN_EMAILS.has(user.email);
+  const isAdmin = isAdminUser(user);
 
   // ─── Favorites (restored from the previous layout) ─────────────
   // The list is also re-fetched on the global `estia:favorites-changed`
@@ -390,7 +393,7 @@ function SidebarInner({
   // can hide section labels / favorites placeholder for admin users.
   // The parent's `isAdmin` lives in a different closure — referencing
   // it here was a ReferenceError that crashed every render.
-  const isAdmin = !!(user && ADMIN_EMAILS.has((user.email || '').toLowerCase()));
+  const isAdmin = isAdminUser(user);
   // Single-active resolver: of all items whose `to` is a prefix of the
   // current pathname, keep only the longest match. Without this,
   // /settings/tags lit BOTH /settings and /settings/tags because
@@ -963,7 +966,7 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
         <button
           type="button"
           onClick={() => {
-            if (ADMIN_EMAILS.has((user?.email || '').toLowerCase())) {
+            if (isAdminUser(user)) {
               navigate('/admin/chats');
             } else {
               onOpenChat();

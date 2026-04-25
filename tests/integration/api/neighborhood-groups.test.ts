@@ -11,27 +11,26 @@ beforeAll(async () => { app = await build(); await app.ready(); });
 afterAll(async () => { await app.close(); });
 
 // Sprint 7 / MLS parity — Task G2. NeighborhoodGroup (marketable-area)
-// admin. Public read, admin-only mutations (SEC-035 — the table is
-// platform-global, so OWNER alone is too permissive). Members cascade
-// from the FK ON DELETE CASCADE — the tests lock that behaviour in so
-// a future migration doesn't drop the cascade silently.
-//
-// Default ADMIN_EMAILS includes 'talfuks1234@gmail.com' (see chat.ts).
-const ADMIN_EMAIL = 'talfuks1234@gmail.com';
+// admin. Public read, ADMIN-only mutations (SEC-010 — was OWNER-only;
+// the lookup is platform-global so it now requires platform admin
+// instead of an office owner). Members cascade from the FK ON DELETE
+// CASCADE — the tests lock that behaviour in so a future migration
+// doesn't drop the cascade silently.
+async function promoteToAdmin(userId: string) {
+  await prisma.$executeRaw`UPDATE "User" SET role = 'ADMIN' WHERE id = ${userId}`;
+}
 
 describe('NeighborhoodGroup admin', () => {
-  it('H — admin can create a group with members; GET includes them', async () => {
-    const owner = await createUser(prisma, {
-      role: UserRole.OWNER,
-      email: ADMIN_EMAIL,
-    });
+  it('H — ADMIN can create a group with members; GET includes them', async () => {
+    const admin = await createUser(prisma, { role: UserRole.AGENT });
+    await promoteToAdmin(admin.id);
     const ramat = await prisma.neighborhood.create({
       data: { city: 'תל אביב', name: 'רמת אביב' },
     });
     const neveSharet = await prisma.neighborhood.create({
       data: { city: 'תל אביב', name: 'נווה שרת' },
     });
-    const cookie = await loginAs(app, owner.email, owner._plainPassword);
+    const cookie = await loginAs(app, admin.email, admin._plainPassword);
     const create = await app.inject({
       method: 'POST', url: '/api/neighborhood-groups', headers: { cookie },
       payload: {
@@ -58,7 +57,9 @@ describe('NeighborhoodGroup admin', () => {
     ]);
   });
 
-  it('Az — plain AGENT (non-admin email) is rejected on POST / PATCH / DELETE', async () => {
+  it('Az — plain AGENT and OWNER are rejected on POST / PATCH / DELETE', async () => {
+    // SEC-010 — neither plain AGENT nor an office OWNER can mutate;
+    // only ADMIN. The original test only covered AGENT; tighten it.
     const agent = await createAgent(prisma);
     const cookie = await loginAs(app, agent.email, agent._plainPassword);
     const post = await app.inject({
@@ -81,14 +82,22 @@ describe('NeighborhoodGroup admin', () => {
       method: 'DELETE', url: `/api/neighborhood-groups/${group.id}`, headers: { cookie },
     });
     expect(del.statusCode).toBe(403);
+
+    // OWNER is also rejected — the lookup is platform-global, only
+    // ADMIN can curate it.
+    const owner = await createUser(prisma, { role: UserRole.OWNER });
+    const ownerCookie = await loginAs(app, owner.email, owner._plainPassword);
+    const ownerPost = await app.inject({
+      method: 'POST', url: '/api/neighborhood-groups', headers: { cookie: ownerCookie },
+      payload: { city: 'תל אביב', name: 'נסיון2' },
+    });
+    expect(ownerPost.statusCode).toBe(403);
   });
 
   it('V — 400 when city is empty', async () => {
-    const owner = await createUser(prisma, {
-      role: UserRole.OWNER,
-      email: ADMIN_EMAIL,
-    });
-    const cookie = await loginAs(app, owner.email, owner._plainPassword);
+    const admin = await createUser(prisma, { role: UserRole.AGENT });
+    await promoteToAdmin(admin.id);
+    const cookie = await loginAs(app, admin.email, admin._plainPassword);
     const res = await app.inject({
       method: 'POST', url: '/api/neighborhood-groups', headers: { cookie },
       payload: { city: '', name: 'שם' },
@@ -97,10 +106,8 @@ describe('NeighborhoodGroup admin', () => {
   });
 
   it('Edge — deleting the group cascades membership rows (Neighborhoods survive)', async () => {
-    const owner = await createUser(prisma, {
-      role: UserRole.OWNER,
-      email: ADMIN_EMAIL,
-    });
+    const admin = await createUser(prisma, { role: UserRole.AGENT });
+    await promoteToAdmin(admin.id);
     const n1 = await prisma.neighborhood.create({
       data: { city: 'חיפה', name: 'הדר' },
     });
@@ -110,7 +117,7 @@ describe('NeighborhoodGroup admin', () => {
         members: { create: [{ neighborhoodId: n1.id, sortOrder: 0 }] },
       },
     });
-    const cookie = await loginAs(app, owner.email, owner._plainPassword);
+    const cookie = await loginAs(app, admin.email, admin._plainPassword);
     const del = await app.inject({
       method: 'DELETE', url: `/api/neighborhood-groups/${group.id}`, headers: { cookie },
     });
@@ -124,10 +131,8 @@ describe('NeighborhoodGroup admin', () => {
   });
 
   it('PATCH replaces member set when memberIds is provided', async () => {
-    const owner = await createUser(prisma, {
-      role: UserRole.OWNER,
-      email: ADMIN_EMAIL,
-    });
+    const admin = await createUser(prisma, { role: UserRole.AGENT });
+    await promoteToAdmin(admin.id);
     const [a, b, c] = await Promise.all([
       prisma.neighborhood.create({ data: { city: 'תל אביב', name: 'א' } }),
       prisma.neighborhood.create({ data: { city: 'תל אביב', name: 'ב' } }),
@@ -144,7 +149,7 @@ describe('NeighborhoodGroup admin', () => {
         },
       },
     });
-    const cookie = await loginAs(app, owner.email, owner._plainPassword);
+    const cookie = await loginAs(app, admin.email, admin._plainPassword);
     const res = await app.inject({
       method: 'PATCH', url: `/api/neighborhood-groups/${group.id}`, headers: { cookie },
       payload: { memberIds: [c.id] },
