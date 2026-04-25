@@ -90,6 +90,12 @@ const AUTH_RL_DISABLED = process.env.AUTH_RATE_LIMIT_DISABLED === '1';
 const LOGIN_LIMIT  = AUTH_RL_DISABLED ? false : { max: 10, timeWindow: '15 minutes' };
 const SIGNUP_LIMIT = AUTH_RL_DISABLED ? false : { max: 3,  timeWindow: '1 hour' };
 const FORGOT_LIMIT = AUTH_RL_DISABLED ? false : { max: 5, timeWindow: '1 hour' };
+// SEC-001 — `/reset-password` was the only auth route without a per-route
+// brake; brute-forceability was bounded only by the global 300/min ceiling
+// inside the 30-min token TTL (~9000 attempts). 10 / 15 min mirrors the
+// /login shape — generous for legitimate users (one or two retries after
+// a typo) and tight enough that the keyspace stays safe.
+const RESET_LIMIT  = AUTH_RL_DISABLED ? false : { max: 10, timeWindow: '15 minutes' };
 
 const forgotSchema = z.object({ email: z.string().email() });
 const resetSchema = z.object({
@@ -267,7 +273,7 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     return reply.send({ ok: true, ...(devToken ? { devToken } : {}) });
   });
 
-  app.post('/reset-password', async (req, reply) => {
+  app.post('/reset-password', { config: { rateLimit: RESET_LIMIT } }, async (req, reply) => {
     const parse = resetSchema.safeParse(req.body);
     if (!parse.success) {
       return reply.code(400).send({ error: { message: 'סיסמה חייבת להיות לפחות 8 תווים' } });
