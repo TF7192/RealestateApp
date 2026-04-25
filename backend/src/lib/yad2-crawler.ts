@@ -217,13 +217,19 @@ function ensureShutdownHook() {
 // a Reblaze interstitial.
 type PageResult = { ok: boolean; html?: string; status?: number; blocked?: boolean };
 
-async function fetchPage(ctx: BrowserContext, url: string): Promise<PageResult> {
+async function fetchPage(
+  ctx: BrowserContext,
+  url: string,
+  opts: { navTimeoutMs?: number; nextDataTimeoutMs?: number } = {},
+): Promise<PageResult> {
   let page: Page | null = null;
+  const navTimeout = opts.navTimeoutMs ?? NAV_TIMEOUT_MS;
+  const nextDataTimeout = opts.nextDataTimeoutMs ?? NEXT_DATA_WAIT_MS;
   try {
     page = await ctx.newPage();
     const response = await page.goto(url, {
       waitUntil: 'domcontentloaded',
-      timeout: NAV_TIMEOUT_MS,
+      timeout: navTimeout,
     });
     const status = response?.status() ?? 0;
 
@@ -240,7 +246,7 @@ async function fetchPage(ctx: BrowserContext, url: string): Promise<PageResult> 
           return !!(el && el.textContent && el.textContent.length > 1000);
         })()`,
         undefined,
-        { timeout: NEXT_DATA_WAIT_MS }
+        { timeout: nextDataTimeout }
       )
       .catch(() => { /* fall through — block detection happens below */ });
 
@@ -413,7 +419,15 @@ async function crawlSection(
 
 async function fetchListingDetails(ctx: BrowserContext, token: string): Promise<{ images: string[]; description?: string } | null> {
   const url = `https://www.yad2.co.il/realestate/item/${encodeURIComponent(token)}`;
-  const r = await fetchPage(ctx, url);
+  // Detail pages run AFTER the listings phase set the WAF cookie, so
+  // the JS challenge typically resolves in <2s instead of the 12s the
+  // listings phase budgets. Tighter timeouts here keep a single bad
+  // page from blocking the parallel batch's progress for too long
+  // before the wall-clock race in the caller fires anyway.
+  const r = await fetchPage(ctx, url, {
+    navTimeoutMs: 12_000,
+    nextDataTimeoutMs: 6_000,
+  });
   if (!r.ok || !r.html) return null;
   const data = extractNextData(r.html);
   if (!data) return null;
@@ -541,6 +555,24 @@ export async function crawlAgency(
     // Per-listing fetch of the item-detail page to pull the FULL gallery.
     // The cookies set by the listings phase carry over (same context),
     // so detail pages don't need to re-solve the JS challenge.
+    //
+    // Failure modes the previous serial loop hit in prod:
+    //   1. A single bad listing's detail page hung the full 30s nav
+    //      timeout + 12s NEXT_DATA wait = 42s; the bar froze with no
+    //      visible error and the next listing didn't start.
+    //   2. Yad2 occasionally re-armed the WAF challenge mid-batch; the
+    //      per-page handler caught the exception silently but the
+    //      sequential loop still paid the full 42s before moving on.
+    //   3. With sequential ~5s/page × 50 = 4+ minutes of dead-time
+    //      where the bar inched forward one tick at a time.
+    //
+    // The fix: parallelise detail fetches with a small concurrency
+    // ceiling (3 workers — well under WAF's per-IP burst threshold for
+    // the agency cookie set), wrap each fetch in an explicit
+    // wall-clock race so a hanging page resolves in 18s flat, ALWAYS
+    // emit a progress tick after each fetch (even on error/timeout)
+    // so the bar never freezes, and log per-listing failures with the
+    // sourceId so we can investigate specific tokens.
     const targets = allListings.slice(0, MAX_DETAIL_FETCHES);
     if (targets.length > 0) {
       emit({
@@ -550,23 +582,54 @@ export async function crawlAgency(
       });
     }
     const detailSpan = DETAIL_BUDGET_END - DETAIL_BUDGET_START;
-    for (let i = 0; i < targets.length; i++) {
-      const l = targets[i];
-      await sleep(POLITE_GAP_MS);
-      try {
-        const details = await fetchListingDetails(ctx, l.sourceId);
-        if (details) {
-          if (details.images.length > 0) l.images = details.images;
-          if (details.description && !l.description) l.description = details.description;
+    const DETAIL_CONCURRENCY = 3;
+    const DETAIL_HARD_TIMEOUT_MS = 18_000;
+    let detailDone = 0;
+    const queue = targets.slice();
+
+    const worker = async () => {
+      for (;;) {
+        const l = queue.shift();
+        if (!l) return;
+        // Tiny stagger between worker pulls so 3 in-flight requests
+        // don't fire at the exact same tick — keeps the WAF heuristic
+        // happier and reduces the chance of all three workers hitting
+        // a flaky network spike together.
+        await sleep(POLITE_GAP_MS / 2);
+        try {
+          // Race the fetch against an explicit wall-clock so a hanging
+          // detail page can't burn the full Playwright nav timeout.
+          // The fetcher's own catch already swallows network errors;
+          // this just stops the wait.
+          const details = await Promise.race([
+            fetchListingDetails(ctx, l.sourceId),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), DETAIL_HARD_TIMEOUT_MS)),
+          ]);
+          if (details) {
+            if (details.images.length > 0) l.images = details.images;
+            if (details.description && !l.description) l.description = details.description;
+          }
+        } catch (e) {
+          // Per-listing failures must not abort the whole crawl.
+          // Logging happens via process stderr so the route's pino
+          // logger can pick it up if attached.
+          // eslint-disable-next-line no-console
+          console.warn(`[yad2-crawler] detail fetch failed for ${l.sourceId}:`, (e as Error)?.message);
+        } finally {
+          detailDone += 1;
+          const pct = DETAIL_BUDGET_START + (detailDone / targets.length) * detailSpan;
+          emit({
+            phase: 'detail-item', pct,
+            stage: `טוען תמונות ${detailDone}/${targets.length}`,
+            index: detailDone, total: targets.length,
+          });
         }
-      } catch { /* keep cover-only */ }
-      const pct = DETAIL_BUDGET_START + ((i + 1) / targets.length) * detailSpan;
-      emit({
-        phase: 'detail-item', pct,
-        stage: `טוען תמונות ${i + 1}/${targets.length}`,
-        index: i + 1, total: targets.length,
-      });
-    }
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(DETAIL_CONCURRENCY, targets.length) }, () => worker())
+    );
     if (allListings.length > MAX_DETAIL_FETCHES) truncated = true;
 
     emit({

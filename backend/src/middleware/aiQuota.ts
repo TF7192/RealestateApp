@@ -17,6 +17,7 @@
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma.js';
+import { getUser } from './auth.js';
 
 export const VOICE_DAILY_SECONDS = 45 * 60; // 45 minutes
 export const CHAT_HOURLY_COUNT = 15;
@@ -112,7 +113,12 @@ interface CheckOpts {
  */
 export function requireAiQuota(opts: CheckOpts) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
-    const u = (req as any).user as { id: string; role: string } | undefined;
+    // Estia stashes the auth'd user under a Symbol via `setUser`/`getUser`,
+    // NOT on `req.user` (which is @fastify/jwt's own decorator with a
+    // wider/different type). The previous `req.user` lookup returned
+    // undefined and silently 401'd every premium agent that reached the
+    // quota gate — bouncing them to /login from /voice-demo.
+    const u = getUser(req);
     if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
     // Admin bypass — platform owner needs to test without rate-limit
     // friction. Same allowlist the rest of the app already uses.
