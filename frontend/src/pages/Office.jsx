@@ -602,7 +602,10 @@ export default function Office() {
         </section>
 
         {/* AI usage (OWNER-only) — per-member monthly spend. */}
-        {isOwner && <AiUsageBlock />}
+        {/* Admin-only observability tile — visible to the platform
+            admin (talfuks1234@gmail.com) on every office, not to
+            office OWNERs. */}
+        {user?.email?.toLowerCase() === 'talfuks1234@gmail.com' && <AiUsageBlock />}
 
         {/* Pending invites (OWNER-only) */}
         {isOwner && pendingCount > 0 && (
@@ -906,10 +909,6 @@ function AiUsageBlock() {
             </ul>
           </div>
           <div>
-            <div style={{
-              fontSize: 11, color: DT.muted, fontWeight: 700,
-              letterSpacing: 0.4, marginBottom: 6,
-            }}>לפי פיצ\'ר</div>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {data.features.map((f) => (
                 <li key={f.feature} style={{

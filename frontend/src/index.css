@@ -974,3 +974,31 @@ main > *[dir="rtl"] > *:nth-child(n+8) { --estia-card-delay: 280ms; }
 @media (prefers-reduced-motion: reduce) {
   main > *[dir="rtl"] > * { animation: none !important; }
 }
+
+/* Sprint 10 — soften the loading→loaded swap. When a page's data
+   container (a ul / tbody / grid) flips from a skeleton to the real
+   list, React swaps element trees so the keyframes from the card
+   stagger above don't re-fire. This rule gives any newly-mounted
+   list / grid / table-body inside a page a small fade-in so the
+   "no data → suddenly there" pop is gentler. The animation is
+   subtle (160ms, opacity only — no transform) so it doesn't fight
+   the heavier 280ms page-card stagger. */
+@keyframes estia-content-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+main ul,
+main ol,
+main tbody,
+main article,
+main section > ul,
+main section > div > ul,
+main [data-grid] {
+  animation: estia-content-fade 180ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  main ul, main ol, main tbody, main article,
+  main section > ul, main section > div > ul, main [data-grid] {
+    animation: none !important;
+  }
+}

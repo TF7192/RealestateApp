@@ -314,12 +314,16 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // GET /api/office/ai-usage?month=YYYY-MM (defaults to current month)
-  // Owner-scoped summary of AI spend across the office: per-member
-  // totals + per-feature breakdown + month-to-date dollars.
-  app.get('/ai-usage', { onRequest: [app.requireAuth, app.requireOwner] }, async (req) => {
+  // Admin-only observability surface. Returns AI spend across every
+  // user in the system for the given month — not office-scoped. Gated
+  // on the platform-admin email so only `talfuks1234@gmail.com` can
+  // see per-user cost; everyone else (including office OWNERs) gets
+  // 403.
+  app.get('/ai-usage', { onRequest: [app.requireAuth] }, async (req, reply) => {
     const u = requireUser(req);
-    const me = await prisma.user.findUnique({ where: { id: u.id } });
-    if (!me?.officeId) return { members: [], features: [], totalUsd: 0, month: null };
+    if (u.email?.toLowerCase() !== 'talfuks1234@gmail.com') {
+      return reply.code(403).send({ error: { message: 'Admin only' } });
+    }
     const q = req.query as { month?: string };
     const today = new Date();
     const [yStr, mStr] = (q.month || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`).split('-');
@@ -327,15 +331,14 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     const start = new Date(Date.UTC(year, month - 1, 1));
     const end = new Date(Date.UTC(year, month, 1));
 
+    // Every non-deleted user in the system. This is the admin-wide
+    // roll-up — cross-office, cross-role.
     const members = await prisma.user.findMany({
-      where: { officeId: me.officeId, deletedAt: null },
+      where: { deletedAt: null },
       select: { id: true, displayName: true, email: true, role: true },
     });
     const rows = await prisma.aiUsage.findMany({
-      where: {
-        userId: { in: members.map((m) => m.id) },
-        createdAt: { gte: start, lt: end },
-      },
+      where: { createdAt: { gte: start, lt: end } },
       select: {
         userId: true, feature: true, model: true,
         inputTokens: true, outputTokens: true,
