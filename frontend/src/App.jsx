@@ -63,7 +63,8 @@ const Admin = lazy(() => import('./pages/Admin'));
 const SellerCalculator = lazy(() => import('./pages/SellerCalculator'));
 const Yad2Import = lazy(() => import('./pages/Yad2Import'));
 // Excel / CSV import wizard — shared between /import/leads and
-// /import/properties. Lazy so xlsx (~300KB) isn't in the main bundle.
+// /import/properties. Lazy so exceljs (~256KB gzipped) isn't in the
+// main bundle.
 const Import = lazy(() => import('./pages/Import'));
 // Landing page the sidebar links to — picks leads vs properties and
 // drops the agent into the wizard above.
