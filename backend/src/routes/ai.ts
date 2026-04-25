@@ -1260,7 +1260,7 @@ ${compsText || '(אין נכסים להשוואה)'}
       // per socket so back-pressure / abort semantics stay simple;
       // the FE opens a fresh socket per turn.
       let started = false;
-      socket.on('message', async (raw) => {
+      socket.on('message', async (raw: Buffer | string) => {
         if (!active) return;
         if (started) return; // ignore extra frames
         started = true;
