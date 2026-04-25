@@ -1,6 +1,26 @@
-import { PrismaClient } from '@prisma/client';
-import argon2 from 'argon2';
-import { createHash } from 'node:crypto';
+// `export {}` so top-level `await` (used by the dynamic imports below)
+// makes this file a module under tsc's strict mode.
+export {};
+
+// SEC-038 — refuse to seed in production unless an operator opts in
+// explicitly. The seed creates six demo accounts whose passwords live
+// in the public source tree, so any prod run is effectively a public
+// login. The guard fires before any other module is loaded so the
+// cheapest possible exit happens, and so a missing dependency can't
+// produce a different error that hides the refusal. ES `import`s are
+// hoisted by the runtime, so to actually run the guard *first* we use
+// dynamic imports below. CI seed runs (test DBs, NODE_ENV unset or
+// 'test') are unaffected; the GitHub Actions workflows that legitimately
+// seed test DBs pass ESTIA_ALLOW_SEED=1 to make intent explicit and
+// cover any future runs that set NODE_ENV=production.
+if (process.env.NODE_ENV === 'production' && process.env.ESTIA_ALLOW_SEED !== '1') {
+  console.error('[seed] refusing to run in production without ESTIA_ALLOW_SEED=1 — see SEC-038');
+  process.exit(1);
+}
+
+const { PrismaClient } = await import('@prisma/client');
+const argon2 = (await import('argon2')).default;
+const { createHash } = await import('node:crypto');
 
 const prisma = new PrismaClient();
 

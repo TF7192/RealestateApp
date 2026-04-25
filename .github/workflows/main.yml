@@ -45,6 +45,8 @@ jobs:
       DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
       JWT_SECRET: test-jwt-secret
       COOKIE_SECRET: test-cookie-secret
+      # SEC-038 — explicit opt-in for the seed-prod-guard (see pr.yml).
+      ESTIA_ALLOW_SEED: '1'
       AUTH_RATE_LIMIT_DISABLED: '1'
       RATE_LIMIT_MAX_PER_MIN: '100000'
     steps:
@@ -77,6 +79,8 @@ jobs:
       DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
       JWT_SECRET: test-jwt-secret
       COOKIE_SECRET: test-cookie-secret
+      # SEC-038 — explicit opt-in for the seed-prod-guard (see pr.yml).
+      ESTIA_ALLOW_SEED: '1'
       PUBLIC_URL: http://localhost:5173
       TEST_AGENT_EMAIL: agent.demo@estia.app
       TEST_AGENT_PASSWORD: estia-demo-1234

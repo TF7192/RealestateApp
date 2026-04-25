@@ -13,6 +13,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:rotate-demo-passwords": "tsx scripts/rotate-demo-passwords.ts",
     "backfill:slugs": "tsx src/scripts/backfill-slugs.ts",
     "backfill:owners": "tsx src/scripts/backfill-owners.ts"
   },

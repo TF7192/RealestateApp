@@ -41,6 +41,11 @@ jobs:
       DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
       JWT_SECRET: test-jwt-secret
       COOKIE_SECRET: test-cookie-secret
+      # SEC-038 — explicit opt-in for the seed-prod-guard. NODE_ENV is
+      # not 'production' on this runner so the guard wouldn't fire
+      # anyway, but the env var documents intent and protects any
+      # future change that flips NODE_ENV=production for the build.
+      ESTIA_ALLOW_SEED: '1'
       # Disable per-route login/signup limits (10/15min, 3/1h) that the
       # integration suite blows through immediately. Bump the global
       # limiter too so 300/min doesn't trip either. See
@@ -85,6 +90,8 @@ jobs:
       DATABASE_URL: postgresql://estia:estia@localhost:54329/estia_test
       JWT_SECRET: test-jwt-secret
       COOKIE_SECRET: test-cookie-secret
+      # SEC-038 — explicit opt-in for the seed-prod-guard (see integration job).
+      ESTIA_ALLOW_SEED: '1'
       PUBLIC_URL: http://localhost:5173
       TEST_AGENT_EMAIL: agent.demo@estia.app
       # Seed uses estia-demo-1234; align here to match seed.ts on the test DB.

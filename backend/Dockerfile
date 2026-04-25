@@ -65,4 +65,9 @@ RUN npm install --no-save \
       --cache /tmp/npm-cache --no-audit --no-fund \
   && node -e "require.resolve('openai'); require.resolve('@anthropic-ai/sdk'); console.log('runtime deps ok')"
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && (npx tsx prisma/seed.ts || true) && node dist/server.js"]
+# SEC-038 — the prod CMD used to run `npx tsx prisma/seed.ts` here,
+# which reseeded six demo accounts (with hardcoded passwords visible in
+# public source) on every container start. Removed entirely; the seed
+# script now also refuses to run with NODE_ENV=production unless
+# ESTIA_ALLOW_SEED=1 is set, in case anyone re-adds it.
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
