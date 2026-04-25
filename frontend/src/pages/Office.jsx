@@ -32,6 +32,7 @@ import { useAuth } from '../lib/auth';
 import { useToast, optimisticUpdate } from '../lib/toast';
 import { displayText } from '../lib/display';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Portal from '../components/Portal';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -1024,7 +1025,10 @@ function PendingInvitesBlock({ toast, onAccepted }) {
 // ─── CloseOfficeDialog ───────────────────────────────────────────
 // Two-mode close flow: transfer ownership to an existing member, or
 // delete the office row. The parent page is already OWNER-gated.
-function CloseOfficeDialog({ members, busy, onCancel, onConfirm }) {
+function CloseOfficeDialog(props) {
+  return <Portal><CloseOfficeDialogInner {...props} /></Portal>;
+}
+function CloseOfficeDialogInner({ members, busy, onCancel, onConfirm }) {
   const [mode, setMode] = useState(members.length > 0 ? 'transfer' : 'delete');
   const [newOwnerId, setNewOwnerId] = useState(members[0]?.id || '');
   const canTransfer = members.length > 0;
@@ -1038,8 +1042,9 @@ function CloseOfficeDialog({ members, busy, onCancel, onConfirm }) {
       aria-label="סגירת משרד"
       onClick={(e) => { if (e.target === e.currentTarget && !busy) onCancel(); }}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(30,26,20,0.55)',
-        display: 'grid', placeItems: 'center', padding: 16, zIndex: 60,
+        position: 'fixed', inset: 0, background: 'rgba(30,26,20,0.6)',
+        display: 'grid', placeItems: 'center', padding: 16, zIndex: 1000,
+        overflowY: 'auto',
       }}
     >
       <div style={{

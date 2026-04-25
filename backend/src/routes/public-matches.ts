@@ -58,7 +58,12 @@ async function pickUniqueSlug(agentId: string, base: string): Promise<string> {
 // Property shape the frontend wants for pool cards. Deliberately narrow
 // — we don't leak owner PII or exclusivity expiry from the source
 // agent's desk; attribution stays on agent level only.
-function serializePoolProperty(p: any, matchCount: number, topMatches: Array<{ id: string; name: string | null }>) {
+function serializePoolProperty(
+  p: any,
+  matchCount: number,
+  topMatches: Array<{ id: string; name: string | null }>,
+  viewerDuplicatedAt: Date | null,
+) {
   return {
     id: p.id,
     street: p.street,
@@ -91,6 +96,10 @@ function serializePoolProperty(p: any, matchCount: number, topMatches: Array<{ i
     matchCount,
     topMatches,
     copies: p._count?.publicMatchCopies || 0,
+    // Sprint 10 — mark rows the viewer already cloned so the pool
+    // grid can show "כבר שוכפל" + a green ring instead of the
+    // normal "שכפל" CTA. Value is the ISO timestamp of the clone.
+    viewerDuplicatedAt: viewerDuplicatedAt ? viewerDuplicatedAt.toISOString() : null,
   };
 }
 
@@ -100,7 +109,7 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const u = requireUser(req);
 
-    const [pool, leads] = await Promise.all([
+    const [pool, leads, myClones] = await Promise.all([
       prisma.property.findMany({
         where: {
           isPublicMatch: true,
@@ -133,7 +142,21 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
         },
         include: { searchProfiles: true },
       }),
+      // Every property the viewer already cloned from the pool —
+      // keyed on sourceId → oldest createdAt so the pool grid can
+      // surface a "כבר שוכפל" chip for rows they've seen.
+      prisma.property.findMany({
+        where: { agentId: u.id, publicMatchSourceId: { not: null } },
+        select: { publicMatchSourceId: true, createdAt: true },
+      }),
     ]);
+
+    const dupedBySource = new Map<string, Date>();
+    for (const c of myClones) {
+      if (!c.publicMatchSourceId) continue;
+      const prev = dupedBySource.get(c.publicMatchSourceId);
+      if (!prev || c.createdAt < prev) dupedBySource.set(c.publicMatchSourceId, c.createdAt);
+    }
 
     const scored = pool.map((p) => {
       const matches: Array<{ id: string; name: string | null; score: number }> = [];
@@ -145,7 +168,7 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
       }
       matches.sort((a, b) => b.score - a.score);
       const top = matches.slice(0, 3).map(({ id, name }) => ({ id, name }));
-      return serializePoolProperty(p, matches.length, top);
+      return serializePoolProperty(p, matches.length, top, dupedBySource.get(p.id) ?? null);
     });
 
     // Highest match-count first, then most-recently published. An item

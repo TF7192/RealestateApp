@@ -13,6 +13,7 @@ import {
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
+import Portal from '../components/Portal';
 
 // ─── Tokens lifted from the bundle's shell.jsx ──────────────
 const DT = {
@@ -593,7 +594,10 @@ function Pipeline({ deals }) {
 }
 
 // ─── Premium-only popup ─────────────────────────────────────
-function PremiumModal({ onClose }) {
+function PremiumModal(props) {
+  return <Portal><PremiumModalInner {...props} /></Portal>;
+}
+function PremiumModalInner({ onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
@@ -605,7 +609,7 @@ function PremiumModal({ onClose }) {
       aria-modal="true"
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 100,
+        position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(20,17,13,0.55)', backdropFilter: 'blur(2px)',
         display: 'grid', placeItems: 'center', padding: 16,
       }}

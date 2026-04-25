@@ -15,6 +15,7 @@ import { useToast } from '../lib/toast';
 import { displayText, displayPrice, displayNumber } from '../lib/display';
 import { useViewportMobile } from '../hooks/mobile';
 import EmptyState from '../components/EmptyState';
+import Portal from '../components/Portal';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -398,16 +399,22 @@ function PoolCard({ row, busy, onDuplicate }) {
 
 function DuplicateSheet({ row, busy, onCancel, onConfirm }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="שכפול נכס"
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(30,26,20,0.55)',
-        display: 'grid', placeItems: 'center', padding: 16, zIndex: 60,
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
-    >
+    <Portal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="שכפול נכס"
+        style={{
+          // Portal + z:1000 so the backdrop covers the topbar (z:20)
+          // and the sidebar (z:30) — the inline render was clipped
+          // by the <main> stacking context and left the app chrome
+          // fully bright behind the modal.
+          position: 'fixed', inset: 0, background: 'rgba(30,26,20,0.6)',
+          display: 'grid', placeItems: 'center', padding: 16, zIndex: 1000,
+          overflowY: 'auto',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+      >
       <div style={{
         ...FONT, background: DT.white, borderRadius: 16,
         padding: 22, maxWidth: 420, width: '100%',
@@ -459,6 +466,7 @@ function DuplicateSheet({ row, busy, onCancel, onConfirm }) {
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </Portal>
   );
 }

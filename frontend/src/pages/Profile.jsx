@@ -34,6 +34,7 @@ import { useToast } from '../lib/toast';
 import { inputPropsForName } from '../lib/inputProps';
 import { PhoneField } from '../components/SmartFields';
 import ShareDialog from '../components/ShareDialog';
+import Portal from '../components/Portal';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -495,7 +496,10 @@ export default function Profile() {
 // panic-quits.
 const CONFIRM_PHRASE = 'מחק את החשבון שלי';
 
-function DeleteAccountDialog({ onClose, onConfirmed }) {
+function DeleteAccountDialog(props) {
+  return <Portal><DeleteAccountDialogInner {...props} /></Portal>;
+}
+function DeleteAccountDialogInner({ onClose, onConfirmed }) {
   const [phrase, setPhrase] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const canConfirm = phrase.trim() === CONFIRM_PHRASE;
@@ -526,8 +530,8 @@ function DeleteAccountDialog({ onClose, onConfirmed }) {
       aria-labelledby="delete-account-title"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
-        position: 'fixed', inset: 0, zIndex: 80,
-        background: 'rgba(30,26,20,0.45)',
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(30,26,20,0.6)',
         display: 'grid', placeItems: 'center',
         padding: 16,
       }}

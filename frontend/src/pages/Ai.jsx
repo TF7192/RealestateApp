@@ -125,12 +125,12 @@ export default function Ai() {
       // bounded height so the panel doesn't eat the whole viewport
       // — feels like a card, not a landing page. The inner panel
       // still scrolls on its own for long transcripts.
-      // ~80% of the viewport (excluding the topbar) so the chat
-      // feels like a proper workspace, not a widget. Still caps at
-      // 960px so it doesn't get absurd on 4K screens.
-      height: 'min(80vh, 960px)',
-      maxHeight: 'calc(100vh - 48px)',
-      maxWidth: 880,
+      // ~85% of the viewport (excluding the topbar) so the chat
+      // feels like a real workspace, not a widget. Caps at 1020px
+      // so it doesn't get absurd on 4K screens.
+      height: 'min(85vh, 1020px)',
+      maxHeight: 'calc(100vh - 32px)',
+      maxWidth: 980,
       marginInline: 'auto',
       width: '100%',
       display: 'flex', flexDirection: 'column', gap: 14,

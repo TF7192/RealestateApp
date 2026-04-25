@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { Plus, X, RotateCcw, GripVertical } from 'lucide-react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useViewportMobile } from '../hooks/mobile';
+import Portal from './Portal';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -599,7 +600,10 @@ function WidgetCard({ widget, data, index, onRemove, onReorder, draggable }) {
   );
 }
 
-function PickerModal({ activeKinds, onPick, onClose }) {
+function PickerModal(props) {
+  return <Portal><PickerModalInner {...props} /></Portal>;
+}
+function PickerModalInner({ activeKinds, onPick, onClose }) {
   const panelRef = useRef(null);
   useFocusTrap(panelRef, { onEscape: onClose });
   return (
@@ -608,7 +612,7 @@ function PickerModal({ activeKinds, onPick, onClose }) {
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(30,26,20,0.55)',
+        background: 'rgba(30,26,20,0.6)',
         display: 'grid', placeItems: 'center', padding: 16,
       }}
     >
