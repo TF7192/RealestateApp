@@ -653,6 +653,10 @@ model Property {
   managementCompany String?
   tenantSideOnly    Boolean @default(false)
   commissionTerms   String?
+  // 2026-04-26 — when the landlord side does pay commission, what does
+  // the agent get from them. Free-form so an agent can write "חודש +
+  // מע״מ", "2%", "5000 ש״ח", or anything else.
+  landlordCommission String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

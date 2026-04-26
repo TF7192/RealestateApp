@@ -177,6 +177,7 @@ const propertyInput = z.object({
   managementCompany: z.string().max(120).nullable().optional(),
   tenantSideOnly:    z.boolean().optional(),
   commissionTerms:   z.string().max(200).nullable().optional(),
+  landlordCommission: z.string().max(200).nullable().optional(),
 
   images: z.array(z.string().url()).optional(),
 });

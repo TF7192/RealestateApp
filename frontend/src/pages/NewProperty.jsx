@@ -38,6 +38,7 @@ import { NumberField, PhoneField, SelectField, Segmented } from '../components/S
 // ships production-ready (see Layout.jsx note).
 import PageTour from '../components/PageTour';
 import PropertyPipelineBlock from '../components/PropertyPipelineBlock';
+import PropertyVideoManager from '../components/PropertyVideoManager';
 import {
   HEATING_TYPE_LABELS,
 } from '../lib/mlsLabels';
@@ -260,6 +261,7 @@ const INITIAL_FORM = {
   managementCompany: '',   // חברת ניהול
   tenantSideOnly: false,   // צד שוכר בלבד (RENT only)
   commissionTerms: '',     // free-form commission shape e.g. "חודש + מע״מ"
+  landlordCommission: '',  // when landlord-side pays, how much (free-form)
 };
 
 // ─── Cream & Gold DT tokens ────────────────────────────────────────────
@@ -452,6 +454,7 @@ export default function NewProperty() {
   const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(isEdit);
   const [existingMeta, setExistingMeta] = useState(null); // { street, city, imageCount }
+  const [videosOpen, setVideosOpen] = useState(false);
 
   const [form, setForm] = useState(INITIAL_FORM);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -619,6 +622,7 @@ export default function NewProperty() {
           managementCompany: p.managementCompany || '',
           tenantSideOnly: !!p.tenantSideOnly,
           commissionTerms: p.commissionTerms || '',
+          landlordCommission: p.landlordCommission || '',
         });
         setExistingMeta({
           street: p.street,
@@ -875,6 +879,7 @@ export default function NewProperty() {
     managementCompany: form.managementCompany || null,
     tenantSideOnly: !!form.tenantSideOnly,
     commissionTerms: form.commissionTerms || null,
+    landlordCommission: form.landlordCommission || null,
   });
   const buildFullEditBody = () => ({ ...buildStep1Body(), ...buildStep2Body() });
 
@@ -1753,9 +1758,9 @@ export default function NewProperty() {
                     (management fees). Residential keeps "ועד בית".
                     Underlying column (buildingCommittee) unchanged. */}
                 <label className="form-label">
-                  {isCommercial ? 'דמי ניהול חודשיים' : 'ועד בית חודשי'}
+                  {isCommercial ? 'דמי ניהול חודשיים למ״ר' : 'ועד בית חודשי'}
                 </label>
-                <NumberField unit="₪" placeholder="220" value={form.buildingCommittee} onChange={(v) => update('buildingCommittee', v)} />
+                <NumberField unit={isCommercial ? '₪/מ״ר' : '₪'} placeholder="220" value={form.buildingCommittee} onChange={(v) => update('buildingCommittee', v)} />
               </div>
             </div>
             <div className="form-row">
@@ -1783,6 +1788,12 @@ export default function NewProperty() {
                 upstream). */}
           <div className="form-section">
             <h3 className="form-section-title">פרטים נוספים</h3>
+            {/* Commercial properties don't need half-rooms / bathrooms /
+                heating / "lifestyle" amenities (gym, pool, etc) — only
+                accessibility (נגישות לנכים) is meaningful for offices and
+                shops. Hide the rest entirely when isCommercial. */}
+            {!isCommercial && (
+            <>
             <div className="form-row form-row-3">
               <div className="form-group">
                 <label className="form-label" htmlFor="np-half-rooms">חצאי חדרים</label>
@@ -1857,20 +1868,25 @@ export default function NewProperty() {
                 })}
               </div>
             </fieldset>
+            </>
+            )}
             <div className="checkbox-grid">
-              {[
-                { key: 'masterBedroom',   label: 'חדר הורים' },
-                { key: 'utilityRoom',     label: 'חדר שירות' },
-                { key: 'furnished',       label: 'מרוהטת' },
-                { key: 'petFriendly',     label: 'ידידותי לחיות מחמד' },
-                { key: 'doormenService',  label: 'שירות קונסיירז׳' },
-                { key: 'gym',             label: 'חדר כושר בבניין' },
-                { key: 'pool',            label: 'בריכת שחייה' },
-                { key: 'gatedCommunity',  label: 'קהילה סגורה' },
-                { key: 'accessibility',   label: 'נגישות לנכים' },
-                { key: 'residentsRoom',   label: 'חדר דיירים' },
-                { key: 'bicycleRoom',     label: 'חדר אופניים' },
-              ].map(({ key, label }) => (
+              {(isCommercial
+                ? [{ key: 'accessibility', label: 'נגישות לנכים' }]
+                : [
+                    { key: 'masterBedroom',   label: 'חדר הורים' },
+                    { key: 'utilityRoom',     label: 'חדר שירות' },
+                    { key: 'furnished',       label: 'מרוהטת' },
+                    { key: 'petFriendly',     label: 'ידידותי לחיות מחמד' },
+                    { key: 'doormenService',  label: 'שירות קונסיירז׳' },
+                    { key: 'gym',             label: 'חדר כושר בבניין' },
+                    { key: 'pool',            label: 'בריכת שחייה' },
+                    { key: 'gatedCommunity',  label: 'קהילה סגורה' },
+                    { key: 'accessibility',   label: 'נגישות לנכים' },
+                    { key: 'residentsRoom',   label: 'חדר דיירים' },
+                    { key: 'bicycleRoom',     label: 'חדר אופניים' },
+                  ]
+              ).map(({ key, label }) => (
                 <label key={key} className="checkbox-item">
                   <input
                     type="checkbox"
@@ -1907,7 +1923,7 @@ export default function NewProperty() {
                 tenant covers the broker. */}
             <div className="form-row form-row-2">
               <div className="form-group">
-                <label className="form-label">תנאי עמלה</label>
+                <label className="form-label">תנאי עמלה (צד שוכר)</label>
                 <SelectField
                   value={form.commissionTerms}
                   onChange={(v) => update('commissionTerms', v)}
@@ -1920,12 +1936,39 @@ export default function NewProperty() {
                   ]}
                 />
               </div>
-              <div className="form-group" style={{ alignSelf: 'end' }}>
+              <div className="form-group">
+                {/* Landlord-side commission: rental brokerage often has
+                    asymmetric terms — the tenant pays one rate, the
+                    landlord pays another (or nothing). Free-form so the
+                    agent can write "חודש + מע״מ", "2%", "5000 ₪", or
+                    leave blank when the landlord doesn't pay. The
+                    "צד שוכר בלבד" toggle below disables this input. */}
+                <label className="form-label">עמלה מבעל הנכס</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={form.landlordCommission}
+                  onChange={(e) => update('landlordCommission', e.target.value)}
+                  placeholder="חודש + מע״מ / 2% / 5000 ₪"
+                  disabled={!!form.tenantSideOnly}
+                  enterKeyHint="next"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
                 <label className="checkbox-item" style={{ marginBottom: 0 }}>
                   <input
                     type="checkbox"
                     checked={!!form.tenantSideOnly}
-                    onChange={(e) => update('tenantSideOnly', e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      update('tenantSideOnly', checked);
+                      // Clear the landlord amount when toggling on, since
+                      // "tenant-side only" means the landlord pays 0.
+                      if (checked) update('landlordCommission', '');
+                    }}
                   />
                   <span className="checkbox-custom" />
                   צד שוכר בלבד (בעל הנכס לא משלם)
@@ -2026,6 +2069,30 @@ export default function NewProperty() {
             )}
           </div>
 
+          {/* Videos — opens the same PropertyVideoManager dialog used on
+              /properties/:id. Requires propertyId so the upload + add-
+              external endpoints have a target; in new-property mode the
+              row is created on step-1 save, so propertyId is set by the
+              time the agent reaches this step. Show a soft hint until
+              then to avoid a dead-looking button. */}
+          <div className="form-section">
+            <h3 className="form-section-title">סרטונים</h3>
+            {propertyId ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setVideosOpen(true)}
+              >
+                <Upload size={16} />
+                ניהול סרטונים — העלאה / קישור / מחיקה
+              </button>
+            ) : (
+              <p style={{ color: '#6b6356', fontSize: 13, margin: 0 }}>
+                שמרו את הנכס פעם אחת כדי לפתוח את ניהול הסרטונים.
+              </p>
+            )}
+          </div>
+
           <div className="form-actions form-actions-desktop" style={NP_STY.footerRow}>
             <button type="submit" className="btn btn-primary btn-lg" disabled={submitting} style={NP_STY.primaryBtn}>
               <Save size={18} />
@@ -2036,6 +2103,13 @@ export default function NewProperty() {
             </button>
           </div>
         </form>
+      )}
+
+      {videosOpen && propertyId && (
+        <PropertyVideoManager
+          propertyId={propertyId}
+          onClose={() => setVideosOpen(false)}
+        />
       )}
 
       {/* Sticky save bar on mobile — mirrors the in-form primary actions */}
