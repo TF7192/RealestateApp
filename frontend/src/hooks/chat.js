@@ -41,7 +41,11 @@ export function useChat({ autoLoad = true } = {}) {
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === 'message:new' && msg.conversationId === conversation?.id) {
-            setMessages((cur) => [...cur, msg.message]);
+            // Dedupe by id — the message is also appended optimistically
+            // by send() when the POST resolves, and the server echoes it
+            // back over the same WS. Without this guard the user sees
+            // their message rendered twice.
+            setMessages((cur) => (cur.some((m) => m.id === msg.message.id) ? cur : [...cur, msg.message]));
             if (msg.message.senderRole === 'admin') setUnread((u) => u + 1);
           } else if (msg.type === 'message:read' && msg.conversationId === conversation?.id) {
             // Admin read our messages — repaint "נקרא" hints
@@ -70,7 +74,9 @@ export function useChat({ autoLoad = true } = {}) {
     const text = String(body || '').trim();
     if (!text) return;
     const { message } = await api.chatSend(text);
-    setMessages((cur) => [...cur, message]);
+    // Dedupe by id — the WS broadcast may arrive before the POST resolves,
+    // so the same message can already be in state. See ws.onmessage above.
+    setMessages((cur) => (cur.some((m) => m.id === message.id) ? cur : [...cur, message]));
   }, []);
 
   const markRead = useCallback(async () => {

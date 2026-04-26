@@ -91,8 +91,11 @@ export default function AdminChats() {
           const msg = JSON.parse(ev.data);
           if (msg.type === 'message:new') {
             // If it's the open thread, append; either way update the list.
+            // Dedupe by id — the admin's own reply is also appended
+            // optimistically by sendReply() when the POST resolves, and
+            // the server echoes it back over the same WS.
             if (msg.conversationId === selectedId) {
-              setMessages((cur) => [...cur, msg.message]);
+              setMessages((cur) => (cur.some((m) => m.id === msg.message.id) ? cur : [...cur, msg.message]));
             }
             setItems((cur) => {
               const found = cur.find((c) => c.id === msg.conversationId);
@@ -152,7 +155,7 @@ export default function AdminChats() {
     setDraft('');
     try {
       const { message } = await api.adminChatSend(selectedId, text);
-      setMessages((cur) => [...cur, message]);
+      setMessages((cur) => (cur.some((m) => m.id === message.id) ? cur : [...cur, message]));
     } catch { /* ignore */ }
   };
 
