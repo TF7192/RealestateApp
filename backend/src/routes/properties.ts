@@ -372,11 +372,21 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         ownerEmail: body.ownerEmail !== undefined ? body.ownerEmail : existing.ownerEmail,
       });
     }
+    // propertyOwnerId must go through the relation on Prisma's update
+    // input — Prisma 5 rejects the raw FK scalar with
+    // "Unknown argument `propertyOwnerId`. Did you mean `propertyOwner`?"
+    // Same family of bug as the primaryAgentId fix from 2026-04-23.
+    const ownerRel =
+      propertyOwnerId === undefined
+        ? {}
+        : propertyOwnerId === null
+        ? { propertyOwner: { disconnect: true } }
+        : { propertyOwner: { connect: { id: propertyOwnerId } } };
     const updated = await prisma.property.update({
       where: { id },
       data: {
         ...normalize(body),
-        ...(propertyOwnerId !== undefined ? { propertyOwnerId } : {}),
+        ...ownerRel,
       },
       include: { images: true, marketingActions: true, propertyOwner: true },
     });
@@ -411,6 +421,15 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       closingPrice: _cp, lastContact: _lc, lastContactNotes: _lcn,
       marketingStartDate: _msd,
       status: _st,
+      // Strip relation FK scalars Prisma 5 rejects on create — reconnect
+      // via relation form below where we want to inherit them. `agentId`
+      // stays as a scalar; only `propertyOwnerId` and `primaryAgentId`
+      // are gated behind their relations.
+      propertyOwnerId: srcOwnerId,
+      primaryAgentId: _pa,
+      // Public-match metadata is per-listing and does not transfer.
+      publicMatchSourceId: _pms, isPublicMatch: _ipm,
+      publicMatchAt: _pma, publicMatchNote: _pmn,
       images: sourceImages,
       ...payload
     } = source as any;
@@ -428,6 +447,9 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         ...payload,
         slug: newSlug,
         status: 'ACTIVE',
+        // Inherit the seller/landlord row when present — relation form is
+        // mandatory; the FK scalar was stripped above.
+        ...(srcOwnerId ? { propertyOwner: { connect: { id: srcOwnerId } } } : {}),
         // Mark the copy so agents eyeballing the list see it instantly.
         notes: payload.notes ? `${payload.notes}\n\n(עותק)` : '(עותק)',
         marketingStartDate: new Date(),
