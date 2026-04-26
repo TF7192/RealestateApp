@@ -641,6 +641,19 @@ model Property {
   publicMatchCopies   Property[] @relation("PublicMatchSource")
   publicMatchSeen     PublicMatchSeen[]
 
+  // 2026-04-26 — PR2 form additions. Unit/apartment number (display
+  // distinguisher when one building has many listings), residential
+  // amenities (residents' room, bicycle room, management company),
+  // commercial extras (en-suite toilet), and rental-brokerage commission
+  // shapes (tenant-side-only flag and free-form terms like "חודש + מע״מ").
+  unitNumber        String?
+  enSuiteToilet     Boolean @default(false)
+  residentsRoom     Boolean @default(false)
+  bicycleRoom       Boolean @default(false)
+  managementCompany String?
+  tenantSideOnly    Boolean @default(false)
+  commissionTerms   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

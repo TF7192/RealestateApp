@@ -6,7 +6,7 @@
 // untouched).
 import { useId, useRef, useState } from 'react';
 import {
-  X, AlertCircle, Save,
+  X, AlertCircle, Save, Sparkles,
   UserCircle, Search, Home, SlidersHorizontal, StickyNote, Shield, Briefcase,
 } from 'lucide-react';
 import api from '../lib/api';
@@ -244,6 +244,10 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                 {err}
               </div>
             )}
+
+            {/* AI-edit panel — free-form Hebrew instruction → backend
+                extracts a partial patch via Haiku. */}
+            <LeadAiEditPanel leadId={lead.id} onApplied={() => { onSaved?.(); onClose?.(); }} />
 
             {/* Section 1 — פרטי לקוח */}
             <section style={sectionCard()} aria-label="פרטי לקוח">
@@ -538,6 +542,71 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
         </div>
       </div>
     </Portal>
+  );
+}
+
+// ── Lead AI-edit panel ────────────────────────────────────────────────
+function LeadAiEditPanel({ leadId, onApplied }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const submit = async () => {
+    const t = text.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.aiEditLead(leadId, t);
+      setText('');
+      onApplied?.();
+    } catch (e) {
+      setErr(e?.message || 'AI לא הצליח לעדכן');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section style={{
+      ...sectionCard(),
+      borderColor: DT.gold,
+      background: `linear-gradient(160deg, ${DT.cream4} 0%, ${DT.white} 100%)`,
+    }}>
+      <h4 style={sectionTitle()}>
+        <Sparkles size={16} style={{ color: DT.gold }} /> עריכה עם AI
+      </h4>
+      <p style={{ margin: '0 0 8px', color: DT.muted, fontSize: 13 }}>
+        תארו בעברית מה לשנות, למשל: "תעדכן את התקציב ל-3 מיליון ושים סטטוס חם".
+      </p>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <textarea
+          className="form-input"
+          rows={2}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="תשנה את ה…"
+          dir="auto"
+          enterKeyHint="send"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+          }}
+          style={{ flex: 1, resize: 'vertical' }}
+        />
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy || !text.trim()}
+          className="btn btn-primary"
+          style={{ alignSelf: 'flex-end', minWidth: 96 }}
+        >
+          {busy ? '…' : 'בצע עדכון'}
+        </button>
+      </div>
+      {err && (
+        <div style={{ marginTop: 8, color: DT.danger, fontSize: 13, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+          <AlertCircle size={14} /> {err}
+        </div>
+      )}
+    </section>
   );
 }
 

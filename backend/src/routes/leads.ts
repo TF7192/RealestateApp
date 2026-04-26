@@ -7,6 +7,8 @@ import { track as phTrack } from '../lib/analytics.js';
 import { evaluateLeadProperty } from '../lib/matching.js';
 import { logActivity } from '../lib/activity.js';
 import { normalizeAddress, normalizeCity } from '../lib/addressNormalize.js';
+import { buildAnthropic } from '../lib/anthropic.js';
+import { recordAnthropic } from '../lib/aiUsage.js';
 
 const leadInput = z.object({
   name: z.string().min(1).max(120),
@@ -328,6 +330,74 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       metadata: { fields: Object.keys(body) },
     });
     return { lead: updated };
+  });
+
+  // 2026-04-26 — AI edit. Mirrors POST /api/properties/:id/ai-edit.
+  app.post('/:id/ai-edit', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const Body = z.object({ instruction: z.string().min(2).max(800) });
+    const { instruction } = Body.parse(req.body);
+    const agentId = requireUser(req).id;
+    const existing = await prisma.lead.findUnique({ where: { id } });
+    if (!existing || existing.agentId !== agentId) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    const fieldList = Object.keys(leadInput.shape).join(', ');
+    const sys = [
+      'אתה עוזר עריכה לנתוני ליד נדל״ן בעברית. הסוכן מתאר בקצרה מה הוא רוצה לשנות.',
+      'החזר אך ורק JSON תקין במבנה: {"updates":{<שדות שצריך לעדכן>},"summary":"<סיכום קצר בעברית>"}.',
+      'שנה רק שדות שהמשתמש ביקש מפורשות לשנות. שמות שדות חייבים להיות מתוך הרשימה הבאה בלבד:',
+      fieldList,
+      'מספרים החזר כ-Number, בוליאנים כ-true/false. אל תכלול שדות שלא הוזכרו.',
+      'אם הבקשה לא ברורה או לא ניתן לבצע אותה, החזר {"updates":{},"summary":"<הסיבה>"}.',
+    ].join('\n');
+    const user = [
+      `ליד נוכחי: ${JSON.stringify(existing)}`,
+      `בקשת המשתמש: "${instruction}"`,
+    ].join('\n\n');
+    let parsed: { updates: any; summary?: string };
+    try {
+      const client = buildAnthropic();
+      if (!client) return reply.code(503).send({ error: { message: 'שירות ה-AI לא מוגדר בשרת' } });
+      const response = await client.messages.create({
+        model: 'claude-haiku-4-5',
+        max_tokens: 800,
+        system: sys,
+        messages: [{ role: 'user', content: user }],
+      });
+      recordAnthropic({ userId: agentId, feature: 'lead-ai-edit', model: 'claude-haiku-4-5', usage: response.usage as any });
+      const text = response.content
+        .filter((b: any) => b.type === 'text')
+        .map((b: any) => b.text)
+        .join('');
+      const match = text.match(/\{[\s\S]*\}/);
+      parsed = match ? JSON.parse(match[0]) : { updates: {} };
+    } catch (e: any) {
+      req.log.warn({ err: e }, 'lead ai-edit model call failed');
+      return reply.code(502).send({ error: { message: 'שירות ה-AI לא זמין כרגע, נסו שוב' } });
+    }
+    const updates = parsed.updates && typeof parsed.updates === 'object' ? parsed.updates : {};
+    if (!Object.keys(updates).length) {
+      return reply.code(422).send({
+        error: { message: parsed.summary || 'לא הצלחתי להבין מה לעדכן' },
+      });
+    }
+    const validated = leadInput.partial().parse(updates);
+    const updated = await prisma.lead.update({
+      where: { id },
+      data: normalize(validated),
+    });
+    await logActivity({
+      agentId, actorId: agentId,
+      verb: 'updated', entityType: 'Lead', entityId: id,
+      summary: `AI עריכה: ${parsed.summary || instruction.slice(0, 60)}`,
+      metadata: { fields: Object.keys(validated), instruction },
+    });
+    return {
+      lead: updated,
+      summary: parsed.summary || null,
+      changedFields: Object.keys(validated),
+    };
   });
 
   app.delete('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {

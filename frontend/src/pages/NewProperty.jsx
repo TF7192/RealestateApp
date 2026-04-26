@@ -251,6 +251,15 @@ const INITIAL_FORM = {
   exclusivityExpire: '',
   sellerSeriousness: 'NONE',
   brokerNotes: '',
+
+  // 2026-04-26 — PR2 form additions.
+  unitNumber: '',          // מס' דירה (residential) / מס' יחידה (commercial)
+  enSuiteToilet: false,    // שירותים צמודים (commercial)
+  residentsRoom: false,    // חדר דיירים (residential)
+  bicycleRoom: false,      // חדר אופניים (residential)
+  managementCompany: '',   // חברת ניהול
+  tenantSideOnly: false,   // צד שוכר בלבד (RENT only)
+  commissionTerms: '',     // free-form commission shape e.g. "חודש + מע״מ"
 };
 
 // ─── Cream & Gold DT tokens ────────────────────────────────────────────
@@ -427,7 +436,12 @@ export default function NewProperty() {
   const { id: editId } = useParams();
   const isEdit = !!editId;
 
-  const [step, setStep] = useState(1);
+  // 2026-04-26 — In edit mode, land directly on step 2 (the rich form
+  // with all the property attributes). The agent rarely needs the
+  // wizard's hand-holding when editing an existing row, and the step-1
+  // header essentials (price, owner) are already on /properties/:id's
+  // surface. The stepper still exists for explicit navigation back.
+  const [step, setStep] = useState(isEdit ? 2 : 1);
   const [propertyId, setPropertyId] = useState(isEdit ? editId : null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -597,6 +611,14 @@ export default function NewProperty() {
             : '',
           sellerSeriousness: p.sellerSeriousness || 'NONE',
           brokerNotes: p.brokerNotes || '',
+          // 2026-04-26 — PR2 form additions.
+          unitNumber: p.unitNumber || '',
+          enSuiteToilet: !!p.enSuiteToilet,
+          residentsRoom: !!p.residentsRoom,
+          bicycleRoom: !!p.bicycleRoom,
+          managementCompany: p.managementCompany || '',
+          tenantSideOnly: !!p.tenantSideOnly,
+          commissionTerms: p.commissionTerms || '',
         });
         setExistingMeta({
           street: p.street,
@@ -845,6 +867,14 @@ export default function NewProperty() {
       : null,
     sellerSeriousness: form.sellerSeriousness || 'NONE',
     brokerNotes: form.brokerNotes || '',
+    // 2026-04-26 — PR2 form additions.
+    unitNumber: form.unitNumber || null,
+    enSuiteToilet: !!form.enSuiteToilet,
+    residentsRoom: !!form.residentsRoom,
+    bicycleRoom: !!form.bicycleRoom,
+    managementCompany: form.managementCompany || null,
+    tenantSideOnly: !!form.tenantSideOnly,
+    commissionTerms: form.commissionTerms || null,
   });
   const buildFullEditBody = () => ({ ...buildStep1Body(), ...buildStep2Body() });
 
@@ -1217,14 +1247,42 @@ export default function NewProperty() {
                   inputProps={{ ...inputPropsForCity(), required: true }}
                 />
               </div>
+              {/* Step 1 area block: residential keeps the single
+                  sqm input; commercial splits to gross/net + auto-
+                  computed ratio so the agent doesn't have to do the
+                  math, and so /properties/new reflects how brokers
+                  actually price commercial space. We keep `sqm`
+                  populated from sqmGross || sqmNet so server validation
+                  (`if (!form.sqm) throw 'חסר שטח'`) still passes. */}
+              {!isCommercial ? (
+                <div className="form-group">
+                  <label className="form-label">שטח (מ״ר)</label>
+                  <NumberField
+                    unit="מ״ר"
+                    placeholder="120"
+                    value={form.sqm}
+                    onChange={(v) => update('sqm', v)}
+                    required
+                  />
+                </div>
+              ) : (
+                <CommercialAreaBlock form={form} setForm={setForm} />
+              )}
+            </div>
+            <div className="form-row">
               <div className="form-group">
-                <label className="form-label">שטח (מ״ר)</label>
-                <NumberField
-                  unit="מ״ר"
-                  placeholder="120"
-                  value={form.sqm}
-                  onChange={(v) => update('sqm', v)}
-                  required
+                <label className="form-label">
+                  {isCommercial ? "מס' יחידה" : "מס' דירה"}
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={form.unitNumber}
+                  onChange={(e) => update('unitNumber', e.target.value)}
+                  placeholder={isCommercial ? '12B' : '4'}
+                  enterKeyHint="next"
+                  autoComplete="off"
+                  inputMode="text"
                 />
               </div>
             </div>
@@ -1325,6 +1383,20 @@ export default function NewProperty() {
         </form>
       ) : (
         <form id="np-form-step2" onSubmit={saveStep2} className="intake-form animate-in animate-in-delay-2" style={NP_STY.stepBody}>
+          {isEdit && (
+            <AiEditPanel
+              propertyId={propertyId}
+              onApplied={(summary) => {
+                if (summary) toast.success(`AI: ${summary}`);
+                // Reload from server so the existing useEffect-driven
+                // edit-load path repopulates the form with the patched
+                // values. Cheaper than threading a shape-mapper through
+                // both the create response and the AI-edit response.
+                window.location.reload();
+              }}
+              toast={toast}
+            />
+          )}
           <div className="form-section">
             <h3 className="form-section-title">מאפיינים</h3>
             <div className="form-row form-row-4">
@@ -1464,7 +1536,7 @@ export default function NewProperty() {
                       value={form.buildState}
                       onChange={(v) => update('buildState', v)}
                       placeholder="בחר…"
-                      options={['מעטפת', 'גמר']}
+                      options={['מעטפת', 'גמר מלא', 'מרוהט']}
                     />
                   </div>
                 </div>
@@ -1517,6 +1589,7 @@ export default function NewProperty() {
                       { key: 'kitchenette',   label: 'מטבחון' },
                       { key: 'meetingRoom',   label: 'חדר ישיבות' },
                       { key: 'lobbySecurity', label: 'עמדת שמירה בלובי' },
+                      { key: 'enSuiteToilet', label: 'שירותים צמודים' },
                       { key: 'nearbyParking', label: 'חניה זמינה בסביבה' },
                     ]
                   : [{ key: 'safeRoom', label: 'ממ״ד' }]),
@@ -1685,6 +1758,20 @@ export default function NewProperty() {
                 <NumberField unit="₪" placeholder="220" value={form.buildingCommittee} onChange={(v) => update('buildingCommittee', v)} />
               </div>
             </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">חברת ניהול</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={form.managementCompany}
+                  onChange={(e) => update('managementCompany', e.target.value)}
+                  placeholder="חברת ניהול בעמ"
+                  enterKeyHint="next"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
           </div>
 
           {/* ── Nadlan parity extras (was labelled J4–J7 — internal
@@ -1781,6 +1868,8 @@ export default function NewProperty() {
                 { key: 'pool',            label: 'בריכת שחייה' },
                 { key: 'gatedCommunity',  label: 'קהילה סגורה' },
                 { key: 'accessibility',   label: 'נגישות לנכים' },
+                { key: 'residentsRoom',   label: 'חדר דיירים' },
+                { key: 'bicycleRoom',     label: 'חדר אופניים' },
               ].map(({ key, label }) => (
                 <label key={key} className="checkbox-item">
                   <input
@@ -1810,6 +1899,39 @@ export default function NewProperty() {
               onChange={update}
               toast={toast}
             />
+            {/* 2026-04-26 — Rental-brokerage commission shape. The
+                pct field above stays for sale + percentage flows;
+                this select/input pair captures the common rental
+                arrangements ("חודש + מע״מ", "חודשיים", "אחר…") plus
+                the case where the landlord pays nothing and only the
+                tenant covers the broker. */}
+            <div className="form-row form-row-2">
+              <div className="form-group">
+                <label className="form-label">תנאי עמלה</label>
+                <SelectField
+                  value={form.commissionTerms}
+                  onChange={(v) => update('commissionTerms', v)}
+                  placeholder="בחר…"
+                  options={[
+                    'חודש + מע״מ',
+                    'חודשיים + מע״מ',
+                    'אחוז קבוע',
+                    'אחר',
+                  ]}
+                />
+              </div>
+              <div className="form-group" style={{ alignSelf: 'end' }}>
+                <label className="checkbox-item" style={{ marginBottom: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!form.tenantSideOnly}
+                    onChange={(e) => update('tenantSideOnly', e.target.checked)}
+                  />
+                  <span className="checkbox-custom" />
+                  צד שוכר בלבד (בעל הנכס לא משלם)
+                </label>
+              </div>
+            </div>
           </div>
 
           <div className="form-section">
@@ -2051,6 +2173,115 @@ function ExclusivityAgreementUpload({ propertyId, initialUrl, onChange, toast })
         onChange={onPick}
       />
     </div>
+  );
+}
+
+// AI-edit panel — free-form Hebrew instruction → backend extracts a
+// partial patch via Haiku. Surfaces only on edit mode (NewProperty
+// renders this conditionally on isEdit). On success the parent reloads
+// the page so the existing edit-load path repopulates fields from prod.
+function AiEditPanel({ propertyId, onApplied, toast }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    const t = text.trim();
+    if (!t || busy || !propertyId) return;
+    setBusy(true);
+    try {
+      const res = await api.aiEditProperty(propertyId, t);
+      onApplied(res.summary);
+      setText('');
+    } catch (e) {
+      toast?.error?.(e?.message || 'AI לא הצליח לעדכן');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="form-section" style={{ borderColor: '#d9b774', background: 'linear-gradient(160deg, #fbf7f0, #fff)' }}>
+      <h3 className="form-section-title">
+        <Sparkles size={14} style={{ verticalAlign: 'middle', marginLeft: 6, color: '#b48b4c' }} />
+        עריכה עם AI
+      </h3>
+      <p style={{ fontSize: 13, color: '#6b6356', margin: '0 0 10px' }}>
+        תארו בעברית מה לשנות — לדוגמה: "תשנה את המחיר ל-2.3 מיליון ותסמן שיש מעלית שבת".
+        ה-AI יעדכן רק את השדות שביקשתם.
+      </p>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <textarea
+          className="form-input"
+          rows={2}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="תשנה את ה…"
+          dir="auto"
+          enterKeyHint="send"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+          }}
+          style={{ flex: 1, resize: 'vertical' }}
+        />
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={submit}
+          disabled={busy || !text.trim()}
+          style={{ alignSelf: 'flex-end', minWidth: 96 }}
+        >
+          {busy ? '…' : 'בצע עדכון'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Commercial area block — gross/net + auto-computed ratio (net/gross %).
+// Mirrors the residential single-`sqm` input but splits to two values
+// (commercial brokers always price both); keeps `sqm` synced from
+// sqmGross || sqmNet so the rest of the codebase (validation, search,
+// matching) still has a single canonical area to work with.
+function CommercialAreaBlock({ form, setForm }) {
+  const ratio = (form.sqmNet && form.sqmGross)
+    ? Math.round((Number(form.sqmNet) / Number(form.sqmGross)) * 100)
+    : null;
+  const setSqmGross = (v) => {
+    setForm((p) => ({
+      ...p,
+      sqmGross: v,
+      sqm: v != null && v !== '' ? Number(v) : (p.sqmNet ?? p.sqm ?? null),
+    }));
+  };
+  const setSqmNet = (v) => {
+    setForm((p) => ({
+      ...p,
+      sqmNet: v,
+      sqm: p.sqmGross != null && p.sqmGross !== ''
+        ? Number(p.sqmGross)
+        : (v != null && v !== '' ? Number(v) : (p.sqm ?? null)),
+    }));
+  };
+  return (
+    <>
+      <div className="form-group">
+        <label className="form-label">שטח ברוטו (מ״ר)</label>
+        <NumberField unit="מ״ר" placeholder="220" value={form.sqmGross} onChange={setSqmGross} required />
+      </div>
+      <div className="form-group">
+        <label className="form-label">שטח נטו (מ״ר)</label>
+        <NumberField unit="מ״ר" placeholder="180" value={form.sqmNet} onChange={setSqmNet} />
+      </div>
+      <div className="form-group">
+        <label className="form-label">יחס נטו/ברוטו</label>
+        <input
+          type="text"
+          className="form-input"
+          value={ratio != null ? `${ratio}%` : '—'}
+          readOnly
+          tabIndex={-1}
+          style={{ background: '#fbf7f0', color: '#6b6356', cursor: 'default' }}
+        />
+      </div>
+    </>
   );
 }
 

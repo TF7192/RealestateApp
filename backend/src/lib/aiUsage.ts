@@ -25,7 +25,9 @@ export type AiFeature =
   | 'voice-ingest'
   | 'meeting-brief'
   | 'offer-review'
-  | 'ai-match';
+  | 'ai-match'
+  | 'property-ai-edit'
+  | 'lead-ai-edit';
 
 interface AnthropicUsageLike {
   input_tokens?: number;

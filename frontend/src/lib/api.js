@@ -252,6 +252,9 @@ export const api = {
   getProperty: (id) => request(`/properties/${id}`),
   createProperty: (body) => request('/properties', { method: 'POST', body }),
   updateProperty: (id, body) => request(`/properties/${id}`, { method: 'PATCH', body }),
+  // 2026-04-26 — Free-form Hebrew instruction → AI-extracted partial patch.
+  aiEditProperty: (id, instruction) =>
+    request(`/properties/${id}/ai-edit`, { method: 'POST', body: { instruction } }),
   deleteProperty: (id) => request(`/properties/${id}`, { method: 'DELETE' }),
   // 5.1 — Clones a property into a fresh draft. Backend tags the new
   // row's notes with "(עותק)" and does NOT carry over marketing/viewings.
@@ -374,6 +377,8 @@ export const api = {
   getLead: (id) => request(`/leads/${id}`),
   createLead: (body) => request('/leads', { method: 'POST', body }),
   updateLead: (id, body) => request(`/leads/${id}`, { method: 'PATCH', body }),
+  aiEditLead: (id, instruction) =>
+    request(`/leads/${id}/ai-edit`, { method: 'POST', body: { instruction } }),
   deleteLead: (id) => request(`/leads/${id}`, { method: 'DELETE' }),
 
   listDeals: (params = {}) => {
