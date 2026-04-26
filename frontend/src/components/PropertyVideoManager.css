@@ -96,7 +96,8 @@
   text-align: center;
 }
 
-.pvm-dropzone:hover {
+.pvm-dropzone:hover,
+.pvm-dropzone.is-over {
   border-color: var(--gold-border);
   background: var(--gold-glow);
 }

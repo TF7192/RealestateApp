@@ -1532,6 +1532,92 @@ export default function NewProperty() {
             </div>
           </div>
 
+          {/* Conditional detail sections — collocated with the checkbox-
+              grid above so ticking חניה / מחסן / מעלית surfaces the
+              detail fields immediately below, instead of ~200px down
+              past unrelated content (which read as "no field opened"). */}
+          {form.elevator && (
+            <div className="form-section">
+              <h3 className="form-section-title">פרטי מעלית</h3>
+              <div className="form-row form-row-2">
+                <div className="form-group">
+                  <label className="form-label">כמה מעליות</label>
+                  <NumberField placeholder="1" min={1} max={12} value={form.elevatorCount} onChange={(v) => update('elevatorCount', v)} />
+                </div>
+                <div className="form-group" style={{ alignSelf: 'end' }}>
+                  <label className="checkbox-item" style={{ marginBottom: 0 }}>
+                    <input type="checkbox" checked={form.shabbatElevator} onChange={(e) => update('shabbatElevator', e.target.checked)} />
+                    <span className="checkbox-custom" />
+                    מעלית שבת
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {form.parking && (
+            <div className="form-section">
+              <h3 className="form-section-title">פרטי חניה</h3>
+              <div className="form-row form-row-3">
+                <div className="form-group">
+                  <label className="form-label">סוג</label>
+                  <SelectField
+                    value={form.parkingType}
+                    onChange={(v) => update('parkingType', v)}
+                    placeholder="בחר…"
+                    options={[
+                      { value: 'tabu',    label: 'חניה בטאבו' },
+                      { value: 'private', label: 'חניית דיירים פרטית' },
+                      { value: 'nearby',  label: 'חניה בקרבת הנכס' },
+                    ]}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">כמות</label>
+                  <NumberField placeholder="1" min={0} max={20} value={form.parkingCount} onChange={(v) => update('parkingCount', v)} />
+                </div>
+              </div>
+              <div className="checkbox-grid">
+                {[
+                  { key: 'parkingCovered',   label: 'מקורה' },
+                  { key: 'parkingCoupled',   label: 'צמודה' },
+                  { key: 'parkingTandem',    label: 'עוקבת' },
+                  { key: 'parkingEvCharger', label: 'עמדת הטענה לרכב חשמלי' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="checkbox-item">
+                    <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />
+                    <span className="checkbox-custom" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {form.storage && (
+            <div className="form-section">
+              <h3 className="form-section-title">פרטי מחסן</h3>
+              <div className="form-row form-row-2">
+                <div className="form-group">
+                  <label className="form-label">מיקום</label>
+                  <SelectField
+                    value={form.storageLocation}
+                    onChange={(v) => update('storageLocation', v)}
+                    placeholder="בחר…"
+                    options={[
+                      { value: 'attached', label: 'צמוד לנכס' },
+                      { value: 'basement', label: 'במרתף' },
+                    ]}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">גודל</label>
+                  <NumberField unit="מ״ר" placeholder="4" min={0} max={200} value={form.storageSize} onChange={(v) => update('storageSize', v)} />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── אזור ורישום ─────────────────────────────────────────── */}
           <div className="form-section">
             <h3 className="form-section-title">אזור ורישום</h3>
@@ -1600,66 +1686,6 @@ export default function NewProperty() {
               </div>
             </div>
           </div>
-
-          {/* ── מעלית מפורט ─────────────────────────────────────────── */}
-          {form.elevator && (
-            <div className="form-section">
-              <h3 className="form-section-title">פרטי מעלית</h3>
-              <div className="form-row form-row-2">
-                <div className="form-group">
-                  <label className="form-label">כמה מעליות</label>
-                  <NumberField placeholder="1" min={1} max={12} value={form.elevatorCount} onChange={(v) => update('elevatorCount', v)} />
-                </div>
-                <div className="form-group" style={{ alignSelf: 'end' }}>
-                  <label className="checkbox-item" style={{ marginBottom: 0 }}>
-                    <input type="checkbox" checked={form.shabbatElevator} onChange={(e) => update('shabbatElevator', e.target.checked)} />
-                    <span className="checkbox-custom" />
-                    מעלית שבת
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── חניה מפורט ─────────────────────────────────────────── */}
-          {form.parking && (
-            <div className="form-section">
-              <h3 className="form-section-title">פרטי חניה</h3>
-              <div className="form-row form-row-3">
-                <div className="form-group">
-                  <label className="form-label">סוג</label>
-                  <SelectField
-                    value={form.parkingType}
-                    onChange={(v) => update('parkingType', v)}
-                    placeholder="בחר…"
-                    options={[
-                      { value: 'tabu',    label: 'חניה בטאבו' },
-                      { value: 'private', label: 'חניית דיירים פרטית' },
-                      { value: 'nearby',  label: 'חניה בקרבת הנכס' },
-                    ]}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">כמות</label>
-                  <NumberField placeholder="1" min={0} max={20} value={form.parkingCount} onChange={(v) => update('parkingCount', v)} />
-                </div>
-              </div>
-              <div className="checkbox-grid">
-                {[
-                  { key: 'parkingCovered',   label: 'מקורה' },
-                  { key: 'parkingCoupled',   label: 'צמודה' },
-                  { key: 'parkingTandem',    label: 'עוקבת' },
-                  { key: 'parkingEvCharger', label: 'עמדת הטענה לרכב חשמלי' },
-                ].map(({ key, label }) => (
-                  <label key={key} className="checkbox-item">
-                    <input type="checkbox" checked={form[key]} onChange={(e) => update(key, e.target.checked)} />
-                    <span className="checkbox-custom" />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* ── Nadlan parity extras (was labelled J4–J7 — internal
                 codes leaked to the UI; stripped per P-10. Also P-11:
@@ -1754,7 +1780,7 @@ export default function NewProperty() {
                 { key: 'gym',             label: 'חדר כושר בבניין' },
                 { key: 'pool',            label: 'בריכת שחייה' },
                 { key: 'gatedCommunity',  label: 'קהילה סגורה' },
-                { key: 'accessibility',   label: 'נגישות לנכי' },
+                { key: 'accessibility',   label: 'נגישות לנכים' },
               ].map(({ key, label }) => (
                 <label key={key} className="checkbox-item">
                   <input
@@ -1785,31 +1811,6 @@ export default function NewProperty() {
               toast={toast}
             />
           </div>
-
-          {/* ── מחסן מפורט ─────────────────────────────────────────── */}
-          {form.storage && (
-            <div className="form-section">
-              <h3 className="form-section-title">פרטי מחסן</h3>
-              <div className="form-row form-row-2">
-                <div className="form-group">
-                  <label className="form-label">מיקום</label>
-                  <SelectField
-                    value={form.storageLocation}
-                    onChange={(v) => update('storageLocation', v)}
-                    placeholder="בחר…"
-                    options={[
-                      { value: 'attached', label: 'צמוד לנכס' },
-                      { value: 'basement', label: 'במרתף' },
-                    ]}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">גודל</label>
-                  <NumberField unit="מ״ר" placeholder="4" min={0} max={200} value={form.storageSize} onChange={(v) => update('storageSize', v)} />
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="form-section">
             <h3 className="form-section-title">בלעדיות והערות</h3>

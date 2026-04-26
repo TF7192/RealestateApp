@@ -11,6 +11,7 @@ export default function PropertyVideoManager({ propertyId, initial = [], onClose
   const [progress, setProgress] = useState(null);
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
+  const [dragOver, setDragOver] = useState(false);
   const fileInput = useRef(null);
 
   useEffect(() => {
@@ -23,6 +24,25 @@ export default function PropertyVideoManager({ propertyId, initial = [], onClose
       setVideos(r.videos || []);
       onChange?.(r.videos || []);
     } catch { /* ignore */ }
+  };
+
+  // Desktop drag-drop. Mirrors PropertyPhotoManager's dropzone — accept the
+  // first video file found, ignore everything else (drag of HTML link
+  // shortcuts from web previews surface here as type "" / no .files entry,
+  // which we just no-op on).
+  const onZoneDragOver = (e) => { e.preventDefault(); setDragOver(true); };
+  const onZoneDragLeave = () => setDragOver(false);
+  const onZoneDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = e.dataTransfer?.files;
+    if (!files || !files.length) return;
+    const file = Array.from(files).find((f) => f.type.startsWith('video/'));
+    if (!file) {
+      setErr('הגרירה לא הכילה קובץ וידאו תקני (לרוב זה מצביע על קיצור דף אינטרנט ולא על הקובץ עצמו)');
+      return;
+    }
+    handleUpload(file);
   };
 
   const handleUpload = async (file) => {
@@ -99,14 +119,17 @@ export default function PropertyVideoManager({ propertyId, initial = [], onClose
             <section className="pvm-section">
               <h4>העלאת סרטון מהמכשיר</h4>
               <div
-                className="pvm-dropzone"
+                className={`pvm-dropzone ${dragOver ? 'is-over' : ''}`}
                 onClick={() => fileInput.current?.click()}
+                onDragOver={onZoneDragOver}
+                onDragLeave={onZoneDragLeave}
+                onDrop={onZoneDrop}
               >
                 <div className="pvm-dz-icon">
                   {progress == null ? <Upload size={24} /> : <Film size={24} />}
                 </div>
                 <strong>
-                  {progress == null ? 'לחץ לבחירת סרטון' : `מעלה… ${progress}%`}
+                  {progress == null ? 'גררו סרטון לכאן או לחצו לבחירה' : `מעלה… ${progress}%`}
                 </strong>
                 <span>MP4 / MOV · עד 100MB</span>
                 {progress != null && (
