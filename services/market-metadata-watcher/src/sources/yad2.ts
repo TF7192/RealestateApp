@@ -149,7 +149,15 @@ async function fetchOnePage(
     // when the renderer is swapping pages; page.content() snapshots the
     // current document and returns. The backend's yad2-crawler.ts
     // (which crawls successfully today) uses this exact pattern.
-    const html = await page.content();
+    //
+    // page.content() can still race against Yad2's client-side router
+    // (Next.js prefetch swap mid-render). Tolerate the first throw,
+    // wait briefly for the load state to settle, then retry once.
+    let html = await page.content().catch(() => null);
+    if (html == null) {
+      await page.waitForLoadState('domcontentloaded', { timeout: 5_000 }).catch(() => {});
+      html = await page.content().catch(() => '');
+    }
     const blockMarkers = /__uzdbm_\d|validate\.perfdrive\.com|shieldsquare|x-rbz-/i.test(html);
     const m = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/);
     if (!m) {
