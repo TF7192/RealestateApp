@@ -390,9 +390,17 @@ function AppRoutes() {
             <Route path="/templates" element={<Templates />} />
             {/* Market Discovery — hourly Yad2 watcher feed. */}
             <Route path="/market-discovery" element={<MarketDiscovery />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/admin/chats" element={<AdminChats />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
+            {/* SEC-2026-04-27 — explicit role guard at the router
+                level. Admin.jsx itself didn't self-guard (AdminChats /
+                AdminUsers do), so any signed-in agent who navigated to
+                /admin saw the admin shell. The shell rendered with
+                empty data because the backend endpoints reject non-
+                admins, but the URL was still reachable. Redirect to
+                /dashboard so the affordance is consistent across all
+                three admin routes. */}
+            <Route path="/admin" element={user?.role === 'ADMIN' ? <Admin /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/admin/chats" element={user?.role === 'ADMIN' ? <AdminChats /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/admin/users" element={user?.role === 'ADMIN' ? <AdminUsers /> : <Navigate to="/dashboard" replace />} />
             <Route path="/calculator" element={<SellerCalculator />} />
             <Route path="/integrations/yad2" element={<Yad2Import />} />
             <Route path="/import" element={<ImportPicker />} />
