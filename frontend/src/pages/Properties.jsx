@@ -1484,18 +1484,21 @@ export default function Properties() {
                     <div className="property-price-overlay">
                       {formatPrice(prop.marketingPrice)}
                     </div>
-                    {/* Cover-image identity pill — sits next to the
-                        share button at the bottom-start corner of the
-                        photo (logical-end of the share button). Was
-                        top-start before but overlapped the asset-class
-                        / category badges; bottom-start has free real
-                        estate where only the share chip lives. */}
+                    {/* Cover-image identity pill — sits literally next
+                        to the share button at the photo's bottom-left
+                        corner. The share button is positioned with
+                        physical `left: 10px` (Properties.css:529) and
+                        is 34px wide, so the pill starts at left:50px
+                        — leaving a ~6px visual gap. Using physical
+                        `left` (not insetInlineStart) so it tracks the
+                        share button regardless of RTL/LTR; the pill's
+                        own text content is naturally Hebrew. */}
                     {(prop.unitNumber || prop.owner) ? (
                       <div
                         style={{
                           position: 'absolute',
-                          bottom: 12,
-                          insetInlineStart: 56,
+                          bottom: 13,
+                          left: 50,
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 4,
@@ -1506,11 +1509,12 @@ export default function Properties() {
                           color: '#fff',
                           fontSize: 11.5,
                           fontWeight: 600,
-                          maxWidth: 'calc(100% - 64px - 110px)',
+                          maxWidth: 'calc(100% - 60px - 120px)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
                           pointerEvents: 'none',
+                          zIndex: 3,
                         }}
                       >
                         {prop.unitNumber
