@@ -130,6 +130,7 @@ async function fetchOnePage(
 }
 
 export type DiscoveryStats = { fetched: number; itemsSeen: number };
+export type PageContext = { region: string; kind: ExtractKind; page: number };
 
 /**
  * Discover new Yad2 listings across all configured regions × kinds.
@@ -137,19 +138,26 @@ export type DiscoveryStats = { fetched: number; itemsSeen: number };
  * `knownTokens` is the set of `externalListingId`s already in our DB
  * for source='yad2'. Used for the early-exit rule: stop walking pages
  * for a (region, kind) when every item on the current page is already
- * known. Page 1 in a quiet hour finds zero new tokens → bails
- * immediately, costing 1 page fetch.
+ * known.
  *
- * Returns flat list of new listings to upsert. The caller (tick.ts)
- * runs the upsert + match-evaluation loop.
+ * `onPage` (NEW, optional): called after every page is extracted with
+ * the page's NOVEL items (already filtered against knownTokens) and
+ * the region/kind/page-number context. Use this to stream-commit rows
+ * to the DB as they arrive — if the watcher container is killed (SIGTERM
+ * during a deploy) or hits a Playwright timeout halfway through, every
+ * page committed BEFORE the failure is preserved.
+ *
+ * Errors thrown from `onPage` propagate up and abort the run for that
+ * (region, kind) — the loop continues with the next region.
  */
 export async function discoverYad2(opts: {
   regions: readonly string[];
   knownTokens: Set<string>;
   hardCeiling: number;
   log: Logger;
+  onPage?: (items: HashableListing[], ctx: PageContext) => Promise<void>;
 }): Promise<{ items: HashableListing[]; stats: DiscoveryStats }> {
-  const { regions, knownTokens, hardCeiling, log } = opts;
+  const { regions, knownTokens, hardCeiling, log, onPage } = opts;
   const allItems: HashableListing[] = [];
   const stats: DiscoveryStats = { fetched: 0, itemsSeen: 0 };
 
@@ -170,55 +178,81 @@ export async function discoverYad2(opts: {
       for (const kind of KINDS) {
         let page = 1;
         let novelInRegionKind = 0;
-        while (page <= MAX_PAGES_PER_REGION) {
-          const sep = page === 1 ? '' : `?page=${page}`;
-          const url = `https://www.yad2.co.il/realestate/${kind}/${region}${sep}`;
-          log.info({ region, kind, page, url }, 'yad2.fetching');
+        // Wrap the inner page-walk in try/catch so one bad
+        // (region, kind) doesn't kill the whole tick — Yad2 sometimes
+        // hits Reblaze timeouts on a single region while every other
+        // region serves cleanly.
+        try {
+          while (page <= MAX_PAGES_PER_REGION) {
+            const sep = page === 1 ? '' : `?page=${page}`;
+            const url = `https://www.yad2.co.il/realestate/${kind}/${region}${sep}`;
+            log.info({ region, kind, page, url }, 'yad2.fetching');
 
-          const pageProps = await fetchOnePage(ctx, url, log);
-          stats.fetched++;
-          if (!pageProps) break;
+            const pageProps = await fetchOnePage(ctx, url, log);
+            stats.fetched++;
+            if (!pageProps) break;
 
-          const items = extractFeedFromPageProps(pageProps, kind);
-          stats.itemsSeen += items.length;
+            const items = extractFeedFromPageProps(pageProps, kind);
+            stats.itemsSeen += items.length;
 
-          let novelOnThisPage = 0;
-          for (const it of items) {
-            if (!knownTokens.has(it.externalListingId)) {
-              allItems.push(it);
-              novelOnThisPage++;
-              // Mark as in-flight known so duplicate tokens within the
-              // same run (e.g. boosted listings appearing in both
-              // private and agency buckets) only get added once.
-              knownTokens.add(it.externalListingId);
+            const novel: HashableListing[] = [];
+            for (const it of items) {
+              if (!knownTokens.has(it.externalListingId)) {
+                novel.push(it);
+                allItems.push(it);
+                // Mark as in-flight known so duplicate tokens within
+                // the same run (boosted listings, cross-bucket repeats)
+                // only get added once.
+                knownTokens.add(it.externalListingId);
+              }
             }
+
+            log.info(
+              { region, kind, page, itemsOnPage: items.length, novelOnThisPage: novel.length },
+              'yad2.page-result',
+            );
+
+            // Stream-commit BEFORE the early-exit check so even a
+            // single-page region writes its rows before we move on.
+            // Errors here bubble out of the `try` and skip the rest
+            // of this region's pages — partial progress is preserved
+            // because earlier pages already committed.
+            if (onPage && novel.length > 0) {
+              await onPage(novel, { region, kind, page });
+            }
+
+            if (allItems.length >= hardCeiling) {
+              log.warn(
+                { allItemsLength: allItems.length, hardCeiling },
+                'yad2.hard-ceiling-hit',
+              );
+              return { items: allItems, stats };
+            }
+
+            novelInRegionKind += novel.length;
+
+            // Early exit: if EVERY item on this page was already known,
+            // we've caught up to last run for this (region, kind).
+            if (items.length > 0 && novel.length === 0) break;
+            if (items.length === 0) break;
+
+            page++;
+            await new Promise((r) => setTimeout(r, POLITE_GAP_MS));
           }
-
-          log.info(
-            { region, kind, page, itemsOnPage: items.length, novelOnThisPage },
-            'yad2.page-result',
-          );
-
-          if (allItems.length >= hardCeiling) {
-            log.warn({ allItemsLength: allItems.length, hardCeiling }, 'yad2.hard-ceiling-hit');
-            return { items: allItems, stats };
+          if (novelInRegionKind >= HIGH_VOLUME_PER_REGION_KIND) {
+            log.warn(
+              { region, kind, novelInRegionKind },
+              'yad2.high-volume-per-region-kind',
+            );
           }
-
-          novelInRegionKind += novelOnThisPage;
-
-          // Early exit: if EVERY item on this page was already known,
-          // we've caught up to last run for this (region, kind).
-          if (items.length > 0 && novelOnThisPage === 0) break;
-          // No items at all = end of feed for this region.
-          if (items.length === 0) break;
-
-          page++;
-          await new Promise((r) => setTimeout(r, POLITE_GAP_MS));
-        }
-        if (novelInRegionKind >= HIGH_VOLUME_PER_REGION_KIND) {
+        } catch (err) {
+          // Per-region error isolation. Most common cause is
+          // Playwright's `page.waitForFunction` 30s timeout when
+          // Reblaze escalates to a CAPTCHA on this specific region
+          // — the next region usually serves cleanly.
           log.warn(
-            { region, kind, novelInRegionKind },
-            'yad2.high-volume-per-region-kind',
+            { region, kind, err: String(err) },
+            'yad2.region-failed-continuing',
           );
         }
       }

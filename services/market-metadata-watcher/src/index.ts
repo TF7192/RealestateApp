@@ -50,11 +50,26 @@ async function main() {
 
   const stop = scheduleHourly(() => runWatcherTick({ prisma, logger }), log);
 
-  // Graceful shutdown — Docker sends SIGTERM on stop; finish the
-  // in-flight tick before exiting so we don't half-write a snapshot.
+  // Graceful shutdown — Docker sends SIGTERM 10s before SIGKILL on
+  // `compose down` / `up -d --recreate`. Mark every in-flight run row
+  // as `failed (interrupted)` so the admin observability page doesn't
+  // show ghosts. The streaming upsert (tick.ts) means every row
+  // already committed before SIGTERM is preserved — only the
+  // currently-running tick's RUN ROW gets finalized here, not the
+  // listings.
   const shutdown = async (signal: string) => {
     log('watcher.shutdown', { signal });
     stop();
+    try {
+      await prisma.marketWatcherRun.updateMany({
+        where: { status: 'running' },
+        data: {
+          status: 'failed',
+          finishedAt: new Date(),
+          errorMessage: `interrupted (${signal}) — graceful shutdown`,
+        },
+      });
+    } catch { /* ignore — DB may already be disconnected */ }
     await prisma.$disconnect();
     process.exit(0);
   };

@@ -31,7 +31,35 @@ import { discoverYad2 } from './sources/yad2.js';
 
 type Deps = { prisma: PrismaClient; logger: Logger };
 
+// Sweep up `running` rows that have been hanging since before this
+// process booted. They almost always indicate a previous container
+// got SIGTERM'd by a deploy mid-tick — the row never got finalized.
+// Running this on boot keeps the admin run-log honest and prevents
+// a 'running' row from blocking the "is anything in-flight?" check
+// elsewhere in the codebase.
+export async function reapStaleRuns(prisma: PrismaClient, logger: Logger) {
+  // 10-minute floor — generous enough that a real in-flight tick
+  // never gets clipped (a normal cold-start tick is ~3 minutes).
+  const cutoff = new Date(Date.now() - 10 * 60 * 1000);
+  const result = await prisma.marketWatcherRun.updateMany({
+    where: { status: 'running', startedAt: { lt: cutoff } },
+    data: {
+      status: 'failed',
+      finishedAt: new Date(),
+      errorMessage: 'interrupted (container restart) — reaped on next boot',
+    },
+  });
+  if (result.count > 0) {
+    logger.warn({ reaped: result.count }, 'tick.reaped-stale-runs');
+  }
+}
+
 export async function runWatcherTick({ prisma, logger }: Deps) {
+  // Self-heal previous interrupted runs so the admin observability
+  // page doesn't accumulate orphaned `running` rows. Idempotent +
+  // cheap (single indexed UPDATE).
+  await reapStaleRuns(prisma, logger);
+
   const run = await prisma.marketWatcherRun.create({
     data: { source: 'all', status: 'running' },
   });
@@ -59,8 +87,99 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
       log('tick.no-sources');
     }
 
+    // Per-item upsert helper. Reused for both initial-fetch and the
+    // per-page streaming path. Returns nothing — counters are bumped
+    // via the closure to keep the call sites tight.
+    const upsertOne = async (
+      item: HashableListing,
+      baseUrl: string,
+    ): Promise<void> => {
+      listingsSeen++;
+      const hash = metadataHash(item);
+      const existing = await prisma.marketListing.findUnique({
+        where: {
+          source_externalListingId: {
+            source: item.source,
+            externalListingId: item.externalListingId,
+          },
+        },
+      });
+      if (!existing) {
+        const created = await prisma.marketListing.create({
+          data: {
+            source: item.source,
+            externalListingId: item.externalListingId,
+            originalUrl: deriveUrl(baseUrl, item),
+            city: item.city,
+            neighborhood: item.neighborhood,
+            street: item.street,
+            propertyType: item.propertyType,
+            rooms: item.rooms,
+            sizeSqm: item.sizeSqm,
+            floor: item.floor,
+            price: item.price,
+            pricePerSqm: item.pricePerSqm,
+            status: item.status || 'active',
+            metadataHash: hash,
+            // reactedAt deliberately left NULL — backend reactor
+            // processes new rows on its 30s poll cadence.
+          },
+        });
+        listingsCreated++;
+        await prisma.marketListingSnapshot.create({
+          data: {
+            marketListingId: created.id,
+            price: created.price,
+            pricePerSqm: created.pricePerSqm,
+            status: created.status,
+            metadataHash: hash,
+          },
+        });
+        snapshotsCreated++;
+      } else {
+        const changed = existing.metadataHash !== hash;
+        await prisma.marketListing.update({
+          where: { id: existing.id },
+          data: {
+            lastSeenAt: new Date(),
+            ...(changed
+              ? {
+                  city: item.city,
+                  neighborhood: item.neighborhood,
+                  street: item.street,
+                  propertyType: item.propertyType,
+                  rooms: item.rooms,
+                  sizeSqm: item.sizeSqm,
+                  floor: item.floor,
+                  price: item.price,
+                  pricePerSqm: item.pricePerSqm,
+                  status: item.status || existing.status,
+                  metadataHash: hash,
+                  // Reset reactor cursor on metadata change so the
+                  // reactor re-evaluates against possibly-affected
+                  // profile thresholds (price drops, status flips).
+                  reactedAt: null,
+                }
+              : {}),
+          },
+        });
+        if (changed) {
+          listingsUpdated++;
+          await prisma.marketListingSnapshot.create({
+            data: {
+              marketListingId: existing.id,
+              price: item.price ?? null,
+              pricePerSqm: item.pricePerSqm ?? null,
+              status: item.status || existing.status,
+              metadataHash: hash,
+            },
+          });
+          snapshotsCreated++;
+        }
+      }
+    };
+
     for (const src of sources) {
-      let discovered: HashableListing[] = [];
       if (src.name === 'yad2') {
         const known = new Set<string>(
           (await prisma.marketListing.findMany({
@@ -68,115 +187,48 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
             select: { externalListingId: true },
           })).map((r) => r.externalListingId),
         );
+        // Streaming upsert — every page commits its rows BEFORE the
+        // next page is fetched. If discovery hits a Reblaze timeout
+        // halfway or the container is killed by a deploy, every
+        // already-committed page survives. Previously this loop
+        // collected every page in memory and committed at the end,
+        // which is why 8 production runs accumulated as 'running'
+        // with 0 listings — every run got interrupted before commit.
         const result = await discoverYad2({
           regions: config.discoveryRegions,
           knownTokens: known,
           hardCeiling: config.hardCeiling,
           log: logger,
+          onPage: async (novel, ctx) => {
+            for (const item of novel) {
+              try {
+                await upsertOne(item, src.baseUrl);
+              } catch (err) {
+                // Per-item error isolation — one malformed listing
+                // shouldn't kill the whole page. Log + continue.
+                logger.warn(
+                  { err: String(err), token: item.externalListingId, ...ctx },
+                  'tick.upsert-failed',
+                );
+              }
+            }
+            // Heartbeat the run row so the admin observability page
+            // shows progress mid-tick, not just at completion.
+            await prisma.marketWatcherRun.update({
+              where: { id: run.id },
+              data: { listingsSeen, listingsCreated, listingsUpdated, snapshotsCreated },
+            }).catch(() => { /* swallow — run row may already be closed */ });
+          },
         });
-        discovered = result.items;
         log('tick.source-fetched', {
           source: src.name,
-          count: discovered.length,
+          discovered: result.items.length,
           fetched: result.stats.fetched,
           itemsSeen: result.stats.itemsSeen,
         });
       } else {
-        // When a new source ships, dispatch it here. Fail open by
-        // logging — an unknown source shouldn't block other sources.
         log('tick.source-skipped-unknown', { source: src.name });
         continue;
-      }
-
-      for (const item of discovered.slice(0, config.hardCeiling)) {
-        listingsSeen++;
-        const hash = metadataHash(item);
-
-        const existing = await prisma.marketListing.findUnique({
-          where: {
-            source_externalListingId: {
-              source: item.source,
-              externalListingId: item.externalListingId,
-            },
-          },
-        });
-
-        if (!existing) {
-          const created = await prisma.marketListing.create({
-            data: {
-              source: item.source,
-              externalListingId: item.externalListingId,
-              originalUrl: deriveUrl(src.baseUrl, item),
-              city: item.city,
-              neighborhood: item.neighborhood,
-              street: item.street,
-              propertyType: item.propertyType,
-              rooms: item.rooms,
-              sizeSqm: item.sizeSqm,
-              floor: item.floor,
-              price: item.price,
-              pricePerSqm: item.pricePerSqm,
-              status: item.status || 'active',
-              metadataHash: hash,
-              // reactedAt deliberately left NULL — the backend's
-              // marketDiscoveryReactor worker picks it up on its
-              // next tick, scores it against active profiles, and
-              // creates Notification + delivery-queue rows.
-            },
-          });
-          listingsCreated++;
-          await prisma.marketListingSnapshot.create({
-            data: {
-              marketListingId: created.id,
-              price: created.price,
-              pricePerSqm: created.pricePerSqm,
-              status: created.status,
-              metadataHash: hash,
-            },
-          });
-          snapshotsCreated++;
-        } else {
-          const changed = existing.metadataHash !== hash;
-          await prisma.marketListing.update({
-            where: { id: existing.id },
-            data: {
-              lastSeenAt: new Date(),
-              ...(changed
-                ? {
-                    city: item.city,
-                    neighborhood: item.neighborhood,
-                    street: item.street,
-                    propertyType: item.propertyType,
-                    rooms: item.rooms,
-                    sizeSqm: item.sizeSqm,
-                    floor: item.floor,
-                    price: item.price,
-                    pricePerSqm: item.pricePerSqm,
-                    status: item.status || existing.status,
-                    metadataHash: hash,
-                    // Reset the reactor cursor when metadata changes
-                    // so the reactor re-evaluates the listing — the
-                    // new price/rooms/etc might cross a different
-                    // agent's threshold than the original did.
-                    reactedAt: null,
-                  }
-                : {}),
-            },
-          });
-          if (changed) {
-            listingsUpdated++;
-            await prisma.marketListingSnapshot.create({
-              data: {
-                marketListingId: existing.id,
-                price: item.price ?? null,
-                pricePerSqm: item.pricePerSqm ?? null,
-                status: item.status || existing.status,
-                metadataHash: hash,
-              },
-            });
-            snapshotsCreated++;
-          }
-        }
       }
     }
 
