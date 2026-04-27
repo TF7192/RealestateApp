@@ -661,6 +661,11 @@ model Property {
   // מע״מ", "2%", "5000 ש״ח", or anything else.
   landlordCommission String?
 
+  // 2026-04-27 — back-relation for the price-offers received on this
+  // listing. Hot/active offers + cold/declined ones; PropertyOffer
+  // owns the row.
+  priceOffers PropertyOffer[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -796,6 +801,48 @@ model PropertyImage {
   createdAt  DateTime @default(now())
 
   @@index([propertyId])
+}
+
+// 2026-04-27 — Price offers received on a property. Captures who
+// offered, how much, optional notes (financing, contingencies), the
+// status (NEW / NEGOTIATING / ACCEPTED / DECLINED / WITHDRAWN), and
+// when. Each row is a single offer event — chained offers from the
+// same buyer create separate rows so we keep the negotiation timeline
+// intact. Optionally links back to a Lead if the buyer is already in
+// the agent's CRM.
+model PropertyOffer {
+  id          String              @id @default(cuid())
+  propertyId  String
+  property    Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  // Optional CRM link — when null, the offer captures only the
+  // free-form name + phone fields below.
+  leadId      String?
+  lead        Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  buyerName   String
+  buyerPhone  String?
+  amount      Int
+  status      PropertyOfferStatus @default(NEW)
+  // Free-form notes — financing terms, contingencies, "מציע מותנה
+  // בקבלת משכנתא", etc. Hebrew-friendly.
+  notes       String?
+  // When the offer was received. Defaults to row creation but can be
+  // overridden when the agent is recording past offers.
+  receivedAt  DateTime            @default(now())
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([propertyId])
+  @@index([leadId])
+  @@index([status])
+  @@index([receivedAt])
+}
+
+enum PropertyOfferStatus {
+  NEW
+  NEGOTIATING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
 }
 
 model PropertyVideo {
@@ -953,6 +1000,10 @@ model Lead {
   dealsAsBuyer    Deal[]              @relation("DealBuyer")
   // Sprint 6 — in-house digital contracts tied to this lead.
   contracts       Contract[]
+  // 2026-04-27 — back-relation for PropertyOffer.lead. When a lead
+  // makes an offer on a listing the row is captured here too so the
+  // CRM can show "all offers from X" across properties.
+  priceOffers     PropertyOffer[]
 
   // Excel-import tag. Set on every Lead row created via the wizard so
   // an agent who realises the mapping was wrong can bulk-delete the

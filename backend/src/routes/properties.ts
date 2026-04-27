@@ -565,6 +565,97 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  // 2026-04-27 — Price offers received on a property. List, create,
+  // update status / amount / notes, delete. All operations are owner-
+  // scoped via the agentId on Property.
+  const offerInput = z.object({
+    leadId:     z.string().nullable().optional(),
+    buyerName:  z.string().min(1).max(120),
+    buyerPhone: z.string().max(40).nullable().optional(),
+    amount:     z.number().int().nonnegative(),
+    status:     z.enum(['NEW', 'NEGOTIATING', 'ACCEPTED', 'DECLINED', 'WITHDRAWN']).optional(),
+    notes:      z.string().max(2000).nullable().optional(),
+    receivedAt: z.string().datetime().nullable().optional(),
+  });
+
+  app.get('/:id/offers', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const owns = await prisma.property.findFirst({
+      where: { id, agentId: requireUser(req).id },
+      select: { id: true },
+    });
+    if (!owns) return reply.code(404).send({ error: { message: 'Not found' } });
+    const offers = await prisma.propertyOffer.findMany({
+      where: { propertyId: id },
+      orderBy: { receivedAt: 'desc' },
+    });
+    return { offers };
+  });
+
+  app.post('/:id/offers', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = offerInput.parse(req.body);
+    const owns = await prisma.property.findFirst({
+      where: { id, agentId: requireUser(req).id },
+      select: { id: true },
+    });
+    if (!owns) return reply.code(404).send({ error: { message: 'Not found' } });
+    if (body.leadId) {
+      const lead = await prisma.lead.findFirst({
+        where: { id: body.leadId, agentId: requireUser(req).id },
+        select: { id: true },
+      });
+      if (!lead) return reply.code(403).send({ error: { message: 'הליד אינו של המשתמש' } });
+    }
+    const created = await prisma.propertyOffer.create({
+      data: {
+        propertyId: id,
+        leadId:     body.leadId || null,
+        buyerName:  body.buyerName,
+        buyerPhone: body.buyerPhone || null,
+        amount:     body.amount,
+        status:     body.status || 'NEW',
+        notes:      body.notes || null,
+        receivedAt: body.receivedAt ? new Date(body.receivedAt) : new Date(),
+      },
+    });
+    await logActivity({
+      agentId: requireUser(req).id, actorId: requireUser(req).id,
+      verb: 'created', entityType: 'PropertyOffer', entityId: created.id,
+      summary: `התקבלה הצעה מ${created.buyerName}: ₪${created.amount.toLocaleString('he-IL')}`,
+      metadata: { propertyId: id, status: created.status, amount: created.amount },
+    });
+    return { offer: created };
+  });
+
+  app.patch('/:id/offers/:offerId', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id, offerId } = req.params as { id: string; offerId: string };
+    const body = offerInput.partial().parse(req.body);
+    const offer = await prisma.propertyOffer.findFirst({
+      where: { id: offerId, propertyId: id, property: { agentId: requireUser(req).id } },
+    });
+    if (!offer) return reply.code(404).send({ error: { message: 'Not found' } });
+    const updated = await prisma.propertyOffer.update({
+      where: { id: offerId },
+      data: {
+        ...body,
+        receivedAt: body.receivedAt ? new Date(body.receivedAt) : undefined,
+      },
+    });
+    return { offer: updated };
+  });
+
+  app.delete('/:id/offers/:offerId', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id, offerId } = req.params as { id: string; offerId: string };
+    const offer = await prisma.propertyOffer.findFirst({
+      where: { id: offerId, propertyId: id, property: { agentId: requireUser(req).id } },
+      select: { id: true },
+    });
+    if (!offer) return reply.code(404).send({ error: { message: 'Not found' } });
+    await prisma.propertyOffer.delete({ where: { id: offerId } });
+    return { ok: true };
+  });
+
   app.delete('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const existing = await prisma.property.findUnique({ where: { id } });

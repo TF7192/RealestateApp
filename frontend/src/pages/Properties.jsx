@@ -1308,6 +1308,11 @@ export default function Properties() {
                         <div className="pc-compact-meta">
                           <div className="pc-compact-title">
                             {prop.street}, {prop.city}
+                            {prop.unitNumber ? (
+                              <span style={{ color: '#b48b4c', fontWeight: 600, marginInlineStart: 4 }}>
+                                · {prop.assetClass === 'COMMERCIAL' ? 'יח׳' : 'דירה'} {prop.unitNumber}
+                              </span>
+                            ) : null}
                           </div>
                           <div className="pc-compact-price">
                             {formatPrice(prop.marketingPrice)}
@@ -1460,6 +1465,38 @@ export default function Properties() {
                     <div className="property-price-overlay">
                       {formatPrice(prop.marketingPrice)}
                     </div>
+                    {/* Cover-image identity pill — owner name (or unit
+                        number when present) overlaid on the photo so 6
+                        listings in the same building are tellable apart
+                        on a quick scroll without opening each card. */}
+                    {(prop.unitNumber || prop.owner) ? (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 8,
+                          insetInlineStart: 8,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '4px 8px',
+                          borderRadius: 999,
+                          background: 'rgba(13,15,20,0.78)',
+                          backdropFilter: 'blur(8px)',
+                          color: '#fff',
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          maxWidth: 'calc(100% - 16px)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        {prop.unitNumber
+                          ? `${prop.assetClass === 'COMMERCIAL' ? 'יח׳' : 'דירה'} ${prop.unitNumber}${prop.owner ? ` · ${prop.owner}` : ''}`
+                          : prop.owner}
+                      </div>
+                    ) : null}
                     {/* Share chip pinned to the bottom-left of the
                         image (inside .property-image so it anchors to
                         the photo, not the full card). preventDefault
@@ -1482,7 +1519,17 @@ export default function Properties() {
                   <div className="property-card-body">
                     <div className="property-address">
                       <MapPin size={14} />
-                      <span>{prop.street}, {prop.city}</span>
+                      {/* Unit number distinguishes 6 listings in the
+                          same building when otherwise the address line
+                          (street + city) is identical across rows. */}
+                      <span>
+                        {prop.street}, {prop.city}
+                        {prop.unitNumber ? (
+                          <span style={{ color: '#b48b4c', fontWeight: 600, marginInlineStart: 6 }}>
+                            · {prop.assetClass === 'COMMERCIAL' ? 'יחידה' : 'דירה'} {prop.unitNumber}
+                          </span>
+                        ) : null}
+                      </span>
                     </div>
                     <div className="property-specs">
                       {prop.rooms != null && (

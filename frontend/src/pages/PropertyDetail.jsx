@@ -36,6 +36,7 @@ import {
   Maximize2,
   Copy,
   Upload,
+  Banknote,
 } from 'lucide-react';
 import { popoutCurrentRoute } from '../lib/popout';
 import { printPage } from '../lib/print';
@@ -1916,6 +1917,10 @@ export default function PropertyDetail() {
           videos block. */}
       <PropertyDocuments propertyId={property.id} />
 
+      {/* Price offers received — separate timeline of offers from
+          interested buyers, each tagged with status + amount + notes. */}
+      <PropertyOffers propertyId={property.id} />
+
       {/* Videos preview if there are videos — shown below the grid */}
       {property.videos?.length > 0 && (
         <div className="pd-videos animate-in animate-in-delay-5">
@@ -2270,6 +2275,193 @@ function PropertyDocuments({ propertyId }) {
               >
                 <Trash2 size={14} />
               </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// Price offers received on a property. Lists offers in reverse-chrono
+// order, lets the agent add a new offer (buyer name + phone + amount +
+// optional notes), update status (NEW / NEGOTIATING / ACCEPTED /
+// DECLINED / WITHDRAWN), or delete a row. Used on PropertyDetail; the
+// CRM later surfaces accepted offers as the closing-price candidate.
+function PropertyOffers({ propertyId }) {
+  const [offers, setOffers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [draft, setDraft] = useState({ buyerName: '', buyerPhone: '', amount: '', notes: '' });
+  const [showAdd, setShowAdd] = useState(false);
+  const reload = useCallback(async () => {
+    try {
+      const r = await api.listPropertyOffers(propertyId);
+      setOffers(r.offers || []);
+    } catch (e) {
+      setErr(e?.message || 'שגיאת טעינה');
+    } finally {
+      setLoading(false);
+    }
+  }, [propertyId]);
+  useEffect(() => { reload(); }, [reload]);
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    if (busy) return;
+    if (!draft.buyerName.trim() || !draft.amount) {
+      setErr('שם המציע והסכום הם שדות חובה');
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.createPropertyOffer(propertyId, {
+        buyerName: draft.buyerName.trim(),
+        buyerPhone: draft.buyerPhone.trim() || null,
+        amount: Number(draft.amount),
+        notes: draft.notes.trim() || null,
+      });
+      setDraft({ buyerName: '', buyerPhone: '', amount: '', notes: '' });
+      setShowAdd(false);
+      await reload();
+    } catch (e2) {
+      setErr(e2?.message || 'הוספה נכשלה');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const setStatus = async (offerId, status) => {
+    try {
+      await api.updatePropertyOffer(propertyId, offerId, { status });
+      setOffers((cur) => cur.map((o) => (o.id === offerId ? { ...o, status } : o)));
+    } catch (e) {
+      setErr(e?.message || 'עדכון נכשל');
+    }
+  };
+  const remove = async (offerId) => {
+    setBusy(true);
+    try {
+      await api.deletePropertyOffer(propertyId, offerId);
+      setOffers((cur) => cur.filter((o) => o.id !== offerId));
+    } catch (e) {
+      setErr(e?.message || 'מחיקה נכשלה');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const STATUS_LABELS = {
+    NEW: 'חדשה', NEGOTIATING: 'במו״מ', ACCEPTED: 'התקבלה',
+    DECLINED: 'נדחתה', WITHDRAWN: 'בוטלה',
+  };
+  const STATUS_TONE = {
+    NEW: '#b48b4c', NEGOTIATING: '#3b82f6', ACCEPTED: '#15803d',
+    DECLINED: '#b91c1c', WITHDRAWN: '#6b6356',
+  };
+  return (
+    <div className="pd-offers animate-in animate-in-delay-5" style={{ marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Banknote size={16} /> הצעות מחיר ({offers.length})
+        </h4>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setShowAdd((s) => !s)}
+        >
+          <UserPlus size={13} />
+          {showAdd ? 'בטל' : 'הוסף הצעה'}
+        </button>
+      </div>
+      {showAdd && (
+        <form onSubmit={submit} style={{
+          background: '#fbf7f0', border: '1px solid rgba(180,139,76,0.3)',
+          borderRadius: 12, padding: 12, marginBottom: 10,
+          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
+        }}>
+          <input
+            type="text" placeholder="שם המציע *"
+            value={draft.buyerName}
+            onChange={(e) => setDraft({ ...draft, buyerName: e.target.value })}
+            className="form-input"
+          />
+          <input
+            type="tel" placeholder="טלפון (אופציונלי)" dir="ltr"
+            value={draft.buyerPhone}
+            onChange={(e) => setDraft({ ...draft, buyerPhone: e.target.value })}
+            className="form-input"
+          />
+          <input
+            type="number" placeholder="סכום הצעה (₪) *" min="0"
+            value={draft.amount}
+            onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+            className="form-input"
+            style={{ gridColumn: '1 / -1' }}
+          />
+          <textarea
+            placeholder="הערות — תנאי מימון, התנייה במשכנתא, וכו׳"
+            value={draft.notes}
+            onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+            className="form-input"
+            rows={2}
+            style={{ gridColumn: '1 / -1', resize: 'vertical' }}
+          />
+          <button type="submit" className="btn btn-primary" disabled={busy} style={{ gridColumn: '1 / -1' }}>
+            {busy ? 'שומר…' : 'שמור הצעה'}
+          </button>
+        </form>
+      )}
+      {err && <div style={{ color: '#b91c1c', fontSize: 13, marginBottom: 8 }}>{err}</div>}
+      {loading ? (
+        <div style={{ color: '#6b6356', fontSize: 13 }}>טוען…</div>
+      ) : offers.length === 0 ? (
+        <div style={{ color: '#6b6356', fontSize: 13 }}>אין הצעות מחיר רשומות לנכס זה.</div>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {offers.map((o) => (
+            <li key={o.id} style={{
+              background: '#fff', border: '1px solid rgba(30,26,20,0.08)',
+              borderRadius: 10, padding: 12,
+              display: 'flex', flexDirection: 'column', gap: 6,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <div>
+                  <strong style={{ fontSize: 15 }}>{o.buyerName}</strong>
+                  {o.buyerPhone && (
+                    <a href={`tel:${o.buyerPhone}`} style={{ color: '#6b6356', fontSize: 13, marginInlineStart: 8, textDecoration: 'none' }} dir="ltr">
+                      {o.buyerPhone}
+                    </a>
+                  )}
+                </div>
+                <strong style={{ fontSize: 17, color: STATUS_TONE[o.status] || '#1e1a14' }}>
+                  ₪{Number(o.amount).toLocaleString('he-IL')}
+                </strong>
+              </div>
+              {o.notes && <div style={{ color: '#6b6356', fontSize: 13 }}>{o.notes}</div>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <select
+                  value={o.status}
+                  onChange={(e) => setStatus(o.id, e.target.value)}
+                  className="form-input"
+                  style={{ width: 140, padding: '4px 8px', fontSize: 13 }}
+                >
+                  {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+                <span style={{ color: '#6b6356', fontSize: 12, marginInlineStart: 'auto' }}>
+                  {new Date(o.receivedAt).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => remove(o.id)}
+                  disabled={busy}
+                  aria-label="מחק"
+                  style={{ background: 'none', border: 0, color: '#b91c1c', cursor: 'pointer' }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </li>
           ))}
         </ul>

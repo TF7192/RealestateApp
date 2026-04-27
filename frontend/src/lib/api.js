@@ -255,6 +255,15 @@ export const api = {
   // 2026-04-26 — Free-form Hebrew instruction → AI-extracted partial patch.
   aiEditProperty: (id, instruction) =>
     request(`/properties/${id}/ai-edit`, { method: 'POST', body: { instruction } }),
+  // 2026-04-27 — Price offers received on a property.
+  listPropertyOffers: (id) =>
+    request(`/properties/${id}/offers`),
+  createPropertyOffer: (id, body) =>
+    request(`/properties/${id}/offers`, { method: 'POST', body }),
+  updatePropertyOffer: (id, offerId, body) =>
+    request(`/properties/${id}/offers/${offerId}`, { method: 'PATCH', body }),
+  deletePropertyOffer: (id, offerId) =>
+    request(`/properties/${id}/offers/${offerId}`, { method: 'DELETE' }),
   deleteProperty: (id) => request(`/properties/${id}`, { method: 'DELETE' }),
   // 5.1 — Clones a property into a fresh draft. Backend tags the new
   // row's notes with "(עותק)" and does NOT carry over marketing/viewings.
@@ -1046,16 +1055,19 @@ export const api = {
   },
   uploadDocument: (file, tags, opts = {}) => {
     const fd = new FormData();
-    fd.append('file', file);
+    // 2026-04-27 — IMPORTANT field order. @fastify/multipart's
+    // req.file() only exposes form fields that come BEFORE the file
+    // part on `mp.fields`; fields appended after the file are silently
+    // dropped. Earlier we appended propertyId last and the row saved
+    // with propertyId=null, so the per-asset documents list returned 0
+    // even after a successful upload. Append all non-file fields first.
+    if (opts.propertyId) fd.append('propertyId', String(opts.propertyId));
     const list = Array.isArray(tags) ? tags : tags ? [tags] : [];
     for (const t of list) {
       const v = String(t || '').trim();
       if (v) fd.append('tags', v);
     }
-    // 2026-04-27 — when scoped to a property, the backend stores the FK
-    // on UploadedFile so /documents?propertyId= can filter to the
-    // matching attachments on the property page.
-    if (opts.propertyId) fd.append('propertyId', String(opts.propertyId));
+    fd.append('file', file);
     return request('/documents', { method: 'POST', body: fd });
   },
   deleteDocument: (id) => request(`/documents/${id}`, { method: 'DELETE' }),
