@@ -84,7 +84,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
       };
     }
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       prisma.marketListing.findMany({
         where,
         orderBy: sortToOrderBy(f.sort) as any,
@@ -93,6 +93,60 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
       }),
       prisma.marketListing.count({ where }),
     ]);
+
+    // Phase 2 polish — match-first sort. For each listing in this
+    // page, check whether THIS agent has a non-dismissed
+    // MarketListingLeadMatch row. If yes, attach `topMatch` (the
+    // highest-scoring one) to the listing payload AND bubble matched
+    // listings to the top of the page. Tie-broken by the user's
+    // chosen sort (already applied at the DB level).
+    //
+    // Per-page (not catalog-wide) so pagination stays sane: page 1
+    // surfaces the agent's hottest matches; deeper pages still serve
+    // the chosen sort. With f.limit ≤ 100 the second query is cheap.
+    const userId = (req as any).user?.id as string;
+    const ids = rawItems.map((x) => x.id);
+    const myMatches = ids.length
+      ? await prisma.marketListingLeadMatch.findMany({
+          where: {
+            agentUserId: userId,
+            marketListingId: { in: ids },
+            status: { not: 'dismissed' },
+          },
+          orderBy: { score: 'desc' },
+          select: {
+            id: true, score: true, reasonsJson: true,
+            leadId: true, marketListingId: true,
+          },
+        })
+      : [];
+    const matchByListing = new Map<string, typeof myMatches[number]>();
+    for (const m of myMatches) {
+      // findMany returns score-desc, so the first occurrence per
+      // listing is the highest-scoring match for that agent.
+      if (!matchByListing.has(m.marketListingId)) {
+        matchByListing.set(m.marketListingId, m);
+      }
+    }
+    const items = rawItems.map((x) => ({
+      ...x,
+      topMatch: matchByListing.get(x.id)
+        ? {
+            id:        matchByListing.get(x.id)!.id,
+            score:     matchByListing.get(x.id)!.score,
+            reasons:   matchByListing.get(x.id)!.reasonsJson,
+            leadId:    matchByListing.get(x.id)!.leadId,
+          }
+        : null,
+    }));
+    // Stable in-memory sort: matched listings first (by score desc),
+    // then everything else in the DB-side order. Array.prototype.sort
+    // is stable in modern V8.
+    items.sort((a, b) => {
+      const sA = a.topMatch?.score ?? -1;
+      const sB = b.topMatch?.score ?? -1;
+      return sB - sA;
+    });
     return reply.send({ items, total, limit: f.limit, offset: f.offset });
   });
 

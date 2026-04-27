@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2, ExternalLink, Copy as CopyIcon, Filter, X,
-  Sparkles,
+  Sparkles, ChevronDown, ChevronRight, ChevronLeft,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
@@ -34,6 +34,11 @@ const DT = {
 };
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
+// Sort options. Matched listings (those with a topMatch from the
+// reactor for the current agent) ALWAYS bubble to the top regardless
+// of which option is selected — sort applies inside each "matched"
+// vs "unmatched" group. The labels below describe the secondary
+// (unmatched-group) order.
 const SORTS = [
   { value: 'firstSeenAt-desc', label: 'נראה לראשונה — חדש לישן' },
   { value: 'price-asc',        label: 'מחיר — מהזול ליקר' },
@@ -61,6 +66,17 @@ export default function MarketDiscovery() {
     status: 'active',
   });
   const [sort, setSort] = useState('firstSeenAt-desc');
+  // Pagination — 10 listings per page so the agent isn't drowning
+  // in 50 cards on first paint. Matched listings always pop to the
+  // top of the page (server-side); pagination walks through the rest
+  // by the agent's chosen sort.
+  const PAGE_SIZE = 10;
+  const [offset, setOffset] = useState(0);
+
+  // Reset pagination whenever filters or sort change — otherwise
+  // the agent ends up on "page 7" of a fresh filter that only has
+  // 3 items and sees an empty page.
+  useEffect(() => { setOffset(0); }, [filters, sort]);
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -95,7 +111,7 @@ export default function MarketDiscovery() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.listMarketListings({ ...filters, sort }).then(
+    api.listMarketListings({ ...filters, sort, limit: PAGE_SIZE, offset }).then(
       (res) => {
         if (cancelled) return;
         setItems(res?.items || []);
@@ -110,7 +126,7 @@ export default function MarketDiscovery() {
       },
     );
     return () => { cancelled = true; };
-  }, [filters, sort]);
+  }, [filters, sort, offset]);
 
   const update = (k) => (v) =>
     setFilters((f) => ({ ...f, [k]: v?.target ? v.target.value : v }));
@@ -195,18 +211,45 @@ export default function MarketDiscovery() {
               </span>
             )}
           </button>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            aria-label="מיון"
-            style={{
-              ...FONT, padding: '10px 12px', borderRadius: 10,
-              border: `1px solid ${DT.border}`, background: DT.white,
-              fontSize: 13, fontWeight: 700, color: DT.ink, minHeight: 44,
-            }}
-          >
-            {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              aria-label="מיון"
+              style={{
+                ...FONT,
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                // padding-inline-start big enough to clear the absolute
+                // ChevronDown icon below; padding-end keeps the label
+                // off the start edge.
+                padding: '10px 32px 10px 14px',
+                borderRadius: 10,
+                border: `1px solid ${DT.border}`,
+                background: DT.white,
+                fontSize: 13, fontWeight: 700, color: DT.ink,
+                minHeight: 44,
+                cursor: 'pointer',
+                // Fix RTL chevron mirror in some Chromium builds.
+                direction: 'rtl',
+              }}
+            >
+              {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                insetInlineStart: 10,
+                pointerEvents: 'none',
+                color: DT.muted,
+                display: 'inline-flex',
+              }}
+            >
+              <ChevronDown size={14} />
+            </span>
+          </div>
         </div>
       </div>
 
@@ -339,10 +382,10 @@ export default function MarketDiscovery() {
         {orderedItems.map((l) => (
           <article
             key={l.id}
-            data-matched={l.id === matchedListingId ? 'true' : undefined}
+            data-matched={(l.topMatch || l.id === matchedListingId) ? 'true' : undefined}
             style={{
               background: DT.white,
-              border: l.id === matchedListingId
+              border: (l.topMatch || l.id === matchedListingId)
                 ? `2px solid ${DT.success}`
                 : `1px solid ${DT.border}`,
               borderRadius: 14,
@@ -354,14 +397,17 @@ export default function MarketDiscovery() {
             }}
           >
             <div style={{ minWidth: 0 }}>
-              {l.id === matchedListingId && (
+              {(l.topMatch || l.id === matchedListingId) && (
                 <div style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   background: DT.success, color: DT.white,
                   fontSize: 10, fontWeight: 800, letterSpacing: 0.4,
                   padding: '2px 8px', borderRadius: 99, marginBottom: 6,
                 }}>
-                  <Sparkles size={10} /> מתאים לליד שלך
+                  <Sparkles size={10} />
+                  {l.topMatch
+                    ? `מתאים לליד שלך · ${l.topMatch.score}/100`
+                    : 'מתאים לליד שלך'}
                 </div>
               )}
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -424,8 +470,58 @@ export default function MarketDiscovery() {
           </article>
         ))}
       </div>
+
+      {/* Pagination — 10 per page. Hidden when there's only one
+          page of results. Hebrew RTL: "previous" is the right
+          chevron (towards the start of a Hebrew sentence) and
+          "next" is the left chevron. */}
+      {!loading && total > PAGE_SIZE && (
+        <div style={{
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          gap: 12, marginTop: 18,
+        }}>
+          <button
+            type="button"
+            onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
+            disabled={offset === 0}
+            style={paginationBtnStyle(offset === 0)}
+          >
+            <ChevronRight size={14} /> הקודם
+          </button>
+          <span style={{ fontSize: 12, color: DT.muted, fontWeight: 700 }}>
+            עמוד {Math.floor(offset / PAGE_SIZE) + 1} מתוך {Math.max(1, Math.ceil(total / PAGE_SIZE))}
+          </span>
+          <button
+            type="button"
+            onClick={() => setOffset((o) => o + PAGE_SIZE)}
+            disabled={offset + PAGE_SIZE >= total}
+            style={paginationBtnStyle(offset + PAGE_SIZE >= total)}
+          >
+            הבא <ChevronLeft size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+function paginationBtnStyle(disabled) {
+  return {
+    fontFamily: 'Assistant, Heebo, -apple-system, sans-serif',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    background: '#fff',
+    color: '#1e1a14',
+    border: '1px solid rgba(30,26,20,0.08)',
+    padding: '8px 14px',
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 700,
+    display: 'inline-flex',
+    gap: 4,
+    alignItems: 'center',
+    minHeight: 40,
+    opacity: disabled ? 0.4 : 1,
+  };
 }
 
 const fieldInputStyle = {
