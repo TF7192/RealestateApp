@@ -10,6 +10,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { getUser } from '../middleware/auth.js';
 
 const listFiltersSchema = z.object({
   city:           z.string().trim().min(1).optional(),
@@ -128,7 +129,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     // Per-page (not catalog-wide) so pagination stays sane: page 1
     // surfaces the agent's hottest matches; deeper pages still serve
     // the chosen sort. With f.limit ≤ 100 the second query is cheap.
-    const userId = (req as any).user?.id as string;
+    const userId = getUser(req)!.id;
     const ids = rawItems.map((x) => x.id);
     const [myMatches, myDuplicates] = await Promise.all([
       ids.length
@@ -205,7 +206,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
   // properties. The new Property's agentId is set from req.user.id —
   // never from the request body.
   app.post<{ Params: { id: string } }>('/listings/:id/duplicate', async (req, reply) => {
-    const userId = (req as any).user?.id as string | undefined;
+    const userId = getUser(req)?.id;
     if (!userId) return reply.code(401).send({ error: { message: 'Unauthorized' } });
 
     const listing = await prisma.marketListing.findUnique({ where: { id: req.params.id } });
@@ -247,7 +248,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
 
   // GET /api/market-discovery/matches — agent-scoped
   app.get('/matches', async (req, reply) => {
-    const userId = (req as any).user?.id as string;
+    const userId = getUser(req)!.id;
     const items = await prisma.marketListingLeadMatch.findMany({
       where: { agentUserId: userId },
       include: { marketListing: true, lead: { select: { id: true, name: true } } },
@@ -259,7 +260,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
 
   // POST /api/market-discovery/matches/:id/view
   app.post<{ Params: { id: string } }>('/matches/:id/view', async (req, reply) => {
-    const userId = (req as any).user?.id as string;
+    const userId = getUser(req)!.id;
     const updated = await prisma.marketListingLeadMatch.updateMany({
       where: { id: req.params.id, agentUserId: userId },
       data: { status: 'viewed' },
@@ -270,7 +271,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
 
   // POST /api/market-discovery/matches/:id/dismiss
   app.post<{ Params: { id: string } }>('/matches/:id/dismiss', async (req, reply) => {
-    const userId = (req as any).user?.id as string;
+    const userId = getUser(req)!.id;
     const updated = await prisma.marketListingLeadMatch.updateMany({
       where: { id: req.params.id, agentUserId: userId },
       data: { status: 'dismissed' },
@@ -301,7 +302,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
   // page calls this endpoint to fetch the match + its listing + the
   // associated lead, and to mark the match as `viewed` in one shot.
   app.get<{ Params: { id: string } }>('/match/:id', async (req, reply) => {
-    const userId = (req as any).user?.id as string;
+    const userId = getUser(req)!.id;
     const match = await prisma.marketListingLeadMatch.findFirst({
       where: { id: req.params.id, agentUserId: userId },
       include: {

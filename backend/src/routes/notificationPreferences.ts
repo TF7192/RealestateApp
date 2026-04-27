@@ -9,11 +9,14 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { getUser } from '../middleware/auth.js';
 
 const patchSchema = z.object({
   marketMatchInAppEnabled:          z.boolean().optional(),
   marketMatchEmailEnabled:          z.boolean().optional(),
   marketMatchSmsEnabled:            z.boolean().optional(),
+  // null clears the override → falls back to user.email at delivery time.
+  customDeliveryEmail:              z.union([z.string().trim().email(), z.null()]).optional(),
   minMatchScoreForExternalDelivery: z.number().int().min(0).max(100).optional(),
 });
 
@@ -33,13 +36,13 @@ export const registerNotificationPreferencesRoutes: FastifyPluginAsync = async (
   }
 
   app.get('/', async (req) => {
-    const userId = (req as any).user?.id as string;
+    const userId = getUser(req)!.id;
     const pref = await getOrCreatePref(userId);
     return pref;
   });
 
   app.patch('/', async (req, reply) => {
-    const userId = (req as any).user?.id as string;
+    const userId = getUser(req)!.id;
     const parse = patchSchema.safeParse(req.body);
     if (!parse.success) {
       return reply.code(400).send({ error: { message: 'Invalid input', issues: parse.error.flatten() } });

@@ -1885,10 +1885,15 @@ model UserNotificationPreference {
   marketMatchInAppEnabled             Boolean  @default(true)
   marketMatchEmailEnabled             Boolean  @default(false)
   marketMatchSmsEnabled               Boolean  @default(false)
+  // Optional override for delivery — if NULL we send to user.email.
+  // Lets the agent route market-match alerts to a personal address
+  // without changing their login email.
+  customDeliveryEmail                 String?
   // Match score (0..100) below which we never deliver via email/SMS,
-  // even if the channel is enabled. Default 85 = high-confidence
-  // only — agents shouldn't get an email for every 70% match.
-  minMatchScoreForExternalDelivery    Int      @default(85)
+  // even if the channel is enabled. Default 40 matches the reactor's
+  // MIN_SCORE so toggling email-on actually delivers; agents who want
+  // higher-confidence-only can raise it via /settings/notifications.
+  minMatchScoreForExternalDelivery    Int      @default(40)
   createdAt                           DateTime @default(now())
   updatedAt                           DateTime @updatedAt
 }

@@ -161,7 +161,17 @@ async function fetchOnePage(
     return null;
   } finally {
     clearTimeout(hardTimer);
-    if (page) await page.close().catch(() => {/* swallow */});
+    if (page) {
+      // Race page.close() against a 5s timer. We've observed real cases
+      // where Chromium's renderer enters a state (Reblaze redirect,
+      // "Execution context was destroyed") that makes close() never
+      // resolve, freezing the entire tick. The leaked page handle is
+      // cleaned up when the BrowserContext closes at end-of-tick.
+      await Promise.race([
+        page.close().catch(() => {/* swallow */}),
+        new Promise<void>((r) => setTimeout(r, 5_000)),
+      ]);
+    }
   }
 }
 

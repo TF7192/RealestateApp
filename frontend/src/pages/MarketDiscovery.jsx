@@ -61,8 +61,10 @@ export default function MarketDiscovery() {
 
   const [filters, setFilters] = useState({
     city: '', neighborhood: '', propertyType: '',
-    kind: '',          // '' = sale + rent, 'forsale', 'rent'
-    posterType: '',    // '' = all, 'private', 'agency'
+    kind: '',                  // '' = sale + rent, 'forsale', 'rent'
+    posterType: 'private',     // default: private only — agents already
+                               // know most local agencies' inventory and
+                               // care about raw deal flow first.
     minPrice: '', maxPrice: '',
     minRooms: '', maxRooms: '',
     minSqm: '', maxSqm: '',
@@ -75,8 +77,10 @@ export default function MarketDiscovery() {
   // /settings/notifications exposes, but in-context here so the agent
   // can opt into the email pipeline directly from the page they want
   // notifications about.
-  const [emailPref, setEmailPref] = useState(null);  // null = loading
+  const [emailPref, setEmailPref] = useState(null);  // null = loading; { enabled, deliveryEmail, accountEmail }
   const [emailSaving, setEmailSaving] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailDraft, setEmailDraft] = useState('');
   const [sort, setSort] = useState('firstSeenAt-desc');
   // Pagination — 10 listings per page so the agent isn't drowning
   // in 50 cards on first paint. Matched listings always pop to the
@@ -105,25 +109,67 @@ export default function MarketDiscovery() {
   }, []);
 
   // Email-notification preference — auto-creates the row if missing.
+  // Loads in parallel with the user's account email so the popup can
+  // pre-fill the input.
   useEffect(() => {
     let cancelled = false;
-    api.getNotificationPreferences().then(
-      (res) => { if (!cancelled) setEmailPref(!!res?.marketMatchEmailEnabled); },
-      () => { if (!cancelled) setEmailPref(false); },
-    );
+    Promise.all([
+      api.getNotificationPreferences().catch(() => null),
+      api.getMe().catch(() => null),
+    ]).then(([pref, me]) => {
+      if (cancelled) return;
+      setEmailPref({
+        enabled: !!pref?.marketMatchEmailEnabled,
+        deliveryEmail: pref?.customDeliveryEmail || null,
+        accountEmail: me?.email || '',
+      });
+    });
     return () => { cancelled = true; };
   }, []);
 
-  const toggleEmailPref = async () => {
-    if (emailSaving || emailPref == null) return;
-    const next = !emailPref;
+  const openEmailModal = () => {
+    if (emailPref == null) return;
+    setEmailDraft(emailPref.deliveryEmail || emailPref.accountEmail || '');
+    setEmailModalOpen(true);
+  };
+
+  const submitEmailModal = async () => {
+    const trimmed = (emailDraft || '').trim();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      toast.error?.('כתובת מייל לא תקינה');
+      return;
+    }
     setEmailSaving(true);
-    setEmailPref(next);  // optimistic
     try {
-      await api.updateNotificationPreferences({ marketMatchEmailEnabled: next });
-      toast.success?.(next ? 'התראות במייל הופעלו' : 'התראות במייל בוטלו');
+      // If the user typed their own login email, store it as null
+      // (= use account default) so the row stays clean.
+      const customDeliveryEmail =
+        trimmed.toLowerCase() === (emailPref.accountEmail || '').toLowerCase()
+          ? null
+          : trimmed;
+      await api.updateNotificationPreferences({
+        marketMatchEmailEnabled: true,
+        customDeliveryEmail,
+      });
+      setEmailPref({ ...emailPref, enabled: true, deliveryEmail: customDeliveryEmail });
+      setEmailModalOpen(false);
+      toast.success?.('נרשמת בהצלחה — נשלח מייל בכל פעם שנמצאת התאמה לליד');
     } catch (err) {
-      setEmailPref(!next);  // revert
+      toast.error?.(err?.message || 'שמירה נכשלה');
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  const disableEmailPref = async () => {
+    if (emailSaving || emailPref == null) return;
+    setEmailSaving(true);
+    try {
+      await api.updateNotificationPreferences({ marketMatchEmailEnabled: false });
+      setEmailPref({ ...emailPref, enabled: false });
+      setEmailModalOpen(false);
+      toast.success?.('התראות במייל בוטלו');
+    } catch (err) {
       toast.error?.(err?.message || 'שמירה נכשלה');
     } finally {
       setEmailSaving(false);
@@ -172,7 +218,7 @@ export default function MarketDiscovery() {
   const clearFilters = () =>
     setFilters({
       city: '', neighborhood: '', propertyType: '',
-      kind: '', posterType: '',
+      kind: '', posterType: 'private',
       minPrice: '', maxPrice: '',
       minRooms: '', maxRooms: '',
       minSqm: '', maxSqm: '',
@@ -181,10 +227,14 @@ export default function MarketDiscovery() {
     });
 
   const activeFilterCount = useMemo(() => {
+    // posterType + firstSeenAfter have non-empty defaults — exclude
+    // them from the chip count so the icon doesn't show "2 active"
+    // on a fresh page load.
     return Object.entries(filters).filter(([k, v]) =>
       v !== ''
         && !(k === 'status' && v === 'active')
-        && !(k === 'firstSeenAfter' && v === '24h'),
+        && !(k === 'firstSeenAfter' && v === '24h')
+        && !(k === 'posterType' && v === 'private'),
     ).length;
   }, [filters]);
 
@@ -234,25 +284,63 @@ export default function MarketDiscovery() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Poster-type filter — promoted to the header row per UX
+              feedback: "פרטי vs מתווך" is one of the two axes the agent
+              decides upfront (alongside sale/rent), so it sits next to
+              the email-signup CTA rather than buried in the filter
+              drawer. Default = פרטי only. */}
+          <div role="tablist" aria-label="מפרסם" style={{
+            display: 'inline-flex', borderRadius: 10, overflow: 'hidden',
+            border: `1px solid ${DT.border}`, height: 44,
+          }}>
+            {[
+              { value: 'private', label: 'פרטי' },
+              { value: 'agency',  label: 'תיווך' },
+              { value: '',        label: 'הכל' },
+            ].map((opt) => {
+              const active = filters.posterType === opt.value;
+              return (
+                <button
+                  key={opt.value || 'all'}
+                  role="tab"
+                  type="button"
+                  aria-selected={active}
+                  onClick={() => setFilters((f) => ({ ...f, posterType: opt.value }))}
+                  style={{
+                    ...FONT, cursor: 'pointer',
+                    background: active ? DT.ink : DT.white,
+                    color: active ? DT.white : DT.ink,
+                    border: 'none',
+                    padding: '0 14px', fontSize: 13, fontWeight: 700,
+                    minWidth: 60,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
           <button
             type="button"
-            onClick={toggleEmailPref}
-            disabled={emailPref == null || emailSaving}
-            aria-pressed={!!emailPref}
-            title={emailPref ? 'בטל קבלת התראות במייל על התאמות' : 'הפעל קבלת התראות במייל כשנמצאת התאמה לליד'}
+            onClick={openEmailModal}
+            disabled={emailPref == null}
+            aria-pressed={!!emailPref?.enabled}
+            title={emailPref?.enabled
+              ? `התראות פעילות — נשלחות אל ${emailPref?.deliveryEmail || emailPref?.accountEmail}`
+              : 'הירשמ/י לקבלת מייל בכל פעם שנמצאת התאמה לליד פעיל'}
             style={{
-              ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
-              background: emailPref ? DT.successSoft : DT.white,
-              color: emailPref ? DT.success : DT.ink,
-              border: `1px solid ${emailPref ? DT.success : DT.border}`,
+              ...FONT, cursor: 'pointer',
+              background: emailPref?.enabled ? DT.successSoft : DT.white,
+              color: emailPref?.enabled ? DT.success : DT.ink,
+              border: `1px solid ${emailPref?.enabled ? DT.success : DT.border}`,
               padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700,
               display: 'inline-flex', gap: 6, alignItems: 'center',
               minHeight: 44,
-              opacity: emailPref == null || emailSaving ? 0.6 : 1,
+              opacity: emailPref == null ? 0.6 : 1,
             }}
           >
-            {emailPref ? <MailCheck size={14} /> : <Mail size={14} />}
-            {emailPref ? 'התראות במייל פעילות' : 'התרע במייל על התאמה'}
+            {emailPref?.enabled ? <MailCheck size={14} /> : <Mail size={14} />}
+            {emailPref?.enabled ? 'התראות פעילות' : 'רישום להתראות מייל'}
           </button>
           <button
             type="button"
@@ -440,14 +528,6 @@ export default function MarketDiscovery() {
               <option value="">הכל</option>
               <option value="removed">הוסר</option>
               <option value="unknown">לא ידוע</option>
-            </select>
-          </FilterField>
-          <FilterField label="מפרסם">
-            <select value={filters.posterType} onChange={update('posterType')}
-              style={fieldInputStyle}>
-              <option value="">הכל</option>
-              <option value="private">פרטי בלבד</option>
-              <option value="agency">תיווך בלבד</option>
             </select>
           </FilterField>
           <FilterField label="טווח זמן">
@@ -679,6 +759,127 @@ export default function MarketDiscovery() {
           </button>
         </div>
       )}
+
+      {/* Email-signup modal. Pre-fills the user's account email; the
+          agent can override with any address (e.g. a personal inbox).
+          Submitting flips marketMatchEmailEnabled=true and stores the
+          override (or null if it equals the account email). */}
+      {emailModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="market-email-modal-title"
+          onClick={(e) => { if (e.target === e.currentTarget) setEmailModalOpen(false); }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(30,26,20,0.45)',
+            display: 'grid', placeItems: 'center', padding: 16, zIndex: 100,
+          }}
+        >
+          <div style={{
+            background: DT.white, borderRadius: 14, padding: 20,
+            width: '100%', maxWidth: 400,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+            ...FONT, color: DT.ink,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <span style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: DT.goldSoft, color: DT.goldDark,
+                display: 'grid', placeItems: 'center',
+              }}><Mail size={18} /></span>
+              <h2 id="market-email-modal-title" style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+                רישום להתראות מייל
+              </h2>
+            </div>
+            <p style={{ fontSize: 13, color: DT.muted, lineHeight: 1.55, marginTop: 8, marginBottom: 14 }}>
+              נשלח לך מייל בכל פעם שנמצאת התאמה חדשה לליד פעיל — מייל אחד בלבד לכל התאמה (ללא ספאם).
+            </p>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+              <span style={{ fontSize: 11, color: DT.muted, fontWeight: 700 }}>
+                כתובת לקבלת ההתראות
+              </span>
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={emailDraft}
+                onChange={(e) => setEmailDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitEmailModal(); }}
+                placeholder={emailPref?.accountEmail || 'name@example.com'}
+                style={{
+                  ...FONT, fontSize: 14, color: DT.ink, background: DT.white,
+                  border: `1px solid ${DT.border}`, borderRadius: 10,
+                  padding: '12px 14px', outline: 'none',
+                  direction: 'ltr', textAlign: 'left',
+                }}
+                autoFocus
+              />
+              {emailPref?.accountEmail && emailDraft !== emailPref.accountEmail && (
+                <button type="button"
+                  onClick={() => setEmailDraft(emailPref.accountEmail)}
+                  style={{
+                    ...FONT, background: 'transparent', border: 'none',
+                    color: DT.muted, fontSize: 11, cursor: 'pointer',
+                    textAlign: 'start', padding: 0,
+                    textDecoration: 'underline',
+                  }}>
+                  שחזר לכתובת ברירת המחדל ({emailPref.accountEmail})
+                </button>
+              )}
+            </label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {emailPref?.enabled && (
+                <button
+                  type="button"
+                  onClick={disableEmailPref}
+                  disabled={emailSaving}
+                  style={{
+                    ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
+                    background: DT.white, color: '#b91c1c',
+                    border: `1px solid ${DT.border}`,
+                    padding: '10px 14px', borderRadius: 10,
+                    fontSize: 13, fontWeight: 700, minHeight: 44,
+                    marginInlineEnd: 'auto',
+                  }}
+                >
+                  בטל רישום
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setEmailModalOpen(false)}
+                disabled={emailSaving}
+                style={{
+                  ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
+                  background: DT.cream2, color: DT.ink,
+                  border: `1px solid ${DT.border}`,
+                  padding: '10px 14px', borderRadius: 10,
+                  fontSize: 13, fontWeight: 700, minHeight: 44,
+                }}
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                onClick={submitEmailModal}
+                disabled={emailSaving || !emailDraft}
+                style={{
+                  ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
+                  background: `linear-gradient(135deg, ${DT.gold}, ${DT.goldDark})`,
+                  color: DT.ink, border: 'none',
+                  padding: '10px 18px', borderRadius: 10,
+                  fontSize: 13, fontWeight: 800, minHeight: 44,
+                  boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
+                  opacity: emailSaving || !emailDraft ? 0.6 : 1,
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <MailCheck size={14} /> אשר רישום
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -726,25 +927,20 @@ function Yad2Badge() {
   return (
     <span
       title="מקור: יד2"
+      aria-label="מקור: יד2"
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 0,
-        height: 18, borderRadius: 4, overflow: 'hidden',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        fontSize: 11, fontWeight: 900, letterSpacing: 0.3,
+        display: 'inline-flex', alignItems: 'center',
+        height: 18, padding: '0 8px', borderRadius: 4,
+        background: '#F1A828', color: '#171717',
+        fontFamily: 'Arial, system-ui, -apple-system, sans-serif',
+        fontSize: 11, fontWeight: 900, letterSpacing: 0.1,
         boxShadow: '0 1px 0 rgba(0,0,0,0.08)',
         verticalAlign: 'middle',
+        // direction:ltr keeps "yad2" reading left-to-right inside our
+        // RTL document so the wordmark renders correctly.
+        direction: 'ltr',
       }}
-      aria-label="מקור: יד2"
-    >
-      <span style={{
-        background: '#1f2937', color: '#fff',
-        padding: '0 5px', height: '100%', display: 'inline-flex', alignItems: 'center',
-      }}>yad</span>
-      <span style={{
-        background: '#fb923c', color: '#1f2937',
-        padding: '0 5px', height: '100%', display: 'inline-flex', alignItems: 'center',
-      }}>2</span>
-    </span>
+    >yad2</span>
   );
 }
 

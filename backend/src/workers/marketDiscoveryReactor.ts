@@ -27,7 +27,12 @@ import { ensureSearchProfilesForOrphanLeads } from '../lib/leadSearchProfileSeed
 
 const POLL_MS = 30 * 1000;
 const BATCH_SIZE = 50;
-const MIN_SCORE = Number.parseInt(process.env.MARKET_MATCH_MIN_SCORE || '70', 10);
+// 40 = city (25 or near-city via the normalizer) + at least one other
+// partial fit (price-near = 8, rooms-near = 8). The pre-rolldown default
+// of 70 was set when matching used strict ranges only; with tolerance
+// + auto-seeded profiles (which often carry only city/budget/rooms),
+// 70 was unreachable and matches never fired in practice.
+const MIN_SCORE = Number.parseInt(process.env.MARKET_MATCH_MIN_SCORE || '40', 10);
 
 let timer: NodeJS.Timeout | null = null;
 let running = false;
@@ -159,19 +164,26 @@ async function drainOnce() {
           include: { user: { select: { email: true } } },
         });
         if (pref && r.score >= pref.minMatchScoreForExternalDelivery) {
-          if (pref.marketMatchEmailEnabled && pref.user.email) {
-            await prisma.pendingNotificationDelivery.create({
-              data: {
-                userId: profile.lead.agentId,
-                channel: 'email',
-                type: 'market_listing_match',
-                title: 'נכס חדש מתאים לליד שלך',
-                body: notificationBody(listing),
-                link: `/market-discovery?match=${match.id}`,
-                recipientEmail: pref.user.email,
-                idempotencyKey: `market_listing_match:${match.id}`,
-              },
-            });
+          if (pref.marketMatchEmailEnabled) {
+            // customDeliveryEmail wins when set — that's the address the
+            // agent typed into the "רישום להתראות מייל" popup. Falls
+            // back to the User's login email so the toggle still works
+            // without explicit override.
+            const recipient = pref.customDeliveryEmail || pref.user.email;
+            if (recipient) {
+              await prisma.pendingNotificationDelivery.create({
+                data: {
+                  userId: profile.lead.agentId,
+                  channel: 'email',
+                  type: 'market_listing_match',
+                  title: 'נכס חדש מתאים לליד שלך',
+                  body: notificationBody(listing),
+                  link: `/market-discovery?match=${match.id}`,
+                  recipientEmail: recipient,
+                  idempotencyKey: `market_listing_match:${match.id}`,
+                },
+              });
+            }
           }
           // SMS branch intentionally not enabled — no provider yet.
         }
