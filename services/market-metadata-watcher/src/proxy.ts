@@ -63,11 +63,16 @@ function parseProxiesEnv(raw: string | undefined): ProxyConfig[] {
 }
 
 function parseProxyUrl(raw: string): ProxyConfig | null {
-  // Accept "http(s)://[user:pass@]host:port" + "socks5://[user:pass@]host:port".
-  // Playwright wants `server` as scheme://host:port (no creds in the URL),
-  // and creds in separate username/password fields.
+  // Accept either:
+  //   - full URL:  "http(s)://USER:PASS@HOST:PORT" / "socks5://...".
+  //   - bare auth: "USER:PASS@HOST:PORT" — common in proxy-vendor
+  //     export files (DataImpulse port lists ship without a scheme).
+  // We assume http:// when no scheme is present (DataImpulse's gateway
+  // accepts HTTP CONNECT). Playwright wants `server` as scheme://host:port
+  // (no creds in the URL), and creds in separate username/password fields.
+  const withScheme = /^[a-z][a-z0-9+\-.]*:\/\//i.test(raw) ? raw : `http://${raw}`;
   try {
-    const u = new URL(raw);
+    const u = new URL(withScheme);
     if (!['http:', 'https:', 'socks5:', 'socks4:'].includes(u.protocol)) return null;
     const out: ProxyConfig = {
       server: `${u.protocol}//${u.host}`,
