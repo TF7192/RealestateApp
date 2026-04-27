@@ -1776,6 +1776,14 @@ model MarketListing {
   status             String    @default("active")             // "active" | "removed" | "unknown"
   // sha256 of canonicalized metadata; new snapshots only when this changes.
   metadataHash       String
+  // Reactor cursor (Phase 3 refactor). NULL = the backend
+  // marketDiscoveryReactor hasn't processed this row yet (= run
+  // matching against active LeadSearchProfiles + create Notifications
+  // for hits). Non-null = processed at this timestamp. Setting back
+  // to NULL forces a re-evaluation (e.g. when matching weights
+  // change). Watcher service NEVER touches this column — it's the
+  // CRM/reactor's bookkeeping.
+  reactedAt          DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -1798,6 +1806,11 @@ model MarketListing {
   @@index([firstSeenAt])
   @@index([status])
   @@index([metadataHash])
+  // Reactor's hot path: WHERE reactedAt IS NULL ORDER BY firstSeenAt
+  // ASC LIMIT N. The (reactedAt, firstSeenAt) covering index keeps
+  // the unprocessed-listing scan a single index range read regardless
+  // of how big MarketListing grows.
+  @@index([reactedAt, firstSeenAt])
 }
 
 model MarketListingSnapshot {

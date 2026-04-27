@@ -84,6 +84,10 @@ const PRIMARY_NAV = [
   // new surface surfaces for agents who are already in the app. Links
   // into /ai which is premium-gated on the backend.
   { k: 'ai',          to: '/ai',         label: 'Estia AI',   Icon: Sparkles, badge: 'חדש' },
+  // Market Discovery (Phase 1–4, 2026-04-27) — hourly Yad2 metadata
+  // watcher feed. New badge so agents notice the surface; will be
+  // dropped once usage stabilises.
+  { k: 'market-discovery', to: '/market-discovery', label: 'מודעות חדשות בשוק', Icon: Building2, badge: 'חדש' },
   { k: 'transfers',   to: '/transfers',  label: 'העברות',     Icon: ArrowLeftRight },
   { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
   // 'פעילות' (/activity) — reachable from the Dashboard instead of the
@@ -96,6 +100,9 @@ const PRIMARY_NAV = [
   // pill now that the route is real but the feature isn't.
   { k: 'inbox',       to: '/inbox',      label: 'תיבת WhatsApp', Icon: MessageSquare, comingSoon: true },
   { k: 'admin-chats', to: '/admin/chats', label: 'הודעות צ׳אט', Icon: MessageSquare, adminOnly: true },
+  // Phase 4 — admin observability for the Market Discovery hourly
+  // watcher (run log, success/failure history, ingestion counts).
+  { k: 'admin-market-watcher', to: '/admin/market-watcher', label: 'Market Watcher · ריצות', Icon: ShieldCheck, adminOnly: true },
 ];
 const TOOL_NAV = [
   // Single unified ייבוא entry — the /import landing page now offers

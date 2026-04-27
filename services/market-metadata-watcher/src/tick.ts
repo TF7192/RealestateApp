@@ -2,23 +2,32 @@ import type { PrismaClient } from '@prisma/client';
 import type { Logger } from 'pino';
 import { config } from './config.js';
 import { metadataHash, type HashableListing } from './hash.js';
-import { scoreMatch } from './matching.js';
 import { discoverYad2 } from './sources/yad2.js';
 
-// One end-to-end watcher run:
-//   1. Open a `MarketWatcherRun` row (status: running).
-//   2. Discover listings from each enabled source.
-//   3. Upsert each listing; insert a snapshot if metadata changed.
-//   4. For new/updated active listings, evaluate matches against
-//      every active LeadSearchProfile.
-//   5. Create CRM Notification rows for matches above threshold.
-//   6. Close the run row with summary counts.
+// Watcher tick — SINGLE RESPONSIBILITY: discover listings from
+// configured sources → upsert metadata rows → snapshot when metadata
+// changes → close the run row with summary counts.
 //
-// Phase 1: source-side discovery is stubbed to a typed shape so the
-// route + DB plumbing can ship + be tested independently. Phase 1.5
-// will plug in a Yad2 city-feed extractor that reuses the existing
-// crawlAgency Playwright pool. The ALL-CAPS NOTE in the body marks
-// the seam.
+// Explicitly NOT this service's job:
+//   - matching listings against LeadSearchProfiles
+//   - creating Notification rows
+//   - queueing email/SMS deliveries
+//
+// Those CRM-domain concerns live in the backend's
+// `marketDiscoveryReactor.ts` worker, which polls
+// `MarketListing.reactedAt IS NULL` rows and reacts on its own
+// schedule. The watcher writes; the reactor reads. Clean
+// hand-off via a single nullable column.
+//
+// Why the split:
+//   - Adding Madlan/Komo/RentNet as new sources = one new file in
+//     `src/sources/`, no matching/notification code duplication.
+//   - Matching weights, notification preferences, email logic can
+//     change without rebuilding the heavy Playwright Chromium
+//     watcher container.
+//   - This service has no AWS/SES/CRM-domain dependencies — it can
+//     even be deployed as a standalone discovery service for a
+//     partner if needed.
 
 type Deps = { prisma: PrismaClient; logger: Logger };
 
@@ -32,19 +41,18 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
   let listingsCreated = 0;
   let listingsUpdated = 0;
   let snapshotsCreated = 0;
-  let matchesCreated = 0;
-  let notificationsCreated = 0;
 
   try {
     log('tick.started');
 
-    // Self-seed the yad2 source on first run so an empty DB still
-    // produces listings without a manual SQL insert.
+    // Self-seed sources on first run.
     await prisma.marketListingSource.upsert({
       where: { name: 'yad2' },
       update: {},
       create: { name: 'yad2', baseUrl: 'https://www.yad2.co.il' },
     });
+    // Future Madlan/Komo/RentNet seeding goes here — the rest of
+    // the loop dispatches by source.name.
 
     const sources = await prisma.marketListingSource.findMany({ where: { isEnabled: true } });
     if (sources.length === 0) {
@@ -54,8 +62,6 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
     for (const src of sources) {
       let discovered: HashableListing[] = [];
       if (src.name === 'yad2') {
-        // Build the known-tokens set once per source so the discoverer
-        // can short-circuit pages where every listing is already in DB.
         const known = new Set<string>(
           (await prisma.marketListing.findMany({
             where: { source: 'yad2' },
@@ -76,7 +82,10 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
           itemsSeen: result.stats.itemsSeen,
         });
       } else {
+        // When a new source ships, dispatch it here. Fail open by
+        // logging — an unknown source shouldn't block other sources.
         log('tick.source-skipped-unknown', { source: src.name });
+        continue;
       }
 
       for (const item of discovered.slice(0, config.hardCeiling)) {
@@ -109,6 +118,10 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
               pricePerSqm: item.pricePerSqm,
               status: item.status || 'active',
               metadataHash: hash,
+              // reactedAt deliberately left NULL — the backend's
+              // marketDiscoveryReactor worker picks it up on its
+              // next tick, scores it against active profiles, and
+              // creates Notification + delivery-queue rows.
             },
           });
           listingsCreated++;
@@ -122,12 +135,6 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
             },
           });
           snapshotsCreated++;
-          // New active listings get the match-evaluation pass.
-          if (created.status === 'active') {
-            const r = await evaluateMatches({ prisma, logger }, created);
-            matchesCreated += r.matchesCreated;
-            notificationsCreated += r.notificationsCreated;
-          }
         } else {
           const changed = existing.metadataHash !== hash;
           await prisma.marketListing.update({
@@ -147,6 +154,11 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
                     pricePerSqm: item.pricePerSqm,
                     status: item.status || existing.status,
                     metadataHash: hash,
+                    // Reset the reactor cursor when metadata changes
+                    // so the reactor re-evaluates the listing — the
+                    // new price/rooms/etc might cross a different
+                    // agent's threshold than the original did.
+                    reactedAt: null,
                   }
                 : {}),
             },
@@ -177,11 +189,11 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
         listingsCreated,
         listingsUpdated,
         snapshotsCreated,
-        matchesCreated,
-        notificationsCreated,
+        // matchesCreated + notificationsCreated stay 0 — those are
+        // the reactor's counters now, recorded elsewhere if needed.
       },
     });
-    log('tick.completed', { listingsSeen, listingsCreated, listingsUpdated, snapshotsCreated, matchesCreated, notificationsCreated });
+    log('tick.completed', { listingsSeen, listingsCreated, listingsUpdated, snapshotsCreated });
   } catch (err) {
     log('tick.failed', { error: String(err) });
     await prisma.marketWatcherRun
@@ -195,146 +207,14 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
 }
 
 function deriveUrl(baseUrl: string, item: HashableListing): string {
-  // For yad2 the externalListingId is the listing token; the
-  // canonical detail URL is `${baseUrl}/realestate/item/<token>`.
-  // Sources that use a different scheme override this in their own
-  // extractor.
+  // Source-specific URL derivation. Yad2 = `${base}/realestate/item/<token>`.
+  // When a new source lands, dispatch on item.source here.
   const trimmed = baseUrl.replace(/\/$/, '');
-  return `${trimmed}/realestate/item/${item.externalListingId}`;
-}
-
-async function evaluateMatches(
-  { prisma, logger }: Deps,
-  listing: { id: string; city: string | null; neighborhood: string | null; propertyType: string | null; rooms: number | null; price: number | null; sizeSqm: number | null },
-): Promise<{ matchesCreated: number; notificationsCreated: number }> {
-  let matchesCreated = 0;
-  let notificationsCreated = 0;
-
-  // Active profiles only — `LeadSearchProfile` doesn't carry an
-  // is_active column directly, but the parent Lead's `status` does.
-  // Phase 1: match against profiles whose lead is in an active state.
-  const profiles = await prisma.leadSearchProfile.findMany({
-    where: {
-      lead: { status: { in: ['NEW', 'CONTACTED', 'QUALIFIED', 'ACTIVE'] as any } },
-    },
-    include: { lead: { select: { id: true, agentId: true } } },
-  });
-
-  for (const profile of profiles) {
-    const r = scoreMatch(
-      {
-        city: listing.city,
-        neighborhood: listing.neighborhood,
-        propertyType: listing.propertyType,
-        rooms: listing.rooms,
-        price: listing.price,
-        sizeSqm: listing.sizeSqm,
-      },
-      {
-        cities: profile.cities,
-        neighborhoods: profile.neighborhoods,
-        propertyTypes: profile.propertyTypes,
-        minRoom: profile.minRoom == null ? null : Math.floor(profile.minRoom),
-        maxRoom: profile.maxRoom == null ? null : Math.floor(profile.maxRoom),
-        minPrice: profile.minPrice,
-        maxPrice: profile.maxPrice,
-      },
-    );
-    if (r.score < config.matchMinScore) continue;
-
-    // Idempotent insert — unique (marketListingId, leadId, searchProfileId).
-    const existing = await prisma.marketListingLeadMatch.findUnique({
-      where: {
-        marketListingId_leadId_searchProfileId: {
-          marketListingId: listing.id,
-          leadId: profile.leadId,
-          searchProfileId: profile.id,
-        },
-      },
-    });
-    if (existing) continue;
-
-    const match = await prisma.marketListingLeadMatch.create({
-      data: {
-        marketListingId: listing.id,
-        leadId: profile.leadId,
-        searchProfileId: profile.id,
-        agentUserId: profile.lead.agentId,
-        score: r.score,
-        reasonsJson: r.reasons as any,
-        status: 'new',
-      },
-    });
-    matchesCreated++;
-
-    await prisma.notification.create({
-      data: {
-        userId: profile.lead.agentId,
-        type: 'market_listing_match',
-        title: 'נכס חדש מתאים לליד שלך',
-        body: notificationBody(listing),
-        link: `/market-discovery?match=${match.id}`,
-      },
-    });
-    notificationsCreated++;
-
-    // Phase 3 — queue external delivery (email/SMS) if the agent
-    // has opted in AND the match score meets their personal threshold.
-    // Watcher runs in a separate container with no AWS SDK; the
-    // backend worker drains this queue.
-    try {
-      const pref = await prisma.userNotificationPreference.findUnique({
-        where: { userId: profile.lead.agentId },
-        include: { user: { select: { email: true } } },
-      });
-      if (pref && r.score >= pref.minMatchScoreForExternalDelivery) {
-        if (pref.marketMatchEmailEnabled && pref.user.email) {
-          await prisma.pendingNotificationDelivery.create({
-            data: {
-              userId: profile.lead.agentId,
-              channel: 'email',
-              type: 'market_listing_match',
-              title: 'נכס חדש מתאים לליד שלך',
-              body: notificationBody(listing),
-              link: `/market-discovery?match=${match.id}`,
-              recipientEmail: pref.user.email,
-              // Idempotency key collapses repeat queue-rows for the
-              // same match id (defensive — match unique index already
-              // prevents the upstream insert from firing twice).
-              idempotencyKey: `market_listing_match:${match.id}`,
-            },
-          });
-        }
-        // SMS branch intentionally not enabled — no provider integrated.
-        // The worker will skip pendingNotificationDelivery rows of
-        // channel='sms' until a provider is wired.
-      }
-    } catch (err) {
-      logger.warn(
-        { err: String(err), matchId: match.id, agentUserId: profile.lead.agentId },
-        'tick.queue-delivery-failed',
-      );
-    }
+  if (item.source === 'yad2') {
+    return `${trimmed}/realestate/item/${item.externalListingId}`;
   }
-
-  logger.info(
-    { listingId: listing.id, matchesCreated, notificationsCreated },
-    'tick.matches-evaluated',
-  );
-  return { matchesCreated, notificationsCreated };
-}
-
-function notificationBody(l: {
-  city: string | null;
-  rooms: number | null;
-  sizeSqm: number | null;
-  price: number | null;
-}): string {
-  const cityFrag = l.city ? ` ב${l.city}` : '';
-  const parts = [
-    l.rooms != null ? `${l.rooms} חדרים` : null,
-    l.sizeSqm != null ? `${l.sizeSqm} מ״ר` : null,
-    l.price != null ? `₪${l.price.toLocaleString('he-IL')}` : null,
-  ].filter(Boolean);
-  return `נמצא נכס חדש${cityFrag} שמתאים לדרישות של ליד פעיל${parts.length ? `: ${parts.join(', ')}` : ''}.`;
+  // Sane default for unknown sources — gives the agent SOMETHING to
+  // click. Source extractors should override by setting their own
+  // url shape if needed (Phase 4 work).
+  return `${trimmed}/${item.externalListingId}`;
 }

@@ -403,6 +403,16 @@ if (runAsMain) {
         './workers/notificationDelivery.js'
       );
       startNotificationDeliveryWorker();
+      // SOLID refactor (Phase 3+) — reactor processes new
+      // MarketListing rows: matches against active LeadSearchProfiles,
+      // creates Notifications + queues email delivery. The Yad2
+      // watcher service is now pure discovery — every CRM-domain
+      // concern (lead, agent, notification, email) lives here.
+      // Polls every 30s; cursor is `MarketListing.reactedAt IS NULL`.
+      const { startMarketDiscoveryReactor } = await import(
+        './workers/marketDiscoveryReactor.js'
+      );
+      startMarketDiscoveryReactor();
       return app.listen({ port: PORT, host: HOST }).then(() => {
         app.log.info(`Estia API listening on ${HOST}:${PORT}`);
       });

@@ -1,9 +1,17 @@
-// Lead-listing match scoring. Mirrors the spec in MARKET_DISCOVERY_PLAN.md
-// §7. Deterministic rule-based scoring — no AI here. The CRM-side
-// `backend/src/lib/matching.ts` has a richer engine for property →
-// lead matching across the whole catalog; this one is the leaner
-// "does this listing match this profile" function the watcher runs
-// for every fresh listing × every active LeadSearchProfile.
+// Listing-vs-LeadSearchProfile matching engine for Market Discovery.
+//
+// Distinct from `lib/matching.ts` (which is property-vs-lead for the
+// CRM-facing matches feature). This module specifically powers the
+// reactor — given a fresh `MarketListing` row, score it against
+// every active `LeadSearchProfile` and return the matches above
+// threshold.
+//
+// Pure functions only — no Prisma, no I/O. The reactor wires this
+// to the DB. Keeps the engine unit-testable without a database.
+//
+// Migrated from services/market-metadata-watcher/src/matching.ts
+// during the SOLID refactor — the watcher container is now pure
+// discovery; CRM-domain matching lives here.
 
 export interface MatchScore {
   score: number;          // 0..100
@@ -11,12 +19,6 @@ export interface MatchScore {
 }
 
 // Field weights (sum = 100):
-//  - city          25
-//  - neighborhood  20
-//  - propertyType  15
-//  - rooms         15
-//  - price         15
-//  - sqm           10
 const W = {
   city:         25,
   neighborhood: 20,
@@ -45,9 +47,8 @@ export type ProfileForMatch = {
   maxPrice: number | null;
   // sqm bounds — `LeadSearchProfile` doesn't carry these directly
   // (the model has min/maxPlot but that's land area, not unit area).
-  // Phase 1 omits sqm matching against profiles; if Phase 2 wants it
-  // we'll either extend `LeadSearchProfile` or compute from price +
-  // pricePerSqm.
+  // Phase 1 omits sqm matching against profiles; future work will
+  // either extend `LeadSearchProfile` or compute from price + ppm.
   minSizeSqm?: number | null;
   maxSizeSqm?: number | null;
 };
@@ -77,15 +78,14 @@ export function scoreMatch(listing: ListingForMatch, profile: ProfileForMatch): 
   let score = 0;
   const reasons: string[] = [];
 
-  // City — required to count, no city = no match (it's the anchor).
+  // City — required to count, no city = no match (the agent's anchor).
   if (profile.cities?.length) {
     if (citiesIntersect(listing.city, profile.cities)) {
       score += W.city;
       reasons.push('city');
     } else {
       // City constraint exists but doesn't match — bail with 0.
-      // The agent set a city explicitly; mismatching it should never
-      // show up as "70% match".
+      // Mismatching an explicit city should never read as 70%.
       return { score: 0, reasons: [] };
     }
   }
