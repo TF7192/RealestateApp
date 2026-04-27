@@ -398,11 +398,8 @@ export default function Profile() {
           </div>
         </section>
 
-        {/* 7.1 — Google Calendar connection. Shows status + connect/disconnect
-            CTA. The redirect URL is handled server-side; after OAuth the user
-            lands back on /profile?calendar=connected. */}
-        <CalendarSection />
-
+        {/* Form-level error (validation / save failure). Sits right
+            above the save button so the agent doesn't miss it. */}
         {err && (
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -415,6 +412,9 @@ export default function Profile() {
           </div>
         )}
 
+        {/* Save sits right after the saveable form sections (פרטים
+            אישיים + ביוגרפיה) — anything below this point has its own
+            section-local action button and isn't part of the form. */}
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             type="button"
@@ -432,25 +432,38 @@ export default function Profile() {
           </button>
         </div>
 
+        {/* ── Group divider ────────────────────────────────────── */}
+        {/* Visual break so the agent reads the sections below as
+            "separate independent actions" rather than form fields the
+            save button covers. Tightly worded — no decoration. */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          color: DT.muted, fontSize: 12, fontWeight: 700,
+          margin: '4px 0',
+        }}>
+          <span style={{ flex: 1, height: 1, background: DT.border }} />
+          <span>אינטגרציות, נתונים וחשבון</span>
+          <span style={{ flex: 1, height: 1, background: DT.border }} />
+        </div>
+
+        {/* 7.1 — Google Calendar connection. Independent integration —
+            has its own connect/disconnect CTA inside the section, not
+            tied to the "שמור שינויים" form save above. */}
+        <CalendarSection />
+
         {/* 2026-04-27 — Data Subject Right (PPL §13 / GDPR Art. 15).
             Hits GET /api/me/export and forces a JSON download of every
-            row owned by this user. Deliberately non-destructive — sits
-            ABOVE the danger zone. */}
+            row owned by this user. Independent action — own button. */}
         <section style={sectionCard()} aria-label="ייצוא נתונים אישיים">
           <h3 style={sectionTitle()}>
-            ייצוא נתונים אישיים
+            <FileText size={16} /> ייצוא נתונים אישיים
             <span style={sectionSubtitle()}>הורדת כל המידע שלך כקובץ JSON</span>
           </h3>
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            gap: 12, flexWrap: 'wrap',
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 200 }}>
-              <span style={{ fontSize: 12.5, color: DT.muted, lineHeight: 1.6 }}>
-                מורידה את כל הנכסים, הלידים, הפגישות, ההסכמים והתיעוד שלך
-                בפורמט JSON אחד. בהתאם לסעיף 13 לחוק הגנת הפרטיות (זכות עיון).
-              </span>
-            </div>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: DT.muted, lineHeight: 1.6 }}>
+            מורידה את כל הנכסים, הלידים, הפגישות, ההסכמים והתיעוד שלך
+            בפורמט JSON אחד. בהתאם לסעיף 13 לחוק הגנת הפרטיות (זכות עיון).
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               type="button"
               onClick={async () => {
