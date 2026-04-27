@@ -67,12 +67,33 @@ export async function closeBrowser(): Promise<void> {
   }
 }
 
+// Total wall-clock budget per page. Hard outer timeout so a single
+// stuck Reblaze challenge can't block the entire tick. When this
+// fires we forcibly close the page (which throws inside any pending
+// goto/evaluate), then move on to the next URL.
+const PAGE_HARD_TIMEOUT_MS = 40_000;
+
 async function fetchOnePage(
   ctx: BrowserContext,
   url: string,
   log: Logger,
 ): Promise<unknown | null> {
   let page: Page | null = null;
+
+  // Outer hard-abort: race the actual fetch against a wall-clock
+  // timer. If the timer wins, we close the page from the OUTSIDE so
+  // any in-flight Playwright primitive (goto / waitForFunction /
+  // evaluate) throws and the inner work unwinds. This guards against
+  // a Chromium-internal hang where Playwright's own timeout doesn't
+  // propagate (we've seen this on Reblaze JS-challenge pages where
+  // the renderer enters a never-resolving state).
+  const abort = { fired: false };
+  const hardTimer = setTimeout(() => {
+    abort.fired = true;
+    log.warn({ url, timeoutMs: PAGE_HARD_TIMEOUT_MS }, 'yad2.hard-timeout-aborting');
+    page?.close().catch(() => { /* swallow */ });
+  }, PAGE_HARD_TIMEOUT_MS);
+
   try {
     page = await ctx.newPage();
     // Block heavy assets — we only need the HTML + its inlined JSON.
@@ -86,25 +107,30 @@ async function fetchOnePage(
       return route.continue();
     });
 
+    log.info({ url }, 'yad2.goto-start');
     const response = await page.goto(url, {
       waitUntil: 'domcontentloaded',
       timeout: PAGE_LOAD_TIMEOUT_MS,
     });
+    log.info({ url, status: response?.status() }, 'yad2.goto-done');
 
     if (!response || response.status() >= 400) {
       log.warn({ url, status: response?.status() }, 'yad2.page-error');
       return null;
     }
 
-    // Wait for __NEXT_DATA__ to be hydrated. The Reblaze JS challenge
-    // resolves in 1–2s on a clean Chromium; we give it 8s headroom.
+    // Wait for __NEXT_DATA__ to hydrate. Reblaze JS-challenge resolves
+    // in 1–2s on a clean Chromium; bumped to 12s headroom for slow
+    // EC2 ↔ Yad2 round-trips under load.
+    log.info({ url }, 'yad2.waiting-next-data');
     await page.waitForFunction(
       () => {
         const el = document.getElementById('__NEXT_DATA__');
         return !!el && (el.textContent?.length ?? 0) > 100;
       },
-      { timeout: 8_000 },
+      { timeout: 12_000 },
     );
+    log.info({ url }, 'yad2.next-data-ready');
 
     const json = await page.evaluate(() => {
       const el = document.getElementById('__NEXT_DATA__');
@@ -124,7 +150,17 @@ async function fetchOnePage(
     }
 
     return (parsed as { props?: { pageProps?: unknown } })?.props?.pageProps ?? null;
+  } catch (err) {
+    if (abort.fired) {
+      // Already logged the hard-timeout warning; surface as null
+      // rather than re-throwing so the caller's per-region try/catch
+      // doesn't classify this as a "region failure" — it's per-page.
+      return null;
+    }
+    log.warn({ url, err: String(err) }, 'yad2.fetch-failed');
+    return null;
   } finally {
+    clearTimeout(hardTimer);
     if (page) await page.close().catch(() => {/* swallow */});
   }
 }

@@ -1,0 +1,94 @@
+# Blue-green production compose. NOT YET ACTIVE — the active
+# template is still docker-compose.prod.yml (single-color).
+# This file ships alongside as the target architecture; activate
+# via the one-time install in `infra/README.md`, then this file
+# becomes docker-compose.prod.yml.
+#
+# Architecture:
+#   backend-blue  (6002) ─┐
+#                          ├─ host nginx upstream `estia_api` (active=blue OR green)
+#   backend-green (6003) ─┘
+#   frontend-blue  (3001) ─┐
+#                           ├─ host nginx upstream `estia_web` (active=blue OR green)
+#   frontend-green (3002) ─┘
+#   market-watcher        ── single instance (no inbound traffic)
+#
+# `scripts/deploy-blue-green.sh` boots the IDLE pair, healthchecks,
+# then atomically flips upstream via sed + nginx -s reload. In-flight
+# connections drain naturally for up to 5 minutes.
+
+services:
+  backend-blue: &backend
+    image: ghcr.io/tf7192/estia-backend:${ESTIA_TAG_BLUE:-main}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      UPLOADS_DIR: /app/uploads
+      ESTIA_COLOR: blue
+    ports:
+      - "127.0.0.1:6002:4000"
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+    pull_policy: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:4000/api/health > /dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 30s
+
+  backend-green:
+    <<: *backend
+    image: ghcr.io/tf7192/estia-backend:${ESTIA_TAG_GREEN:-main}
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      UPLOADS_DIR: /app/uploads
+      ESTIA_COLOR: green
+    ports:
+      - "127.0.0.1:6003:4000"
+
+  frontend-blue: &frontend
+    image: ghcr.io/tf7192/estia-frontend:${ESTIA_TAG_BLUE:-main}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:80"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    pull_policy: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:80/ > /dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+    stop_grace_period: 15s
+
+  frontend-green:
+    <<: *frontend
+    image: ghcr.io/tf7192/estia-frontend:${ESTIA_TAG_GREEN:-main}
+    ports:
+      - "127.0.0.1:3002:80"
+
+  market-watcher:
+    image: ghcr.io/tf7192/estia-market-watcher:${ESTIA_TAG:-main}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      MARKET_WATCHER_INTERVAL_MS: "3600000"
+      MARKET_WATCHER_JITTER_MS: "600000"
+      MARKET_MATCH_MIN_SCORE: "70"
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+    pull_policy: always
+    stop_grace_period: 30s
+    shm_size: 1gb

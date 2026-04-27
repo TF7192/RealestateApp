@@ -4,15 +4,14 @@
 # file drives both forward deploys and rollbacks (pick a different
 # tag, up).
 #
-# Why separate from docker-compose.yml:
-#   • docker-compose.yml keeps `build:` for local dev (so you can work
-#     off your checkout without GHCR access).
-#   • This file uses `image:` so the EC2 never needs source, never
-#     rebuilds, and rollbacks are one pull away.
-#
-# The EC2 logs in to GHCR on every deploy with the runner-minted
-# GITHUB_TOKEN (short-lived, scoped to the package) — no long-lived
-# PAT lives on the host.
+# BLUE-GREEN MIGRATION (in progress, 2026-04-27):
+#   The blue-green-capable compose template lives at
+#   `docker-compose.prod.blue-green.yml`. Once the host nginx is
+#   migrated to the template in `infra/nginx/estia.conf` and the
+#   four-service set is bootstrapped (see `infra/README.md`),
+#   `scripts/deploy-blue-green.sh` becomes the active deploy path
+#   and this file is replaced. Until then the existing single-color
+#   path keeps shipping.
 
 services:
   backend:
@@ -61,15 +60,17 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      # Hourly cadence + ±10min jitter is the spec default. Override
-      # via the .env file on the host if you need to tune for an
-      # incident.
       MARKET_WATCHER_INTERVAL_MS: "3600000"
       MARKET_WATCHER_JITTER_MS: "600000"
-      # Min match score to fire a Notification. Default 70 per the
-      # plan doc; bump to 80+ if matches feel noisy.
       MARKET_MATCH_MIN_SCORE: "70"
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
     pull_policy: always
+    stop_grace_period: 30s
+    # Chromium needs proper /dev/shm headroom in containers. Default
+    # Docker /dev/shm is 64MB which causes hangs on JS-heavy pages
+    # (Reblaze JS challenge stalls). 1GB matches Playwright's
+    # official Docker image. Combined with --disable-dev-shm-usage
+    # in the Chromium launch args this is belt-and-braces.
+    shm_size: 1gb
