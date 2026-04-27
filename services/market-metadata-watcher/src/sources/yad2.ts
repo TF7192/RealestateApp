@@ -27,6 +27,8 @@ import path from 'node:path';
 import type { Logger } from 'pino';
 
 chromiumStealth.use(StealthPlugin());
+
+import { pickProxy, poolSize, describeProxy } from '../proxy.js';
 import { extractFeedFromPageProps, type ExtractKind } from '../extractors/yad2-listing.js';
 import type { HashableListing } from '../hash.js';
 
@@ -331,20 +333,34 @@ export async function discoverYad2(opts: {
   // through subsequent listing fetches; next tick spins up a fresh
   // BrowserContext with a new fingerprint pulled from the pool.
   const fp = pickFingerprint();
-  log.info({ ua: fp.userAgent.slice(0, 30), viewport: fp.viewport }, 'yad2.fingerprint');
+  // Pick a proxy for THIS tick. Round-robin through the pool so every
+  // tick presents to Reblaze with a different IP. Pool is parsed once
+  // from WATCHER_PROXIES at process start; running without proxies
+  // (empty pool) is still supported — falls back to the EC2 NAT IP.
+  const proxy = pickProxy();
+  log.info(
+    { ua: fp.userAgent.slice(0, 30), viewport: fp.viewport, proxy: describeProxy(proxy), poolSize: poolSize() },
+    'yad2.fingerprint',
+  );
 
   // Persist Reblaze session cookies between ticks. A real user keeps
   // their cookies for days; we used to throw them away every hour,
   // forcing a fresh challenge each time. Loading prior storageState
   // means subsequent ticks usually skip the challenge entirely. File
   // is per-fingerprint-class so different UAs don't share cookies.
-  const stateKey = fp.userAgent.replace(/[^a-z0-9]/gi, '').slice(0, 24);
-  const statePath = path.join(STATE_DIR, `yad2-${stateKey}.json`);
+  // State key includes both fingerprint AND proxy host — Reblaze ties
+  // its session cookies to (UA × IP), so reusing cookies across proxies
+  // re-triggers a challenge anyway. Per-(fp × proxy) cookie file means
+  // round-robin ticks land on a warm session whenever they reuse a
+  // (fp, proxy) pair (likely after a few ticks given pool size).
+  const proxyKey = proxy ? proxy.server.replace(/[^a-z0-9]/gi, '').slice(0, 16) : 'direct';
+  const fpKey = fp.userAgent.replace(/[^a-z0-9]/gi, '').slice(0, 16);
+  const statePath = path.join(STATE_DIR, `yad2-${fpKey}-${proxyKey}.json`);
   let storageState: string | undefined;
   try {
     await fs.access(statePath);
     storageState = statePath;
-    log.info({ stateKey }, 'yad2.storage-state-loaded');
+    log.info({ fpKey, proxyKey }, 'yad2.storage-state-loaded');
   } catch { /* no prior state — first run for this fingerprint */ }
 
   const ctx = await br.newContext({
@@ -356,6 +372,10 @@ export async function discoverYad2(opts: {
       'Accept-Language': fp.acceptLanguage,
     },
     ...(storageState ? { storageState } : {}),
+    // Per-context proxy. Playwright routes ALL traffic from this
+    // context (warmup + every fetchOnePage) through the proxy, so the
+    // tick's IP stays consistent.
+    ...(proxy ? { proxy } : {}),
   });
 
   // Warm-up: visit Yad2's homepage first to establish Reblaze session

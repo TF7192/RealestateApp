@@ -63,6 +63,10 @@ services:
       MARKET_WATCHER_INTERVAL_MS: "3600000"
       MARKET_WATCHER_JITTER_MS: "600000"
       MARKET_MATCH_MIN_SCORE: "70"
+      # Residential proxy pool. Set via .env on the EC2 host:
+      #   WATCHER_PROXIES=http://user:pass@ip1:port,http://user:pass@ip2:port,...
+      # Comma- or newline-separated. Per-tick round-robin; empty = direct.
+      WATCHER_PROXIES: ${WATCHER_PROXIES:-}
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
