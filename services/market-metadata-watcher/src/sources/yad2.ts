@@ -52,10 +52,20 @@ const HIGH_VOLUME_PER_REGION_KIND = 100;
 let browser: Browser | null = null;
 
 async function getBrowser(): Promise<Browser> {
-  if (browser) return browser;
+  if (browser && browser.isConnected()) return browser;
   browser = await chromium.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      // Critical for Reblaze: Playwright/Puppeteer set
+      // navigator.webdriver=true by default, which Reblaze fingerprints
+      // as "automated browser → serve challenge". This flag suppresses
+      // the marker. Same line the backend's yad2-crawler uses, which
+      // crawls Yad2 successfully today.
+      '--disable-blink-features=AutomationControlled',
+    ],
   });
   return browser;
 }
@@ -121,33 +131,39 @@ async function fetchOnePage(
 
     // Wait for __NEXT_DATA__ to hydrate. Reblaze JS-challenge resolves
     // in 1–2s on a clean Chromium; bumped to 12s headroom for slow
-    // EC2 ↔ Yad2 round-trips under load.
+    // EC2 ↔ Yad2 round-trips under load. Tolerate timeout — we'll
+    // pull HTML anyway and let the regex/blocked-marker logic decide.
     log.info({ url }, 'yad2.waiting-next-data');
     await page.waitForFunction(
-      () => {
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      `(() => {
         const el = document.getElementById('__NEXT_DATA__');
-        return !!el && (el.textContent?.length ?? 0) > 100;
-      },
+        return !!(el && el.textContent && el.textContent.length > 1000);
+      })()`,
+      undefined,
       { timeout: 12_000 },
-    );
-    log.info({ url }, 'yad2.next-data-ready');
+    ).catch(() => { /* swallow — extraction below decides */ });
 
-    const json = await page.evaluate(() => {
-      const el = document.getElementById('__NEXT_DATA__');
-      return el?.textContent || null;
-    });
-
-    if (!json) {
-      log.warn({ url }, 'yad2.no-next-data');
+    // Read full HTML via page.content() — robust to Reblaze redirects
+    // mid-fetch. page.evaluate() throws "Execution context was destroyed"
+    // when the renderer is swapping pages; page.content() snapshots the
+    // current document and returns. The backend's yad2-crawler.ts
+    // (which crawls successfully today) uses this exact pattern.
+    const html = await page.content();
+    const blockMarkers = /__uzdbm_\d|validate\.perfdrive\.com|shieldsquare|x-rbz-/i.test(html);
+    const m = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/);
+    if (!m) {
+      log.warn({ url, blocked: blockMarkers }, 'yad2.no-next-data');
       return null;
     }
 
     let parsed: unknown;
-    try { parsed = JSON.parse(json); }
+    try { parsed = JSON.parse(m[1]); }
     catch (e) {
       log.warn({ url, err: String(e) }, 'yad2.next-data-parse-failed');
       return null;
     }
+    log.info({ url }, 'yad2.next-data-extracted');
 
     return (parsed as { props?: { pageProps?: unknown } })?.props?.pageProps ?? null;
   } catch (err) {
@@ -212,11 +228,21 @@ export async function discoverYad2(opts: {
   // leakage across hourly ticks. The route-level asset blocking
   // configured per-page above survives the close.
   const ctx = await br.newContext({
+    // Modern desktop Chrome on macOS — what the average Israeli
+    // residential visitor's browser sends. Fingerprint shape is
+    // unremarkable; Reblaze classifies it as legitimate.
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-      '(KHTML, like Gecko) Chrome/127.0 Safari/537.36',
+      '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     locale: 'he-IL',
     timezoneId: 'Asia/Jerusalem',
+    // Realistic viewport — undefined viewport (Playwright default)
+    // shows up in window.screen telemetry. 1366×900 is the most common
+    // desktop in Israel.
+    viewport: { width: 1366, height: 900 },
+    extraHTTPHeaders: {
+      'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
+    },
   });
 
   try {
