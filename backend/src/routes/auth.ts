@@ -65,6 +65,12 @@ const signupSchema = z.object({
   role: z.enum(['AGENT', 'CUSTOMER']),
   displayName: z.string().min(1).max(120),
   phone: z.string().min(5).max(40).optional(),
+  // 2026-04-27 — PPL §11 lawful-basis requirement. Frontend must
+  // surface a "I agree to Terms + Privacy" checkbox; signup is
+  // refused if the box wasn't ticked.
+  acceptedTerms: z.literal(true, {
+    errorMap: () => ({ message: 'יש לאשר את תנאי השימוש ומדיניות הפרטיות' }),
+  }),
 });
 
 const loginSchema = z.object({
@@ -139,6 +145,9 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
         slug,
         phone: body.phone,
         provider: 'EMAIL',
+        // PPL §11 — record the consent timestamp at signup.
+        termsAcceptedAt: new Date(),
+        passwordChangedAt: new Date(),
         agentProfile: body.role === 'AGENT' ? { create: {} } : undefined,
         customerProfile: body.role === 'CUSTOMER' ? { create: {} } : undefined,
       },
@@ -284,8 +293,15 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(400).send({ error: { message: 'הקישור לא תקין או פג תוקפו' } });
     }
     const passwordHash = await argon2.hash(password);
+    // 2026-04-27 — bump passwordChangedAt so any pre-reset JWT is
+    // rejected by the auth middleware on its next request. Without
+    // this, the 30-day cookie issued before the reset would still
+    // authenticate.
     await prisma.$transaction([
-      prisma.user.update({ where: { id: row.userId }, data: { passwordHash } }),
+      prisma.user.update({
+        where: { id: row.userId },
+        data: { passwordHash, passwordChangedAt: new Date() },
+      }),
       prisma.passwordResetToken.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
     ]);
     phTrack('password_reset_completed', row.userId, {});

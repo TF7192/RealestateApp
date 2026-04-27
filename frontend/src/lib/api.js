@@ -209,6 +209,15 @@ export const api = {
   // seeing shared properties.
   deleteAccount: () => request('/auth/delete-account', { method: 'POST' }),
   me: () => request('/me'),
+  getMe: () => request('/me'),
+  // 2026-04-27 — DSR data export (PPL §13 / GDPR Art. 15). Triggers
+  // a download of the JSON bundle from the server.
+  exportMyData: () => request('/me/export', { raw: true }),
+  // 2026-04-27 — analytics consent persistence. CookieBanner calls
+  // this with true/false; backend stores it on the user row so the
+  // choice survives across devices.
+  setAnalyticsConsent: (consent) =>
+    request('/me/analytics-consent', { method: 'POST', body: { consent } }),
   // A-4 — submit first-login onboarding form (license + optional title /
   // agency / phone). On success the server stamps `profileCompletedAt`
   // and the SPA route guard stops redirecting to /onboarding.

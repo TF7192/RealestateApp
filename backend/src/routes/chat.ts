@@ -68,6 +68,25 @@ function broadcastRead(conversation: { id: string; userId: string }, readerRole:
 }
 
 export const registerChatRoutes: FastifyPluginAsync = async (app) => {
+  // 2026-04-27 — PPL Reg. 4(b) audit logging for admin-side reads of
+  // user conversations. Mirrors the hook in admin.ts.
+  const { logActivity } = await import('../lib/activity.js');
+  app.addHook('onResponse', async (req, reply) => {
+    const url = (req as any).routeOptions?.url || req.url;
+    if (typeof url !== 'string' || !url.includes('/admin/')) return;
+    const u = getUser(req);
+    if (!u || u.role !== 'ADMIN') return;
+    if (reply.statusCode >= 400) return;
+    try {
+      await logActivity({
+        agentId: u.id, actorId: u.id,
+        verb: 'admin_access', entityType: 'AdminChatRoute', entityId: url,
+        summary: `${req.method} ${url}`,
+        metadata: { method: req.method, status: reply.statusCode },
+      });
+    } catch { /* never break the response */ }
+  });
+
   // ── user-facing routes ───────────────────────────────────────
   // Get-or-create the current user's conversation + last 50 messages.
   app.get('/me', { onRequest: [app.requireAuth] }, async (req) => {

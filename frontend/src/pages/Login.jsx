@@ -44,7 +44,7 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const initialSignup = searchParams.get('flow') === 'signup';
   const [mode, setMode] = useState(initialSignup ? 'signup' : 'login');
-  const [form, setForm] = useState({ email: '', password: '', displayName: '', phone: '' });
+  const [form, setForm] = useState({ email: '', password: '', displayName: '', phone: '', acceptedTerms: false });
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -124,6 +124,10 @@ export default function Login() {
     if (form.password.length < 8) {
       setError(isSignup ? 'סיסמה חייבת להיות לפחות 8 תווים' : 'סיסמה קצרה מדי'); return;
     }
+    if (isSignup && !form.acceptedTerms) {
+      setError('יש לאשר את תנאי השימוש ומדיניות הפרטיות');
+      return;
+    }
     setSubmitting(true);
     try {
       if (isSignup) {
@@ -133,6 +137,7 @@ export default function Login() {
           role: 'AGENT',
           displayName: form.displayName || form.email.split('@')[0],
           phone: form.phone || undefined,
+          acceptedTerms: true,
         });
       } else {
         await login({ email: form.email, password: form.password });
@@ -266,6 +271,22 @@ function DesktopLogin(p) {
                   style={{ color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>שכחת סיסמה?</a>
               </div>
             )}
+            {isSignup && (
+              <label style={{ display: 'inline-flex', gap: 8, alignItems: 'flex-start', color: DT.muted, fontSize: 12.5, cursor: 'pointer', lineHeight: 1.5 }}>
+                <input
+                  type="checkbox"
+                  checked={form.acceptedTerms}
+                  onChange={(e) => update('acceptedTerms', e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span>
+                  אני מאשר/ת שקראתי ואני מסכים/ה ל
+                  <a href="/terms" target="_blank" rel="noreferrer" style={{ color: DT.gold, textDecoration: 'underline', fontWeight: 700 }}>תנאי השימוש</a>
+                  {' '}ול
+                  <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: DT.gold, textDecoration: 'underline', fontWeight: 700 }}>מדיניות הפרטיות</a>.
+                </span>
+              </label>
+            )}
             {error && <div style={{ background: 'rgba(185,28,28,0.08)', color: DT.danger, padding: '10px 12px', borderRadius: 10, fontSize: 13 }} role="alert">{error}</div>}
             <button type="submit" disabled={submitting} style={{
               ...FONT, background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
@@ -350,6 +371,22 @@ function MobileLogin(p) {
           <div style={{ textAlign: 'left', marginBottom: 18 }}>
             <a href="/forgot-password" style={{ fontSize: 12, color: DT.gold, fontWeight: 600 }}>שכחתי סיסמה</a>
           </div>
+        )}
+        {isSignup && (
+          <label style={{ display: 'inline-flex', gap: 8, alignItems: 'flex-start', color: DT.muted, fontSize: 12.5, cursor: 'pointer', lineHeight: 1.5, marginBottom: 12 }}>
+            <input
+              type="checkbox"
+              checked={form.acceptedTerms}
+              onChange={(e) => update('acceptedTerms', e.target.checked)}
+              style={{ marginTop: 2 }}
+            />
+            <span>
+              אני מאשר/ת שקראתי ואני מסכים/ה ל
+              <a href="/terms" target="_blank" rel="noreferrer" style={{ color: DT.gold, textDecoration: 'underline', fontWeight: 700 }}>תנאי השימוש</a>
+              {' '}ול
+              <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: DT.gold, textDecoration: 'underline', fontWeight: 700 }}>מדיניות הפרטיות</a>.
+            </span>
+          </label>
         )}
         {error && <div style={{ background: 'rgba(185,28,28,0.08)', color: DT.danger, padding: '10px 12px', borderRadius: 10, fontSize: 13, marginBottom: 12 }} role="alert">{error}</div>}
         <PrimaryBtn type="submit" disabled={submitting}>

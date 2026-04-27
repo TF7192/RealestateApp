@@ -31,6 +31,7 @@ import { recordAnthropic } from '../lib/aiUsage.js';
 import { requirePremium } from '../middleware/requirePremium.js';
 import { buildAnthropic } from '../lib/anthropic.js';
 import { putMeetingAudio } from '../lib/meetingAudio.js';
+import { deleteUpload } from '../lib/storage.js';
 import { getFreshAccessToken, createCalendarEvent } from './calendar.js';
 
 const querySchema = z.object({
@@ -362,6 +363,26 @@ export const registerMeetingRoutes: FastifyPluginAsync = async (app) => {
         summaryJson: structured as any,
       },
     });
+
+    // 2026-04-27 — privacy/PPL retention: the raw recording is the
+    // most sensitive artefact in the entire CRM (live conversations
+    // with named owners + buyers). Once Whisper has produced a
+    // transcript and Claude has produced a structured summary, the
+    // audio's purpose has been served. Delete the S3 object and
+    // null-out audioKey so the row stays for history but the blob
+    // doesn't sit on indefinitely.
+    if (audioKey && !audioKey.startsWith('local://')) {
+      try {
+        const blobKey = audioKey.replace(/^\/uploads\//, '');
+        if (blobKey && blobKey !== audioKey) await deleteUpload(blobKey);
+        await prisma.leadMeeting.update({
+          where: { id: meeting.id },
+          data: { audioKey: null },
+        });
+      } catch (err) {
+        req.log.warn({ err, meetingId: meeting.id }, 'meeting audio cleanup failed');
+      }
+    }
     return { meeting: updated };
   });
 };

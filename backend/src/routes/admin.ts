@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { getUser } from '../middleware/auth.js';
+import { logActivity } from '../lib/activity.js';
 
 /**
  * Admin-only routes. SEC-010 — every route gates on the role-based
@@ -10,6 +12,25 @@ import { prisma } from '../lib/prisma.js';
  * Mounted at /api/admin in server.ts.
  */
 export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
+  // 2026-04-27 — PPL Reg. 4(b) requires audit logs of access to
+  // "high"-classified data. Every admin route hit writes a row to
+  // ActivityLog so we have a 24-month-retained trail of who looked
+  // at what.
+  app.addHook('onResponse', async (req, reply) => {
+    const url = (req as any).routeOptions?.url || req.url;
+    if (typeof url !== 'string' || !url.startsWith('/admin/')) return;
+    const u = getUser(req);
+    if (!u) return;
+    if (reply.statusCode >= 400) return;
+    try {
+      await logActivity({
+        agentId: u.id, actorId: u.id,
+        verb: 'admin_access', entityType: 'AdminRoute', entityId: url,
+        summary: `${req.method} ${url}`,
+        metadata: { method: req.method, status: reply.statusCode },
+      });
+    } catch { /* never let audit logging break the response */ }
+  });
   // Market Discovery (Phase 4) — admin observability.
   // GET /api/admin/market-watcher/runs — last 50 watcher runs, newest
   // first. Used by /admin/market-watcher to surface success/failure

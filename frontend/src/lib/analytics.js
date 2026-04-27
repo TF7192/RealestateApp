@@ -42,8 +42,20 @@ const enqueue = (fn) => {
   if (preInitQueue.length < PRE_INIT_MAX) preInitQueue.push(fn);
 };
 
+// 2026-04-27 — consent gate. PostHog session-replay + autocapture
+// must NOT run until the user opts in via the cookie banner. The
+// localStorage key matches CookieBanner.jsx; null/false = no init.
+function hasAnalyticsConsent() {
+  try {
+    return localStorage.getItem('estia_analytics_consent') === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export async function initAnalytics() {
   if (ready || !ENABLED || !KEY) return;
+  if (!hasAnalyticsConsent()) return;
   try {
     // Dynamic import keeps posthog-js out of the critical-path bundle.
     // Vite hoists this into its own chunk (posthog-js-<hash>.js) and

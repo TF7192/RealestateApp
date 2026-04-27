@@ -320,6 +320,21 @@ model User {
   // rows stay intact so a follow-up support request can restore them
   // and shared properties remain visible to co-owner agents.
   deletedAt             DateTime?
+  // 2026-04-27 — Compliance/PPL §11. When the user accepted the
+  // current Terms + Privacy Policy. Required at signup; updated when
+  // a new policy version forces re-consent.
+  termsAcceptedAt       DateTime?
+  // 2026-04-27 — Cookie/analytics opt-in. NULL = no decision yet
+  // (essential cookies only); true = consented to PostHog product
+  // analytics; false = explicitly declined. Frontend reads this so
+  // it can re-prompt only when null.
+  analyticsConsent      Boolean?
+  analyticsConsentAt    DateTime?
+  // 2026-04-27 — JWT revocation anchor. Reject any JWT whose `iat`
+  // is older than this timestamp. Bumped on password change and on
+  // explicit "log out everywhere" so a leaked 30-day token is dead
+  // on the next request after the user remediates.
+  passwordChangedAt     DateTime?
   // 7.1 — Google Calendar OAuth tokens. Populated by a consent flow
   // that's separate from (but layered on top of) the existing Google
   // login — agents who logged in with email can still connect their

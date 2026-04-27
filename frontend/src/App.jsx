@@ -53,6 +53,10 @@ const Transfers = lazy(() => import('./pages/Transfers'));
 // the dialog is mounted once at the root and stays eager.
 const Contact = lazy(() => import('./pages/Contact'));
 import PremiumGateDialog from './components/PremiumGateDialog';
+// 2026-04-27 — Cookie/analytics consent banner. Mounted at root so it
+// can show on any page (landing, login, app). Until the user accepts,
+// initAnalytics() short-circuits and PostHog never loads.
+import CookieBanner from './components/CookieBanner';
 // S13: Templates, AdminChats, CommandPalette are heavy and not on the
 // critical path for the first page paint. Lazy-load them so the main
 // bundle drops ~90KB and cold-start on cellular gets noticeably faster.
@@ -541,6 +545,9 @@ function AppRoutes() {
           onClose={() => setPremiumFeature(null)}
         />
       )}
+      {/* 2026-04-27 — cookie/analytics consent banner. Self-hides
+          once the user has decided (locally and/or server-side). */}
+      <CookieBanner />
     </>
   );
 }

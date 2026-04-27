@@ -432,6 +432,50 @@ export default function Profile() {
           </button>
         </div>
 
+        {/* 2026-04-27 — Data Subject Right (PPL §13 / GDPR Art. 15).
+            Hits GET /api/me/export and forces a JSON download of every
+            row owned by this user. Deliberately non-destructive — sits
+            ABOVE the danger zone. */}
+        <section style={sectionCard()} aria-label="ייצוא נתונים אישיים">
+          <h3 style={sectionTitle()}>
+            ייצוא נתונים אישיים
+            <span style={sectionSubtitle()}>הורדת כל המידע שלך כקובץ JSON</span>
+          </h3>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 12, flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 200 }}>
+              <span style={{ fontSize: 12.5, color: DT.muted, lineHeight: 1.6 }}>
+                מורידה את כל הנכסים, הלידים, הפגישות, ההסכמים והתיעוד שלך
+                בפורמט JSON אחד. בהתאם לסעיף 13 לחוק הגנת הפרטיות (זכות עיון).
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const res = await api.exportMyData();
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `estia-export-${new Date().toISOString().slice(0, 10)}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+                } catch (e) {
+                  alert(e?.message || 'הייצוא נכשל — נסו שוב מאוחר יותר');
+                }
+              }}
+              style={primaryBtn()}
+            >
+              הורד עותק JSON
+            </button>
+          </div>
+        </section>
+
         {/* A-1 — destructive surface. Lives at the bottom of Profile so
             the agent has to scroll past everything else to find it. The
             confirmation dialog is the actual guard (type-the-phrase). */}

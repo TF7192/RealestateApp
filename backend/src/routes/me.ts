@@ -181,6 +181,63 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
     });
     return { user: user && toPublic(user), url };
   });
+  // 2026-04-27 — DSR (Data Subject Right) export. PPL §13 access right;
+  // GDPR Art. 15 + 20. Returns a JSON bundle of every row scoped to
+  // this user. We deliberately don't stream binary blobs (photos /
+  // videos / signed PDFs) — those are linked by URL so the user can
+  // pull them via the same authenticated cookie afterwards. Rate-limit
+  // is the global default (a user dumping their own catalogue isn't
+  // an attack vector worth a tighter cap).
+  app.get('/export', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const uid = requireUser(req).id;
+    const [
+      user, properties, leads, owners, deals, prospects,
+      reminders, meetings, contracts, agreements, documents, activity,
+    ] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: uid },
+        include: { agentProfile: true, customerProfile: true },
+      }),
+      prisma.property.findMany({ where: { agentId: uid }, include: { images: true, videos: true, marketingActions: true, priceOffers: true } }),
+      prisma.lead.findMany({ where: { agentId: uid }, include: { searchProfiles: true, viewings: true } }),
+      prisma.owner.findMany({ where: { agentId: uid } }),
+      prisma.deal.findMany({ where: { agentId: uid } }),
+      prisma.prospect.findMany({ where: { agentId: uid } }),
+      prisma.reminder.findMany({ where: { agentId: uid } }),
+      prisma.leadMeeting.findMany({ where: { agentId: uid } }),
+      prisma.contract.findMany({ where: { agentId: uid } }),
+      prisma.agreement.findMany({ where: { property: { agentId: uid } } }),
+      prisma.uploadedFile.findMany({ where: { ownerId: uid } }),
+      prisma.activityLog.findMany({ where: { agentId: uid }, orderBy: { createdAt: 'desc' }, take: 5000 }),
+    ]);
+    if (!user || user.deletedAt) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    const fileBase = `estia-export-${user.email.replace(/[^a-z0-9]+/gi, '_')}-${new Date().toISOString().slice(0, 10)}.json`;
+    reply.header('Content-Type', 'application/json; charset=utf-8');
+    reply.header('Content-Disposition', `attachment; filename="${fileBase}"`);
+    return {
+      meta: {
+        generatedAt: new Date().toISOString(),
+        about: 'Personal data export per PPL §13 / GDPR Art. 15. Files (photos / videos / PDFs) are referenced by URL — fetch them with the same cookie.',
+      },
+      user, properties, leads, owners, deals, prospects,
+      reminders, meetings, contracts, agreements, documents, activity,
+    };
+  });
+
+  // 2026-04-27 — analytics consent. Frontend writes here when the user
+  // accepts/declines the cookie banner. Tri-state: true / false / null
+  // (never decided). The banner only re-prompts when null.
+  app.post('/analytics-consent', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const uid = requireUser(req).id;
+    const body = z.object({ consent: z.boolean() }).parse(req.body);
+    await prisma.user.update({
+      where: { id: uid },
+      data: { analyticsConsent: body.consent, analyticsConsentAt: new Date() },
+    });
+    return reply.send({ ok: true });
+  });
 };
 
 function toPublic(user: any) {
@@ -202,5 +259,10 @@ function toPublic(user: any) {
     // Same flag the auth-login response exposes. Clients read it to
     // skip the premium upsell modal when the row really is premium.
     isPremium: !!user.isPremium,
+    // 2026-04-27 — privacy / consent state. The frontend uses these to
+    // decide whether to mount the cookie banner (`analyticsConsent ===
+    // null`) and whether to fire PostHog (`analyticsConsent === true`).
+    termsAcceptedAt: user.termsAcceptedAt || null,
+    analyticsConsent: user.analyticsConsent ?? null,
   };
 }

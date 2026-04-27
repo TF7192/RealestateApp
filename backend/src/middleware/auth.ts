@@ -46,7 +46,7 @@ const plugin: FastifyPluginAsync = async (app) => {
           ? req.headers.authorization.slice(7)
           : undefined);
       if (!token) return;
-      const decoded = app.jwt.verify<{ sub: string; role: UserRole; email: string }>(token);
+      const decoded = app.jwt.verify<{ sub: string; role: UserRole; email: string; iat?: number }>(token);
       // SEC-014 — soft-deleted accounts must lose access immediately,
       // not when their 30-day JWT expires. The cookie is cleared on
       // delete-account, but the in-flight token in a running iOS app
@@ -54,12 +54,22 @@ const plugin: FastifyPluginAsync = async (app) => {
       // this re-check. One row read per authed request is the simplest
       // correct fix; do NOT cache this naively in a future perf-pass —
       // a stale cache here means a deleted user keeps their access.
+      // 2026-04-27 — also reject any JWT issued before the user's last
+      // passwordChangedAt timestamp. Trims the post-credential-reset
+      // attack window from "30-day JWT lifetime" to "next request".
       const { prisma } = await import('../lib/prisma.js');
       const stillActive = await prisma.user.findFirst({
         where: { id: decoded.sub, deletedAt: null },
-        select: { id: true },
+        select: { id: true, passwordChangedAt: true },
       });
-      if (!stillActive) return; // leaves req unauthenticated; downstream requireX returns 401
+      if (!stillActive) return;
+      if (
+        stillActive.passwordChangedAt &&
+        typeof decoded.iat === 'number' &&
+        decoded.iat * 1000 < stillActive.passwordChangedAt.getTime()
+      ) {
+        return; // JWT pre-dates the password change → reject
+      }
       setUser(req, { id: decoded.sub, role: decoded.role, email: decoded.email });
     } catch {
       // ignore — unauthenticated requests hit requireAuth below

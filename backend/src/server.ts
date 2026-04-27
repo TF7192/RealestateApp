@@ -413,6 +413,14 @@ if (runAsMain) {
         './workers/marketDiscoveryReactor.js'
       );
       startMarketDiscoveryReactor();
+      // 2026-04-27 — soft-delete purge. Hard-deletes users with
+      // deletedAt < now - 30d and their S3 blobs. Honours the
+      // privacy-policy promise that account-deletion is final after
+      // 30 days. Hourly cadence with a 90s stagger from boot.
+      const { startPurgeDeletedUsersWorker } = await import(
+        './workers/purgeDeletedUsers.js'
+      );
+      startPurgeDeletedUsersWorker();
       return app.listen({ port: PORT, host: HOST }).then(() => {
         app.log.info(`Estia API listening on ${HOST}:${PORT}`);
       });
