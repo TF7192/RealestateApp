@@ -1,25 +1,31 @@
-// Residential proxy pool. Each tick picks a proxy and uses it for the
-// entire BrowserContext (warmup + every region fetch). Per-tick rotation
-// keeps a single proxy from getting flagged after sustained scraping;
-// combined with our existing fingerprint rotation, every tick presents
-// to Reblaze as a fresh visitor (new IP + new UA + new cookies if
-// warmup re-challenged).
+// Residential proxy pool. Each `pickProxy()` call advances the round-robin
+// cursor; openRegionContext() invokes pickProxy() + pickFingerprint()
+// together, so per-region opens AND mid-region re-rolls present a fresh
+// (IP × UA × cookie-jar) tuple to Reblaze.
 //
-// Configuration:
-//   WATCHER_PROXIES — newline-or-comma-separated list of proxy URLs.
-//   Each entry must be a full URL with scheme + creds + host + port:
+// Configuration (one of):
+//   WATCHER_PROXIES_FILE — path to a file containing one proxy URL per
+//     line. Preferred for large pools (e.g. DataImpulse's 2999-port
+//     gateway list) so we don't stuff thousands of lines into env.
+//   WATCHER_PROXIES — inline newline-or-comma-separated list. Same URL
+//     format. Used as a fallback if the file is unset/missing.
+//
+// URL format (either source):
 //     http://USER:PASS@HOST:PORT
 //     https://USER:PASS@HOST:PORT
 //     socks5://USER:PASS@HOST:PORT
 //
-// Example .env:
-//   WATCHER_PROXIES=http://user:pass@1.2.3.4:8080,http://user:pass@5.6.7.8:8080
+// DataImpulse port-rotation note: their gateway exposes 2999 distinct
+// ports (10000–12998) on a single host IP, where each PORT routes to a
+// different residential exit IP. So the pool is the port list — round-
+// robin through it and you cycle exit IPs without any session-token
+// magic.
 //
-// (newlines also OK — useful for `docker compose -e` heredocs)
-//
-// Selection strategy: round-robin per tick (modular index in module
-// scope). Process restart resets the cursor; that's fine because
-// fingerprint rotation already randomizes per tick.
+// Selection strategy: round-robin (modular index in module scope).
+// Process restart resets the cursor; that's fine because fingerprint
+// rotation already randomizes per tick.
+
+import fs from 'node:fs';
 
 export type ProxyConfig = {
   server: string;       // "http://host:port" or "socks5://host:port"
@@ -27,8 +33,24 @@ export type ProxyConfig = {
   password?: string;
 };
 
-const POOL: ProxyConfig[] = parseProxiesEnv(process.env.WATCHER_PROXIES);
+const POOL: ProxyConfig[] = loadPool();
 let cursor = 0;
+
+function loadPool(): ProxyConfig[] {
+  // File source wins if set + readable. We deliberately don't merge —
+  // one source of truth avoids accidental duplicates that would skew
+  // round-robin distribution.
+  const filePath = process.env.WATCHER_PROXIES_FILE?.trim();
+  if (filePath) {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf8');
+      const parsed = parseProxiesEnv(raw);
+      if (parsed.length > 0) return parsed;
+      // Fall through to env if file existed but had nothing parseable.
+    } catch { /* file missing/unreadable — fall through to env */ }
+  }
+  return parseProxiesEnv(process.env.WATCHER_PROXIES);
+}
 
 function parseProxiesEnv(raw: string | undefined): ProxyConfig[] {
   if (!raw) return [];

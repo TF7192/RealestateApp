@@ -63,10 +63,22 @@ services:
       MARKET_WATCHER_INTERVAL_MS: "3600000"
       MARKET_WATCHER_JITTER_MS: "600000"
       MARKET_MATCH_MIN_SCORE: "70"
-      # Residential proxy pool. Set via .env on the EC2 host:
-      #   WATCHER_PROXIES=http://user:pass@ip1:port,http://user:pass@ip2:port,...
-      # Comma- or newline-separated. Per-tick round-robin; empty = direct.
+      # Residential proxy pool. Two ways to configure (file wins):
+      #   1) WATCHER_PROXIES_FILE=/run/proxies.txt — bind-mounted below.
+      #      Preferred for large pools (e.g. DataImpulse's 2999-port
+      #      gateway list).
+      #   2) WATCHER_PROXIES=http://user:pass@ip1:port,...
+      #      Inline comma- or newline-separated; fine for small pools.
+      # Per-call round-robin; empty = direct.
+      WATCHER_PROXIES_FILE: /run/proxies.txt
       WATCHER_PROXIES: ${WATCHER_PROXIES:-}
+    volumes:
+      # Mount the host-side proxy list read-only into the container.
+      # The file is gitignored (DataImpulse credentials). If the host
+      # file doesn't exist, Docker creates an empty placeholder dir —
+      # proxy.ts treats an unparseable/empty source as "no pool" and
+      # falls back to direct, so this stays safe.
+      - ./services/market-metadata-watcher/proxies.txt:/run/proxies.txt:ro
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
