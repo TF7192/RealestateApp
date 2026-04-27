@@ -9,11 +9,11 @@
 // descriptions, phone numbers, or HTML. Every card surfaces the
 // "פתח במקור" link so the source remains canonical.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2, ExternalLink, Copy as CopyIcon, Filter, X,
-  Sparkles, ChevronDown, ChevronRight, ChevronLeft,
+  Sparkles, ChevronDown,
   Mail, MailCheck, CheckCircle2, User, Briefcase,
 } from 'lucide-react';
 import api from '../lib/api';
@@ -21,6 +21,8 @@ import { useToast } from '../lib/toast';
 import { displayPriceShort } from '../lib/display';
 import { relLabel } from '../lib/relativeDate';
 import EmptyState from '../components/EmptyState';
+import Portal from '../components/Portal';
+import useInfiniteScroll from '../lib/useInfiniteScroll';
 import {
   inputPropsForPrice, inputPropsForRooms, inputPropsForSqm,
   inputPropsForCity,
@@ -82,17 +84,11 @@ export default function MarketDiscovery() {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [emailDraft, setEmailDraft] = useState('');
   const [sort, setSort] = useState('firstSeenAt-desc');
-  // Pagination — 10 listings per page so the agent isn't drowning
-  // in 50 cards on first paint. Matched listings always pop to the
-  // top of the page (server-side); pagination walks through the rest
-  // by the agent's chosen sort.
-  const PAGE_SIZE = 10;
-  const [offset, setOffset] = useState(0);
-
-  // Reset pagination whenever filters or sort change — otherwise
-  // the agent ends up on "page 7" of a fresh filter that only has
-  // 3 items and sees an empty page.
-  useEffect(() => { setOffset(0); }, [filters, sort]);
+  // Pagination — fetch a deep window from the backend (100), then
+  // reveal 15 cards at a time via infinite scroll. Matches Properties
+  // page UX (no pager buttons; the page just grows as you scroll).
+  const FETCH_LIMIT = 100;
+  const REVEAL_PAGE = 15;
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -118,10 +114,14 @@ export default function MarketDiscovery() {
       api.getMe().catch(() => null),
     ]).then(([pref, me]) => {
       if (cancelled) return;
+      // /api/me returns { user: { email, ... } } — the unwrap was
+      // missing before, so accountEmail came back '' and the popup
+      // never pre-filled.
+      const accountEmail = me?.user?.email || me?.email || '';
       setEmailPref({
         enabled: !!pref?.marketMatchEmailEnabled,
         deliveryEmail: pref?.customDeliveryEmail || null,
-        accountEmail: me?.email || '',
+        accountEmail,
       });
     });
     return () => { cancelled = true; };
@@ -195,7 +195,7 @@ export default function MarketDiscovery() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.listMarketListings({ ...filters, sort, limit: PAGE_SIZE, offset }).then(
+    api.listMarketListings({ ...filters, sort, limit: FETCH_LIMIT, offset: 0 }).then(
       (res) => {
         if (cancelled) return;
         setItems(res?.items || []);
@@ -210,7 +210,7 @@ export default function MarketDiscovery() {
       },
     );
     return () => { cancelled = true; };
-  }, [filters, sort, offset]);
+  }, [filters, sort]);
 
   const update = (k) => (v) =>
     setFilters((f) => ({ ...f, [k]: v?.target ? v.target.value : v }));
@@ -262,6 +262,18 @@ export default function MarketDiscovery() {
     if (matchContext?.marketListing) return [matchContext.marketListing, ...items];
     return items;
   }, [items, matchedListingId, matchContext]);
+
+  // Infinite scroll — initial reveal = REVEAL_PAGE, sentinel pulls
+  // another batch when it scrolls into view.
+  const infinite = useInfiniteScroll(orderedItems.length, {
+    pageSize: REVEAL_PAGE,
+    initial: REVEAL_PAGE,
+    rootMargin: '300px',
+  });
+  const visibleItems = useMemo(
+    () => orderedItems.slice(0, infinite.visible),
+    [orderedItems, infinite.visible],
+  );
 
   return (
     <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
@@ -571,85 +583,110 @@ export default function MarketDiscovery() {
         />
       )}
 
-      <div style={{ display: 'grid', gap: 10 }}>
-        {orderedItems.map((l) => {
-          const isMatched = !!l.topMatch || l.id === matchedListingId;
+      <div style={{
+        display: 'grid',
+        // 3-column grid on desktop, auto-fills down to 1 column on mobile
+        // (keeps cards readable on phones — minmax floor of 280 means
+        // a phone screen gets 1 card, a tablet 2, desktop 3).
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
+        gap: 12,
+      }}>
+        {visibleItems.map((l) => {
+          const isMatched = (Array.isArray(l.matches) && l.matches.length > 0)
+            || !!l.topMatch
+            || l.id === matchedListingId;
           const isDuplicated = !!l.duplicatedByMe;
-          // Visual hierarchy: duplicated (already-acted) takes precedence
-          // over matched (still-actionable). Both cases mirror the
-          // התאמות פומביות card style — colored 1px border + soft shadow.
+          // Names of all leads that match this listing — capped at 3
+          // visible + "+N" overflow so the badge stays compact.
+          const matchedNames = (Array.isArray(l.matches) ? l.matches : [])
+            .map((m) => m && m.leadName)
+            .filter(Boolean);
+          const namesShown = matchedNames.slice(0, 3).join(', ');
+          const namesOverflow = matchedNames.length > 3 ? matchedNames.length - 3 : 0;
+          // Visual hierarchy: duplicated (already-acted) → green;
+          // matched → strong gold (richer than the soft 1px border we
+          // had before — 2px + saturated shadow + tinted background).
           const accent = isDuplicated ? DT.success
                        : isMatched   ? DT.gold
                        : null;
-          const accentSoft = isDuplicated ? DT.successSoft
-                           : isMatched   ? DT.goldSoft
-                           : null;
           return (
           <article
             key={l.id}
             data-matched={isMatched ? 'true' : undefined}
             data-duplicated={isDuplicated ? 'true' : undefined}
             style={{
-              background: DT.white,
-              border: `1px solid ${accent || DT.border}`,
+              background: isMatched && !isDuplicated
+                ? 'linear-gradient(180deg, rgba(180,139,76,0.06), #fff 35%)'
+                : DT.white,
+              border: accent ? `2px solid ${accent}` : `1px solid ${DT.border}`,
               borderRadius: 14,
               padding: 14,
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr) auto',
-              gap: 14,
-              alignItems: 'center',
-              boxShadow: accent
-                ? `0 4px 14px ${accentSoft.replace('0.08', '0.18').replace('0.12', '0.22')}`
+              display: 'flex', flexDirection: 'column', gap: 10,
+              boxShadow: isDuplicated
+                ? '0 6px 16px rgba(21,128,61,0.18)'
+                : isMatched
+                ? '0 6px 18px rgba(180,139,76,0.28)'
                 : '0 1px 0 rgba(30,26,20,0.03)',
             }}
           >
-            <div style={{ minWidth: 0 }}>
-              {/* Status badges row — match, duplicated, source, poster type */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-                {isDuplicated && (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    background: DT.success, color: DT.white,
-                    fontSize: 10, fontWeight: 800, letterSpacing: 0.4,
-                    padding: '2px 8px', borderRadius: 99,
+            {/* Lead-match banner — bigger, golden, names not score */}
+            {isMatched && !isDuplicated && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+                background: 'rgba(180,139,76,0.12)',
+                border: `1px solid rgba(180,139,76,0.35)`,
+                borderRadius: 10, padding: '8px 10px',
+              }}>
+                <Sparkles size={16} style={{ color: DT.goldDark, flexShrink: 0, marginTop: 2 }} />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 800, color: DT.goldDark, lineHeight: 1.35,
                   }}>
-                    <CheckCircle2 size={10} /> בנכסים שלך
-                  </span>
-                )}
-                {isMatched && !isDuplicated && (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    background: DT.gold, color: DT.white,
-                    fontSize: 10, fontWeight: 800, letterSpacing: 0.4,
-                    padding: '2px 8px', borderRadius: 99,
-                  }}>
-                    <Sparkles size={10} />
-                    {l.topMatch
-                      ? `מתאים לליד שלך · ${l.topMatch.score}/100`
+                    {namesShown
+                      ? `מתאים ל${namesShown}${namesOverflow ? ` +${namesOverflow}` : ''}`
                       : 'מתאים לליד שלך'}
-                  </span>
-                )}
-                {l.source === 'yad2' && <Yad2Badge />}
-                {l.kind && (
-                  <span style={kindPillStyle}>
-                    {l.kind === 'rent' ? 'להשכרה' : 'למכירה'}
-                  </span>
-                )}
-                {l.posterType && (
-                  <span style={{
-                    ...kindPillStyle,
-                    background: DT.cream2, color: DT.muted,
-                  }}>
-                    {l.posterType === 'agency'
-                      ? <><Briefcase size={9} /> תיווך</>
-                      : <><User size={9} /> פרטי</>}
-                  </span>
-                )}
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            )}
+            {isDuplicated && (
+              <div style={{
+                display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
+                background: DT.success, color: DT.white,
+                fontSize: 11, fontWeight: 800, letterSpacing: 0.3,
+                padding: '3px 9px', borderRadius: 99,
+              }}>
+                <CheckCircle2 size={11} /> בנכסים שלך
+              </div>
+            )}
+            {/* Source / kind / poster pills row */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+              {l.source === 'yad2' && <Yad2Badge />}
+              {l.kind && (
+                <span style={kindPillStyle}>
+                  {l.kind === 'rent' ? 'להשכרה' : 'למכירה'}
+                </span>
+              )}
+              {l.posterType && (
+                <span style={{
+                  ...kindPillStyle,
+                  background: DT.cream2, color: DT.muted,
+                }}>
+                  {l.posterType === 'agency'
+                    ? <><Briefcase size={9} /> תיווך</>
+                    : <><User size={9} /> פרטי</>}
+                </span>
+              )}
+            </div>
+            {/* Address + meta */}
+            <div>
+              <div style={{
+                fontSize: 15, fontWeight: 800, marginBottom: 4,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
                 {[l.street, l.neighborhood, l.city].filter(Boolean).join(' · ') || 'נכס'}
               </div>
-              <div style={{ fontSize: 12, color: DT.muted, marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: DT.muted }}>
                 {[
                   l.propertyType,
                   l.rooms != null ? `${l.rooms} חד׳` : null,
@@ -657,28 +694,33 @@ export default function MarketDiscovery() {
                   l.floor != null ? `קומה ${l.floor}` : null,
                 ].filter(Boolean).join(' · ')}
               </div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                {l.price != null && (
-                  <span style={{ fontSize: 18, fontWeight: 800, color: DT.gold }}>
-                    {displayPriceShort(l.price)}
-                    {l.kind === 'rent' && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: DT.muted, marginInlineStart: 4 }}>
-                        / חודש
-                      </span>
-                    )}
-                  </span>
-                )}
-                {l.pricePerSqm != null && l.kind !== 'rent' && (
-                  <span style={{ fontSize: 12, color: DT.muted }}>
-                    {`₪${l.pricePerSqm.toLocaleString('he-IL')} / מ״ר`}
-                  </span>
-                )}
-                <span style={{ fontSize: 11, color: DT.muted }}>
-                  נראה לראשונה {relLabel(l.firstSeenAt)}
-                </span>
-              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 130 }}>
+            {/* Price + first-seen */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+              {l.price != null && (
+                <span style={{ fontSize: 18, fontWeight: 800, color: DT.gold }}>
+                  {displayPriceShort(l.price)}
+                  {l.kind === 'rent' && (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: DT.muted, marginInlineStart: 4 }}>
+                      / חודש
+                    </span>
+                  )}
+                </span>
+              )}
+              {l.pricePerSqm != null && l.kind !== 'rent' && (
+                <span style={{ fontSize: 12, color: DT.muted }}>
+                  {`₪${l.pricePerSqm.toLocaleString('he-IL')} / מ״ר`}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: DT.muted, marginTop: -4 }}>
+              נראה לראשונה {relLabel(l.firstSeenAt)}
+            </div>
+            {/* Action row at the bottom of the card */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
+              marginTop: 'auto', paddingTop: 4,
+            }}>
               <a
                 href={l.originalUrl}
                 target="_blank"
@@ -702,10 +744,10 @@ export default function MarketDiscovery() {
                     background: DT.success, color: DT.white, border: 'none',
                     padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 800,
                     display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
-                    minHeight: 44, boxShadow: '0 4px 12px rgba(21,128,61,0.25)',
+                    minHeight: 40, boxShadow: '0 4px 12px rgba(21,128,61,0.25)',
                   }}
                 >
-                  <CheckCircle2 size={13} /> פתח בנכסים שלי
+                  <CheckCircle2 size={13} /> פתח אצלי
                 </button>
               ) : (
                 <button
@@ -717,10 +759,10 @@ export default function MarketDiscovery() {
                     color: DT.ink, border: 'none',
                     padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 800,
                     display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
-                    minHeight: 44, boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
+                    minHeight: 40, boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
                   }}
                 >
-                  <CopyIcon size={13} /> שכפל לנכסים שלי
+                  <CopyIcon size={13} /> שכפל
                 </button>
               )}
             </div>
@@ -729,178 +771,188 @@ export default function MarketDiscovery() {
         })}
       </div>
 
-      {/* Pagination — 10 per page. Hidden when there's only one
-          page of results. Hebrew RTL: "previous" is the right
-          chevron (towards the start of a Hebrew sentence) and
-          "next" is the left chevron. */}
-      {!loading && total > PAGE_SIZE && (
-        <div style={{
-          display: 'flex', justifyContent: 'center', alignItems: 'center',
-          gap: 12, marginTop: 18,
-        }}>
-          <button
-            type="button"
-            onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-            disabled={offset === 0}
-            style={paginationBtnStyle(offset === 0)}
-          >
-            <ChevronRight size={14} /> הקודם
-          </button>
-          <span style={{ fontSize: 12, color: DT.muted, fontWeight: 700 }}>
-            עמוד {Math.floor(offset / PAGE_SIZE) + 1} מתוך {Math.max(1, Math.ceil(total / PAGE_SIZE))}
-          </span>
-          <button
-            type="button"
-            onClick={() => setOffset((o) => o + PAGE_SIZE)}
-            disabled={offset + PAGE_SIZE >= total}
-            style={paginationBtnStyle(offset + PAGE_SIZE >= total)}
-          >
-            הבא <ChevronLeft size={14} />
-          </button>
-        </div>
+      {/* Infinite-scroll sentinel — invisible div that triggers the
+          next batch reveal when it scrolls within 300px of the
+          viewport. Replaces the prior pager buttons. */}
+      {infinite.hasMore && (
+        <div
+          ref={infinite.sentinelRef}
+          aria-hidden="true"
+          style={{ height: 24, width: '100%' }}
+        />
       )}
 
-      {/* Email-signup modal. Pre-fills the user's account email; the
-          agent can override with any address (e.g. a personal inbox).
-          Submitting flips marketMatchEmailEnabled=true and stores the
-          override (or null if it equals the account email). */}
-      {emailModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="market-email-modal-title"
-          onClick={(e) => { if (e.target === e.currentTarget) setEmailModalOpen(false); }}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(30,26,20,0.45)',
-            display: 'grid', placeItems: 'center', padding: 16, zIndex: 100,
-          }}
-        >
-          <div style={{
-            background: DT.white, borderRadius: 14, padding: 20,
-            width: '100%', maxWidth: 400,
-            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-            ...FONT, color: DT.ink,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <span style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: DT.goldSoft, color: DT.goldDark,
-                display: 'grid', placeItems: 'center',
-              }}><Mail size={18} /></span>
-              <h2 id="market-email-modal-title" style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
-                רישום להתראות מייל
-              </h2>
-            </div>
-            <p style={{ fontSize: 13, color: DT.muted, lineHeight: 1.55, marginTop: 8, marginBottom: 14 }}>
-              נשלח לך מייל בכל פעם שנמצאת התאמה חדשה לליד פעיל — מייל אחד בלבד לכל התאמה (ללא ספאם).
-            </p>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-              <span style={{ fontSize: 11, color: DT.muted, fontWeight: 700 }}>
-                כתובת לקבלת ההתראות
-              </span>
-              <input
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                value={emailDraft}
-                onChange={(e) => setEmailDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') submitEmailModal(); }}
-                placeholder={emailPref?.accountEmail || 'name@example.com'}
-                style={{
-                  ...FONT, fontSize: 14, color: DT.ink, background: DT.white,
-                  border: `1px solid ${DT.border}`, borderRadius: 10,
-                  padding: '12px 14px', outline: 'none',
-                  direction: 'ltr', textAlign: 'left',
-                }}
-                autoFocus
-              />
-              {emailPref?.accountEmail && emailDraft !== emailPref.accountEmail && (
-                <button type="button"
-                  onClick={() => setEmailDraft(emailPref.accountEmail)}
-                  style={{
-                    ...FONT, background: 'transparent', border: 'none',
-                    color: DT.muted, fontSize: 11, cursor: 'pointer',
-                    textAlign: 'start', padding: 0,
-                    textDecoration: 'underline',
-                  }}>
-                  שחזר לכתובת ברירת המחדל ({emailPref.accountEmail})
-                </button>
-              )}
-            </label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              {emailPref?.enabled && (
-                <button
-                  type="button"
-                  onClick={disableEmailPref}
-                  disabled={emailSaving}
-                  style={{
-                    ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
-                    background: DT.white, color: '#b91c1c',
-                    border: `1px solid ${DT.border}`,
-                    padding: '10px 14px', borderRadius: 10,
-                    fontSize: 13, fontWeight: 700, minHeight: 44,
-                    marginInlineEnd: 'auto',
-                  }}
-                >
-                  בטל רישום
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setEmailModalOpen(false)}
-                disabled={emailSaving}
-                style={{
-                  ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
-                  background: DT.cream2, color: DT.ink,
-                  border: `1px solid ${DT.border}`,
-                  padding: '10px 14px', borderRadius: 10,
-                  fontSize: 13, fontWeight: 700, minHeight: 44,
-                }}
-              >
-                ביטול
-              </button>
-              <button
-                type="button"
-                onClick={submitEmailModal}
-                disabled={emailSaving || !emailDraft}
-                style={{
-                  ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
-                  background: `linear-gradient(135deg, ${DT.gold}, ${DT.goldDark})`,
-                  color: DT.ink, border: 'none',
-                  padding: '10px 18px', borderRadius: 10,
-                  fontSize: 13, fontWeight: 800, minHeight: 44,
-                  boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
-                  opacity: emailSaving || !emailDraft ? 0.6 : 1,
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                }}
-              >
-                <MailCheck size={14} /> אשר רישום
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EmailSignupModal
+        open={emailModalOpen}
+        onClose={() => setEmailModalOpen(false)}
+        emailPref={emailPref}
+        emailDraft={emailDraft}
+        setEmailDraft={setEmailDraft}
+        emailSaving={emailSaving}
+        onSubmit={submitEmailModal}
+        onDisable={disableEmailPref}
+      />
     </div>
   );
 }
 
-function paginationBtnStyle(disabled) {
-  return {
-    fontFamily: 'Assistant, Heebo, -apple-system, sans-serif',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    background: '#fff',
-    color: '#1e1a14',
-    border: '1px solid rgba(30,26,20,0.08)',
-    padding: '8px 14px',
-    borderRadius: 10,
-    fontSize: 13,
-    fontWeight: 700,
-    display: 'inline-flex',
-    gap: 4,
-    alignItems: 'center',
-    minHeight: 40,
-    opacity: disabled ? 0.4 : 1,
-  };
+// Email-signup popup. Renders into a Portal so the backdrop covers
+// sidebar + topbar (the page-local fixed div couldn't darken those).
+// Pre-fills the user's account email when first opened — emailDraft
+// initial value is set by openEmailModal() in the parent. Submitting
+// flips marketMatchEmailEnabled=true and stores the override (or null
+// if it equals the account email so the row stays clean).
+function EmailSignupModal({
+  open, onClose, emailPref, emailDraft, setEmailDraft,
+  emailSaving, onSubmit, onDisable,
+}) {
+  const titleId = useId();
+  if (!open) return null;
+  return (
+    <Portal>
+      <div
+        dir="rtl"
+        onClick={onClose}
+        style={{
+          ...FONT,
+          position: 'fixed', inset: 0,
+          background: 'rgba(30,26,20,0.55)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+          zIndex: 1200,
+        }}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '100%', maxWidth: 440,
+            maxHeight: 'calc(100dvh - 32px)',
+            overflow: 'auto',
+            background: DT.white, color: DT.ink,
+            border: `1px solid ${DT.border}`,
+            borderRadius: 14,
+            boxShadow: '0 20px 60px rgba(30,26,20,0.25)',
+            padding: 22,
+            display: 'flex', flexDirection: 'column', gap: 14,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: DT.goldSoft, color: DT.goldDark,
+              display: 'grid', placeItems: 'center', flexShrink: 0,
+            }}><Mail size={18} /></span>
+            <h2 id={titleId} style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+              רישום להתראות מייל
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="סגור"
+              style={{
+                marginInlineStart: 'auto', background: 'transparent',
+                border: 'none', cursor: 'pointer', color: DT.muted,
+                padding: 4, display: 'inline-flex',
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <p style={{ fontSize: 13, color: DT.muted, lineHeight: 1.55, margin: 0 }}>
+            נשלח לך מייל בכל פעם שנמצאת התאמה חדשה לליד פעיל — מייל אחד בלבד לכל התאמה (ללא ספאם).
+          </p>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 11, color: DT.muted, fontWeight: 700 }}>
+              כתובת לקבלת ההתראות
+            </span>
+            <input
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={emailDraft}
+              onChange={(e) => setEmailDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') onSubmit(); }}
+              placeholder={emailPref?.accountEmail || 'name@example.com'}
+              style={{
+                ...FONT, fontSize: 14, color: DT.ink, background: DT.white,
+                border: `1px solid ${DT.border}`, borderRadius: 10,
+                padding: '12px 14px', outline: 'none',
+                direction: 'ltr', textAlign: 'left',
+              }}
+              autoFocus
+            />
+            {emailPref?.accountEmail && emailDraft !== emailPref.accountEmail && (
+              <button type="button"
+                onClick={() => setEmailDraft(emailPref.accountEmail)}
+                style={{
+                  ...FONT, background: 'transparent', border: 'none',
+                  color: DT.muted, fontSize: 11, cursor: 'pointer',
+                  textAlign: 'start', padding: 0,
+                  textDecoration: 'underline',
+                }}>
+                שחזר לכתובת ברירת המחדל ({emailPref.accountEmail})
+              </button>
+            )}
+          </label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+            {emailPref?.enabled && (
+              <button
+                type="button"
+                onClick={onDisable}
+                disabled={emailSaving}
+                style={{
+                  ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
+                  background: DT.white, color: '#b91c1c',
+                  border: `1px solid ${DT.border}`,
+                  padding: '10px 14px', borderRadius: 10,
+                  fontSize: 13, fontWeight: 700, minHeight: 44,
+                  marginInlineEnd: 'auto',
+                }}
+              >
+                בטל רישום
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={emailSaving}
+              style={{
+                ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
+                background: DT.cream2, color: DT.ink,
+                border: `1px solid ${DT.border}`,
+                padding: '10px 14px', borderRadius: 10,
+                fontSize: 13, fontWeight: 700, minHeight: 44,
+              }}
+            >
+              ביטול
+            </button>
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={emailSaving || !emailDraft}
+              style={{
+                ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
+                background: `linear-gradient(135deg, ${DT.gold}, ${DT.goldDark})`,
+                color: DT.ink, border: 'none',
+                padding: '10px 18px', borderRadius: 10,
+                fontSize: 13, fontWeight: 800, minHeight: 44,
+                boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
+                opacity: emailSaving || !emailDraft ? 0.6 : 1,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <MailCheck size={14} /> אשר רישום
+            </button>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  );
 }
 
 const fieldInputStyle = {

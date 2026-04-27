@@ -143,6 +143,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
             select: {
               id: true, score: true, reasonsJson: true,
               leadId: true, marketListingId: true,
+              lead: { select: { name: true } },
             },
           })
         : Promise.resolve([] as any[]),
@@ -159,31 +160,39 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
           })
         : Promise.resolve([] as any[]),
     ]);
-    const matchByListing = new Map<string, typeof myMatches[number]>();
+    // Group ALL matches per listing (was: top-only). UI now shows lead
+    // names ("מתאים לטל פוקס, הדר…") instead of a 55/100 score, so we
+    // need every match — sorted score-desc, capped at 5 per listing
+    // for sane payload size.
+    const matchesByListing = new Map<string, typeof myMatches>();
     for (const m of myMatches) {
-      // findMany returns score-desc, so the first occurrence per
-      // listing is the highest-scoring match for that agent.
-      if (!matchByListing.has(m.marketListingId)) {
-        matchByListing.set(m.marketListingId, m);
-      }
+      const arr = matchesByListing.get(m.marketListingId) || [];
+      arr.push(m);
+      matchesByListing.set(m.marketListingId, arr);
     }
     const duplicateByListing = new Map<string, string>();
     for (const p of myDuplicates) {
       if (p.marketListingId) duplicateByListing.set(p.marketListingId, p.id);
     }
-    const items = rawItems.map((x) => ({
-      ...x,
-      topMatch: matchByListing.get(x.id)
-        ? {
-            id:        matchByListing.get(x.id)!.id,
-            score:     matchByListing.get(x.id)!.score,
-            reasons:   matchByListing.get(x.id)!.reasonsJson,
-            leadId:    matchByListing.get(x.id)!.leadId,
-          }
-        : null,
-      duplicatedByMe: duplicateByListing.get(x.id) || null,
-    }));
-    // Stable in-memory sort: matched listings first (by score desc),
+    const items = rawItems.map((x) => {
+      const ms = matchesByListing.get(x.id) || [];
+      const matches = ms.slice(0, 5).map((m) => ({
+        id:       m.id,
+        score:    m.score,
+        reasons:  m.reasonsJson,
+        leadId:   m.leadId,
+        leadName: m.lead?.name || null,
+      }));
+      return {
+        ...x,
+        // topMatch retained for back-compat (FE pre-existing readers); points
+        // at the highest-scoring match for the current agent.
+        topMatch: matches[0] || null,
+        matches,
+        duplicatedByMe: duplicateByListing.get(x.id) || null,
+      };
+    });
+    // Stable in-memory sort: matched listings first (by top score desc),
     // then everything else in the DB-side order. Array.prototype.sort
     // is stable in modern V8.
     items.sort((a, b) => {

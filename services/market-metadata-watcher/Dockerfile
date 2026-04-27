@@ -33,10 +33,11 @@ RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npx tsc -p tsconfig.json
 
 ENV NODE_ENV=production
-# Headful via xvfb. WATCHER_HEADFUL=1 toggles the playwright launch
-# from headless to non-headless; xvfb-run gives the process a virtual
-# display so Chromium starts cleanly. -a auto-picks a free display
-# number; --server-args sets the screen geometry to a desktop-shaped
-# viewport so window.screen reports a normal value.
-ENV WATCHER_HEADFUL=1
-CMD ["xvfb-run", "-a", "--server-args=-screen 0 1920x1080x24", "node", "dist/index.js"]
+# Headful mode + xvfb is wired (set WATCHER_HEADFUL=1 to enable) but
+# disabled by default. The proxies + stealth plugin combination proved
+# sufficient in production smoke tests; xvfb-run + chromium-headful
+# adds startup complexity that broke `docker logs` capture in the
+# initial rollout. Re-enable when needed by setting the env var on
+# the host and switching CMD to:
+#   ["xvfb-run", "-a", "--server-args=-screen 0 1920x1080x24", "node", "dist/index.js"]
+CMD ["node", "dist/index.js"]
