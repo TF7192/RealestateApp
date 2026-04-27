@@ -49,6 +49,51 @@ const PAGE_LOAD_TIMEOUT_MS = 25_000;
 // should investigate before next run.
 const HIGH_VOLUME_PER_REGION_KIND = 100;
 
+// Per-tick fingerprint rotation. Reblaze profiles repeated visits
+// from the same UA/viewport/locale combo, so rotating each tick lowers
+// the chance of getting flagged after sustained scraping. All entries
+// are real Chrome/Safari builds the average Israeli desktop visitor
+// might use; locale stays Israeli (he-IL primary) since the timezone
+// must match for Reblaze's locale check.
+const FINGERPRINTS: Array<{
+  userAgent: string;
+  viewport: { width: number; height: number };
+  acceptLanguage: string;
+}> = [
+  {
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 900 },
+    acceptLanguage: 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
+  },
+  {
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    viewport: { width: 1920, height: 1080 },
+    acceptLanguage: 'he-IL,he;q=0.9,en;q=0.8',
+  },
+  {
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 ' +
+      '(KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+    viewport: { width: 1440, height: 900 },
+    acceptLanguage: 'he-IL,he;q=0.9,en-US;q=0.8',
+  },
+  {
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+    viewport: { width: 1536, height: 864 },
+    acceptLanguage: 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
+  },
+];
+
+function pickFingerprint() {
+  return FINGERPRINTS[Math.floor(Math.random() * FINGERPRINTS.length)];
+}
+
 let browser: Browser | null = null;
 
 async function getBrowser(): Promise<Browser> {
@@ -127,6 +172,21 @@ async function fetchOnePage(
     if (!response || response.status() >= 400) {
       log.warn({ url, status: response?.status() }, 'yad2.page-error');
       return null;
+    }
+
+    // Reblaze challenge handling — if we landed on validate.perfdrive.com
+    // (Reblaze's Shieldsquare interstitial), wait for the JS challenge
+    // to auto-resolve and redirect us back to yad2.co.il. This gives us
+    // a session cookie that subsequent fetches reuse.
+    const landedAt = page.url();
+    if (landedAt.includes('perfdrive.com') || landedAt.includes('shieldsquare')) {
+      log.info({ url, challengeUrl: landedAt.slice(0, 80) }, 'yad2.challenge-detected');
+      await page
+        .waitForURL((u) => !u.href.includes('perfdrive.com') && !u.href.includes('shieldsquare'), {
+          timeout: 15_000,
+        })
+        .catch(() => { /* fall through — extraction below decides */ });
+      log.info({ url, finalUrl: page.url().slice(0, 80) }, 'yad2.challenge-resolved');
     }
 
     // Wait for __NEXT_DATA__ to hydrate. Reblaze JS-challenge resolves
@@ -235,23 +295,41 @@ export async function discoverYad2(opts: {
   // One BrowserContext per discovery run — fresh cookies, no state
   // leakage across hourly ticks. The route-level asset blocking
   // configured per-page above survives the close.
+  // Rotate fingerprint per tick. Same context for the duration of a
+  // tick so Reblaze cookies established on the first request carry
+  // through subsequent listing fetches; next tick spins up a fresh
+  // BrowserContext with a new fingerprint pulled from the pool.
+  const fp = pickFingerprint();
+  log.info({ ua: fp.userAgent.slice(0, 30), viewport: fp.viewport }, 'yad2.fingerprint');
   const ctx = await br.newContext({
-    // Modern desktop Chrome on macOS — what the average Israeli
-    // residential visitor's browser sends. Fingerprint shape is
-    // unremarkable; Reblaze classifies it as legitimate.
-    userAgent:
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-      '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    userAgent: fp.userAgent,
     locale: 'he-IL',
     timezoneId: 'Asia/Jerusalem',
-    // Realistic viewport — undefined viewport (Playwright default)
-    // shows up in window.screen telemetry. 1366×900 is the most common
-    // desktop in Israel.
-    viewport: { width: 1366, height: 900 },
+    viewport: fp.viewport,
     extraHTTPHeaders: {
-      'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Language': fp.acceptLanguage,
     },
   });
+
+  // Warm-up: visit Yad2's homepage first to establish Reblaze session
+  // cookies. Real users land on / before drilling into /realestate/rent/...
+  // — directly hitting a deep listing path triggers stricter challenges.
+  // The cookies set here ride the BrowserContext through every region
+  // fetch this tick.
+  try {
+    log.info({}, 'yad2.warmup-start');
+    const warmup = await ctx.newPage();
+    await warmup.goto('https://www.yad2.co.il/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 20_000,
+    });
+    // Give Reblaze ~3s to run its challenge JS and stamp our cookies.
+    await new Promise((r) => setTimeout(r, 3_000));
+    await warmup.close().catch(() => {/* swallow */});
+    log.info({}, 'yad2.warmup-done');
+  } catch (err) {
+    log.warn({ err: String(err) }, 'yad2.warmup-failed-continuing');
+  }
 
   try {
     for (const region of regions) {
