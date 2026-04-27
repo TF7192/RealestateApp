@@ -13,8 +13,20 @@
 // yad2-crawler. Keeps the watcher container's deps minimal and means
 // a refactor of the existing CRM crawler can never break this surface.
 
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+// playwright-extra is a thin wrapper around playwright that lets us
+// chain in puppeteer-extra-plugin-stealth. Stealth patches ~20
+// headless-Chromium fingerprint leaks (navigator.plugins, chrome
+// runtime, WebGL renderer, canvas hash, permissions API, etc.) that
+// Reblaze fingerprints on. The runtime types come from `playwright`
+// itself — we just swap the launcher.
+import { chromium as chromiumStealth } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import type { Browser, BrowserContext, Page } from 'playwright';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import type { Logger } from 'pino';
+
+chromiumStealth.use(StealthPlugin());
 import { extractFeedFromPageProps, type ExtractKind } from '../extractors/yad2-listing.js';
 import type { HashableListing } from '../hash.js';
 
@@ -30,7 +42,7 @@ export const REGION_SLUGS = [
 
 export type RegionSlug = typeof REGION_SLUGS[number];
 
-const KINDS: ExtractKind[] = ['forsale', 'rent'];
+const ALL_KINDS: ExtractKind[] = ['forsale', 'rent'];
 
 const POLITE_GAP_MS = 600;
 // 8 pages × 40 items = ~320-listing buffer per (region, kind) per
@@ -94,12 +106,26 @@ function pickFingerprint() {
   return FINGERPRINTS[Math.floor(Math.random() * FINGERPRINTS.length)];
 }
 
+// Where storageState (cookies + localStorage) is persisted across
+// ticks. /tmp is fine in the container — it's per-container, survives
+// between ticks, lost on container restart (acceptable: warmup re-stamps
+// cookies on first post-restart tick).
+const STATE_DIR = process.env.WATCHER_STATE_DIR || '/tmp/yad2-state';
+
 let browser: Browser | null = null;
+
+// Headful flag — when WATCHER_HEADFUL=1, run a real (non-headless)
+// Chromium. Combined with xvfb-run on the container side this gives a
+// real GPU/screen surface, which Reblaze can no longer detect as
+// "headless browser". Defaults to headful in production via the
+// Docker CMD; falls back to headless when the env var isn't set
+// (local dev without an X server).
+const HEADFUL = process.env.WATCHER_HEADFUL === '1';
 
 async function getBrowser(): Promise<Browser> {
   if (browser && browser.isConnected()) return browser;
-  browser = await chromium.launch({
-    headless: true,
+  browser = await chromiumStealth.launch({
+    headless: !HEADFUL,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -282,12 +308,17 @@ export type PageContext = { region: string; kind: ExtractKind; page: number };
  */
 export async function discoverYad2(opts: {
   regions: readonly string[];
+  // Subset of ['forsale', 'rent'] to crawl this tick. Defaults to
+  // BOTH if omitted, but production schedules them in separate ticks
+  // 15 min apart to give each kind a fresh Reblaze challenge slot.
+  kinds?: readonly ExtractKind[];
   knownTokens: Set<string>;
   hardCeiling: number;
   log: Logger;
   onPage?: (items: HashableListing[], ctx: PageContext) => Promise<void>;
 }): Promise<{ items: HashableListing[]; stats: DiscoveryStats }> {
   const { regions, knownTokens, hardCeiling, log, onPage } = opts;
+  const kinds = opts.kinds && opts.kinds.length > 0 ? opts.kinds : ALL_KINDS;
   const allItems: HashableListing[] = [];
   const stats: DiscoveryStats = { fetched: 0, itemsSeen: 0 };
 
@@ -301,6 +332,21 @@ export async function discoverYad2(opts: {
   // BrowserContext with a new fingerprint pulled from the pool.
   const fp = pickFingerprint();
   log.info({ ua: fp.userAgent.slice(0, 30), viewport: fp.viewport }, 'yad2.fingerprint');
+
+  // Persist Reblaze session cookies between ticks. A real user keeps
+  // their cookies for days; we used to throw them away every hour,
+  // forcing a fresh challenge each time. Loading prior storageState
+  // means subsequent ticks usually skip the challenge entirely. File
+  // is per-fingerprint-class so different UAs don't share cookies.
+  const stateKey = fp.userAgent.replace(/[^a-z0-9]/gi, '').slice(0, 24);
+  const statePath = path.join(STATE_DIR, `yad2-${stateKey}.json`);
+  let storageState: string | undefined;
+  try {
+    await fs.access(statePath);
+    storageState = statePath;
+    log.info({ stateKey }, 'yad2.storage-state-loaded');
+  } catch { /* no prior state — first run for this fingerprint */ }
+
   const ctx = await br.newContext({
     userAgent: fp.userAgent,
     locale: 'he-IL',
@@ -309,6 +355,7 @@ export async function discoverYad2(opts: {
     extraHTTPHeaders: {
       'Accept-Language': fp.acceptLanguage,
     },
+    ...(storageState ? { storageState } : {}),
   });
 
   // Warm-up: visit Yad2's homepage first to establish Reblaze session
@@ -323,17 +370,37 @@ export async function discoverYad2(opts: {
       waitUntil: 'domcontentloaded',
       timeout: 20_000,
     });
-    // Give Reblaze ~3s to run its challenge JS and stamp our cookies.
+    // Give Reblaze ~3s to run its challenge JS and stamp our cookies,
+    // and let it auto-redirect back to yad2 if we landed on the
+    // challenge interstitial.
     await new Promise((r) => setTimeout(r, 3_000));
+    const warmupUrl = warmup.url();
+    const challenged = warmupUrl.includes('perfdrive.com') || warmupUrl.includes('shieldsquare');
     await warmup.close().catch(() => {/* swallow */});
-    log.info({}, 'yad2.warmup-done');
+
+    if (challenged) {
+      // We're still on the challenge page after 3s — Reblaze either
+      // didn't accept us or our IP is currently flagged. Don't poison
+      // the persisted state file with challenge cookies; surface the
+      // signal to the operator instead.
+      log.warn({ warmupUrl: warmupUrl.slice(0, 80) }, 'yad2.warmup-challenged-not-saving');
+    } else {
+      try {
+        await fs.mkdir(STATE_DIR, { recursive: true });
+        await ctx.storageState({ path: statePath });
+        log.info({ statePath }, 'yad2.storage-state-saved');
+      } catch (err) {
+        log.warn({ err: String(err) }, 'yad2.storage-state-save-failed');
+      }
+    }
+    log.info({ challenged }, 'yad2.warmup-done');
   } catch (err) {
     log.warn({ err: String(err) }, 'yad2.warmup-failed-continuing');
   }
 
   try {
     for (const region of regions) {
-      for (const kind of KINDS) {
+      for (const kind of kinds) {
         let page = 1;
         let novelInRegionKind = 0;
         // Wrap the inner page-walk in try/catch so one bad

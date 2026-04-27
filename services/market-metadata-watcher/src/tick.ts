@@ -31,6 +31,13 @@ import { discoverYad2 } from './sources/yad2.js';
 
 type Deps = { prisma: PrismaClient; logger: Logger };
 
+// Kinds to crawl in a single tick. Default is `forsale` only — a
+// follow-up tick crawls `rent`. Splitting kinds across separate
+// browser sessions (15+ min apart) gives each kind a fresh Reblaze
+// challenge slot, since challenge cookies + IP reputation accumulate
+// over a single context's lifetime.
+export type WatcherKind = 'forsale' | 'rent';
+
 // Sweep up `running` rows that have been hanging since before this
 // process booted. They almost always indicate a previous container
 // got SIGTERM'd by a deploy mid-tick — the row never got finalized.
@@ -54,14 +61,18 @@ export async function reapStaleRuns(prisma: PrismaClient, logger: Logger) {
   }
 }
 
-export async function runWatcherTick({ prisma, logger }: Deps) {
+export async function runWatcherTick(
+  { prisma, logger }: Deps,
+  opts: { kinds?: WatcherKind[] } = {},
+) {
+  const kinds = opts.kinds ?? ['forsale'];
   // Self-heal previous interrupted runs so the admin observability
   // page doesn't accumulate orphaned `running` rows. Idempotent +
   // cheap (single indexed UPDATE).
   await reapStaleRuns(prisma, logger);
 
   const run = await prisma.marketWatcherRun.create({
-    data: { source: 'all', status: 'running' },
+    data: { source: kinds.join('+'), status: 'running' },
   });
   const log = (msg: string, extra?: unknown) =>
     logger.info({ runId: run.id, ...((extra as object) || {}) }, msg);
@@ -200,6 +211,7 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
         // with 0 listings — every run got interrupted before commit.
         const result = await discoverYad2({
           regions: config.discoveryRegions,
+          kinds,
           knownTokens: known,
           hardCeiling: config.hardCeiling,
           log: logger,

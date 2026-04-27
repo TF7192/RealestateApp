@@ -1,7 +1,7 @@
 import pino from 'pino';
 import { PrismaClient } from '@prisma/client';
 import { config } from './config.js';
-import { scheduleHourly } from './scheduler.js';
+import { scheduleLoop } from './scheduler.js';
 import { runWatcherTick } from './tick.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -48,7 +48,30 @@ async function main() {
     return;
   }
 
-  const stop = scheduleHourly(() => runWatcherTick({ prisma, logger }), log);
+  // Two independent schedulers — forsale and rent each tick on the
+  // same interval (default 60min) but with the rent loop offset by
+  // ~15min. This gives each kind its own browser session per tick;
+  // Reblaze treats them as independent visitors instead of a single
+  // ramped scraper.
+  const forsaleBootDelay = Math.floor(Math.random() * 30_000);
+  const rentBootDelay = forsaleBootDelay + 15 * 60 * 1000;
+  const stopForsale = scheduleLoop({
+    label: 'forsale',
+    intervalMs: config.intervalMs,
+    jitterMs: config.jitterMs,
+    bootDelayMs: forsaleBootDelay,
+    tick: () => runWatcherTick({ prisma, logger }, { kinds: ['forsale'] }),
+    log,
+  });
+  const stopRent = scheduleLoop({
+    label: 'rent',
+    intervalMs: config.intervalMs,
+    jitterMs: config.jitterMs,
+    bootDelayMs: rentBootDelay,
+    tick: () => runWatcherTick({ prisma, logger }, { kinds: ['rent'] }),
+    log,
+  });
+  const stop = () => { stopForsale(); stopRent(); };
 
   // Graceful shutdown — Docker sends SIGTERM 10s before SIGKILL on
   // `compose down` / `up -d --recreate`. Mark every in-flight run row
