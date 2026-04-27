@@ -153,6 +153,15 @@ export default function Admin() {
         >
           <MessageSquare size={14} /> שיחות תמיכה
         </Link>
+        {/* Phase 4 — admin observability for the Market Discovery
+            hourly Yad2 watcher (run log, success/failure counts,
+            error messages, ingestion volumes). */}
+        <Link
+          to="/admin/market-watcher"
+          style={ctaSecondary()}
+        >
+          <ActivityIcon size={14} /> Market Watcher
+        </Link>
       </header>
 
       {/* Hero KPI strip */}
