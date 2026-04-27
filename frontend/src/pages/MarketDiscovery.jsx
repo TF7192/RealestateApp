@@ -14,6 +14,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2, ExternalLink, Copy as CopyIcon, Filter, X,
   Sparkles, ChevronDown, ChevronRight, ChevronLeft,
+  Mail, MailCheck, CheckCircle2, User, Briefcase,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
@@ -60,11 +61,22 @@ export default function MarketDiscovery() {
 
   const [filters, setFilters] = useState({
     city: '', neighborhood: '', propertyType: '',
+    kind: '',          // '' = sale + rent, 'forsale', 'rent'
+    posterType: '',    // '' = all, 'private', 'agency'
     minPrice: '', maxPrice: '',
     minRooms: '', maxRooms: '',
     minSqm: '', maxSqm: '',
     status: 'active',
+    firstSeenAfter: '24h',  // server defaults to 24h; explicit so the
+                            // user can flip it to '7d' / 'all'.
   });
+  // Notification-channel toggle — wired to UserNotificationPreference.
+  // marketMatchEmailEnabled. Surfaces the same setting that
+  // /settings/notifications exposes, but in-context here so the agent
+  // can opt into the email pipeline directly from the page they want
+  // notifications about.
+  const [emailPref, setEmailPref] = useState(null);  // null = loading
+  const [emailSaving, setEmailSaving] = useState(false);
   const [sort, setSort] = useState('firstSeenAt-desc');
   // Pagination — 10 listings per page so the agent isn't drowning
   // in 50 cards on first paint. Matched listings always pop to the
@@ -91,6 +103,32 @@ export default function MarketDiscovery() {
     );
     return () => { cancelled = true; };
   }, []);
+
+  // Email-notification preference — auto-creates the row if missing.
+  useEffect(() => {
+    let cancelled = false;
+    api.getNotificationPreferences().then(
+      (res) => { if (!cancelled) setEmailPref(!!res?.marketMatchEmailEnabled); },
+      () => { if (!cancelled) setEmailPref(false); },
+    );
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggleEmailPref = async () => {
+    if (emailSaving || emailPref == null) return;
+    const next = !emailPref;
+    setEmailSaving(true);
+    setEmailPref(next);  // optimistic
+    try {
+      await api.updateNotificationPreferences({ marketMatchEmailEnabled: next });
+      toast.success?.(next ? 'התראות במייל הופעלו' : 'התראות במייל בוטלו');
+    } catch (err) {
+      setEmailPref(!next);  // revert
+      toast.error?.(err?.message || 'שמירה נכשלה');
+    } finally {
+      setEmailSaving(false);
+    }
+  };
 
   // Match deep-link from a Notification: ?match=:id. Fetch the match,
   // surface a "מתאים לליד שלך" banner with the lead context, and mark
@@ -134,15 +172,19 @@ export default function MarketDiscovery() {
   const clearFilters = () =>
     setFilters({
       city: '', neighborhood: '', propertyType: '',
+      kind: '', posterType: '',
       minPrice: '', maxPrice: '',
       minRooms: '', maxRooms: '',
       minSqm: '', maxSqm: '',
       status: 'active',
+      firstSeenAfter: '24h',
     });
 
   const activeFilterCount = useMemo(() => {
     return Object.entries(filters).filter(([k, v]) =>
-      v !== '' && !(k === 'status' && v === 'active'),
+      v !== ''
+        && !(k === 'status' && v === 'active')
+        && !(k === 'firstSeenAfter' && v === '24h'),
     ).length;
   }, [filters]);
 
@@ -191,7 +233,27 @@ export default function MarketDiscovery() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={toggleEmailPref}
+            disabled={emailPref == null || emailSaving}
+            aria-pressed={!!emailPref}
+            title={emailPref ? 'בטל קבלת התראות במייל על התאמות' : 'הפעל קבלת התראות במייל כשנמצאת התאמה לליד'}
+            style={{
+              ...FONT, cursor: emailSaving ? 'wait' : 'pointer',
+              background: emailPref ? DT.successSoft : DT.white,
+              color: emailPref ? DT.success : DT.ink,
+              border: `1px solid ${emailPref ? DT.success : DT.border}`,
+              padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+              display: 'inline-flex', gap: 6, alignItems: 'center',
+              minHeight: 44,
+              opacity: emailPref == null || emailSaving ? 0.6 : 1,
+            }}
+          >
+            {emailPref ? <MailCheck size={14} /> : <Mail size={14} />}
+            {emailPref ? 'התראות במייל פעילות' : 'התרע במייל על התאמה'}
+          </button>
           <button
             type="button"
             onClick={() => setFiltersOpen((v) => !v)}
@@ -251,6 +313,40 @@ export default function MarketDiscovery() {
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Kind tabs — sale / rent / all. Sits between header and the
+          collapsible filter panel; primary axis of the catalogue, so
+          it stays visible even when the filter drawer is closed. */}
+      <div role="tablist" aria-label="סוג עסקה" style={{
+        display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap',
+      }}>
+        {[
+          { value: '',        label: 'הכל' },
+          { value: 'forsale', label: 'למכירה' },
+          { value: 'rent',    label: 'להשכרה' },
+        ].map((opt) => {
+          const active = filters.kind === opt.value;
+          return (
+            <button
+              key={opt.value || 'all'}
+              role="tab"
+              aria-selected={active}
+              type="button"
+              onClick={() => setFilters((f) => ({ ...f, kind: opt.value }))}
+              style={{
+                ...FONT, cursor: 'pointer',
+                background: active ? DT.ink : DT.white,
+                color: active ? DT.white : DT.ink,
+                border: `1px solid ${active ? DT.ink : DT.border}`,
+                padding: '8px 16px', borderRadius: 99,
+                fontSize: 13, fontWeight: 700, minHeight: 36,
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Match deep-link banner */}
@@ -346,6 +442,23 @@ export default function MarketDiscovery() {
               <option value="unknown">לא ידוע</option>
             </select>
           </FilterField>
+          <FilterField label="מפרסם">
+            <select value={filters.posterType} onChange={update('posterType')}
+              style={fieldInputStyle}>
+              <option value="">הכל</option>
+              <option value="private">פרטי בלבד</option>
+              <option value="agency">תיווך בלבד</option>
+            </select>
+          </FilterField>
+          <FilterField label="טווח זמן">
+            <select value={filters.firstSeenAfter} onChange={update('firstSeenAfter')}
+              style={fieldInputStyle}>
+              <option value="24h">24 שעות אחרונות</option>
+              <option value="7d">שבוע אחרון</option>
+              <option value="30d">30 יום אחרונים</option>
+              <option value="all">הכל</option>
+            </select>
+          </FilterField>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
             <button type="button" onClick={clearFilters}
               style={{
@@ -379,37 +492,80 @@ export default function MarketDiscovery() {
       )}
 
       <div style={{ display: 'grid', gap: 10 }}>
-        {orderedItems.map((l) => (
+        {orderedItems.map((l) => {
+          const isMatched = !!l.topMatch || l.id === matchedListingId;
+          const isDuplicated = !!l.duplicatedByMe;
+          // Visual hierarchy: duplicated (already-acted) takes precedence
+          // over matched (still-actionable). Both cases mirror the
+          // התאמות פומביות card style — colored 1px border + soft shadow.
+          const accent = isDuplicated ? DT.success
+                       : isMatched   ? DT.gold
+                       : null;
+          const accentSoft = isDuplicated ? DT.successSoft
+                           : isMatched   ? DT.goldSoft
+                           : null;
+          return (
           <article
             key={l.id}
-            data-matched={(l.topMatch || l.id === matchedListingId) ? 'true' : undefined}
+            data-matched={isMatched ? 'true' : undefined}
+            data-duplicated={isDuplicated ? 'true' : undefined}
             style={{
               background: DT.white,
-              border: (l.topMatch || l.id === matchedListingId)
-                ? `2px solid ${DT.success}`
-                : `1px solid ${DT.border}`,
+              border: `1px solid ${accent || DT.border}`,
               borderRadius: 14,
               padding: 14,
               display: 'grid',
               gridTemplateColumns: 'minmax(0, 1fr) auto',
               gap: 14,
               alignItems: 'center',
+              boxShadow: accent
+                ? `0 4px 14px ${accentSoft.replace('0.08', '0.18').replace('0.12', '0.22')}`
+                : '0 1px 0 rgba(30,26,20,0.03)',
             }}
           >
             <div style={{ minWidth: 0 }}>
-              {(l.topMatch || l.id === matchedListingId) && (
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  background: DT.success, color: DT.white,
-                  fontSize: 10, fontWeight: 800, letterSpacing: 0.4,
-                  padding: '2px 8px', borderRadius: 99, marginBottom: 6,
-                }}>
-                  <Sparkles size={10} />
-                  {l.topMatch
-                    ? `מתאים לליד שלך · ${l.topMatch.score}/100`
-                    : 'מתאים לליד שלך'}
-                </div>
-              )}
+              {/* Status badges row — match, duplicated, source, poster type */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                {isDuplicated && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    background: DT.success, color: DT.white,
+                    fontSize: 10, fontWeight: 800, letterSpacing: 0.4,
+                    padding: '2px 8px', borderRadius: 99,
+                  }}>
+                    <CheckCircle2 size={10} /> בנכסים שלך
+                  </span>
+                )}
+                {isMatched && !isDuplicated && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    background: DT.gold, color: DT.white,
+                    fontSize: 10, fontWeight: 800, letterSpacing: 0.4,
+                    padding: '2px 8px', borderRadius: 99,
+                  }}>
+                    <Sparkles size={10} />
+                    {l.topMatch
+                      ? `מתאים לליד שלך · ${l.topMatch.score}/100`
+                      : 'מתאים לליד שלך'}
+                  </span>
+                )}
+                {l.source === 'yad2' && <Yad2Badge />}
+                {l.kind && (
+                  <span style={kindPillStyle}>
+                    {l.kind === 'rent' ? 'להשכרה' : 'למכירה'}
+                  </span>
+                )}
+                {l.posterType && (
+                  <span style={{
+                    ...kindPillStyle,
+                    background: DT.cream2, color: DT.muted,
+                  }}>
+                    {l.posterType === 'agency'
+                      ? <><Briefcase size={9} /> תיווך</>
+                      : <><User size={9} /> פרטי</>}
+                  </span>
+                )}
+              </div>
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {[l.street, l.neighborhood, l.city].filter(Boolean).join(' · ') || 'נכס'}
               </div>
@@ -425,9 +581,14 @@ export default function MarketDiscovery() {
                 {l.price != null && (
                   <span style={{ fontSize: 18, fontWeight: 800, color: DT.gold }}>
                     {displayPriceShort(l.price)}
+                    {l.kind === 'rent' && (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: DT.muted, marginInlineStart: 4 }}>
+                        / חודש
+                      </span>
+                    )}
                   </span>
                 )}
-                {l.pricePerSqm != null && (
+                {l.pricePerSqm != null && l.kind !== 'rent' && (
                   <span style={{ fontSize: 12, color: DT.muted }}>
                     {`₪${l.pricePerSqm.toLocaleString('he-IL')} / מ״ר`}
                   </span>
@@ -452,23 +613,40 @@ export default function MarketDiscovery() {
               >
                 <ExternalLink size={13} /> פתח במקור
               </a>
-              <button
-                type="button"
-                onClick={() => duplicate(l.id)}
-                style={{
-                  ...FONT, cursor: 'pointer', textAlign: 'center',
-                  background: `linear-gradient(135deg, ${DT.gold}, ${DT.goldDark})`,
-                  color: DT.ink, border: 'none',
-                  padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 800,
-                  display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
-                  minHeight: 44, boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
-                }}
-              >
-                <CopyIcon size={13} /> שכפל לנכסים שלי
-              </button>
+              {isDuplicated ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/properties/${l.duplicatedByMe}/edit`)}
+                  style={{
+                    ...FONT, cursor: 'pointer', textAlign: 'center',
+                    background: DT.success, color: DT.white, border: 'none',
+                    padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 800,
+                    display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
+                    minHeight: 44, boxShadow: '0 4px 12px rgba(21,128,61,0.25)',
+                  }}
+                >
+                  <CheckCircle2 size={13} /> פתח בנכסים שלי
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => duplicate(l.id)}
+                  style={{
+                    ...FONT, cursor: 'pointer', textAlign: 'center',
+                    background: `linear-gradient(135deg, ${DT.gold}, ${DT.goldDark})`,
+                    color: DT.ink, border: 'none',
+                    padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 800,
+                    display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
+                    minHeight: 44, boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
+                  }}
+                >
+                  <CopyIcon size={13} /> שכפל לנכסים שלי
+                </button>
+              )}
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
 
       {/* Pagination — 10 per page. Hidden when there's only one
@@ -540,3 +718,39 @@ function FilterField({ label, children }) {
     </label>
   );
 }
+
+// Source badge — recognizable Yad2 brand pill. The watcher writes
+// `source='yad2'` on every row; future Madlan/Komo sources will get
+// their own badge components rendered the same way.
+function Yad2Badge() {
+  return (
+    <span
+      title="מקור: יד2"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 0,
+        height: 18, borderRadius: 4, overflow: 'hidden',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontSize: 11, fontWeight: 900, letterSpacing: 0.3,
+        boxShadow: '0 1px 0 rgba(0,0,0,0.08)',
+        verticalAlign: 'middle',
+      }}
+      aria-label="מקור: יד2"
+    >
+      <span style={{
+        background: '#1f2937', color: '#fff',
+        padding: '0 5px', height: '100%', display: 'inline-flex', alignItems: 'center',
+      }}>yad</span>
+      <span style={{
+        background: '#fb923c', color: '#1f2937',
+        padding: '0 5px', height: '100%', display: 'inline-flex', alignItems: 'center',
+      }}>2</span>
+    </span>
+  );
+}
+
+const kindPillStyle = {
+  display: 'inline-flex', alignItems: 'center', gap: 3,
+  background: 'rgba(180,139,76,0.10)', color: '#7a5c2c',
+  fontSize: 10, fontWeight: 700, letterSpacing: 0.2,
+  padding: '2px 7px', borderRadius: 99,
+};

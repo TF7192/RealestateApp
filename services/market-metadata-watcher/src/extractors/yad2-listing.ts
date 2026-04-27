@@ -69,7 +69,11 @@ function asNumber(v: unknown): number | null {
 
 export type ExtractKind = 'forsale' | 'rent';
 
-export function extractYad2Listing(raw: RawYad2Item, _kind: ExtractKind): HashableListing | null {
+export function extractYad2Listing(
+  raw: RawYad2Item,
+  kind: ExtractKind,
+  posterType: 'private' | 'agency',
+): HashableListing | null {
   const token = asString(raw?.token);
   if (!token) return null;
 
@@ -101,6 +105,8 @@ export function extractYad2Listing(raw: RawYad2Item, _kind: ExtractKind): Hashab
     price,
     pricePerSqm,
     status: 'active',
+    kind,
+    posterType,
   };
 }
 
@@ -115,13 +121,13 @@ export function extractFeedFromPageProps(
   const feed = (pageProps as { feed?: { private?: unknown[]; agency?: unknown[] } })?.feed;
   if (!feed) return [];
   const out: HashableListing[] = [];
-  const buckets: unknown[][] = [
-    Array.isArray(feed.private) ? feed.private : [],
-    Array.isArray(feed.agency) ? feed.agency : [],
+  const buckets: { items: unknown[]; posterType: 'private' | 'agency' }[] = [
+    { items: Array.isArray(feed.private) ? feed.private : [], posterType: 'private' },
+    { items: Array.isArray(feed.agency)  ? feed.agency  : [], posterType: 'agency'  },
   ];
   for (const bucket of buckets) {
-    for (const raw of bucket) {
-      const mapped = extractYad2Listing(raw as RawYad2Item, kind);
+    for (const raw of bucket.items) {
+      const mapped = extractYad2Listing(raw as RawYad2Item, kind, bucket.posterType);
       if (mapped) out.push(mapped);
     }
   }

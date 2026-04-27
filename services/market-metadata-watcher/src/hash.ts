@@ -23,6 +23,10 @@ export type HashableListing = {
   price: number | null;
   pricePerSqm: number | null;
   status: string;
+  // "forsale" | "rent" — derived from the feed URL the watcher hit.
+  kind: string | null;
+  // "private" | "agency" — which feed bucket the listing came from.
+  posterType: string | null;
 };
 
 export function metadataHash(input: HashableListing): string {
@@ -41,6 +45,8 @@ export function metadataHash(input: HashableListing): string {
     price: input.price ?? null,
     pricePerSqm: input.pricePerSqm ?? null,
     status: input.status,
+    kind: input.kind ?? null,
+    posterType: input.posterType ?? null,
   };
   const ordered = Object.keys(norm)
     .sort()

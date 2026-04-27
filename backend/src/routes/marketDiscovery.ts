@@ -15,6 +15,8 @@ const listFiltersSchema = z.object({
   city:           z.string().trim().min(1).optional(),
   neighborhood:   z.string().trim().min(1).optional(),
   propertyType:   z.string().trim().min(1).optional(),
+  kind:           z.enum(['forsale', 'rent']).optional(),
+  posterType:     z.enum(['private', 'agency']).optional(),
   minPrice:       z.coerce.number().int().min(0).optional(),
   maxPrice:       z.coerce.number().int().min(0).optional(),
   minRooms:       z.coerce.number().min(0).optional(),
@@ -22,7 +24,9 @@ const listFiltersSchema = z.object({
   minSqm:         z.coerce.number().int().min(0).optional(),
   maxSqm:         z.coerce.number().int().min(0).optional(),
   status:         z.enum(['active', 'removed', 'unknown']).optional(),
-  firstSeenAfter: z.coerce.date().optional(),
+  // ISO date or "24h" / "7d" / "30d" / "all" shorthand. Default 24h:
+  // agents care about fresh deal flow, not 6-month-old listings.
+  firstSeenAfter: z.union([z.coerce.date(), z.enum(['24h', '7d', '30d', 'all'])]).optional(),
   // Phase 2 sort options. Allowlisted enum so the orderBy mapping
   // below can't be tricked into ordering by a column that has no
   // index (every value here corresponds to a real index on
@@ -64,8 +68,27 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     if (f.city) where.city = f.city;
     if (f.neighborhood) where.neighborhood = f.neighborhood;
     if (f.propertyType) where.propertyType = f.propertyType;
+    if (f.kind) where.kind = f.kind;
+    if (f.posterType) where.posterType = f.posterType;
     if (f.status) where.status = f.status;
-    if (f.firstSeenAfter) where.firstSeenAt = { gte: f.firstSeenAfter };
+    // 24h is the default: an agent opens "מודעות חדשות בשוק" expecting
+    // *new* deal flow, not yesterday's leftovers. Pass `firstSeenAfter=all`
+    // to disable.
+    const sinceShorthand: Record<string, number | null> = {
+      '24h': 24 * 3600 * 1000,
+      '7d':  7 * 24 * 3600 * 1000,
+      '30d': 30 * 24 * 3600 * 1000,
+      'all': null,
+    };
+    if (typeof f.firstSeenAfter === 'string') {
+      const ms = sinceShorthand[f.firstSeenAfter];
+      if (ms != null) where.firstSeenAt = { gte: new Date(Date.now() - ms) };
+    } else if (f.firstSeenAfter instanceof Date) {
+      where.firstSeenAt = { gte: f.firstSeenAfter };
+    } else {
+      // Default — last 24h.
+      where.firstSeenAt = { gte: new Date(Date.now() - 24 * 3600 * 1000) };
+    }
     if (f.minPrice != null || f.maxPrice != null) {
       where.price = {
         ...(f.minPrice != null ? { gte: f.minPrice } : {}),
@@ -107,20 +130,34 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     // the chosen sort. With f.limit ≤ 100 the second query is cheap.
     const userId = (req as any).user?.id as string;
     const ids = rawItems.map((x) => x.id);
-    const myMatches = ids.length
-      ? await prisma.marketListingLeadMatch.findMany({
-          where: {
-            agentUserId: userId,
-            marketListingId: { in: ids },
-            status: { not: 'dismissed' },
-          },
-          orderBy: { score: 'desc' },
-          select: {
-            id: true, score: true, reasonsJson: true,
-            leadId: true, marketListingId: true,
-          },
-        })
-      : [];
+    const [myMatches, myDuplicates] = await Promise.all([
+      ids.length
+        ? prisma.marketListingLeadMatch.findMany({
+            where: {
+              agentUserId: userId,
+              marketListingId: { in: ids },
+              status: { not: 'dismissed' },
+            },
+            orderBy: { score: 'desc' },
+            select: {
+              id: true, score: true, reasonsJson: true,
+              leadId: true, marketListingId: true,
+            },
+          })
+        : Promise.resolve([] as any[]),
+      // "Already in my CRM" — Property rows owned by this agent that
+      // point back to one of these MarketListings. Drives the green
+      // "כבר בנכסים שלי" outline + button state.
+      ids.length
+        ? prisma.property.findMany({
+            where: {
+              agentId: userId,
+              marketListingId: { in: ids },
+            },
+            select: { id: true, marketListingId: true },
+          })
+        : Promise.resolve([] as any[]),
+    ]);
     const matchByListing = new Map<string, typeof myMatches[number]>();
     for (const m of myMatches) {
       // findMany returns score-desc, so the first occurrence per
@@ -128,6 +165,10 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
       if (!matchByListing.has(m.marketListingId)) {
         matchByListing.set(m.marketListingId, m);
       }
+    }
+    const duplicateByListing = new Map<string, string>();
+    for (const p of myDuplicates) {
+      if (p.marketListingId) duplicateByListing.set(p.marketListingId, p.id);
     }
     const items = rawItems.map((x) => ({
       ...x,
@@ -139,6 +180,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
             leadId:    matchByListing.get(x.id)!.leadId,
           }
         : null,
+      duplicatedByMe: duplicateByListing.get(x.id) || null,
     }));
     // Stable in-memory sort: matched listings first (by score desc),
     // then everything else in the DB-side order. Array.prototype.sort

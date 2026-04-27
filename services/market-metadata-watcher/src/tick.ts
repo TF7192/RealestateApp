@@ -119,6 +119,8 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
             floor: item.floor,
             price: item.price,
             pricePerSqm: item.pricePerSqm,
+            kind: item.kind,
+            posterType: item.posterType,
             status: item.status || 'active',
             metadataHash: hash,
             // reactedAt deliberately left NULL — backend reactor
@@ -153,6 +155,8 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
                   floor: item.floor,
                   price: item.price,
                   pricePerSqm: item.pricePerSqm,
+                  kind: item.kind,
+                  posterType: item.posterType,
                   status: item.status || existing.status,
                   metadataHash: hash,
                   // Reset reactor cursor on metadata change so the

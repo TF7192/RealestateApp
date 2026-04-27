@@ -7,6 +7,7 @@ describe('metadataHash', () => {
     city: 'תל אביב', neighborhood: 'הצפון הישן', street: 'בן יהודה',
     propertyType: 'apartment', rooms: 3, sizeSqm: 80, floor: 2,
     price: 3_500_000, pricePerSqm: 43_750, status: 'active',
+    kind: 'forsale', posterType: 'private',
   };
 
   it('is deterministic across calls', () => {
@@ -24,6 +25,7 @@ describe('metadataHash', () => {
       floor: 2, sizeSqm: 80, rooms: 3, propertyType: 'apartment',
       street: 'בן יהודה', neighborhood: 'הצפון הישן', city: 'תל אביב',
       externalListingId: 'abc', source: 'yad2',
+      kind: 'forsale', posterType: 'private',
     };
     expect(metadataHash(reordered)).toBe(metadataHash(base));
   });

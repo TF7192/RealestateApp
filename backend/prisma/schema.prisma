@@ -1786,6 +1786,13 @@ model MarketListing {
   floor              Int?
   price              Int?
   pricePerSqm        Int?
+  // "forsale" | "rent" — Yad2 splits its catalogue into these two
+  // top-level kinds. Madlan/Komo will follow the same dichotomy.
+  kind               String?
+  // "private" | "agency" — Yad2 splits its feed into private + agency
+  // buckets. Useful to filter out agency listings (the agent already
+  // works with most local agencies and wants raw deal flow).
+  posterType         String?
   firstSeenAt        DateTime  @default(now())
   lastSeenAt         DateTime  @default(now())
   status             String    @default("active")             // "active" | "removed" | "unknown"
@@ -1820,6 +1827,8 @@ model MarketListing {
   @@index([sizeSqm])
   @@index([firstSeenAt])
   @@index([status])
+  @@index([kind])
+  @@index([posterType])
   @@index([metadataHash])
   // Reactor's hot path: WHERE reactedAt IS NULL ORDER BY firstSeenAt
   // ASC LIMIT N. The (reactedAt, firstSeenAt) covering index keeps
