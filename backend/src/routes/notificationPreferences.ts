@@ -9,7 +9,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { requireUser } from '../middleware/auth.js';
 
 const patchSchema = z.object({
   marketMatchInAppEnabled:          z.boolean().optional(),
@@ -19,7 +18,8 @@ const patchSchema = z.object({
 });
 
 export const registerNotificationPreferencesRoutes: FastifyPluginAsync = async (app) => {
-  app.addHook('onRequest', requireUser);
+  // Auth gate — returns 401 (not 500) on missing/invalid cookies.
+  app.addHook('onRequest', app.requireAuth);
 
   // Defaults match the model defaults — keep them in sync on changes.
   // The "auto-create on first GET" pattern keeps the API surface

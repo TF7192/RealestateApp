@@ -69,7 +69,7 @@ async function drainOnce() {
   // listings × M=100 profiles the in-memory loop is microseconds.
   const profiles = await prisma.leadSearchProfile.findMany({
     where: {
-      lead: { status: { in: ['NEW', 'CONTACTED', 'QUALIFIED', 'ACTIVE'] as any } },
+      lead: { status: { in: ['HOT', 'WARM', 'COLD'] } },
     },
     include: { lead: { select: { id: true, agentId: true } } },
   });

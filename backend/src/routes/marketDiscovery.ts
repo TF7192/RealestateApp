@@ -10,7 +10,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { requireUser } from '../middleware/auth.js';
 
 const listFiltersSchema = z.object({
   city:           z.string().trim().min(1).optional(),
@@ -50,7 +49,9 @@ function sortToOrderBy(sort: string): { [k: string]: 'asc' | 'desc' }[] {
 }
 
 export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => {
-  app.addHook('onRequest', requireUser);
+  // Auth gate — returns 401 (not 500) on missing/invalid cookies so the
+  // FE error UI surfaces "session expired" rather than a generic crash.
+  app.addHook('onRequest', app.requireAuth);
 
   // GET /api/market-discovery/listings — paginated list with filters
   app.get('/listings', async (req, reply) => {
