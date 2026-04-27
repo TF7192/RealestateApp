@@ -1431,13 +1431,32 @@ export default function Properties() {
                 )}
                 <Link to={`/properties/${prop.id}`} className="property-card-link" onClick={handleCardTap}>
                   <div className="property-image">
-                    <img
-                      src={thumb || 'https://via.placeholder.com/800x450'}
-                      alt={prop.street}
-                      loading={isLcpCandidate ? 'eager' : 'lazy'}
-                      fetchpriority={isLcpCandidate ? 'high' : undefined}
-                      decoding="async"
-                    />
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt={prop.street}
+                        loading={isLcpCandidate ? 'eager' : 'lazy'}
+                        fetchpriority={isLcpCandidate ? 'high' : undefined}
+                        decoding="async"
+                      />
+                    ) : (
+                      // Inline SVG placeholder — replaces the
+                      // via.placeholder.com URL that rendered as a
+                      // tiny broken-image glyph in the corner. The
+                      // gold building icon on a cream gradient reads
+                      // as "no photo yet" instead of "broken".
+                      <div
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute', inset: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'linear-gradient(160deg, #fbf7f0 0%, #efe9df 100%)',
+                          color: 'rgba(180,139,76,0.55)',
+                        }}
+                      >
+                        <Building2 size={56} strokeWidth={1.4} />
+                      </div>
+                    )}
                     <div className="property-badges">
                       <span className={`badge ${prop.assetClass === 'COMMERCIAL' ? 'badge-warning' : 'badge-success'}`}>
                         {prop.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}
@@ -1465,27 +1484,29 @@ export default function Properties() {
                     <div className="property-price-overlay">
                       {formatPrice(prop.marketingPrice)}
                     </div>
-                    {/* Cover-image identity pill — owner name (or unit
-                        number when present) overlaid on the photo so 6
-                        listings in the same building are tellable apart
-                        on a quick scroll without opening each card. */}
+                    {/* Cover-image identity pill — sits next to the
+                        share button at the bottom-start corner of the
+                        photo (logical-end of the share button). Was
+                        top-start before but overlapped the asset-class
+                        / category badges; bottom-start has free real
+                        estate where only the share chip lives. */}
                     {(prop.unitNumber || prop.owner) ? (
                       <div
                         style={{
                           position: 'absolute',
-                          top: 8,
-                          insetInlineStart: 8,
+                          bottom: 12,
+                          insetInlineStart: 56,
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 4,
-                          padding: '4px 8px',
+                          padding: '4px 10px',
                           borderRadius: 999,
                           background: 'rgba(13,15,20,0.78)',
                           backdropFilter: 'blur(8px)',
                           color: '#fff',
                           fontSize: 11.5,
                           fontWeight: 600,
-                          maxWidth: 'calc(100% - 16px)',
+                          maxWidth: 'calc(100% - 64px - 110px)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
