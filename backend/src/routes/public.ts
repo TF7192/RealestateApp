@@ -173,7 +173,33 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     if (!property) {
       return reply.code(404).send({ error: { message: 'Property not found' } });
     }
-    return { agent: { id: agent.id, slug: agent.slug, displayName: agent.displayName }, property };
+    // Flatten images to the shape CustomerPropertyView expects:
+    // - `images`: string[] (URLs) so `<img src={images[0]}>` renders.
+    // - `imageThumbs` / `imageList`: parallel structures the desktop
+    //   detail page uses. Without these the public page rendered the
+    //   PropertyImage objects directly into <img src=…>, producing
+    //   broken image tiles. Mirrors the `serialize()` output of
+    //   /api/properties/:id.
+    const imageRows = property.images || [];
+    const flatProperty: any = {
+      ...property,
+      images: imageRows.map((i: any) => i.url),
+      imageThumbs: imageRows.map((i: any) => i.urlThumb || i.urlCard || i.url),
+      imageList: imageRows.map((i: any) => ({
+        id: i.id, url: i.url, urlCard: i.urlCard, urlThumb: i.urlThumb, sortOrder: i.sortOrder,
+      })),
+    };
+    return {
+      agent: {
+        id: agent.id,
+        slug: agent.slug,
+        displayName: agent.displayName,
+        // Surface the agent avatar so the public page can show a
+        // profile pic next to the name + contact card.
+        avatarUrl: (agent as any).avatarUrl ?? null,
+      },
+      property: flatProperty,
+    };
   });
 
   // 2.2 — Server-rendered Open Graph preview. Nginx should route crawler
