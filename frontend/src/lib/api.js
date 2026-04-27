@@ -1112,6 +1112,33 @@ export const api = {
     `/public/agents/${encodeURIComponent(agentSlug)}/properties/${encodeURIComponent(propertySlug)}/view`,
     { method: 'POST', body: {} },
   ),
+
+  // Market Discovery (Phases 1–4, 2026-04-27) — hourly Yad2 metadata
+  // watcher feed + lead-listing matches + opt-in notification
+  // preferences. All routes auth-gated via requireUser; ownership
+  // checks happen server-side.
+  listMarketListings: (params)        => request(`/market-discovery/listings${qsFrom(params)}`),
+  getMarketListing:   (id)            => request(`/market-discovery/listings/${encodeURIComponent(id)}`),
+  duplicateMarketListing: (id, body)  => request(
+    `/market-discovery/listings/${encodeURIComponent(id)}/duplicate`,
+    { method: 'POST', body: body || {} },
+  ),
+  listMarketMatches:  ()              => request('/market-discovery/matches'),
+  viewMarketMatch:    (id)            => request(
+    `/market-discovery/matches/${encodeURIComponent(id)}/view`, { method: 'POST' },
+  ),
+  dismissMarketMatch: (id)            => request(
+    `/market-discovery/matches/${encodeURIComponent(id)}/dismiss`, { method: 'POST' },
+  ),
+  getMarketMatch:     (id)            => request(`/market-discovery/match/${encodeURIComponent(id)}`),
+  getMarketLastScan:  ()              => request('/market-discovery/last-scan'),
+  // Phase 4 — admin observability for the watcher.
+  listMarketWatcherRuns: () => request('/admin/market-watcher/runs'),
+  // Phase 3 — opt-in notification preferences.
+  getNotificationPreferences:    () => request('/notification-preferences'),
+  updateNotificationPreferences: (body) => request(
+    '/notification-preferences', { method: 'PATCH', body },
+  ),
 };
 
 // Small querystring helper: drops empty values so `?from=&to=` doesn't

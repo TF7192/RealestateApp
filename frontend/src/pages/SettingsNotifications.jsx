@@ -26,7 +26,7 @@ export default function SettingsNotifications() {
 
   useEffect(() => {
     let cancelled = false;
-    api.get('/notification-preferences').then(
+    api.getNotificationPreferences().then(
       (res) => { if (!cancelled) { setPref(res); setLoading(false); } },
       (err) => { if (!cancelled) { toast.error?.(err?.message || 'טעינה נכשלה'); setLoading(false); } },
     );
@@ -39,7 +39,7 @@ export default function SettingsNotifications() {
     if (!pref) return;
     setSaving(true);
     try {
-      const next = await api.patch('/notification-preferences', {
+      const next = await api.updateNotificationPreferences({
         marketMatchInAppEnabled:          pref.marketMatchInAppEnabled,
         marketMatchEmailEnabled:          pref.marketMatchEmailEnabled,
         marketMatchSmsEnabled:            pref.marketMatchSmsEnabled,

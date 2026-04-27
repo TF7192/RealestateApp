@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2, ExternalLink, Copy as CopyIcon, Filter, X,
-  Sparkles, ArrowUpDown,
+  Sparkles,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
@@ -40,17 +40,6 @@ const SORTS = [
   { value: 'price-desc',       label: 'מחיר — מהיקר לזול' },
   { value: 'pricePerSqm-asc',  label: 'מחיר למ״ר — נמוך לגבוה' },
 ];
-
-function buildQuery(filters, sort) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(filters)) {
-    if (v === '' || v == null) continue;
-    params.set(k, v);
-  }
-  if (sort) params.set('sort', sort);
-  const q = params.toString();
-  return q ? `?${q}` : '';
-}
 
 export default function MarketDiscovery() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -80,7 +69,7 @@ export default function MarketDiscovery() {
   // fresh deploy) the page should still render the empty state.
   useEffect(() => {
     let cancelled = false;
-    api.get('/market-discovery/last-scan').then(
+    api.getMarketLastScan().then(
       (res) => { if (!cancelled) setLastScan(res?.run || null); },
       () => { /* tolerate failure — header just hides */ },
     );
@@ -94,7 +83,7 @@ export default function MarketDiscovery() {
   useEffect(() => {
     if (!matchId) { setMatchContext(null); return undefined; }
     let cancelled = false;
-    api.get(`/market-discovery/match/${matchId}`).then(
+    api.getMarketMatch(matchId).then(
       (res) => { if (!cancelled) setMatchContext(res?.match || null); },
       (err) => { if (!cancelled) toast.error?.(err?.message || 'התאמה לא נמצאה'); },
     );
@@ -106,7 +95,7 @@ export default function MarketDiscovery() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.get(`/market-discovery/listings${buildQuery(filters, sort)}`).then(
+    api.listMarketListings({ ...filters, sort }).then(
       (res) => {
         if (cancelled) return;
         setItems(res?.items || []);
@@ -144,7 +133,7 @@ export default function MarketDiscovery() {
   const duplicate = async (listingId) => {
     try {
       const body = matchId ? { matchId } : {};
-      const res = await api.post(`/market-discovery/listings/${listingId}/duplicate`, body);
+      const res = await api.duplicateMarketListing(listingId, body);
       toast.success?.('הנכס הועתק לרשימה שלך');
       navigate(`/properties/${res.propertyId}/edit`);
     } catch (err) {
@@ -338,7 +327,7 @@ export default function MarketDiscovery() {
         <EmptyState
           icon={<Building2 size={28} />}
           title="אין מודעות תואמות"
-          body={
+          description={
             activeFilterCount > 0
               ? 'נסה/י להרחיב את הסינון, או נקה אותו.'
               : 'הסורק רץ פעם בשעה ויאסוף מודעות חדשות מ-Yad2 ומקורות נוספים. חזור/חזרי אחר כך.'

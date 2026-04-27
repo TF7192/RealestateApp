@@ -46,7 +46,7 @@ export default function AdminMarketWatcher() {
 
   const load = () => {
     setRefreshing(true);
-    return api.get('/admin/market-watcher/runs').then(
+    return api.listMarketWatcherRuns().then(
       (res) => { setRuns(res?.runs || []); setLoading(false); setRefreshing(false); setError(null); },
       (err) => { setError(err?.message || 'טעינה נכשלה'); setLoading(false); setRefreshing(false); },
     );
