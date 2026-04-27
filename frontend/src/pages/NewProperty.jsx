@@ -21,7 +21,7 @@ import VoiceCaptureDialog from '../components/VoiceCaptureDialog';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
 import useBeforeUnload from '../hooks/useBeforeUnload';
-import { cityNames } from '../data/mockData';
+import { cityNames as fallbackCityNames } from '../data/mockData';
 import StickyActionBar from '../components/StickyActionBar';
 import OwnerPicker from '../components/OwnerPicker';
 import StreetHouseField from '../components/StreetHouseField';
@@ -456,6 +456,7 @@ export default function NewProperty() {
   const [loadingExisting, setLoadingExisting] = useState(isEdit);
   const [existingMeta, setExistingMeta] = useState(null); // { street, city, imageCount }
   const [videosOpen, setVideosOpen] = useState(false);
+  const [cityOptions, setCityOptions] = useState(fallbackCityNames);
 
   const [form, setForm] = useState(INITIAL_FORM);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -479,6 +480,19 @@ export default function NewProperty() {
     DRAFT_KEY,
     isEdit ? null : { form, step }
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    api.cities().then((res) => {
+      if (cancelled) return;
+      const names = (res?.cities || [])
+        .map((c) => c?.name)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'he'));
+      if (names.length) setCityOptions(names);
+    }).catch(() => { /* keep fallback list */ });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (isEdit) return;
@@ -1212,7 +1226,7 @@ export default function NewProperty() {
                 <CityField
                   value={form.city}
                   onChange={(v) => update('city', v)}
-                  options={cityNames}
+                  options={cityOptions}
                   placeholder="רמלה"
                   inputProps={{ ...inputPropsForCity(), required: true }}
                 />
