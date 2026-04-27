@@ -3,6 +3,7 @@ import type { Logger } from 'pino';
 import { config } from './config.js';
 import { metadataHash, type HashableListing } from './hash.js';
 import { scoreMatch } from './matching.js';
+import { discoverYad2 } from './sources/yad2.js';
 
 // One end-to-end watcher run:
 //   1. Open a `MarketWatcherRun` row (status: running).
@@ -37,18 +38,46 @@ export async function runWatcherTick({ prisma, logger }: Deps) {
   try {
     log('tick.started');
 
+    // Self-seed the yad2 source on first run so an empty DB still
+    // produces listings without a manual SQL insert.
+    await prisma.marketListingSource.upsert({
+      where: { name: 'yad2' },
+      update: {},
+      create: { name: 'yad2', baseUrl: 'https://www.yad2.co.il' },
+    });
+
     const sources = await prisma.marketListingSource.findMany({ where: { isEnabled: true } });
     if (sources.length === 0) {
       log('tick.no-sources');
     }
 
     for (const src of sources) {
-      // NOTE: discovery is the only piece deferred to Phase 1.5. Once
-      // the Yad2 city-feed extractor lands, this loop calls it instead
-      // of the empty array. The contract is `discoverListings(src)
-      // → Promise<HashableListing[]>`.
-      const discovered: HashableListing[] = []; // ← Phase 1.5 plug-in point
-      log('tick.source-fetched', { source: src.name, count: discovered.length });
+      let discovered: HashableListing[] = [];
+      if (src.name === 'yad2') {
+        // Build the known-tokens set once per source so the discoverer
+        // can short-circuit pages where every listing is already in DB.
+        const known = new Set<string>(
+          (await prisma.marketListing.findMany({
+            where: { source: 'yad2' },
+            select: { externalListingId: true },
+          })).map((r) => r.externalListingId),
+        );
+        const result = await discoverYad2({
+          regions: config.discoveryRegions,
+          knownTokens: known,
+          hardCeiling: config.hardCeiling,
+          log: logger,
+        });
+        discovered = result.items;
+        log('tick.source-fetched', {
+          source: src.name,
+          count: discovered.length,
+          fetched: result.stats.fetched,
+          itemsSeen: result.stats.itemsSeen,
+        });
+      } else {
+        log('tick.source-skipped-unknown', { source: src.name });
+      }
 
       for (const item of discovered.slice(0, config.hardCeiling)) {
         listingsSeen++;

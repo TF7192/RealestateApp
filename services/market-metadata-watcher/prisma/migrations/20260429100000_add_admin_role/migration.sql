@@ -1,0 +1,15 @@
+-- SEC-010 — extend UserRole with ADMIN.
+--
+-- The platform was previously gating /api/admin, /api/chat/admin/*,
+-- POST /api/neighborhoods, /api/office/ai-usage and the chat-WS admin
+-- bucket on an `ADMIN_EMAILS` env allowlist that defaulted to
+-- talfuks1234@gmail.com. That's brittle (email changes invalidate the
+-- mapping until next login; a seeded demo account that ever happened
+-- to land on the magic email would silently inherit admin) and
+-- cross-cuts SEC-022 (sensitive flags driven by string matching).
+--
+-- This migration adds ADMIN to the UserRole enum. A follow-up
+-- migration (20260429100100_backfill_admin_role) flips the existing
+-- platform admin row to role='ADMIN' so the gate change is a no-op
+-- for them. All admin-gated code paths now read role off the JWT.
+ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'ADMIN';

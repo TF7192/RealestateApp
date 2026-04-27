@@ -10,10 +10,40 @@ const log = (msg: string, extra?: unknown) => logger.info({ ...((extra as object
 
 async function main() {
   const once = process.argv.includes('--once');
-  log('watcher.boot', { once, intervalMs: config.intervalMs, jitterMs: config.jitterMs });
+  const dryRun = process.argv.includes('--dry-run');
+  log('watcher.boot', { once, dryRun, intervalMs: config.intervalMs, jitterMs: config.jitterMs });
+
+  // Dry-run: fetch + parse + log; no DB writes. Used to verify the
+  // Yad2 fetch + extractor end-to-end without applying migrations or
+  // hitting prod RDS — the full DB plumbing is exercised separately
+  // by --once mode.
+  if (dryRun) {
+    const { discoverYad2, closeBrowser } = await import('./sources/yad2.js');
+    const result = await discoverYad2({
+      regions: config.discoveryRegions,
+      knownTokens: new Set<string>(),
+      hardCeiling: config.hardCeiling,
+      log: logger,
+    });
+    log('watcher.dry-run-complete', {
+      itemsFound: result.items.length,
+      pagesFetched: result.stats.fetched,
+      itemsSeen: result.stats.itemsSeen,
+    });
+    // Print a few sample items so the operator can eyeball the
+    // metadata-only payload (no images, no descriptions, no phones).
+    for (const it of result.items.slice(0, 5)) {
+      logger.info({ sample: it }, 'watcher.dry-run-sample');
+    }
+    await closeBrowser();
+    await prisma.$disconnect();
+    return;
+  }
 
   if (once) {
     await runWatcherTick({ prisma, logger });
+    const { closeBrowser } = await import('./sources/yad2.js');
+    await closeBrowser();
     await prisma.$disconnect();
     return;
   }

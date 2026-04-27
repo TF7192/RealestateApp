@@ -22,14 +22,18 @@ export const config = {
   // ±10 minutes by default — keeps us off the top-of-the-hour and
   // out of cron-clash territory.
   jitterMs:          intEnv('MARKET_WATCHER_JITTER_MS',   10 * 60 * 1000),
-  // Cities to discover. Hebrew strings — the existing yad2-crawler.ts
-  // parses Hebrew city names natively.
-  discoveryCities:   listEnv('MARKET_WATCHER_DISCOVERY_CITIES', [
-    'תל אביב',
-    'רמת גן',
-    'גבעתיים',
-    'רעננה',
-    'הרצליה',
+  // Yad2 region slugs to discover. Live-verified in chat: 7 regions
+  // cover 100% of Israel's listing volume. Default = all 7.
+  // Override per-env if you want to scope down (e.g. dev runs only
+  // tel-aviv-area to save fetch budget).
+  discoveryRegions:  listEnv('MARKET_WATCHER_DISCOVERY_REGIONS', [
+    'tel-aviv-area',
+    'center-and-sharon',
+    'jerusalem-area',
+    'coastal-north',
+    'north-and-valleys',
+    'south',
+    'east',
   ]),
   // Min match score (0..100) to create a notification.
   matchMinScore:     intEnv('MARKET_MATCH_MIN_SCORE', 70),

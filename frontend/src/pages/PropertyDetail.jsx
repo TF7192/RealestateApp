@@ -262,7 +262,7 @@ function formatPrice(price) {
   return `₪${price.toLocaleString('he-IL')}`;
 }
 
-function buildFullWhatsAppMessage(prop, agent) {
+function buildFullWhatsAppMessage(prop, agent, opts = {}) {
   const lines = [];
   lines.push(`*${prop.type} — ${prop.street}, ${prop.city}*`);
   lines.push('');
@@ -284,7 +284,12 @@ function buildFullWhatsAppMessage(prop, agent) {
   if (prop.notes) { lines.push(''); lines.push(prop.notes); }
   lines.push('');
   lines.push(`📷 פרטי הנכס:`);
-  const pUrl = prop.slug && agent?.slug
+  // Same precedence as the customerLink builder in the component:
+  // server-resolved publicPath (always pretty) → inline agent.slug +
+  // prop.slug → bare /p/:id fallback.
+  const pUrl = opts.publicSlugPath
+    ? `${window.location.origin}${opts.publicSlugPath}`
+    : prop.slug && agent?.slug
     ? `${window.location.origin}/agents/${encodeURI(agent.slug)}/${encodeURI(prop.slug)}`
     : `${window.location.origin}/p/${prop.id}`;
   lines.push(pUrl);
@@ -358,6 +363,14 @@ export default function PropertyDetail() {
   // the notes field, and we don't flicker the read-only panel text.
   const [aiDesc, setAiDesc] = useState(null); // { description, highlights } | null
   const [aiBusy, setAiBusy] = useState(false);
+  // Resolved (agentSlug, propertySlug) pair from the public lookup
+  // helper. We hit /api/public/lookup/property/:id once after the
+  // property loads so the share link is always the slug-friendly URL
+  // ("/agents/etty-dvash/דירה-4-חד-רמלה-משה-צדקה") instead of the
+  // bare cuid ("/p/cmofu..."). The lookup endpoint also lazily mints
+  // missing slugs server-side, so this works even on rows that were
+  // created before the slug system existed.
+  const [publicSlugPath, setPublicSlugPath] = useState(null);
 
   useEffect(() => {
     api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
@@ -376,6 +389,22 @@ export default function PropertyDetail() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  // Fetch the canonical slug pair so "שתף נכס" copies the pretty URL
+  // even when user.slug or property.slug isn't yet populated client-
+  // side. The lookup is public + cheap (1 row + 2 slug-mint calls)
+  // and runs once per id.
+  useEffect(() => {
+    let cancelled = false;
+    if (!id) return undefined;
+    api.lookupPropertySlug(id)
+      .then((r) => {
+        if (cancelled) return;
+        if (r?.publicPath) setPublicSlugPath(r.publicPath);
+      })
+      .catch(() => { /* fall back to /p/:id */ });
+    return () => { cancelled = true; };
+  }, [id]);
 
   // Sprint 5 — Ask the backend to draft a marketing description. The
   // endpoint calls Claude Opus 4.7 and returns {description, highlights}.
@@ -516,7 +545,15 @@ export default function PropertyDetail() {
   const mapsEmbed = `https://www.google.com/maps?q=${mapsQuery}&output=embed`;
   const mapsOpen = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
-  const customerLink = property.slug && user?.slug
+  // Prefer the slug pair resolved from the public lookup helper
+  // (server-side lazy-mints missing slugs); fall back to user.slug +
+  // property.slug if we have them client-side; last resort is the bare
+  // /p/:id short link. End result: "שתף נכס" always copies the
+  // human-readable URL when the property has any kind of public slug,
+  // never the cuid.
+  const customerLink = publicSlugPath
+    ? `${window.location.origin}${publicSlugPath}`
+    : property.slug && user?.slug
     ? `${window.location.origin}/agents/${encodeURI(user.slug)}/${encodeURI(property.slug)}`
     : `${window.location.origin}/p/${property.id}`;
 
@@ -559,12 +596,17 @@ export default function PropertyDetail() {
       const vars = tplBuildVars(property, user, { stripAgent: false });
       return tplRender(tpl.body, vars);
     }
-    return buildFullWhatsAppMessage(property, {
-      displayName: user?.displayName,
-      agency: user?.agentProfile?.agency,
-      phone: user?.phone,
-      bio: user?.agentProfile?.bio,
-    });
+    return buildFullWhatsAppMessage(
+      property,
+      {
+        displayName: user?.displayName,
+        agency: user?.agentProfile?.agency,
+        phone: user?.phone,
+        bio: user?.agentProfile?.bio,
+        slug: user?.slug,
+      },
+      { publicSlugPath },
+    );
   };
 
   const handleWhatsApp = () => {
