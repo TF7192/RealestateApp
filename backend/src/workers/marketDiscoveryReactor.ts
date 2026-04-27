@@ -23,6 +23,7 @@
 
 import { prisma } from '../lib/prisma.js';
 import { scoreMatch } from '../lib/marketDiscoveryMatching.js';
+import { ensureSearchProfilesForOrphanLeads } from '../lib/leadSearchProfileSeed.js';
 
 const POLL_MS = 30 * 1000;
 const BATCH_SIZE = 50;
@@ -57,6 +58,21 @@ export function stopMarketDiscoveryReactor() {
 }
 
 async function drainOnce() {
+  // Auto-seed missing LeadSearchProfile rows. Most agents never open the
+  // dedicated profile editor, so without this fallback the matching
+  // pipeline runs against an empty profile set and never fires.
+  // Idempotent — only inserts where the relation is empty.
+  try {
+    const seeded = await ensureSearchProfilesForOrphanLeads(prisma);
+    if (seeded > 0) {
+      // eslint-disable-next-line no-console
+      console.info('[market-discovery-reactor] seeded-profiles', { count: seeded });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[market-discovery-reactor] seed-failed', String(err));
+  }
+
   const unprocessed = await prisma.marketListing.findMany({
     where: { reactedAt: null, status: 'active' },
     orderBy: { firstSeenAt: 'asc' },
