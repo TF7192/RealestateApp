@@ -169,6 +169,7 @@ export async function discoverYad2(opts: {
     for (const region of regions) {
       for (const kind of KINDS) {
         let page = 1;
+        let novelInRegionKind = 0;
         while (page <= MAX_PAGES_PER_REGION) {
           const sep = page === 1 ? '' : `?page=${page}`;
           const url = `https://www.yad2.co.il/realestate/${kind}/${region}${sep}`;
@@ -203,6 +204,8 @@ export async function discoverYad2(opts: {
             return { items: allItems, stats };
           }
 
+          novelInRegionKind += novelOnThisPage;
+
           // Early exit: if EVERY item on this page was already known,
           // we've caught up to last run for this (region, kind).
           if (items.length > 0 && novelOnThisPage === 0) break;
@@ -211,6 +214,12 @@ export async function discoverYad2(opts: {
 
           page++;
           await new Promise((r) => setTimeout(r, POLITE_GAP_MS));
+        }
+        if (novelInRegionKind >= HIGH_VOLUME_PER_REGION_KIND) {
+          log.warn(
+            { region, kind, novelInRegionKind },
+            'yad2.high-volume-per-region-kind',
+          );
         }
       }
     }
