@@ -1,6 +1,58 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { slugify, propertySlug, ensureUniqueSlug } from '../lib/slug.js';
+
+// Shared OG renderer used by both the slug-based and id-based property
+// endpoints. Generates a minimal HTML page with og: + twitter: meta
+// tags so WhatsApp / Telegram / Twitter / Facebook crawlers see a
+// property-specific preview (image, title, price line) instead of the
+// site-level fallback.
+function sendPropertyOg(
+  reply: FastifyReply,
+  agent: { id: string; displayName?: string | null; slug?: string | null },
+  property: { type: string; street: string; city: string; rooms: number | null; sqm: number; marketingPrice: number; images: Array<{ url: string }> },
+  agentSlug: string | null,
+  propSlug: string | null,
+): FastifyReply {
+  const origin = process.env.PUBLIC_ORIGIN || 'https://estia.co.il';
+  const url = `${origin}/agents/${agentSlug}/${propSlug}`;
+  const img = property.images[0]?.url || '';
+  const imgAbs = img.startsWith('http') ? img : `${origin}${img}`;
+  const title = `${property.type} ב${property.street}, ${property.city}`;
+  const parts: string[] = [];
+  if (property.rooms) parts.push(`${property.rooms} חדרים`);
+  if (property.sqm) parts.push(`${property.sqm} מ״ר`);
+  const price = `₪${property.marketingPrice.toLocaleString('he-IL')}`;
+  const desc = [price, ...parts, agent.displayName].filter(Boolean).join(' · ');
+  const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
+  const html = `<!doctype html><html lang="he" dir="rtl"><head>
+<meta charset="utf-8">
+<title>${esc(title)}</title>
+<meta property="og:type" content="website">
+<meta property="og:url" content="${esc(url)}">
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${esc(imgAbs)}">
+<meta property="og:locale" content="he_IL">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(title)}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${esc(imgAbs)}">
+<meta http-equiv="refresh" content="0; url=${esc(url)}">
+</head><body><a href="${esc(url)}">${esc(title)}</a></body></html>`;
+  reply.header('Content-Type', 'text/html; charset=utf-8');
+  reply.header('Cache-Control', 'public, max-age=300');
+  // SEC-011 — server-wide helmet CSP is "default-src 'none'", which
+  // is right for the JSON API but would block this HTML page's
+  // og:image (loaded by the social-bot crawler) and its meta-refresh
+  // navigation in some clients. Override with a minimal HTML CSP:
+  // images allowed over https, no scripts at all, framing forbidden.
+  reply.header(
+    'Content-Security-Policy',
+    "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none';",
+  );
+  return reply.send(html);
+}
 
 /**
  * Public, unauthenticated, SEO-friendly routes for client-facing pages.
@@ -145,44 +197,28 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
         include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
       }));
     if (!property) return reply.code(404).send('Not found');
-    const origin = process.env.PUBLIC_ORIGIN || 'https://estia.co.il';
-    const url = `${origin}/agents/${agentSlug}/${propSlug}`;
-    const img = property.images[0]?.url || '';
-    const imgAbs = img.startsWith('http') ? img : `${origin}${img}`;
-    const title = `${property.type} ב${property.street}, ${property.city}`;
-    const parts: string[] = [];
-    if (property.rooms) parts.push(`${property.rooms} חדרים`);
-    if (property.sqm) parts.push(`${property.sqm} מ״ר`);
-    const price = `₪${property.marketingPrice.toLocaleString('he-IL')}`;
-    const desc = [price, ...parts, agent.displayName].filter(Boolean).join(' · ');
-    const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
-    const html = `<!doctype html><html lang="he" dir="rtl"><head>
-<meta charset="utf-8">
-<title>${esc(title)}</title>
-<meta property="og:type" content="website">
-<meta property="og:url" content="${esc(url)}">
-<meta property="og:title" content="${esc(title)}">
-<meta property="og:description" content="${esc(desc)}">
-<meta property="og:image" content="${esc(imgAbs)}">
-<meta property="og:locale" content="he_IL">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${esc(title)}">
-<meta name="twitter:description" content="${esc(desc)}">
-<meta name="twitter:image" content="${esc(imgAbs)}">
-<meta http-equiv="refresh" content="0; url=${esc(url)}">
-</head><body><a href="${esc(url)}">${esc(title)}</a></body></html>`;
-    reply.header('Content-Type', 'text/html; charset=utf-8');
-    reply.header('Cache-Control', 'public, max-age=300');
-    // SEC-011 — server-wide helmet CSP is "default-src 'none'", which
-    // is right for the JSON API but would block this HTML page's
-    // og:image (loaded by the social-bot crawler) and its meta-refresh
-    // navigation in some clients. Override with a minimal HTML CSP:
-    // images allowed over https, no scripts at all, framing forbidden.
-    reply.header(
-      'Content-Security-Policy',
-      "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none';",
-    );
-    return reply.send(html);
+    return sendPropertyOg(reply, agent, property, agentSlug, propSlug);
+  });
+
+  // Companion to the slug-based OG endpoint above. The legacy /p/:id
+  // short links share to WhatsApp / Telegram / Twitter — without this
+  // route the social-bot rewrite has nowhere to send the crawler, so
+  // the preview fell back to index.html's site-level meta tags
+  // ("ניהול נכסים ולידים — Estia") with no property image. Resolves
+  // the id internally and forwards the canonical agent slug + property
+  // slug to the same renderer the slug endpoint uses.
+  app.get('/og/property-by-id/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const property = await prisma.property.findUnique({
+      where: { id },
+      include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+    });
+    if (!property) return reply.code(404).send('Not found');
+    const agent = await prisma.user.findUnique({ where: { id: property.agentId } });
+    if (!agent) return reply.code(404).send('Not found');
+    const agentSlug = await findOrCreateAgentSlug(agent.id);
+    const propSlug = await findOrCreatePropertySlug(property.id);
+    return sendPropertyOg(reply, agent, property, agentSlug, propSlug);
   });
 
   /** Public inquiry — lead form on the per-asset landing page (/l/:agentSlug/:propertySlug).

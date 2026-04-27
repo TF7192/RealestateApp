@@ -139,15 +139,18 @@ export default function CustomerPropertyView() {
           setAgent(r.agent);
           return;
         }
-        const res = await api.getProperty(id);
+        // Legacy /p/:id short-link path. The route is public (declared
+        // in App.jsx's unauthenticated route table) but the page used
+        // to fetch via api.getProperty(id) — that endpoint is
+        // auth-gated, so an unauthenticated visitor got bounced to
+        // /login. Resolve the id to its (agentSlug, propertySlug) pair
+        // via the public lookup helper, then fetch through the
+        // publicProperty endpoint that doesn't require auth.
+        const lookup = await api.lookupPropertySlug(id);
+        const r = await api.publicProperty(lookup.agentSlug, lookup.propertySlug);
         if (cancelled) return;
-        setProperty(res.property);
-        if (res.property?.agentId) {
-          try {
-            const a = await api.getAgentPublic(res.property.agentId);
-            if (!cancelled) setAgent(a.agent);
-          } catch { /* ignore */ }
-        }
+        setProperty(r.property);
+        setAgent(r.agent);
       } catch (e) {
         if (!cancelled) setError(e.message || 'שגיאה');
       } finally {
