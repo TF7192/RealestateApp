@@ -19,6 +19,7 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
+      - 'services/**'
       - 'docker-compose*.yml'
       - '.github/workflows/build-images.yml'
   workflow_call:
@@ -61,6 +62,16 @@ jobs:
           - service: frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile
+          # Market Discovery watcher — separate container that runs
+          # the hourly Yad2 metadata scrape. Build context is the
+          # repo root (.) because the Dockerfile copies both the
+          # service tree (services/market-metadata-watcher/) and the
+          # Prisma schema (backend/prisma/) — schema is the canonical
+          # source for the generated client. See
+          # services/market-metadata-watcher/Dockerfile.
+          - service: market-watcher
+            context: .
+            dockerfile: ./services/market-metadata-watcher/Dockerfile
     outputs:
       sha: ${{ steps.meta.outputs.sha }}
     steps:
@@ -137,6 +148,7 @@ jobs:
             echo ""
             echo "- \`ghcr.io/tf7192/estia-backend:${{ needs.build.outputs.sha }}\`"
             echo "- \`ghcr.io/tf7192/estia-frontend:${{ needs.build.outputs.sha }}\`"
+            echo "- \`ghcr.io/tf7192/estia-market-watcher:${{ needs.build.outputs.sha }}\`"
             echo ""
             echo "Deploy with: \`gh workflow run deploy-prod.yml -f ref=${{ inputs.ref || github.sha }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

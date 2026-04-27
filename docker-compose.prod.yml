@@ -46,3 +46,30 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
     pull_policy: always
+
+  # Market Discovery (2026-04-27) — hourly Yad2 metadata watcher.
+  # Separate container by design (per spec): the CRM keeps working
+  # if the watcher is stopped or fails. No port binding — the
+  # watcher only writes to the same RDS the backend reads.
+  #
+  # LEGAL/SAFETY: stores SAFE METADATA ONLY (no images, no
+  # descriptions, no phones, no HTML). See MARKET_DISCOVERY_PLAN.md
+  # and services/market-metadata-watcher/src/extractors/yad2-listing.ts.
+  market-watcher:
+    image: ghcr.io/tf7192/estia-market-watcher:${ESTIA_TAG:-main}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      # Hourly cadence + ±10min jitter is the spec default. Override
+      # via the .env file on the host if you need to tune for an
+      # incident.
+      MARKET_WATCHER_INTERVAL_MS: "3600000"
+      MARKET_WATCHER_JITTER_MS: "600000"
+      # Min match score to fire a Notification. Default 70 per the
+      # plan doc; bump to 80+ if matches feel noisy.
+      MARKET_MATCH_MIN_SCORE: "70"
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+    pull_policy: always
