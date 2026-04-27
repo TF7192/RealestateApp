@@ -25,6 +25,7 @@ import { registerAdminRoutes } from './routes/admin.js';
 import { registerYad2Routes } from './routes/yad2.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerMarketRoutes } from './routes/market.js';
+import { registerMarketDiscoveryRoutes } from './routes/marketDiscovery.js';
 import { registerMarketingRoutes } from './routes/marketing.js';
 import { registerSitemapRoute } from './routes/sitemap.js';
 import { registerProspectRoutes } from './routes/prospects.js';
@@ -285,6 +286,9 @@ export async function build(opts: BuildOptions = {}) {
   await app.register(registerYad2Routes,  { prefix: '/api/integrations/yad2' });
   await app.register(registerImportRoutes, { prefix: '/api/import' });
   await app.register(registerMarketRoutes, { prefix: '/api/market' });
+  // Market Discovery (2026-04-27) — hourly Yad2 metadata watcher
+  // surface. Read-only listings + per-agent matches + duplicate flow.
+  await app.register(registerMarketDiscoveryRoutes, { prefix: '/api/market-discovery' });
   // Sprint 9 / marketing (lane B) — aggregation + inquiry→lead promotion
   // for the agent-facing "ניהול שיווקי" dashboard. Distinct prefix from
   // /api/market (nadlan market-context).

@@ -1,0 +1,129 @@
+// Lead-listing match scoring. Mirrors the spec in MARKET_DISCOVERY_PLAN.md
+// §7. Deterministic rule-based scoring — no AI here. The CRM-side
+// `backend/src/lib/matching.ts` has a richer engine for property →
+// lead matching across the whole catalog; this one is the leaner
+// "does this listing match this profile" function the watcher runs
+// for every fresh listing × every active LeadSearchProfile.
+
+export interface MatchScore {
+  score: number;          // 0..100
+  reasons: string[];
+}
+
+// Field weights (sum = 100):
+//  - city          25
+//  - neighborhood  20
+//  - propertyType  15
+//  - rooms         15
+//  - price         15
+//  - sqm           10
+const W = {
+  city:         25,
+  neighborhood: 20,
+  propertyType: 15,
+  rooms:        15,
+  price:        15,
+  sqm:          10,
+} as const;
+
+export type ListingForMatch = {
+  city: string | null;
+  neighborhood: string | null;
+  propertyType: string | null;
+  rooms: number | null;
+  price: number | null;
+  sizeSqm: number | null;
+};
+
+export type ProfileForMatch = {
+  cities: string[];
+  neighborhoods: string[];
+  propertyTypes: string[];
+  minRoom: number | null;
+  maxRoom: number | null;
+  minPrice: number | null;
+  maxPrice: number | null;
+  // sqm bounds — `LeadSearchProfile` doesn't carry these directly
+  // (the model has min/maxPlot but that's land area, not unit area).
+  // Phase 1 omits sqm matching against profiles; if Phase 2 wants it
+  // we'll either extend `LeadSearchProfile` or compute from price +
+  // pricePerSqm.
+  minSizeSqm?: number | null;
+  maxSizeSqm?: number | null;
+};
+
+function eqLoose(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function inRange(
+  value: number | null | undefined,
+  min: number | null | undefined,
+  max: number | null | undefined,
+): boolean {
+  if (value == null) return false;
+  if (min != null && value < min) return false;
+  if (max != null && value > max) return false;
+  return true;
+}
+
+function citiesIntersect(listingCity: string | null, profileCities: string[]): boolean {
+  if (!listingCity || !profileCities?.length) return false;
+  return profileCities.some((c) => eqLoose(c, listingCity));
+}
+
+export function scoreMatch(listing: ListingForMatch, profile: ProfileForMatch): MatchScore {
+  let score = 0;
+  const reasons: string[] = [];
+
+  // City — required to count, no city = no match (it's the anchor).
+  if (profile.cities?.length) {
+    if (citiesIntersect(listing.city, profile.cities)) {
+      score += W.city;
+      reasons.push('city');
+    } else {
+      // City constraint exists but doesn't match — bail with 0.
+      // The agent set a city explicitly; mismatching it should never
+      // show up as "70% match".
+      return { score: 0, reasons: [] };
+    }
+  }
+
+  if (profile.neighborhoods?.length && listing.neighborhood) {
+    if (profile.neighborhoods.some((n) => eqLoose(n, listing.neighborhood))) {
+      score += W.neighborhood;
+      reasons.push('neighborhood');
+    }
+  }
+
+  if (profile.propertyTypes?.length && listing.propertyType) {
+    if (profile.propertyTypes.some((t) => eqLoose(t, listing.propertyType))) {
+      score += W.propertyType;
+      reasons.push('property_type');
+    }
+  }
+
+  if ((profile.minRoom != null || profile.maxRoom != null) && listing.rooms != null) {
+    if (inRange(listing.rooms, profile.minRoom, profile.maxRoom)) {
+      score += W.rooms;
+      reasons.push('rooms');
+    }
+  }
+
+  if ((profile.minPrice != null || profile.maxPrice != null) && listing.price != null) {
+    if (inRange(listing.price, profile.minPrice, profile.maxPrice)) {
+      score += W.price;
+      reasons.push('price');
+    }
+  }
+
+  if ((profile.minSizeSqm != null || profile.maxSizeSqm != null) && listing.sizeSqm != null) {
+    if (inRange(listing.sizeSqm, profile.minSizeSqm, profile.maxSizeSqm)) {
+      score += W.sqm;
+      reasons.push('sqm');
+    }
+  }
+
+  return { score, reasons };
+}

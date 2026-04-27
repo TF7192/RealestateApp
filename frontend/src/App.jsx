@@ -57,6 +57,8 @@ import PremiumGateDialog from './components/PremiumGateDialog';
 // critical path for the first page paint. Lazy-load them so the main
 // bundle drops ~90KB and cold-start on cellular gets noticeably faster.
 const Templates = lazy(() => import('./pages/Templates'));
+// Market Discovery (2026-04-27) — hourly Yad2 metadata watcher feed.
+const MarketDiscovery = lazy(() => import('./pages/MarketDiscovery'));
 const AdminChats = lazy(() => import('./pages/AdminChats'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const Admin = lazy(() => import('./pages/Admin'));
@@ -386,6 +388,8 @@ function AppRoutes() {
             <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
             <Route path="/transfers" element={<Transfers />} />
             <Route path="/templates" element={<Templates />} />
+            {/* Market Discovery — hourly Yad2 watcher feed. */}
+            <Route path="/market-discovery" element={<MarketDiscovery />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/chats" element={<AdminChats />} />
             <Route path="/admin/users" element={<AdminUsers />} />
