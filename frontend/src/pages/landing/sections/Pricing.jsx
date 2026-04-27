@@ -38,11 +38,13 @@ export default function Pricing() {
 
         <div className="lp-pricing-grid">
           {t.tiers.map((tier) => {
-            const price = cycle === 'yearly' ? Math.round(tier.yearly / 12) : tier.monthly;
+            const price = tier.free
+              ? null
+              : (cycle === 'yearly' ? Math.round(tier.yearly / 12) : tier.monthly);
             return (
               <div
                 key={tier.key}
-                className={`lp-tier ${tier.recommended ? 'is-recommended' : ''}`}
+                className={`lp-tier ${tier.recommended ? 'is-recommended' : ''} ${tier.free ? 'is-free' : ''}`}
               >
                 {tier.recommended && (
                   <span className="lp-tier-badge">{tier.recommended_badge}</span>
@@ -51,17 +53,26 @@ export default function Pricing() {
                   <h3 className="lp-tier-name">{tier.name}</h3>
                   <p className="lp-tier-lead">{tier.lead}</p>
                 </div>
-                <div className="lp-tier-price">
-                  <span className="lp-tier-price-c">{t.currency}</span>
-                  <span className="lp-tier-price-n">{price}</span>
-                  <span className="lp-tier-price-s">
-                    / חודש · {t.vat_note}
-                  </span>
-                </div>
-                {cycle === 'yearly' && (
-                  <p className="lp-tier-lead" style={{ marginTop: -8 }}>
-                    {t.yearly_hint}
-                  </p>
+                {tier.free ? (
+                  <div className="lp-tier-price">
+                    <span className="lp-tier-price-n">חינם</span>
+                    <span className="lp-tier-price-s">לתמיד · בלי כרטיס אשראי</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="lp-tier-price">
+                      <span className="lp-tier-price-c">{t.currency}</span>
+                      <span className="lp-tier-price-n">{price}</span>
+                      <span className="lp-tier-price-s">
+                        / חודש · {t.vat_note}
+                      </span>
+                    </div>
+                    {cycle === 'yearly' && (
+                      <p className="lp-tier-lead" style={{ marginTop: -8 }}>
+                        {t.yearly_hint}
+                      </p>
+                    )}
+                  </>
                 )}
 
                 <ul className="lp-tier-bullets">
@@ -77,7 +88,7 @@ export default function Pricing() {
 
                 <a
                   className={`lp-btn ${tier.recommended ? 'lp-btn-primary' : 'lp-btn-secondary'}`}
-                  href={`/login?flow=signup&utm_source=landing&utm_medium=pricing_${tier.key}`}
+                  href={tier.cta_href || `/login?flow=signup&utm_source=landing&utm_medium=pricing_${tier.key}`}
                 >
                   {tier.cta}
                 </a>
@@ -87,6 +98,11 @@ export default function Pricing() {
         </div>
 
         <p className="lp-pricing-vat">{t.vat_note}</p>
+        {t.paid_only_via_support && (
+          <p className="lp-pricing-support-note">
+            {t.paid_only_via_support}
+          </p>
+        )}
         <div className="lp-pricing-trust">
           {t.trust.map((s) => <span key={s}>{s}</span>)}
         </div>

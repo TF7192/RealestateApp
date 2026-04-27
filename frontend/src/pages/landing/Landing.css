@@ -751,7 +751,15 @@
 .lp-pricing-grid {
   display: grid; gap: 20px; align-items: stretch;
 }
-@media (min-width: 900px) { .lp-pricing-grid { grid-template-columns: 1fr 1fr; max-width: 860px; margin-inline: auto; } }
+@media (min-width: 900px) { .lp-pricing-grid { grid-template-columns: 1fr 1fr 1fr; max-width: 1140px; margin-inline: auto; } }
+.lp-pricing-support-note {
+  text-align: center; margin: 18px auto 0; max-width: 720px;
+  padding: 12px 18px; border: 1px solid var(--gold);
+  border-radius: var(--radius-md); background: rgba(180, 139, 76, 0.08);
+  color: var(--text-primary); font-size: 14px; font-weight: 600;
+}
+.lp-tier.is-free { border-color: var(--gold); }
+.lp-tier.is-free .lp-tier-price-n { color: var(--gold); }
 .lp-tier {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 32px 28px; display: flex; flex-direction: column; gap: 16px;

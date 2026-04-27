@@ -170,12 +170,28 @@ export const copy = {
   pricing: {
     section_eyebrow: 'מחירים',
     section_title: 'מחיר ברור. הכול כלול.',
-    section_sub: '30 יום חינם. בלי כרטיס אשראי. ביטול בכל רגע.',
+    section_sub: 'התוכנית החינמית פתוחה לכולם — בלי כרטיס אשראי.',
+    paid_only_via_support: 'שדרוג לתוכניות בתשלום מתבצע כרגע דרך הצוות שלנו במייל support@estia.co.il',
     cycle_toggle: { monthly: 'חיוב חודשי', yearly: 'חיוב שנתי — חודשיים מתנה' },
     yearly_hint: 'חודשיים מתנה בתשלום שנתי',
     vat_note: 'כל המחירים כוללים מע״מ',
     currency: '₪',
     tiers: [
+      {
+        key: 'free',
+        name: 'חינם',
+        lead: 'להתחיל מיד — בלי כרטיס אשראי',
+        free: true,
+        recommended: false,
+        bullets: [
+          'עד 10 נכסים פעילים',
+          'עד 25 לקוחות/לידים',
+          'אפליקציה לאייפון ואנדרואיד',
+          'סנכרון ליומן גוגל',
+          'תמיכה בעברית',
+        ],
+        cta: 'התחלה חינם',
+      },
       {
         key: 'starter',
         name: 'בסיס',
@@ -191,7 +207,8 @@ export const copy = {
           'סנכרון ליומן גוגל',
           'תמיכה בעברית',
         ],
-        cta: 'התחלה חינם',
+        cta: 'שדרוג דרך התמיכה',
+        cta_href: 'mailto:support@estia.co.il?subject=Estia%20%E2%80%94%20%D7%A9%D7%93%D7%A8%D7%95%D7%92%20%D7%9C%D7%AA%D7%95%D7%9B%D7%A0%D7%99%D7%AA%20%D7%91%D7%A1%D7%99%D7%A1',
       },
       {
         key: 'pro',
@@ -211,7 +228,8 @@ export const copy = {
           'העברות נכסים בין סוכנים',
           'עדיפות תמיכה',
         ],
-        cta: 'התחלה חינם',
+        cta: 'שדרוג דרך התמיכה',
+        cta_href: 'mailto:support@estia.co.il?subject=Estia%20%E2%80%94%20%D7%A9%D7%93%D7%A8%D7%95%D7%92%20%D7%9C%D7%AA%D7%95%D7%9B%D7%A0%D7%99%D7%AA%20%D7%9E%D7%A7%D7%A6%D7%95%D7%A2%D7%99',
       },
     ],
     trust: [
