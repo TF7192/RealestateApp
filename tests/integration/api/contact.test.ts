@@ -22,7 +22,7 @@ const { sendEmail } = vi.hoisted(() => ({
 vi.mock('../../../backend/src/lib/email.js', () => ({
   sendContactEmail: sendEmail,
   _internals: {
-    RECIPIENT: 'talfuks1234@gmail.com',
+    RECIPIENT: 'support@estia.co.il',
     SENDER: 'no-reply@estia.co.il',
     REGION: 'eu-north-1',
     SUBJECT_PREFIX: '[Estia][Contact]',

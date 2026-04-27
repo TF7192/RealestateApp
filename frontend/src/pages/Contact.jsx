@@ -2,7 +2,7 @@
 //
 // Public "צרו קשר" form — referenced from the PremiumGateDialog's
 // primary CTA and from the landing footer. Posts to /api/contact,
-// which ships mail to talfuks1234@gmail.com via SES.
+// which ships mail to support@estia.co.il via SES.
 //
 // Visual style matches ForgotPassword / the rest of the auth surface:
 // inline Cream & Gold tokens, Assistant/Heebo font, gold primary

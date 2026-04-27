@@ -10,7 +10,7 @@ import './VoiceCaptureFab.css';
 // gate the AI-extraction step behind a "contact support" dialog. The
 // recording itself still runs so the agent gets the same affordance —
 // we only intercept the upload, replacing it with the upgrade prompt.
-const SUPPORT_EMAIL = 'support@estia.app';
+const SUPPORT_EMAIL = 'support@estia.co.il';
 const PREMIUM_SUBJECT = 'הפעלת פיצ׳ר הקלטה קולית — Estia';
 const PREMIUM_BODY =
   'היי, אני רוצה להפעיל את פיצ׳ר הקלטת הליד הקולי בחשבון שלי.';

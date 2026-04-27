@@ -28,7 +28,7 @@ import './VoiceCaptureButton.css';
 //   onExtracted   (extracted) => void — receives the extracted JSON
 //                 object. Caller maps it into its own form keys.
 
-const SUPPORT_EMAIL = 'support@estia.app';
+const SUPPORT_EMAIL = 'support@estia.co.il';
 const PREMIUM_SUBJECT = 'הפעלת פיצ׳ר הקלטה קולית — Estia';
 const PREMIUM_BODY =
   'היי, אני רוצה להפעיל את פיצ׳ר הקלטת הליד הקולי בחשבון שלי.';

@@ -32,7 +32,7 @@ export interface SendContactEmailArgs {
 
 // Constants — all overridable by env so staging / CI can re-route mail
 // to a sandbox verified address without a code change.
-const RECIPIENT = process.env.CONTACT_RECIPIENT_EMAIL || 'talfuks1234@gmail.com';
+const RECIPIENT = process.env.CONTACT_RECIPIENT_EMAIL || 'support@estia.co.il';
 const SENDER = process.env.CONTACT_SENDER_EMAIL || 'no-reply@estia.co.il';
 const REGION = process.env.AWS_REGION || process.env.SES_REGION || 'eu-north-1';
 const SUBJECT_PREFIX = '[Estia][Contact]';

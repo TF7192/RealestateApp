@@ -37,7 +37,7 @@ const SUPPORT_PHONE_RAW =
   '+972541234567';
 const SUPPORT_PHONE_DIGITS = SUPPORT_PHONE_RAW.replace(/\D/g, '');
 
-const SUPPORT_EMAIL = 'talfuks1234@gmail.com';
+const SUPPORT_EMAIL = 'support@estia.co.il';
 const EMAIL_SUBJECT = 'תמיכה ב-Estia';
 
 // Ordered category list — drives the pill row. "הכול" is synthetic.

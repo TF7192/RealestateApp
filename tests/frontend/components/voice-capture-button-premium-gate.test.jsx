@@ -56,7 +56,7 @@ describe('N-16 — VoiceCaptureButton premium gate', () => {
     await user.click(screen.getByRole('button', { name: /דבר במקום להקליד — ליד/ }));
     await user.click(await screen.findByRole('button', { name: /צור קשר עם התמיכה/ }));
 
-    await waitFor(() => expect(navigatedTo).toMatch(/^mailto:support@estia\.app/));
+    await waitFor(() => expect(navigatedTo).toMatch(/^mailto:support@estia\.co\.il/));
     // Subject + body carry the Hebrew copy percent-encoded; looking for
     // the distinctive 'Estia' tail in the subject is plenty of proof.
     expect(navigatedTo).toMatch(/Estia/);

@@ -183,7 +183,7 @@ function safeParse(text) {
 
 export const api = {
   // Sprint 5.1 — public contact form. POSTs { subject, body,
-  // fromName?, fromEmail? }; backend mails talfuks1234@gmail.com via
+  // fromName?, fromEmail? }; backend mails support@estia.co.il via
   // SES. No auth required.
   sendContact: (body) => request('/contact', { method: 'POST', body }),
 

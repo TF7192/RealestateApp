@@ -129,7 +129,7 @@ describe('Sprint 7 — Help page', () => {
     expect(wa.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/\d+/);
 
     const mailto = screen.getByRole('link', { name: /אימייל/ });
-    expect(mailto.getAttribute('href')).toMatch(/^mailto:talfuks1234@gmail\.com/);
+    expect(mailto.getAttribute('href')).toMatch(/^mailto:support@estia\.co\.il/);
 
     const contact = screen.getByRole('link', { name: /צרו קשר/ });
     expect(contact.getAttribute('href')).toBe('/contact');
