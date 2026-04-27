@@ -24,10 +24,30 @@ const listFiltersSchema = z.object({
   maxSqm:         z.coerce.number().int().min(0).optional(),
   status:         z.enum(['active', 'removed', 'unknown']).optional(),
   firstSeenAfter: z.coerce.date().optional(),
+  // Phase 2 sort options. Allowlisted enum so the orderBy mapping
+  // below can't be tricked into ordering by a column that has no
+  // index (every value here corresponds to a real index on
+  // MarketListing — see schema.prisma).
+  sort: z.enum([
+    'firstSeenAt-desc',
+    'price-asc',
+    'price-desc',
+    'pricePerSqm-asc',
+  ]).default('firstSeenAt-desc'),
   // Pagination
   limit:          z.coerce.number().int().min(1).max(100).default(50),
   offset:         z.coerce.number().int().min(0).default(0),
 });
+
+function sortToOrderBy(sort: string): { [k: string]: 'asc' | 'desc' }[] {
+  switch (sort) {
+    case 'price-asc':       return [{ price: 'asc' },       { firstSeenAt: 'desc' }];
+    case 'price-desc':      return [{ price: 'desc' },      { firstSeenAt: 'desc' }];
+    case 'pricePerSqm-asc': return [{ pricePerSqm: 'asc' }, { firstSeenAt: 'desc' }];
+    case 'firstSeenAt-desc':
+    default:                return [{ firstSeenAt: 'desc' }];
+  }
+}
 
 export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => {
   app.addHook('onRequest', requireUser);
@@ -67,7 +87,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     const [items, total] = await Promise.all([
       prisma.marketListing.findMany({
         where,
-        orderBy: [{ firstSeenAt: 'desc' }],
+        orderBy: sortToOrderBy(f.sort) as any,
         skip: f.offset,
         take: f.limit,
       }),
@@ -160,5 +180,47 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     });
     if (updated.count === 0) return reply.code(404).send({ error: { message: 'Match not found' } });
     return reply.send({ ok: true });
+  });
+
+  // GET /api/market-discovery/last-scan — Phase 4 observability.
+  // Returns the latest successful MarketWatcherRun summary so the
+  // /market-discovery page can show "נסרק לפני X דקות". All agents
+  // can read this — the watcher's run metadata isn't sensitive.
+  app.get('/last-scan', async (_req, reply) => {
+    const last = await prisma.marketWatcherRun.findFirst({
+      where: { status: 'success' },
+      orderBy: { startedAt: 'desc' },
+      select: {
+        id: true, startedAt: true, finishedAt: true, source: true,
+        listingsSeen: true, listingsCreated: true, listingsUpdated: true,
+        matchesCreated: true, notificationsCreated: true,
+      },
+    });
+    return reply.send({ run: last });
+  });
+
+  // GET /api/market-discovery/match/:id — Phase 2 match deep-link.
+  // The Notification row's link is /market-discovery?match=:id. The
+  // page calls this endpoint to fetch the match + its listing + the
+  // associated lead, and to mark the match as `viewed` in one shot.
+  app.get<{ Params: { id: string } }>('/match/:id', async (req, reply) => {
+    const userId = (req as any).user?.id as string;
+    const match = await prisma.marketListingLeadMatch.findFirst({
+      where: { id: req.params.id, agentUserId: userId },
+      include: {
+        marketListing: true,
+        lead: { select: { id: true, name: true, city: true } },
+      },
+    });
+    if (!match) return reply.code(404).send({ error: { message: 'Match not found' } });
+    // Idempotent state transition: new → viewed. Doesn't downgrade
+    // a `dismissed` or `duplicated` match.
+    if (match.status === 'new') {
+      await prisma.marketListingLeadMatch.update({
+        where: { id: match.id },
+        data: { status: 'viewed' },
+      });
+    }
+    return reply.send({ match });
   });
 };

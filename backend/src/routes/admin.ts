@@ -10,6 +10,25 @@ import { prisma } from '../lib/prisma.js';
  * Mounted at /api/admin in server.ts.
  */
 export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
+  // Market Discovery (Phase 4) — admin observability.
+  // GET /api/admin/market-watcher/runs — last 50 watcher runs, newest
+  // first. Used by /admin/market-watcher to surface success/failure
+  // history, ingestion counts, and error messages.
+  app.get('/market-watcher/runs', { onRequest: [app.requireAdmin] }, async () => {
+    const runs = await prisma.marketWatcherRun.findMany({
+      orderBy: { startedAt: 'desc' },
+      take: 50,
+      select: {
+        id: true, startedAt: true, finishedAt: true, status: true, source: true,
+        listingsSeen: true, listingsCreated: true, listingsUpdated: true,
+        snapshotsCreated: true, matchesCreated: true, notificationsCreated: true,
+        errorMessage: true,
+      },
+    });
+    return { runs };
+  });
+
+
 
   // ── GET /api/admin/users ────────────────────────────────────────
   // Single round-trip: every user with their owned-property count and

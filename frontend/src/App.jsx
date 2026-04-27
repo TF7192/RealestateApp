@@ -59,6 +59,8 @@ import PremiumGateDialog from './components/PremiumGateDialog';
 const Templates = lazy(() => import('./pages/Templates'));
 // Market Discovery (2026-04-27) — hourly Yad2 metadata watcher feed.
 const MarketDiscovery = lazy(() => import('./pages/MarketDiscovery'));
+// Phase 4 — admin observability for the Market Discovery watcher.
+const AdminMarketWatcher = lazy(() => import('./pages/AdminMarketWatcher'));
 const AdminChats = lazy(() => import('./pages/AdminChats'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const Admin = lazy(() => import('./pages/Admin'));
@@ -390,6 +392,7 @@ function AppRoutes() {
             <Route path="/templates" element={<Templates />} />
             {/* Market Discovery — hourly Yad2 watcher feed. */}
             <Route path="/market-discovery" element={<MarketDiscovery />} />
+            <Route path="/admin/market-watcher" element={<AdminMarketWatcher />} />
             {/* SEC-2026-04-27 — explicit role guard at the router
                 level. Admin.jsx itself didn't self-guard (AdminChats /
                 AdminUsers do), so any signed-in agent who navigated to
