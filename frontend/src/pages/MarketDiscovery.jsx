@@ -583,14 +583,22 @@ export default function MarketDiscovery() {
         />
       )}
 
-      <div style={{
-        display: 'grid',
-        // 3-column grid on desktop, auto-fills down to 1 column on mobile
-        // (keeps cards readable on phones — minmax floor of 280 means
-        // a phone screen gets 1 card, a tablet 2, desktop 3).
-        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
-        gap: 12,
-      }}>
+      {/* 3-col on desktop, 2-col on tablet, 1-col on mobile. Inline
+          <style> with media queries so we don't need a global CSS rule. */}
+      <style>{`
+        .market-grid {
+          display: grid;
+          gap: 14px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        @media (max-width: 900px) {
+          .market-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 600px) {
+          .market-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+      <div className="market-grid">
         {visibleItems.map((l) => {
           const isMatched = (Array.isArray(l.matches) && l.matches.length > 0)
             || !!l.topMatch

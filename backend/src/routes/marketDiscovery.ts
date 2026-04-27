@@ -221,22 +221,30 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     const listing = await prisma.marketListing.findUnique({ where: { id: req.params.id } });
     if (!listing) return reply.code(404).send({ error: { message: 'Listing not found' } });
 
-    // Map the source's property type → CRM enum. Phase 1 keeps this
-    // intentionally minimal: residential sale for Yad2 forsale items.
-    // Phase 2 will widen with rent + commercial mappings.
+    // Map the source's property type → CRM enum. The Property model
+    // requires several fields that Yad2 listings don't expose
+    // (owner / ownerPhone — by legal-safety design we never store
+    // PII from the watcher). Use empty-string placeholders so the
+    // create succeeds; the agent immediately lands on /edit and can
+    // fill in real values. category mirrors the listing's kind:
+    // 'rent' → RENT, anything else → SALE.
+    const category =
+      (listing as { kind?: string | null }).kind === 'rent' ? 'RENT' : 'SALE';
     const newProp = await prisma.property.create({
       data: {
         agentId: userId,
         assetClass: 'RESIDENTIAL',
-        category: 'SALE',
-        type: listing.propertyType ?? null,
+        category,
+        type: listing.propertyType ?? 'דירה',
         city: listing.city ?? '',
-        street: listing.street ?? null,
+        street: listing.street ?? '',
         neighborhood: listing.neighborhood ?? null,
         rooms: listing.rooms ?? null,
-        size: listing.sizeSqm ?? null,
+        sqm: listing.sizeSqm ?? 0,
         floor: listing.floor ?? null,
-        marketingPrice: listing.price ?? null,
+        marketingPrice: listing.price ?? 0,
+        owner: '',
+        ownerPhone: '',
         status: 'ACTIVE',
         marketListingId: listing.id,
       } as any,

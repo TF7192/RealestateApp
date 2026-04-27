@@ -48,27 +48,28 @@ async function main() {
     return;
   }
 
-  // Two independent schedulers — forsale and rent each tick on the
-  // same interval (default 60min) but with the rent loop offset by
-  // ~15min. This gives each kind its own browser session per tick;
-  // Reblaze treats them as independent visitors instead of a single
-  // ramped scraper.
-  const forsaleBootDelay = Math.floor(Math.random() * 30_000);
-  const rentBootDelay = forsaleBootDelay + 15 * 60 * 1000;
-  const stopForsale = scheduleLoop({
-    label: 'forsale',
-    intervalMs: config.intervalMs,
-    jitterMs: config.jitterMs,
-    bootDelayMs: forsaleBootDelay,
-    tick: () => runWatcherTick({ prisma, logger }, { kinds: ['forsale'] }),
-    log,
-  });
+  // Two independent schedulers — rent and forsale each tick on the
+  // same interval (default 60min) but offset by ~15min. Rent boots
+  // FIRST (~0-30s) so the underrepresented kind gets fresh deal flow
+  // sooner; forsale follows 15min later. Each kind gets its own
+  // browser session per tick; Reblaze treats them as independent
+  // visitors instead of a single ramped scraper.
+  const rentBootDelay = Math.floor(Math.random() * 30_000);
+  const forsaleBootDelay = rentBootDelay + 15 * 60 * 1000;
   const stopRent = scheduleLoop({
     label: 'rent',
     intervalMs: config.intervalMs,
     jitterMs: config.jitterMs,
     bootDelayMs: rentBootDelay,
     tick: () => runWatcherTick({ prisma, logger }, { kinds: ['rent'] }),
+    log,
+  });
+  const stopForsale = scheduleLoop({
+    label: 'forsale',
+    intervalMs: config.intervalMs,
+    jitterMs: config.jitterMs,
+    bootDelayMs: forsaleBootDelay,
+    tick: () => runWatcherTick({ prisma, logger }, { kinds: ['forsale'] }),
     log,
   });
   const stop = () => { stopForsale(); stopRent(); };
