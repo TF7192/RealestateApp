@@ -277,6 +277,44 @@ async function evaluateMatches(
       },
     });
     notificationsCreated++;
+
+    // Phase 3 — queue external delivery (email/SMS) if the agent
+    // has opted in AND the match score meets their personal threshold.
+    // Watcher runs in a separate container with no AWS SDK; the
+    // backend worker drains this queue.
+    try {
+      const pref = await prisma.userNotificationPreference.findUnique({
+        where: { userId: profile.lead.agentId },
+        include: { user: { select: { email: true } } },
+      });
+      if (pref && r.score >= pref.minMatchScoreForExternalDelivery) {
+        if (pref.marketMatchEmailEnabled && pref.user.email) {
+          await prisma.pendingNotificationDelivery.create({
+            data: {
+              userId: profile.lead.agentId,
+              channel: 'email',
+              type: 'market_listing_match',
+              title: 'נכס חדש מתאים לליד שלך',
+              body: notificationBody(listing),
+              link: `/market-discovery?match=${match.id}`,
+              recipientEmail: pref.user.email,
+              // Idempotency key collapses repeat queue-rows for the
+              // same match id (defensive — match unique index already
+              // prevents the upstream insert from firing twice).
+              idempotencyKey: `market_listing_match:${match.id}`,
+            },
+          });
+        }
+        // SMS branch intentionally not enabled — no provider integrated.
+        // The worker will skip pendingNotificationDelivery rows of
+        // channel='sms' until a provider is wired.
+      }
+    } catch (err) {
+      logger.warn(
+        { err: String(err), matchId: match.id, agentUserId: profile.lead.agentId },
+        'tick.queue-delivery-failed',
+      );
+    }
   }
 
   logger.info(

@@ -61,6 +61,8 @@ const Templates = lazy(() => import('./pages/Templates'));
 const MarketDiscovery = lazy(() => import('./pages/MarketDiscovery'));
 // Phase 4 — admin observability for the Market Discovery watcher.
 const AdminMarketWatcher = lazy(() => import('./pages/AdminMarketWatcher'));
+// Phase 3 — opt-in notification preferences (in-app/email/SMS toggles).
+const SettingsNotifications = lazy(() => import('./pages/SettingsNotifications'));
 const AdminChats = lazy(() => import('./pages/AdminChats'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const Admin = lazy(() => import('./pages/Admin'));
@@ -393,6 +395,7 @@ function AppRoutes() {
             {/* Market Discovery — hourly Yad2 watcher feed. */}
             <Route path="/market-discovery" element={<MarketDiscovery />} />
             <Route path="/admin/market-watcher" element={<AdminMarketWatcher />} />
+            <Route path="/settings/notifications" element={<SettingsNotifications />} />
             {/* SEC-2026-04-27 — explicit role guard at the router
                 level. Admin.jsx itself didn't self-guard (AdminChats /
                 AdminUsers do), so any signed-in agent who navigated to

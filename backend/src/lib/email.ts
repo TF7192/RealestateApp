@@ -72,3 +72,37 @@ export async function sendContactEmail(args: SendContactEmailArgs): Promise<void
 
 // Exposed for tests.
 export const _internals = { RECIPIENT, SENDER, REGION, SUBJECT_PREFIX };
+
+// Phase 3 — generic notification email. Used by the
+// PendingNotificationDelivery worker. Differs from sendContactEmail
+// in that the recipient is the agent themselves (not our support
+// inbox) and there's no form-sender concept.
+export interface SendNotificationEmailArgs {
+  to: string;
+  subject: string;
+  body: string;
+  // Optional CTA link rendered as a footer line. The watcher passes
+  // the deep-link to /market-discovery?match=:id here so agents land
+  // directly on the matched listing.
+  link?: string | null;
+  linkLabel?: string | null;
+}
+
+export async function sendNotificationEmail(args: SendNotificationEmailArgs): Promise<void> {
+  const lines: string[] = [args.body];
+  if (args.link) {
+    lines.push('');
+    lines.push(args.linkLabel || 'פתח באפליקציה');
+    lines.push(args.link);
+  }
+  const client = new SESClient({ region: REGION });
+  await client.send(new SendEmailCommand({
+    Source: SENDER,
+    Destination: { ToAddresses: [args.to] },
+    Message: {
+      Subject: { Data: args.subject.slice(0, 200), Charset: 'UTF-8' },
+      Body:    { Text:  { Data: lines.join('\n'),     Charset: 'UTF-8' } },
+    },
+    ReplyToAddresses: [SENDER],
+  }));
+}

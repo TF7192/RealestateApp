@@ -399,6 +399,10 @@ model User {
   // Market Discovery (2026-04-27) — back-relation for matches the
   // hourly watcher creates against this agent's active LeadSearchProfiles.
   marketListingMatches  MarketListingLeadMatch[]
+  // Phase 3 — opt-in notification preferences (email/SMS).
+  notificationPreference UserNotificationPreference?
+  // Phase 3 — pending email/SMS deliveries the worker drains.
+  pendingDeliveries     PendingNotificationDelivery[]
   // Sprint 6 — in-house digital contracts (exclusivity / brokerage /
   // offer) authored by this agent.
   contracts             Contract[]        @relation("AgentContracts")
@@ -1832,6 +1836,56 @@ model MarketWatcherRun {
   @@index([startedAt])
   @@index([status])
   @@index([source])
+}
+
+// Phase 3 — notification preferences per user. Opt-in for email/SMS;
+// internal CRM notifications stay on by default. The watcher reads
+// these before queueing an external delivery.
+model UserNotificationPreference {
+  id                                  String   @id @default(cuid())
+  userId                              String   @unique
+  user                                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketMatchInAppEnabled             Boolean  @default(true)
+  marketMatchEmailEnabled             Boolean  @default(false)
+  marketMatchSmsEnabled               Boolean  @default(false)
+  // Match score (0..100) below which we never deliver via email/SMS,
+  // even if the channel is enabled. Default 85 = high-confidence
+  // only — agents shouldn't get an email for every 70% match.
+  minMatchScoreForExternalDelivery    Int      @default(85)
+  createdAt                           DateTime @default(now())
+  updatedAt                           DateTime @updatedAt
+}
+
+// Phase 3 — pending external delivery queue. The watcher (separate
+// container, no AWS SDK) writes a row here when a match qualifies
+// for email/SMS. A backend worker (which has AWS credentials via the
+// EC2 instance role) polls status='pending', sends via lib/email.ts,
+// flips to 'sent'/'failed', records the attempt.
+//
+// Decouples the watcher from the SES dependency and gives us
+// auditability + retry semantics for free.
+model PendingNotificationDelivery {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel         String                                              // 'email' | 'sms'
+  type            String                                              // 'market_listing_match'
+  title           String
+  body            String?
+  link            String?
+  recipientEmail  String?                                             // captured at queue time so a later email change doesn't redirect a pending mail
+  recipientPhone  String?
+  status          String    @default("pending")                       // 'pending' | 'sent' | 'failed' | 'skipped'
+  errorMessage    String?
+  sentAt          DateTime?
+  attemptCount    Int       @default(0)
+  idempotencyKey  String?                                             // optional dedup hint for the worker
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, status])
+  @@index([idempotencyKey])
 }
 
 model MarketListingLeadMatch {

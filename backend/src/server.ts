@@ -26,6 +26,7 @@ import { registerYad2Routes } from './routes/yad2.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerMarketRoutes } from './routes/market.js';
 import { registerMarketDiscoveryRoutes } from './routes/marketDiscovery.js';
+import { registerNotificationPreferencesRoutes } from './routes/notificationPreferences.js';
 import { registerMarketingRoutes } from './routes/marketing.js';
 import { registerSitemapRoute } from './routes/sitemap.js';
 import { registerProspectRoutes } from './routes/prospects.js';
@@ -289,6 +290,9 @@ export async function build(opts: BuildOptions = {}) {
   // Market Discovery (2026-04-27) — hourly Yad2 metadata watcher
   // surface. Read-only listings + per-agent matches + duplicate flow.
   await app.register(registerMarketDiscoveryRoutes, { prefix: '/api/market-discovery' });
+  // Phase 3 — per-user opt-in notification preferences (in-app /
+  // email / SMS toggles + min-score-for-external-delivery threshold).
+  await app.register(registerNotificationPreferencesRoutes, { prefix: '/api/notification-preferences' });
   // Sprint 9 / marketing (lane B) — aggregation + inquiry→lead promotion
   // for the agent-facing "ניהול שיווקי" dashboard. Distinct prefix from
   // /api/market (nadlan market-context).
@@ -390,11 +394,19 @@ export async function build(opts: BuildOptions = {}) {
 const runAsMain = import.meta.url === `file://${process.argv[1]}`;
 if (runAsMain) {
   build()
-    .then((app) =>
-      app.listen({ port: PORT, host: HOST }).then(() => {
+    .then(async (app) => {
+      // Phase 3 — start the pending-notification delivery worker.
+      // Polls PendingNotificationDelivery every 60s, sends pending
+      // emails via SES, marks rows as sent/failed. Idempotent: safe
+      // if the start function is called twice.
+      const { startNotificationDeliveryWorker } = await import(
+        './workers/notificationDelivery.js'
+      );
+      startNotificationDeliveryWorker();
+      return app.listen({ port: PORT, host: HOST }).then(() => {
         app.log.info(`Estia API listening on ${HOST}:${PORT}`);
-      })
-    )
+      });
+    })
     .catch((err) => {
       console.error('Failed to start', err);
       process.exit(1);
