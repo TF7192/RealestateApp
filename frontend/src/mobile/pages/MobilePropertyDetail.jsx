@@ -224,6 +224,19 @@ export default function MobilePropertyDetail() {
           )}
         </div>
 
+        {prop.videos?.length > 0 && (
+          <>
+            <SectionHeader title={`סרטונים · ${prop.videos.length}`} />
+            <div className="m-card" style={{ padding: 12 }}>
+              <div className="m-videos-list">
+                {prop.videos.map((v) => (
+                  <MobileVideoTile key={v.id} video={v} />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
         <SectionHeader title={`פעולות שיווק · ${actionsDone}/${actionsTotal}`} />
         <div className="m-card">
           <div className="m-progress" style={{ marginBottom: 14 }}>
@@ -327,4 +340,50 @@ function formatDate(str) {
     const d = new Date(str);
     return d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
   } catch { return str; }
+}
+
+// Inline video tile — uploaded files use a native <video controls>
+// player; YouTube / Vimeo links embed via iframe; everything else
+// degrades to a plain link. Mirrors the desktop VideoTile in
+// PropertyDetail.jsx but without that page's full CSS.
+function MobileVideoTile({ video }) {
+  const isUpload = video.kind === 'upload' || (video.url || '').startsWith('/uploads/');
+  if (isUpload) {
+    return (
+      <div className="m-video-tile">
+        <video src={video.url} controls preload="metadata" playsInline />
+        {video.title && <div className="m-video-title">{video.title}</div>}
+        <style>{`
+          .m-video-tile video { width: 100%; max-height: 320px; background: #000; border-radius: 12px; }
+          .m-video-title { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
+          .m-videos-list { display: flex; flex-direction: column; gap: 14px; }
+        `}</style>
+      </div>
+    );
+  }
+  const ytId = (video.url || '').match(/(?:youtu\.be\/|youtube\.com\/watch\?v=|youtube\.com\/embed\/)([\w-]{11})/)?.[1];
+  const vimeoId = (video.url || '').match(/vimeo\.com\/(\d+)/)?.[1];
+  const embed = ytId ? `https://www.youtube.com/embed/${ytId}` : vimeoId ? `https://player.vimeo.com/video/${vimeoId}` : null;
+  if (embed) {
+    return (
+      <div className="m-video-tile m-video-embed">
+        <iframe
+          title={video.title || 'וידאו'}
+          src={embed}
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+        <style>{`
+          .m-video-embed { position: relative; padding-top: 56.25%; border-radius: 12px; overflow: hidden; }
+          .m-video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+        `}</style>
+      </div>
+    );
+  }
+  return (
+    <a href={video.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gold-light)' }}>
+      ▶ {video.title || 'צפה בסרטון'}
+    </a>
+  );
 }

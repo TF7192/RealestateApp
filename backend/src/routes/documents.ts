@@ -80,6 +80,8 @@ function classifyKind(mime: string, filename: string): string | null {
 const listQuery = z.object({
   kind: z.enum(['pdf', 'dwg', 'zip', 'xlsx']).optional(),
   tag:  z.union([z.string(), z.array(z.string())]).optional(),
+  // 2026-04-27 — filter by property when called from a property page.
+  propertyId: z.string().optional(),
 });
 
 export const registerDocumentRoutes: FastifyPluginAsync = async (app) => {
@@ -93,6 +95,7 @@ export const registerDocumentRoutes: FastifyPluginAsync = async (app) => {
 
     const where: any = { ownerId: uid, kind: 'document' };
     if (tags.length) where.tags = { hasSome: tags };
+    if (q.propertyId) where.propertyId = q.propertyId;
 
     const rows = await prisma.uploadedFile.findMany({
       where,
@@ -118,6 +121,7 @@ export const registerDocumentRoutes: FastifyPluginAsync = async (app) => {
       sizeBytes:    r.sizeBytes,
       tags:         r.tags,
       kind:         classifyKind(r.mimeType, r.originalName),
+      propertyId:   r.propertyId,
       createdAt:    r.createdAt,
       downloadUrl:  `/api/documents/${r.id}/download`,
     }));
@@ -178,6 +182,21 @@ export const registerDocumentRoutes: FastifyPluginAsync = async (app) => {
       .filter(Boolean)
       .slice(0, 10); // cap — no realistic use-case needs more than 10.
 
+    // 2026-04-27 — optional propertyId for per-asset attachments.
+    // Verified to belong to the same agent before storing the FK so a
+    // crafted multipart can't link to a stranger's property.
+    const rawPropertyId = fields.propertyId;
+    const propertyId = rawPropertyId ? String(rawPropertyId.value ?? rawPropertyId) : null;
+    if (propertyId) {
+      const owns = await prisma.property.findFirst({
+        where: { id: propertyId, agentId: uid },
+        select: { id: true },
+      });
+      if (!owns) {
+        return reply.code(403).send({ error: { message: 'הנכס אינו של המשתמש', code: 'forbidden' } });
+      }
+    }
+
     let buffer: Buffer;
     try {
       buffer = await mp.toBuffer();
@@ -213,6 +232,7 @@ export const registerDocumentRoutes: FastifyPluginAsync = async (app) => {
         sizeBytes:    buffer.byteLength,
         path:         key,
         tags,
+        ...(propertyId ? { propertyId } : {}),
       },
     });
 

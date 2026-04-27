@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -34,6 +34,8 @@ import {
   Target,
   Printer,
   Maximize2,
+  Copy,
+  Upload,
 } from 'lucide-react';
 import { popoutCurrentRoute } from '../lib/popout';
 import { printPage } from '../lib/print';
@@ -313,6 +315,7 @@ export default function PropertyDetail() {
   const [deleting, setDeleting] = useState(false);
   const [managingPhotos, setManagingPhotos] = useState(false);
   const [managingVideos, setManagingVideos] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [waShare, setWaShare] = useState(null);
   // Sprint 7 — universal Share dialog (property channel picker).
@@ -656,6 +659,28 @@ export default function PropertyDetail() {
     }
   };
 
+  // Duplicate the current property — clones address/specs/owner/photos
+  // into a fresh draft and navigates to /properties/:newId/edit so the
+  // agent can tweak the copy. Mirrors the row-level affordance in
+  // /properties (Properties.jsx) so the action is reachable from the
+  // detail page too — the small icon-only button there was easy to
+  // miss. (`duplicating` state declared up top with the other useStates
+  // — hooks must run in the same order on every render, including
+  // after early returns.)
+  const handleDuplicate = async () => {
+    if (duplicating) return;
+    setDuplicating(true);
+    try {
+      const { property: created } = await api.duplicateProperty(property.id);
+      toast.success('הנכס שוכפל — מעבר לעריכה');
+      navigate(`/properties/${created.id}/edit?duplicated=1`);
+    } catch (e) {
+      toast.error(e?.message || 'שכפול נכשל');
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   const nextImage = () => setCurrentImage((i) => (i + 1) % images.length);
   const prevImage = () => setCurrentImage((i) => (i - 1 + images.length) % images.length);
 
@@ -812,6 +837,10 @@ export default function PropertyDetail() {
           <button type="button" style={PD_DT.secondaryBtn} onClick={() => navigate(`/properties/${id}/edit`)}>
             <Edit3 size={14} />
             <span>עריכה</span>
+          </button>
+          <button type="button" style={PD_DT.secondaryBtn} onClick={handleDuplicate} disabled={duplicating} title="צור עותק של הנכס">
+            <Copy size={14} />
+            <span>{duplicating ? 'משכפל…' : 'שכפל נכס'}</span>
           </button>
           <button type="button" style={PD_DT.secondaryBtn} onClick={handleShare}>
             <Share2 size={14} />
@@ -1839,6 +1868,12 @@ export default function PropertyDetail() {
         </PropertyPanelSheet>
       )}
 
+      {/* Per-asset documents — agents attach PDFs (exclusivity
+          agreement, building plan, arnona statement) directly to a
+          listing here. Renders below the marketing grid alongside the
+          videos block. */}
+      <PropertyDocuments propertyId={property.id} />
+
       {/* Videos preview if there are videos — shown below the grid */}
       {property.videos?.length > 0 && (
         <div className="pd-videos animate-in animate-in-delay-5">
@@ -2067,6 +2102,138 @@ function embedUrl(url) {
   const vimeo = url.match(/vimeo\.com\/(\d+)/)?.[1];
   if (vimeo) return `https://player.vimeo.com/video/${vimeo}`;
   return null;
+}
+
+// Per-asset documents block. Lists files scoped to this property,
+// uploads new files (PDFs, dwg, zip, xlsx) attached to it, and offers
+// a delete button per row. Files double as global library entries —
+// the same row appears on /documents — so the agent can drop a PDF
+// once and reach it from either surface.
+function PropertyDocuments({ propertyId }) {
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef(null);
+  const reload = useCallback(async () => {
+    try {
+      const r = await api.listDocuments({ propertyId });
+      setDocs(r.items || r.documents || []);
+    } catch (e) {
+      setErr(e?.message || 'שגיאת טעינה');
+    } finally {
+      setLoading(false);
+    }
+  }, [propertyId]);
+  useEffect(() => { reload(); }, [reload]);
+  const onUpload = async (file) => {
+    if (!file || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.uploadDocument(file, [], { propertyId });
+      await reload();
+    } catch (e) {
+      setErr(e?.message || 'העלאה נכשלה');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const onDelete = async (id) => {
+    setBusy(true);
+    try {
+      await api.deleteDocument(id);
+      setDocs((cur) => cur.filter((d) => d.id !== id));
+    } catch (e) {
+      setErr(e?.message || 'מחיקה נכשלה');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="pd-documents animate-in animate-in-delay-5" style={{ marginTop: 16 }}>
+      <div className="pd-documents-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <FileText size={16} /> מסמכים ({docs.length})
+        </h4>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
+        >
+          <Upload size={13} />
+          {busy ? 'מעלה…' : 'העלאת מסמך'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf,.dwg,.zip,.xlsx,.docx,.jpg,.jpeg,.png,.heic"
+          style={{ display: 'none' }}
+          onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ''; }}
+        />
+      </div>
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const f = e.dataTransfer?.files?.[0];
+          if (f) onUpload(f);
+        }}
+        style={{
+          border: `2px dashed ${dragOver ? '#b48b4c' : 'rgba(30,26,20,0.12)'}`,
+          background: dragOver ? '#fbf7f0' : '#fff',
+          borderRadius: 12,
+          padding: '14px 16px',
+          marginBottom: 10,
+          color: '#6b6356',
+          fontSize: 13,
+          textAlign: 'center',
+        }}
+      >
+        גרור קובץ לכאן או לחץ "העלאת מסמך"
+      </div>
+      {err && <div style={{ color: '#b91c1c', fontSize: 13, marginBottom: 8 }}>{err}</div>}
+      {loading ? (
+        <div style={{ color: '#6b6356', fontSize: 13 }}>טוען…</div>
+      ) : docs.length === 0 ? (
+        <div style={{ color: '#6b6356', fontSize: 13 }}>אין מסמכים מצורפים לנכס זה.</div>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {docs.map((d) => (
+            <li key={d.id} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: '#fff', border: '1px solid rgba(30,26,20,0.08)',
+              borderRadius: 10, padding: '8px 12px',
+            }}>
+              <FileText size={14} style={{ color: '#b48b4c', flexShrink: 0 }} />
+              <a
+                href={`/api/documents/${d.id}/download`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ flex: 1, color: '#1e1a14', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {d.originalName}
+              </a>
+              <span style={{ fontSize: 12, color: '#6b6356' }}>{Math.round((d.sizeBytes || 0) / 1024)} KB</span>
+              <button
+                type="button"
+                onClick={() => onDelete(d.id)}
+                disabled={busy}
+                aria-label="מחק"
+                style={{ background: 'none', border: 0, color: '#b91c1c', cursor: 'pointer' }}
+              >
+                <Trash2 size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export function VideoTile({ video }) {

@@ -64,7 +64,12 @@ const INITIAL = {
   // NumberField). Percent fields stay strings because they accept
   // decimal input and the optional "%" suffix.
   amount: null,
+  // 2026-04-27 — brokerage may be a percent of price OR a fixed ₪ amount
+  // (mirrors the lawyer fee's already-existing Segmented). Default is
+  // 'percent' so existing flows behave identically.
+  commissionMode: 'percent',
   commissionPctText: '2',
+  commissionAmount: null,
   commissionVatIncluded: false,
   lawyerMode: 'percent',
   lawyerPctText: '0.5',
@@ -103,7 +108,9 @@ function DesktopSellerCalculator() {
   const result = useMemo(() => sellerCalc({
     mode: debounced.mode,
     amount: debounced.amount,
+    commissionMode: debounced.commissionMode,
     commissionRate: (parsePercent(debounced.commissionPctText) ?? 0) / 100,
+    commissionAmount: debounced.commissionAmount || 0,
     commissionVatIncluded: debounced.commissionVatIncluded,
     lawyerMode: debounced.lawyerMode,
     lawyerRate: (parsePercent(debounced.lawyerPctText) ?? 0) / 100,
@@ -186,18 +193,37 @@ function DesktopSellerCalculator() {
             </div>
             {s.showBrokerage && (
               <>
-                <PercentField
-                  id="sc-commission"
-                  value={s.commissionPctText}
-                  onChange={(v) => update('commissionPctText', v)}
+                <Segmented
+                  value={s.commissionMode}
+                  onChange={(v) => update('commissionMode', v)}
+                  ariaLabel="סוג עמלת תיווך"
+                  options={[
+                    { value: 'percent', label: 'אחוז' },
+                    { value: 'fixed', label: 'סכום קבוע' },
+                  ]}
                 />
+                {s.commissionMode === 'percent' ? (
+                  <PercentField
+                    id="sc-commission"
+                    value={s.commissionPctText}
+                    onChange={(v) => update('commissionPctText', v)}
+                  />
+                ) : (
+                  <NumberField
+                    id="sc-commission"
+                    value={s.commissionAmount}
+                    onChange={(v) => update('commissionAmount', v)}
+                    unit="₪"
+                    placeholder="40,000"
+                  />
+                )}
                 <label className="sc-toggle">
                   <input
                     type="checkbox"
                     checked={s.commissionVatIncluded}
                     onChange={(e) => update('commissionVatIncluded', e.target.checked)}
                   />
-                  <span>האחוז כולל מע״מ</span>
+                  <span>{s.commissionMode === 'percent' ? 'האחוז כולל מע״מ' : 'הסכום כולל מע״מ'}</span>
                 </label>
               </>
             )}
@@ -464,8 +490,8 @@ function buildShareUrl({ result, mode }) {
     isFwd
       ? `מחיר: ₪${Math.round(result.listingPrice).toLocaleString('he-IL')}`
       : `מחיר סגירה: ₪${Math.round(result.listingPrice).toLocaleString('he-IL')}`,
-    `עמלת תיווך: ₪${Math.round(result.brokerage).toLocaleString('he-IL')}`,
-    `שכ"ט עו"ד: ₪${Math.round(result.lawyer).toLocaleString('he-IL')}`,
+    `עמלת תיווך: ₪${Math.round(result.brokerage).toLocaleString('he-IL')} (כולל מע״מ)`,
+    `שכ"ט עו"ד: ₪${Math.round(result.lawyer).toLocaleString('he-IL')} (כולל מע״מ)`,
   ];
   if (result.additional > 0) {
     lines.push(`עלויות נוספות: ₪${Math.round(result.additional).toLocaleString('he-IL')}`);

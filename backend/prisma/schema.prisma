@@ -669,6 +669,7 @@ model Property {
   viewings         PropertyViewing[]
   inquiries        PropertyInquiry[]
   videos           PropertyVideo[]
+  documents        UploadedFile[]
   deal             Deal?
   agreements       Agreement[]
   transfers        PropertyTransfer[]
@@ -1060,6 +1061,12 @@ model UploadedFile {
   // default; legacy rows (property images / signed agreements) never
   // populate it.
   tags         String[] @default([])
+  // 2026-04-27 — optional scoping to a specific property so the agent
+  // can attach a PDF (e.g. exclusivity agreement, building plan,
+  // arnona statement) directly to a listing. Nullable so existing
+  // rows + the global /documents page keep working unchanged.
+  propertyId   String?
+  property     Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
 
   agreements Agreement[]
@@ -1067,6 +1074,7 @@ model UploadedFile {
   @@index([ownerId])
   @@index([kind])
   @@index([ownerId, kind])
+  @@index([propertyId])
 }
 
 enum MessageTemplateKind {

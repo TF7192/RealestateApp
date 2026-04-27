@@ -70,6 +70,11 @@ export function sellerCalc(input) {
   const vat = input.vatRate ?? DEFAULT_VAT_RATE;
   const c   = clampRate(input.commissionRate);
   const vb  = input.commissionVatIncluded ? 1 : (1 + vat);
+  // 2026-04-27 — fixed-price brokerage. When commissionMode === 'fixed',
+  // commissionAmount (pre-VAT ₪) replaces the percent-of-price formula.
+  // Default mode is 'percent' so existing call-sites are unaffected.
+  const commissionMode = input.commissionMode === 'fixed' ? 'fixed' : 'percent';
+  const commissionAmount = Math.max(0, Number(input.commissionAmount) || 0);
 
   const empty = {
     listingPrice: 0,
@@ -88,7 +93,7 @@ export function sellerCalc(input) {
   // ── forward: amount IS the listing price; compute net ──────────
   if (input.mode === 'forward') {
     const P = input.amount;
-    const brokerageBase = P * c;
+    const brokerageBase = commissionMode === 'fixed' ? commissionAmount : P * c;
     const brokerage     = brokerageBase * vb;
     const brokerageVat  = brokerage - brokerageBase;
 
@@ -128,15 +133,32 @@ export function sellerCalc(input) {
 
   let P;
   let denom;
-  if (input.lawyerMode === 'fixed') {
-    const L = Math.max(0, input.lawyerAmount || 0);
+  // Reverse algebra branches on whether either fee is a fixed ₪ amount
+  // (constant on the right side, doesn't multiply P) versus a percent
+  // (scales with P). Four combinations: percent/percent, percent/fixed,
+  // fixed/percent, fixed/fixed.
+  const fixedC = commissionMode === 'fixed';
+  const fixedL = input.lawyerMode === 'fixed';
+  const C = commissionAmount;
+  const L = Math.max(0, input.lawyerAmount || 0);
+  const l = clampRate(input.lawyerRate);
+  if (fixedC && fixedL) {
+    // N = P - C·vb - L·vl - A → P = N + C·vb + L·vl + A
+    P = N + C * vb + L * vl + additional;
+  } else if (fixedC) {
+    // N = P - C·vb - P·l·vl - A → P·(1 - l·vl) = N + C·vb + A
+    denom = 1 - (l * vl);
+    if (denom <= 0) {
+      return { ...empty, error: 'fees_exceed_100_percent' };
+    }
+    P = (N + C * vb + additional) / denom;
+  } else if (fixedL) {
     denom = 1 - (c * vb);
     if (denom <= 0) {
       return { ...empty, error: 'fees_exceed_100_percent' };
     }
     P = (N + L * vl + additional) / denom;
   } else {
-    const l = clampRate(input.lawyerRate);
     denom = 1 - (c * vb) - (l * vl);
     if (denom <= 0) {
       return { ...empty, error: 'fees_exceed_100_percent' };
@@ -147,7 +169,7 @@ export function sellerCalc(input) {
     return { ...empty, error: 'invalid_inputs' };
   }
 
-  const brokerageBase = P * c;
+  const brokerageBase = fixedC ? C : P * c;
   const brokerage     = brokerageBase * vb;
   const brokerageVat  = brokerage - brokerageBase;
   const lawyer = lawyerOnPrice(P, input, vat);

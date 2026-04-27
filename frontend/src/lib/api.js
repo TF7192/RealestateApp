@@ -1044,7 +1044,7 @@ export const api = {
     const s = qs.toString();
     return request(`/documents${s ? `?${s}` : ''}`);
   },
-  uploadDocument: (file, tags) => {
+  uploadDocument: (file, tags, opts = {}) => {
     const fd = new FormData();
     fd.append('file', file);
     const list = Array.isArray(tags) ? tags : tags ? [tags] : [];
@@ -1052,6 +1052,10 @@ export const api = {
       const v = String(t || '').trim();
       if (v) fd.append('tags', v);
     }
+    // 2026-04-27 — when scoped to a property, the backend stores the FK
+    // on UploadedFile so /documents?propertyId= can filter to the
+    // matching attachments on the property page.
+    if (opts.propertyId) fd.append('propertyId', String(opts.propertyId));
     return request('/documents', { method: 'POST', body: fd });
   },
   deleteDocument: (id) => request(`/documents/${id}`, { method: 'DELETE' }),
