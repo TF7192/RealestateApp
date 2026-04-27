@@ -26,6 +26,7 @@ import StickyActionBar from '../components/StickyActionBar';
 import OwnerPicker from '../components/OwnerPicker';
 import StreetHouseField from '../components/StreetHouseField';
 import { RoomsChips, DateQuickChips, SuggestPicker } from '../components/MobilePickers';
+import CityField from '../components/CityField';
 import { useDraftAutosave, readDraft } from '../hooks/mobile';
 import { relLabel } from '../lib/relativeDate';
 import {
@@ -1207,12 +1208,17 @@ export default function NewProperty() {
             </div>
             <div className="form-row form-row-3">
               <div className="form-group">
+                <label className="form-label">עיר</label>
+                <CityField
+                  value={form.city}
+                  onChange={(v) => update('city', v)}
+                  options={cityNames}
+                  placeholder="רמלה"
+                  inputProps={{ ...inputPropsForCity(), required: true }}
+                />
+              </div>
+              <div className="form-group">
                 <label className="form-label">רחוב ומספר</label>
-                {/* Split into two inputs — street autocomplete on the
-                    population-authority registry + a short numeric house-
-                    number input. Picking a street stamps `streetCode`
-                    onto the form so hasValidatedAddress passes; typing
-                    past the pick clears the validated metadata. */}
                 <StreetHouseField
                   street={form.street}
                   houseNumber={form.houseNumber}
@@ -1227,9 +1233,6 @@ export default function NewProperty() {
                     }));
                   }}
                   onClear={() => {
-                    // Diverged from the picked street — invalidate the
-                    // streetCode so save blocks until they re-pick or
-                    // use-current-location stamps lat/lng.
                     setForm((p) => ({
                       ...p,
                       streetCode: null,
@@ -1239,17 +1242,6 @@ export default function NewProperty() {
                       lng: null,
                     }));
                   }}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">עיר</label>
-                <SuggestPicker
-                  options={cityNames}
-                  value={form.city}
-                  onChange={(v) => update('city', v)}
-                  placeholder="רמלה"
-                  label="עיר"
-                  inputProps={{ ...inputPropsForCity(), required: true }}
                 />
               </div>
               {/* Step 1 area block: residential keeps the single
