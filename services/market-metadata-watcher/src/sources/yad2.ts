@@ -399,42 +399,32 @@ export async function discoverYad2(opts: {
 
   const br = await getBrowser();
 
-  // Per-region BrowserContext rotation. Each region opens a fresh
-  // (proxy × fingerprint) context; cookie state is keyed on
-  // (fp × proxy × region) so a return visit to the same combo lands
-  // on a warm session.
-  //
-  // Why per-region (not per-tick): Reblaze rate-limits the IP after
-  // ~5-6 listing-page fetches in quick succession. With a single
-  // per-tick context, Tel Aviv's 5-page burst burns the IP's trust
-  // budget and every subsequent region (Center+Sharon, Jerusalem, …)
-  // gets slow-walked into a 25s page.goto timeout. Rotating the
-  // proxy per region resets the budget.
+  // Per-region BrowserContext rotation + runtime re-roll. Each region
+  // opens a fresh (proxy × fingerprint) context; if a page fetch
+  // returns null mid-region (signal of an Reblaze-flagged IP), we
+  // close that context, pick a NEW (proxy × fp), open a fresh context,
+  // and retry the same page. Capped at MAX_PAGE_REROLLS per page so a
+  // bad-batch run doesn't burn the proxy budget on a single region.
   log.info({ poolSize: poolSize(), regions: regions.length }, 'yad2.tick-start');
 
-  // Track cookie file age threshold — the persisted storageState is
-  // considered "fresh" for this long after its mtime; warmup gets
-  // skipped when reuse is safe.
   const STATE_FRESH_MS = 2 * 60 * 60 * 1000; // 2 hours
+  // Max times we re-roll a fresh (proxy × fp) context for the SAME
+  // page. With a ~3k-port DataImpulse pool the marginal cost of
+  // trying again is tiny; capping at 3 keeps a worst-case page
+  // bounded to ~100 s while giving us three chances to land on a
+  // clean exit IP.
+  const MAX_PAGE_REROLLS = 3;
 
-  for (const region of regions) {
-    // Pick a fresh (fp × proxy) PER region. pickProxy() advances the
-    // round-robin cursor each call.
+  // Helper: open a fresh BrowserContext for (region, attempt) using a
+  // newly-picked fingerprint + proxy + cookie-state. Returns the ctx
+  // and the keys we used (so the caller can save state on success).
+  async function openRegionContext(region: string) {
     const fp = pickFingerprint();
     const proxy = pickProxy();
     const proxyKey = proxy ? proxy.server.replace(/[^a-z0-9]/gi, '').slice(0, 16) : 'direct';
     const fpKey = fp.userAgent.replace(/[^a-z0-9]/gi, '').slice(0, 16);
     const regionKey = region.replace(/[^a-z0-9]/gi, '').slice(0, 24);
     const statePath = path.join(STATE_DIR, `yad2-${fpKey}-${proxyKey}-${regionKey}.json`);
-    log.info(
-      {
-        region,
-        ua: fp.userAgent.slice(0, 30),
-        viewport: fp.viewport,
-        proxy: describeProxy(proxy),
-      },
-      'yad2.region-fingerprint',
-    );
 
     let storageState: string | undefined;
     let stateAgeMs = Infinity;
@@ -442,8 +432,18 @@ export async function discoverYad2(opts: {
       const st = await fs.stat(statePath);
       storageState = statePath;
       stateAgeMs = Date.now() - st.mtimeMs;
-      log.info({ region, fpKey, proxyKey, stateAgeMs }, 'yad2.storage-state-loaded');
-    } catch { /* no prior state — first run for this combo */ }
+    } catch { /* fresh combo */ }
+
+    log.info(
+      {
+        region, fpKey, proxyKey,
+        ua: fp.userAgent.slice(0, 30),
+        viewport: fp.viewport,
+        proxy: describeProxy(proxy),
+        stateAgeMs: Number.isFinite(stateAgeMs) ? stateAgeMs : null,
+      },
+      'yad2.region-context-open',
+    );
 
     const ctx = await br.newContext({
       userAgent: fp.userAgent,
@@ -455,64 +455,73 @@ export async function discoverYad2(opts: {
       ...(proxy ? { proxy } : {}),
     });
 
-    try {
-      // Warm-up — only when the cookie file isn't fresh. Each region's
-      // context owns its own (proxy × fp × region) cookie file; if
-      // we have a < 2h old cookie for this exact combo, we skip the
-      // homepage hit entirely.
-      if (stateAgeMs < STATE_FRESH_MS) {
-        log.info({ region, stateAgeMs }, 'yad2.warmup-skipped-cookie-fresh');
-        await new Promise((r) => setTimeout(r, 1500 + Math.floor(Math.random() * 2500)));
-      } else {
-        try {
-          log.info({ region }, 'yad2.warmup-start');
-          const warmup = await ctx.newPage();
-          await warmup.goto('https://www.yad2.co.il/', {
-            waitUntil: 'domcontentloaded',
-            timeout: 20_000,
-          });
-          await new Promise((r) => setTimeout(r, 3_000));
-          const warmupUrl = warmup.url();
-          const challenged = warmupUrl.includes('perfdrive.com') || warmupUrl.includes('shieldsquare');
-          await warmup.close().catch(() => {/* swallow */});
-
-          if (challenged) {
-            log.warn(
-              { region, warmupUrl: warmupUrl.slice(0, 80) },
-              'yad2.warmup-challenged-not-saving',
-            );
-          } else {
-            try {
-              await fs.mkdir(STATE_DIR, { recursive: true });
-              await ctx.storageState({ path: statePath });
-              log.info({ region, statePath }, 'yad2.storage-state-saved');
-            } catch (err) {
-              log.warn({ region, err: String(err) }, 'yad2.storage-state-save-failed');
-            }
+    // Warm-up — only when cookies aren't fresh.
+    if (stateAgeMs < STATE_FRESH_MS) {
+      log.info({ region, stateAgeMs }, 'yad2.warmup-skipped-cookie-fresh');
+      await new Promise((r) => setTimeout(r, 1500 + Math.floor(Math.random() * 2500)));
+    } else {
+      try {
+        log.info({ region }, 'yad2.warmup-start');
+        const warmup = await ctx.newPage();
+        await warmup.goto('https://www.yad2.co.il/', {
+          waitUntil: 'domcontentloaded',
+          timeout: 20_000,
+        });
+        await new Promise((r) => setTimeout(r, 3_000));
+        const warmupUrl = warmup.url();
+        const challenged = warmupUrl.includes('perfdrive.com') || warmupUrl.includes('shieldsquare');
+        await warmup.close().catch(() => {/* swallow */});
+        if (challenged) {
+          log.warn({ region, warmupUrl: warmupUrl.slice(0, 80) }, 'yad2.warmup-challenged-not-saving');
+        } else {
+          try {
+            await fs.mkdir(STATE_DIR, { recursive: true });
+            await ctx.storageState({ path: statePath });
+          } catch (err) {
+            log.warn({ region, err: String(err) }, 'yad2.storage-state-save-failed');
           }
-          log.info({ region, challenged }, 'yad2.warmup-done');
-          await new Promise((r) => setTimeout(r, 1500 + Math.floor(Math.random() * 2500)));
-        } catch (err) {
-          log.warn({ region, err: String(err) }, 'yad2.warmup-failed-continuing');
         }
+        log.info({ region, challenged }, 'yad2.warmup-done');
+        await new Promise((r) => setTimeout(r, 1500 + Math.floor(Math.random() * 2500)));
+      } catch (err) {
+        log.warn({ region, err: String(err) }, 'yad2.warmup-failed-continuing');
       }
+    }
+    return { ctx, statePath };
+  }
 
+  for (const region of regions) {
+    let regionState: { ctx: BrowserContext; statePath: string } | null = null;
+    try {
+      regionState = await openRegionContext(region);
       for (const kind of kinds) {
         let page = 1;
+        let pageRerolls = 0;
         let novelInRegionKind = 0;
-        // Wrap the inner page-walk in try/catch so one bad
-        // (region, kind) doesn't kill the whole tick — Yad2 sometimes
-        // hits Reblaze timeouts on a single region while every other
-        // region serves cleanly.
         try {
           while (page <= MAX_PAGES_PER_REGION) {
             const sep = page === 1 ? '' : `?page=${page}`;
             const url = `https://www.yad2.co.il/realestate/${kind}/${region}${sep}`;
             log.info({ region, kind, page, url }, 'yad2.fetching');
 
-            const pageProps = await fetchOnePage(ctx, url, log);
+            const pageProps = await fetchOnePage(regionState!.ctx, url, log);
             stats.fetched++;
-            if (!pageProps) break;
+
+            if (!pageProps) {
+              // Bad page — likely Reblaze flagged the upstream IP.
+              if (pageRerolls < MAX_PAGE_REROLLS) {
+                pageRerolls++;
+                log.warn({ region, kind, page, attempt: pageRerolls }, 'yad2.reroll-bad-page');
+                await regionState!.ctx.close().catch(() => {/* swallow */});
+                regionState = await openRegionContext(region);
+                continue;
+              }
+              log.warn({ region, kind, page, rerolls: pageRerolls }, 'yad2.reroll-exhausted');
+              break;
+            }
+            // Successful page — reset reroll counter so a later flaky
+            // page can still get its own retries.
+            pageRerolls = 0;
 
             const items = extractFeedFromPageProps(pageProps, kind);
             stats.itemsSeen += items.length;
@@ -522,9 +531,6 @@ export async function discoverYad2(opts: {
               if (!knownTokens.has(it.externalListingId)) {
                 novel.push(it);
                 allItems.push(it);
-                // Mark as in-flight known so duplicate tokens within
-                // the same run (boosted listings, cross-bucket repeats)
-                // only get added once.
                 knownTokens.add(it.externalListingId);
               }
             }
@@ -539,18 +545,14 @@ export async function discoverYad2(opts: {
             }
 
             if (allItems.length >= hardCeiling) {
-              log.warn(
-                { allItemsLength: allItems.length, hardCeiling },
-                'yad2.hard-ceiling-hit',
-              );
-              await ctx.close().catch(() => {/* swallow */});
+              log.warn({ allItemsLength: allItems.length, hardCeiling }, 'yad2.hard-ceiling-hit');
+              await regionState!.ctx.close().catch(() => {/* swallow */});
               return { items: allItems, stats };
             }
 
             novelInRegionKind += novel.length;
 
-            // Early exit: if EVERY item on this page was already known,
-            // we've caught up to last run for this (region, kind).
+            // Early exit: every item already known.
             if (items.length > 0 && novel.length === 0) break;
             if (items.length === 0) break;
 
@@ -558,28 +560,17 @@ export async function discoverYad2(opts: {
             await new Promise((r) => setTimeout(r, humanGapMs()));
           }
           if (novelInRegionKind >= HIGH_VOLUME_PER_REGION_KIND) {
-            log.warn(
-              { region, kind, novelInRegionKind },
-              'yad2.high-volume-per-region-kind',
-            );
+            log.warn({ region, kind, novelInRegionKind }, 'yad2.high-volume-per-region-kind');
           }
         } catch (err) {
-          log.warn(
-            { region, kind, err: String(err) },
-            'yad2.region-failed-continuing',
-          );
+          log.warn({ region, kind, err: String(err) }, 'yad2.region-failed-continuing');
         }
       }
     } finally {
-      // Always close the per-region context — frees Chromium memory
-      // and ensures the next region starts with a guaranteed fresh
-      // (proxy × fp × cookie-jar) tuple.
-      await ctx.close().catch(() => {/* swallow */});
+      if (regionState) await regionState.ctx.close().catch(() => {/* swallow */});
     }
 
-    // Polite gap between regions (real users don't whip-pan from one
-    // search-area to another in <1s). Slightly wider jitter than the
-    // intra-region gap.
+    // Polite gap between regions.
     await new Promise((r) => setTimeout(r, 2500 + Math.floor(Math.random() * 3500)));
   }
 
