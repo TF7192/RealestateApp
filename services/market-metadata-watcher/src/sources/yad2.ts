@@ -57,14 +57,14 @@ const POLITE_GAP_MAX_MS = 3500;
 function humanGapMs(): number {
   return POLITE_GAP_MIN_MS + Math.floor(Math.random() * (POLITE_GAP_MAX_MS - POLITE_GAP_MIN_MS));
 }
-// 8 pages × 40 items = ~320-listing buffer per (region, kind) per
-// hour. Yad2's sort is freshness-weighted with boost mixing, not
-// pure date-desc — fresh listings land somewhere on page 1 reliably,
-// but we walk deeper than strictly necessary as a safety net against
-// any future sort weirdness or marketing bursts. Page 6+ is unusual
-// in steady state because the early-exit fires when all 40 items
-// are known.
-const MAX_PAGES_PER_REGION = 8;
+// 3 pages × 40 items = ~120-listing buffer per (region, kind) per
+// tick. Tightened from 8 → 3 to keep bandwidth bounded and reduce
+// the chance of triggering Reblaze's rate-limit on a single IP.
+// Yad2's sort is freshness-weighted: novel listings reliably land
+// on page 1; the page 2-3 walk is a safety net against the boost
+// rotation occasionally shuffling fresh items deeper. Early-exit
+// (every item already known) still fires on page 1 in steady state.
+const MAX_PAGES_PER_REGION = 3;
 const PAGE_LOAD_TIMEOUT_MS = 25_000;
 // Volume tripwire — if a single (region, kind) ingests more than
 // this in one run, log a WATCHER_HIGH_VOLUME warning. Steady-state
@@ -187,14 +187,53 @@ async function fetchOnePage(
     page?.close().catch(() => { /* swallow */ });
   }, PAGE_HARD_TIMEOUT_MS);
 
+  // Tracks whether the document's initial load has reached
+  // domcontentloaded. Set true right after page.goto(...) resolves;
+  // used to abort post-load XHR/fetch telemetry that doesn't affect
+  // the listing payload. Setting via a closure flag (Playwright's
+  // route handler doesn't have direct access to the load state).
+  const loadState = { domLoaded: false };
+
   try {
     page = await ctx.newPage();
-    // Block heavy assets — we only need the HTML + its inlined JSON.
-    // Cuts page weight by ~95% and lets us stay polite under the
-    // 600ms gap without hammering Yad2.
+    // Bandwidth-trim route handler. Three filters, in order:
+    //   1. Block heavy asset classes (image/font/media/stylesheet) —
+    //      Yad2's listings render fine without them.
+    //   2. Block known third-party telemetry domains — analytics,
+    //      pixels, tag managers don't affect the __NEXT_DATA__ payload.
+    //      Whitelist only: yad2.co.il itself, Reblaze challenge hosts,
+    //      and the Yad2 CDN. Everything else gets aborted.
+    //   3. After domcontentloaded fires, abort any further xhr/fetch
+    //      requests — Yad2's client-side JS pings several telemetry
+    //      endpoints we don't need (recommendations, ad-tracking, log
+    //      beacons). The HTML + inline JSON we want is already in hand
+    //      by domcontentloaded.
     await page.route('**/*', (route) => {
-      const t = route.request().resourceType();
+      const req = route.request();
+      const t = req.resourceType();
       if (t === 'image' || t === 'font' || t === 'media' || t === 'stylesheet') {
+        return route.abort();
+      }
+      // Allowlist by host — any other host = abort.
+      let host = '';
+      try { host = new URL(req.url()).host.toLowerCase(); }
+      catch { return route.continue(); /* malformed URL — let it through */ }
+      const isYad2 =
+        host === 'www.yad2.co.il' ||
+        host === 'yad2.co.il' ||
+        host.endsWith('.yad2.co.il') ||
+        host.endsWith('.y2cdn.io');     // Yad2's image CDN (already blocked above by resourceType)
+      const isReblaze =
+        host === 'validate.perfdrive.com' ||
+        host.endsWith('.perfdrive.com') ||
+        host.endsWith('.shieldsquare.com') ||
+        host === 'shieldsquare.com';
+      if (!isYad2 && !isReblaze) {
+        return route.abort();
+      }
+      // Post-DCL XHR/fetch abort. Yad2 fires telemetry pings AFTER
+      // initial render; we have everything we need by then.
+      if (loadState.domLoaded && (t === 'xhr' || t === 'fetch')) {
         return route.abort();
       }
       return route.continue();
@@ -205,6 +244,7 @@ async function fetchOnePage(
       waitUntil: 'domcontentloaded',
       timeout: PAGE_LOAD_TIMEOUT_MS,
     });
+    loadState.domLoaded = true;
     log.info({ url, status: response?.status() }, 'yad2.goto-done');
 
     if (!response || response.status() >= 400) {
@@ -358,104 +398,105 @@ export async function discoverYad2(opts: {
   const stats: DiscoveryStats = { fetched: 0, itemsSeen: 0 };
 
   const br = await getBrowser();
-  // One BrowserContext per discovery run — fresh cookies, no state
-  // leakage across hourly ticks. The route-level asset blocking
-  // configured per-page above survives the close.
-  // Rotate fingerprint per tick. Same context for the duration of a
-  // tick so Reblaze cookies established on the first request carry
-  // through subsequent listing fetches; next tick spins up a fresh
-  // BrowserContext with a new fingerprint pulled from the pool.
-  const fp = pickFingerprint();
-  // Pick a proxy for THIS tick. Round-robin through the pool so every
-  // tick presents to Reblaze with a different IP. Pool is parsed once
-  // from WATCHER_PROXIES at process start; running without proxies
-  // (empty pool) is still supported — falls back to the EC2 NAT IP.
-  const proxy = pickProxy();
-  log.info(
-    { ua: fp.userAgent.slice(0, 30), viewport: fp.viewport, proxy: describeProxy(proxy), poolSize: poolSize() },
-    'yad2.fingerprint',
-  );
 
-  // Persist Reblaze session cookies between ticks. A real user keeps
-  // their cookies for days; we used to throw them away every hour,
-  // forcing a fresh challenge each time. Loading prior storageState
-  // means subsequent ticks usually skip the challenge entirely. File
-  // is per-fingerprint-class so different UAs don't share cookies.
-  // State key includes both fingerprint AND proxy host — Reblaze ties
-  // its session cookies to (UA × IP), so reusing cookies across proxies
-  // re-triggers a challenge anyway. Per-(fp × proxy) cookie file means
-  // round-robin ticks land on a warm session whenever they reuse a
-  // (fp, proxy) pair (likely after a few ticks given pool size).
-  const proxyKey = proxy ? proxy.server.replace(/[^a-z0-9]/gi, '').slice(0, 16) : 'direct';
-  const fpKey = fp.userAgent.replace(/[^a-z0-9]/gi, '').slice(0, 16);
-  const statePath = path.join(STATE_DIR, `yad2-${fpKey}-${proxyKey}.json`);
-  let storageState: string | undefined;
-  try {
-    await fs.access(statePath);
-    storageState = statePath;
-    log.info({ fpKey, proxyKey }, 'yad2.storage-state-loaded');
-  } catch { /* no prior state — first run for this fingerprint */ }
+  // Per-region BrowserContext rotation. Each region opens a fresh
+  // (proxy × fingerprint) context; cookie state is keyed on
+  // (fp × proxy × region) so a return visit to the same combo lands
+  // on a warm session.
+  //
+  // Why per-region (not per-tick): Reblaze rate-limits the IP after
+  // ~5-6 listing-page fetches in quick succession. With a single
+  // per-tick context, Tel Aviv's 5-page burst burns the IP's trust
+  // budget and every subsequent region (Center+Sharon, Jerusalem, …)
+  // gets slow-walked into a 25s page.goto timeout. Rotating the
+  // proxy per region resets the budget.
+  log.info({ poolSize: poolSize(), regions: regions.length }, 'yad2.tick-start');
 
-  const ctx = await br.newContext({
-    userAgent: fp.userAgent,
-    locale: 'he-IL',
-    timezoneId: 'Asia/Jerusalem',
-    viewport: fp.viewport,
-    extraHTTPHeaders: {
-      'Accept-Language': fp.acceptLanguage,
-    },
-    ...(storageState ? { storageState } : {}),
-    // Per-context proxy. Playwright routes ALL traffic from this
-    // context (warmup + every fetchOnePage) through the proxy, so the
-    // tick's IP stays consistent.
-    ...(proxy ? { proxy } : {}),
-  });
+  // Track cookie file age threshold — the persisted storageState is
+  // considered "fresh" for this long after its mtime; warmup gets
+  // skipped when reuse is safe.
+  const STATE_FRESH_MS = 2 * 60 * 60 * 1000; // 2 hours
 
-  // Warm-up: visit Yad2's homepage first to establish Reblaze session
-  // cookies. Real users land on / before drilling into /realestate/rent/...
-  // — directly hitting a deep listing path triggers stricter challenges.
-  // The cookies set here ride the BrowserContext through every region
-  // fetch this tick.
-  try {
-    log.info({}, 'yad2.warmup-start');
-    const warmup = await ctx.newPage();
-    await warmup.goto('https://www.yad2.co.il/', {
-      waitUntil: 'domcontentloaded',
-      timeout: 20_000,
+  for (const region of regions) {
+    // Pick a fresh (fp × proxy) PER region. pickProxy() advances the
+    // round-robin cursor each call.
+    const fp = pickFingerprint();
+    const proxy = pickProxy();
+    const proxyKey = proxy ? proxy.server.replace(/[^a-z0-9]/gi, '').slice(0, 16) : 'direct';
+    const fpKey = fp.userAgent.replace(/[^a-z0-9]/gi, '').slice(0, 16);
+    const regionKey = region.replace(/[^a-z0-9]/gi, '').slice(0, 24);
+    const statePath = path.join(STATE_DIR, `yad2-${fpKey}-${proxyKey}-${regionKey}.json`);
+    log.info(
+      {
+        region,
+        ua: fp.userAgent.slice(0, 30),
+        viewport: fp.viewport,
+        proxy: describeProxy(proxy),
+      },
+      'yad2.region-fingerprint',
+    );
+
+    let storageState: string | undefined;
+    let stateAgeMs = Infinity;
+    try {
+      const st = await fs.stat(statePath);
+      storageState = statePath;
+      stateAgeMs = Date.now() - st.mtimeMs;
+      log.info({ region, fpKey, proxyKey, stateAgeMs }, 'yad2.storage-state-loaded');
+    } catch { /* no prior state — first run for this combo */ }
+
+    const ctx = await br.newContext({
+      userAgent: fp.userAgent,
+      locale: 'he-IL',
+      timezoneId: 'Asia/Jerusalem',
+      viewport: fp.viewport,
+      extraHTTPHeaders: { 'Accept-Language': fp.acceptLanguage },
+      ...(storageState ? { storageState } : {}),
+      ...(proxy ? { proxy } : {}),
     });
-    // Give Reblaze ~3s to run its challenge JS and stamp our cookies,
-    // and let it auto-redirect back to yad2 if we landed on the
-    // challenge interstitial.
-    await new Promise((r) => setTimeout(r, 3_000));
-    const warmupUrl = warmup.url();
-    const challenged = warmupUrl.includes('perfdrive.com') || warmupUrl.includes('shieldsquare');
-    await warmup.close().catch(() => {/* swallow */});
 
-    if (challenged) {
-      // We're still on the challenge page after 3s — Reblaze either
-      // didn't accept us or our IP is currently flagged. Don't poison
-      // the persisted state file with challenge cookies; surface the
-      // signal to the operator instead.
-      log.warn({ warmupUrl: warmupUrl.slice(0, 80) }, 'yad2.warmup-challenged-not-saving');
-    } else {
-      try {
-        await fs.mkdir(STATE_DIR, { recursive: true });
-        await ctx.storageState({ path: statePath });
-        log.info({ statePath }, 'yad2.storage-state-saved');
-      } catch (err) {
-        log.warn({ err: String(err) }, 'yad2.storage-state-save-failed');
+    try {
+      // Warm-up — only when the cookie file isn't fresh. Each region's
+      // context owns its own (proxy × fp × region) cookie file; if
+      // we have a < 2h old cookie for this exact combo, we skip the
+      // homepage hit entirely.
+      if (stateAgeMs < STATE_FRESH_MS) {
+        log.info({ region, stateAgeMs }, 'yad2.warmup-skipped-cookie-fresh');
+        await new Promise((r) => setTimeout(r, 1500 + Math.floor(Math.random() * 2500)));
+      } else {
+        try {
+          log.info({ region }, 'yad2.warmup-start');
+          const warmup = await ctx.newPage();
+          await warmup.goto('https://www.yad2.co.il/', {
+            waitUntil: 'domcontentloaded',
+            timeout: 20_000,
+          });
+          await new Promise((r) => setTimeout(r, 3_000));
+          const warmupUrl = warmup.url();
+          const challenged = warmupUrl.includes('perfdrive.com') || warmupUrl.includes('shieldsquare');
+          await warmup.close().catch(() => {/* swallow */});
+
+          if (challenged) {
+            log.warn(
+              { region, warmupUrl: warmupUrl.slice(0, 80) },
+              'yad2.warmup-challenged-not-saving',
+            );
+          } else {
+            try {
+              await fs.mkdir(STATE_DIR, { recursive: true });
+              await ctx.storageState({ path: statePath });
+              log.info({ region, statePath }, 'yad2.storage-state-saved');
+            } catch (err) {
+              log.warn({ region, err: String(err) }, 'yad2.storage-state-save-failed');
+            }
+          }
+          log.info({ region, challenged }, 'yad2.warmup-done');
+          await new Promise((r) => setTimeout(r, 1500 + Math.floor(Math.random() * 2500)));
+        } catch (err) {
+          log.warn({ region, err: String(err) }, 'yad2.warmup-failed-continuing');
+        }
       }
-    }
-    log.info({ challenged }, 'yad2.warmup-done');
-    // Small "I'm reading the homepage" pause before drilling into the
-    // listings — adds another behavioral signal that this is a human.
-    await new Promise((r) => setTimeout(r, 1500 + Math.floor(Math.random() * 2500)));
-  } catch (err) {
-    log.warn({ err: String(err) }, 'yad2.warmup-failed-continuing');
-  }
 
-  try {
-    for (const region of regions) {
       for (const kind of kinds) {
         let page = 1;
         let novelInRegionKind = 0;
@@ -493,11 +534,6 @@ export async function discoverYad2(opts: {
               'yad2.page-result',
             );
 
-            // Stream-commit BEFORE the early-exit check so even a
-            // single-page region writes its rows before we move on.
-            // Errors here bubble out of the `try` and skip the rest
-            // of this region's pages — partial progress is preserved
-            // because earlier pages already committed.
             if (onPage && novel.length > 0) {
               await onPage(novel, { region, kind, page });
             }
@@ -507,6 +543,7 @@ export async function discoverYad2(opts: {
                 { allItemsLength: allItems.length, hardCeiling },
                 'yad2.hard-ceiling-hit',
               );
+              await ctx.close().catch(() => {/* swallow */});
               return { items: allItems, stats };
             }
 
@@ -527,19 +564,23 @@ export async function discoverYad2(opts: {
             );
           }
         } catch (err) {
-          // Per-region error isolation. Most common cause is
-          // Playwright's `page.waitForFunction` 30s timeout when
-          // Reblaze escalates to a CAPTCHA on this specific region
-          // — the next region usually serves cleanly.
           log.warn(
             { region, kind, err: String(err) },
             'yad2.region-failed-continuing',
           );
         }
       }
+    } finally {
+      // Always close the per-region context — frees Chromium memory
+      // and ensures the next region starts with a guaranteed fresh
+      // (proxy × fp × cookie-jar) tuple.
+      await ctx.close().catch(() => {/* swallow */});
     }
-  } finally {
-    await ctx.close().catch(() => {/* swallow */});
+
+    // Polite gap between regions (real users don't whip-pan from one
+    // search-area to another in <1s). Slightly wider jitter than the
+    // intra-region gap.
+    await new Promise((r) => setTimeout(r, 2500 + Math.floor(Math.random() * 3500)));
   }
 
   return { items: allItems, stats };

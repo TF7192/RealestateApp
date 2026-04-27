@@ -583,19 +583,23 @@ export default function MarketDiscovery() {
         />
       )}
 
-      {/* 3-col on desktop, 2-col on tablet, 1-col on mobile. Inline
-          <style> with media queries so we don't need a global CSS rule. */}
+      {/* 2-col on desktop, 1-col on mobile. Per UX feedback the cards
+          looked cramped at 3-up; widening to 2-up gives the price + match
+          banner real estate to breathe. */}
       <style>{`
         .market-grid {
           display: grid;
-          gap: 14px;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-        @media (max-width: 900px) {
-          .market-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-        @media (max-width: 600px) {
+        @media (max-width: 720px) {
           .market-grid { grid-template-columns: 1fr; }
+        }
+        .market-card {
+          transition: transform 120ms ease, box-shadow 120ms ease;
+        }
+        .market-card:hover {
+          transform: translateY(-2px);
         }
       `}</style>
       <div className="market-grid">
@@ -620,58 +624,91 @@ export default function MarketDiscovery() {
           return (
           <article
             key={l.id}
+            className="market-card"
             data-matched={isMatched ? 'true' : undefined}
             data-duplicated={isDuplicated ? 'true' : undefined}
             style={{
+              position: 'relative',
               background: isMatched && !isDuplicated
-                ? 'linear-gradient(180deg, rgba(180,139,76,0.06), #fff 35%)'
+                ? 'linear-gradient(180deg, rgba(180,139,76,0.10), #fff 50%)'
                 : DT.white,
               border: accent ? `2px solid ${accent}` : `1px solid ${DT.border}`,
-              borderRadius: 14,
-              padding: 14,
-              display: 'flex', flexDirection: 'column', gap: 10,
+              borderRadius: 16,
+              padding: 18,
+              paddingTop: isMatched && !isDuplicated ? 18 : 18,
+              display: 'flex', flexDirection: 'column', gap: 12,
+              minHeight: 240,
               boxShadow: isDuplicated
-                ? '0 6px 16px rgba(21,128,61,0.18)'
+                ? '0 8px 22px rgba(21,128,61,0.20)'
                 : isMatched
-                ? '0 6px 18px rgba(180,139,76,0.28)'
-                : '0 1px 0 rgba(30,26,20,0.03)',
+                ? '0 10px 26px rgba(180,139,76,0.30)'
+                : '0 2px 6px rgba(30,26,20,0.05)',
+              overflow: 'hidden',
             }}
           >
-            {/* Lead-match banner — bigger, golden, names not score */}
+            {/* Top accent strip on matched cards — adds an immediate
+                visual cue without competing with the lead-name banner */}
             {isMatched && !isDuplicated && (
               <div style={{
-                display: 'flex', alignItems: 'flex-start', gap: 8,
-                background: 'rgba(180,139,76,0.12)',
-                border: `1px solid rgba(180,139,76,0.35)`,
-                borderRadius: 10, padding: '8px 10px',
+                position: 'absolute', top: 0, insetInline: 0, height: 4,
+                background: `linear-gradient(90deg, ${DT.gold}, ${DT.goldDark}, ${DT.gold})`,
+              }} />
+            )}
+            {isDuplicated && (
+              <div style={{
+                position: 'absolute', top: 0, insetInline: 0, height: 4,
+                background: DT.success,
+              }} />
+            )}
+
+            {/* Lead-match banner — full-width, large, golden */}
+            {isMatched && !isDuplicated && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                background: 'rgba(180,139,76,0.16)',
+                border: `1px solid rgba(180,139,76,0.45)`,
+                borderRadius: 12, padding: '10px 12px',
               }}>
-                <Sparkles size={16} style={{ color: DT.goldDark, flexShrink: 0, marginTop: 2 }} />
+                <Sparkles size={20} style={{ color: DT.goldDark, flexShrink: 0, marginTop: 1 }} />
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{
-                    fontSize: 13, fontWeight: 800, color: DT.goldDark, lineHeight: 1.35,
+                    fontSize: 11, fontWeight: 700, color: DT.goldDark,
+                    letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2,
+                  }}>
+                    התאמה לליד
+                  </div>
+                  <div style={{
+                    fontSize: 15, fontWeight: 800, color: DT.ink, lineHeight: 1.3,
                   }}>
                     {namesShown
-                      ? `מתאים ל${namesShown}${namesOverflow ? ` +${namesOverflow}` : ''}`
-                      : 'מתאים לליד שלך'}
+                      ? `${namesShown}${namesOverflow ? ` +${namesOverflow}` : ''}`
+                      : 'ליד שלך'}
                   </div>
                 </div>
               </div>
             )}
             {isDuplicated && (
               <div style={{
-                display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
+                display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 6,
                 background: DT.success, color: DT.white,
-                fontSize: 11, fontWeight: 800, letterSpacing: 0.3,
-                padding: '3px 9px', borderRadius: 99,
+                fontSize: 12, fontWeight: 800, letterSpacing: 0.3,
+                padding: '5px 12px', borderRadius: 99,
               }}>
-                <CheckCircle2 size={11} /> בנכסים שלך
+                <CheckCircle2 size={13} /> בנכסים שלך
               </div>
             )}
+
             {/* Source / kind / poster pills row */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
               {l.source === 'yad2' && <Yad2Badge />}
               {l.kind && (
-                <span style={kindPillStyle}>
+                <span style={{
+                  ...kindPillStyle,
+                  background: l.kind === 'rent'
+                    ? 'rgba(59,130,246,0.12)'
+                    : 'rgba(180,139,76,0.10)',
+                  color: l.kind === 'rent' ? '#1e40af' : '#7a5c2c',
+                }}>
                   {l.kind === 'rent' ? 'להשכרה' : 'למכירה'}
                 </span>
               )}
@@ -681,20 +718,25 @@ export default function MarketDiscovery() {
                   background: DT.cream2, color: DT.muted,
                 }}>
                   {l.posterType === 'agency'
-                    ? <><Briefcase size={9} /> תיווך</>
-                    : <><User size={9} /> פרטי</>}
+                    ? <><Briefcase size={10} /> תיווך</>
+                    : <><User size={10} /> פרטי</>}
                 </span>
               )}
+              <span style={{ marginInlineStart: 'auto', fontSize: 11, color: DT.muted, fontWeight: 600 }}>
+                {relLabel(l.firstSeenAt)}
+              </span>
             </div>
-            {/* Address + meta */}
+
+            {/* Address — primary identifier */}
             <div>
               <div style={{
-                fontSize: 15, fontWeight: 800, marginBottom: 4,
+                fontSize: 18, fontWeight: 800, marginBottom: 4,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                color: DT.ink, lineHeight: 1.3,
               }}>
                 {[l.street, l.neighborhood, l.city].filter(Boolean).join(' · ') || 'נכס'}
               </div>
-              <div style={{ fontSize: 12, color: DT.muted }}>
+              <div style={{ fontSize: 13, color: DT.muted, fontWeight: 600 }}>
                 {[
                   l.propertyType,
                   l.rooms != null ? `${l.rooms} חד׳` : null,
@@ -703,31 +745,38 @@ export default function MarketDiscovery() {
                 ].filter(Boolean).join(' · ')}
               </div>
             </div>
-            {/* Price + first-seen */}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
-              {l.price != null && (
-                <span style={{ fontSize: 18, fontWeight: 800, color: DT.gold }}>
+
+            {/* Big price */}
+            {l.price != null && (
+              <div style={{
+                display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap',
+                paddingTop: 4, paddingBottom: 4,
+                borderTop: `1px dashed ${DT.border}`,
+                borderBottom: `1px dashed ${DT.border}`,
+              }}>
+                <span style={{
+                  fontSize: 26, fontWeight: 900, color: DT.goldDark,
+                  letterSpacing: -0.5,
+                }}>
                   {displayPriceShort(l.price)}
-                  {l.kind === 'rent' && (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: DT.muted, marginInlineStart: 4 }}>
-                      / חודש
-                    </span>
-                  )}
                 </span>
-              )}
-              {l.pricePerSqm != null && l.kind !== 'rent' && (
-                <span style={{ fontSize: 12, color: DT.muted }}>
-                  {`₪${l.pricePerSqm.toLocaleString('he-IL')} / מ״ר`}
-                </span>
-              )}
-            </div>
-            <div style={{ fontSize: 11, color: DT.muted, marginTop: -4 }}>
-              נראה לראשונה {relLabel(l.firstSeenAt)}
-            </div>
+                {l.kind === 'rent' && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: DT.muted }}>
+                    / חודש
+                  </span>
+                )}
+                {l.pricePerSqm != null && l.kind !== 'rent' && (
+                  <span style={{ fontSize: 12, color: DT.muted, marginInlineStart: 'auto' }}>
+                    {`₪${l.pricePerSqm.toLocaleString('he-IL')} / מ״ר`}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Action row at the bottom of the card */}
             <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
-              marginTop: 'auto', paddingTop: 4,
+              display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 8,
+              marginTop: 'auto', paddingTop: 2,
             }}>
               <a
                 href={l.originalUrl}
@@ -736,12 +785,12 @@ export default function MarketDiscovery() {
                 style={{
                   ...FONT, textDecoration: 'none', textAlign: 'center',
                   background: DT.cream2, color: DT.ink, border: `1px solid ${DT.border}`,
-                  padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  padding: '10px 12px', borderRadius: 10, fontSize: 13, fontWeight: 700,
                   display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
-                  minHeight: 40,
+                  minHeight: 44,
                 }}
               >
-                <ExternalLink size={13} /> פתח במקור
+                <ExternalLink size={14} /> פתח במקור
               </a>
               {isDuplicated ? (
                 <button
@@ -750,12 +799,12 @@ export default function MarketDiscovery() {
                   style={{
                     ...FONT, cursor: 'pointer', textAlign: 'center',
                     background: DT.success, color: DT.white, border: 'none',
-                    padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 800,
+                    padding: '10px 12px', borderRadius: 10, fontSize: 13, fontWeight: 800,
                     display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
-                    minHeight: 40, boxShadow: '0 4px 12px rgba(21,128,61,0.25)',
+                    minHeight: 44, boxShadow: '0 4px 12px rgba(21,128,61,0.30)',
                   }}
                 >
-                  <CheckCircle2 size={13} /> פתח אצלי
+                  <CheckCircle2 size={14} /> פתח אצלי
                 </button>
               ) : (
                 <button
@@ -764,13 +813,13 @@ export default function MarketDiscovery() {
                   style={{
                     ...FONT, cursor: 'pointer', textAlign: 'center',
                     background: `linear-gradient(135deg, ${DT.gold}, ${DT.goldDark})`,
-                    color: DT.ink, border: 'none',
-                    padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 800,
+                    color: DT.white, border: 'none',
+                    padding: '10px 12px', borderRadius: 10, fontSize: 13, fontWeight: 800,
                     display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
-                    minHeight: 40, boxShadow: '0 4px 12px rgba(180,139,76,0.28)',
+                    minHeight: 44, boxShadow: '0 4px 14px rgba(180,139,76,0.35)',
                   }}
                 >
-                  <CopyIcon size={13} /> שכפל
+                  <CopyIcon size={14} /> שכפל לנכסים שלי
                 </button>
               )}
             </div>

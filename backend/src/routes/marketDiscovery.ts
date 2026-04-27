@@ -66,9 +66,13 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     }
     const f = parse.data;
     const where: Record<string, unknown> = {};
-    if (f.city) where.city = f.city;
-    if (f.neighborhood) where.neighborhood = f.neighborhood;
-    if (f.propertyType) where.propertyType = f.propertyType;
+    // Substring match (case-insensitive) for free-text fields — agents
+    // shouldn't have to type the canonical Yad2 city name ("תל אביב יפו")
+    // to match; "תל אביב" should be enough. Same for neighborhood and
+    // propertyType. Backend stays Postgres-side via Prisma's `contains`.
+    if (f.city)         where.city         = { contains: f.city,         mode: 'insensitive' };
+    if (f.neighborhood) where.neighborhood = { contains: f.neighborhood, mode: 'insensitive' };
+    if (f.propertyType) where.propertyType = { contains: f.propertyType, mode: 'insensitive' };
     if (f.kind) where.kind = f.kind;
     if (f.posterType) where.posterType = f.posterType;
     if (f.status) where.status = f.status;

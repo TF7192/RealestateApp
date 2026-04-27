@@ -61,11 +61,46 @@ export async function reapStaleRuns(prisma: PrismaClient, logger: Logger) {
   }
 }
 
+// Quiet-hours window in Israel local time. Skip scans between
+// 23:00 and 06:00 — Yad2's organic traffic drops to ~5% of daytime
+// volume in those hours, so our scrape would stand out in their
+// telemetry. Honest residential users aren't doom-scrolling listings
+// at 3am; we shouldn't either.
+const QUIET_START_HOUR = 23; // 23:00 Asia/Jerusalem
+const QUIET_END_HOUR   = 6;  // 06:00 Asia/Jerusalem
+
+function isInQuietHours(): boolean {
+  // Asia/Jerusalem handles DST automatically (Mar/Oct). 24h hour.
+  const hour = Number.parseInt(
+    new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Jerusalem',
+    }).format(new Date()),
+    10,
+  );
+  // Window is [23:00, 06:00) — wrap-around midnight.
+  if (QUIET_START_HOUR > QUIET_END_HOUR) {
+    return hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR;
+  }
+  return hour >= QUIET_START_HOUR && hour < QUIET_END_HOUR;
+}
+
 export async function runWatcherTick(
   { prisma, logger }: Deps,
   opts: { kinds?: WatcherKind[] } = {},
 ) {
   const kinds = opts.kinds ?? ['forsale'];
+
+  // Skip during Israel-local quiet hours (23:00-06:00). The
+  // scheduler still fires on cadence; we just bail before opening any
+  // browser/proxy connections so Reblaze doesn't see overnight
+  // traffic from us. Returns silently — no run row, no log noise.
+  if (isInQuietHours()) {
+    logger.info({ kinds }, 'tick.skipped-quiet-hours');
+    return;
+  }
+
   // Self-heal previous interrupted runs so the admin observability
   // page doesn't accumulate orphaned `running` rows. Idempotent +
   // cheap (single indexed UPDATE).
