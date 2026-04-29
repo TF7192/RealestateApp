@@ -281,6 +281,21 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* Co-broker flag — listings handed over by another brokerage get a
+   distinct teal outline so the agent can see at a glance which rows
+   are not their own mandate. Stronger weight + an inner glow keep
+   the row legible against the gold-on-hover state without overriding
+   it. */
+.property-card.is-co-brokered {
+  border-color: #2c8aa6;
+  border-width: 2px;
+  box-shadow: 0 0 0 1px rgba(44, 138, 166, 0.18);
+}
+.property-card.is-co-brokered:hover {
+  border-color: #2c8aa6;
+  box-shadow: 0 0 0 1px rgba(44, 138, 166, 0.18), var(--shadow-lg);
+}
+
 .property-card-link {
   text-decoration: none;
   color: inherit;

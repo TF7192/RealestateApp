@@ -205,6 +205,11 @@ const propertyInput = z.object({
   commissionTerms:   z.string().max(200).nullable().optional(),
   landlordCommission: z.string().max(200).nullable().optional(),
 
+  // 2026-04-30 — true when the listing was handed over by another
+  // brokerage. Default false (agent's own mandate). Surfaces a distinct
+  // outline colour on Properties cards + the detail header.
+  coBrokered: z.boolean().optional(),
+
   images: z.array(z.string().url()).optional(),
 });
 

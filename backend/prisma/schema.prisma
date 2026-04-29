@@ -685,6 +685,13 @@ model Property {
   // owns the row.
   priceOffers PropertyOffer[]
 
+  // 2026-04-30 — co-broker flag. False (default) = the listing is the
+  // agent's own mandate; true = the listing was passed over by another
+  // brokerage and this agent is co-listing it. The Properties list and
+  // the detail page render co-broker rows with a distinct outline
+  // colour so the agent can spot them at a glance.
+  coBrokered Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

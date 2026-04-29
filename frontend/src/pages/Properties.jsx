@@ -1275,7 +1275,7 @@ export default function Properties() {
               return (
                 <div
                   key={prop.id}
-                  className={`property-card property-card-compact animate-in ${delayClass} ${selectMode ? 'is-selectable' : ''} ${isPicked ? 'is-selected' : ''}`}
+                  className={`property-card property-card-compact animate-in ${delayClass} ${selectMode ? 'is-selectable' : ''} ${isPicked ? 'is-selected' : ''} ${prop.coBrokered ? 'is-co-brokered' : ''}`}
                   {...longPressBind(prop.id)}
                 >
                   <SwipeRow actions={selectMode ? [] : swipeActions}>
@@ -1421,7 +1421,7 @@ export default function Properties() {
             return (
               <div
                 key={prop.id}
-                className={`property-card animate-in ${delayClass} ${selectMode ? 'is-selectable' : ''} ${isPicked ? 'is-selected' : ''}`}
+                className={`property-card animate-in ${delayClass} ${selectMode ? 'is-selectable' : ''} ${isPicked ? 'is-selected' : ''} ${prop.coBrokered ? 'is-co-brokered' : ''}`}
                 {...longPressBind(prop.id)}
               >
                 {selectMode && (

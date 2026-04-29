@@ -263,6 +263,7 @@ const INITIAL_FORM = {
   tenantSideOnly: false,   // צד שוכר בלבד (RENT only)
   commissionTerms: '',     // free-form commission shape e.g. "חודש + מע״מ"
   landlordCommission: '',  // when landlord-side pays, how much (free-form)
+  coBrokered: false,       // false = own listing, true = handed over by another brokerage
 };
 
 // ─── Cream & Gold DT tokens ────────────────────────────────────────────
@@ -638,6 +639,7 @@ export default function NewProperty() {
           tenantSideOnly: !!p.tenantSideOnly,
           commissionTerms: p.commissionTerms || '',
           landlordCommission: p.landlordCommission || '',
+          coBrokered: !!p.coBrokered,
         });
         setExistingMeta({
           street: p.street,
@@ -793,6 +795,7 @@ export default function NewProperty() {
       lng: form.lng ?? null,
       marketingPrice: Number(form.marketingPrice) || 0,
       sqm: Number(form.sqm) || 0,
+      coBrokered: !!form.coBrokered,
     };
     if (form.propertyOwnerId) {
       body.propertyOwnerId = form.propertyOwnerId;
@@ -895,6 +898,7 @@ export default function NewProperty() {
     tenantSideOnly: !!form.tenantSideOnly,
     commissionTerms: form.commissionTerms || null,
     landlordCommission: form.landlordCommission || null,
+    coBrokered: !!form.coBrokered,
   });
   const buildFullEditBody = () => ({ ...buildStep1Body(), ...buildStep2Body() });
 
@@ -1203,6 +1207,27 @@ export default function NewProperty() {
                   onChange={(v) => update('marketingPrice', v)}
                   required
                 />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">מקור הנכס</label>
+                <div className="toggle-group">
+                  <button
+                    type="button"
+                    className={`toggle-btn ${!form.coBrokered ? 'active' : ''}`}
+                    onClick={() => update('coBrokered', false)}
+                  >
+                    הנכס שלי
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${form.coBrokered ? 'active' : ''}`}
+                    onClick={() => update('coBrokered', true)}
+                  >
+                    התקבל מסוכן אחר
+                  </button>
+                </div>
               </div>
             </div>
           </div>
