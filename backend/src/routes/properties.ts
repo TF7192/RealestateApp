@@ -81,8 +81,13 @@ const propertyInput = z.object({
   // write.
   placeId: z.string().max(120).nullable().optional(),
   formattedAddress: z.string().max(400).nullable().optional(),
-  owner: z.string().min(1).max(120),
-  ownerPhone: z.string().min(3).max(40),
+  // Accept empty strings: Yad2-imported properties land with an empty
+  // owner phone (and sometimes an empty owner name when the listing
+  // had no recoverable seller info). The form re-sends those values
+  // verbatim on edit, so a strict min() blocks PATCHes on otherwise-
+  // valid rows. Length caps stay; missing data is permitted.
+  owner: z.string().max(120),
+  ownerPhone: z.string().max(40),
   ownerEmail: z.string().email().nullable().optional(),
   // New: link this property to an existing Owner record (the canonical
   // persona table). When omitted, an Owner row is created/looked up from
