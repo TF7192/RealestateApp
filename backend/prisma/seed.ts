@@ -353,9 +353,17 @@ async function main() {
   });
 
   // Office manager — OWNER role, attached to the office.
+  // 2026-04-30 — seed `specialtyCities` so the "מודעות חדשות בשוק"
+  // feed demos the new specialty-cities filter out of the box.
+  const managerSpecialtyCities = ['תל אביב', 'רמת גן', 'גבעתיים'];
   const manager = await prisma.user.upsert({
     where: { email: managerEmail },
-    update: { role: 'OWNER', officeId: office.id, isPremium: true },
+    update: {
+      role: 'OWNER',
+      officeId: office.id,
+      isPremium: true,
+      specialtyCities: managerSpecialtyCities,
+    },
     create: {
       email: managerEmail,
       passwordHash: await argon2.hash(managerPassword),
@@ -364,6 +372,7 @@ async function main() {
       displayName: 'דנה לוי',
       phone: '050-5550100',
       isPremium: true,
+      specialtyCities: managerSpecialtyCities,
       avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&q=80',
       agentProfile: {
         create: {
@@ -1409,6 +1418,106 @@ async function main() {
       },
     });
   }
+
+  // ─── New-features showcase rows (2026-04-30) ───────────────────────
+  // Three properties + one lead on the manager that exercise the
+  // recently-shipped fields end-to-end:
+  //   • coBrokered = true               → teal outline on /properties
+  //   • priority   = 100 / 50 / 0       → list-ordering boost
+  //   • Lead.neighborhood + 2 M budget  → soft match boost,
+  //                                       strict price-cap demo
+  //   • stage = SIGNED_NON_EXCLUSIVE    → renders as "בהסכמה"
+  const showcaseProps = [
+    {
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
+      street: 'רוטשילד 76', city: 'תל אביב', neighborhood: 'לב העיר',
+      owner: 'מירה אבני', ownerPhone: '050-5559001',
+      marketingPrice: 4_900_000, sqm: 110, rooms: 4, floor: 5, totalFloors: 8,
+      elevator: true, parking: true, storage: true, balconySize: 14, ac: true,
+      safeRoom: true, buildingAge: 9,
+      coBrokered: true, priority: 0,
+      stage: 'SIGNED_NON_EXCLUSIVE' as const,
+      brokerNotes: 'הנכס התקבל מסוכנת שותפה ממשרד אחר — חלוקת עמלה 50/50.',
+      photo: 'https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&q=80',
+    },
+    {
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
+      street: 'אבן גבירול 145', city: 'תל אביב', neighborhood: 'הצפון הישן',
+      owner: 'דוד בן-יעקב', ownerPhone: '052-5559002',
+      marketingPrice: 6_750_000, sqm: 138, rooms: 5, floor: 9, totalFloors: 12,
+      elevator: true, parking: true, storage: true, balconySize: 22, ac: true,
+      safeRoom: true, buildingAge: 6,
+      coBrokered: false, priority: 100,
+      stage: 'SIGNED_EXCLUSIVE' as const,
+      brokerNotes: 'נכס דגל — מקדמת אגרסיבית, פגישה שבועית עם הבעלים.',
+      photo: 'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?w=800&q=80',
+    },
+    {
+      assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
+      street: 'הירקון 220', city: 'תל אביב', neighborhood: 'הצפון החדש',
+      owner: 'נטלי כספי', ownerPhone: '054-5559003',
+      marketingPrice: 5_300_000, sqm: 120, rooms: 4.5, floor: 6, totalFloors: 10,
+      elevator: true, parking: true, storage: false, balconySize: 16, ac: true,
+      safeRoom: true, buildingAge: 11,
+      coBrokered: false, priority: 50,
+      stage: 'IN_PROGRESS' as const,
+      brokerNotes: 'מקדמת — בעלים גמישים, מתעניינים פעילים.',
+      photo: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80',
+    },
+  ];
+  const showcaseExclusiveStart = new Date();
+  const showcaseExclusiveEnd = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+  for (const p of showcaseProps) {
+    await prisma.property.create({
+      data: {
+        agentId: manager.id,
+        assetClass: p.assetClass as any,
+        category: p.category as any,
+        type: p.type,
+        street: p.street, city: p.city, neighborhood: p.neighborhood,
+        owner: p.owner, ownerPhone: p.ownerPhone,
+        marketingPrice: p.marketingPrice, sqm: p.sqm,
+        rooms: p.rooms, floor: p.floor, totalFloors: p.totalFloors,
+        elevator: p.elevator, parking: p.parking, storage: p.storage,
+        balconySize: p.balconySize, ac: p.ac, safeRoom: p.safeRoom,
+        buildingAge: p.buildingAge,
+        coBrokered: p.coBrokered, priority: p.priority,
+        stage: p.stage,
+        brokerNotes: p.brokerNotes,
+        sector: 'כללי', status: 'ACTIVE',
+        exclusiveStart: showcaseExclusiveStart,
+        exclusiveEnd: showcaseExclusiveEnd,
+        marketingStartDate: showcaseExclusiveStart,
+        images: { create: [{ url: p.photo, sortOrder: 0 }] },
+      },
+    });
+  }
+
+  // The "שני ואלכס" lead from the field feedback — budget capped at 2 M,
+  // neighborhood specified (no street). Demos: strict price-ceiling
+  // matching + neighborhood soft-boost + the new lead form field.
+  await prisma.lead.create({
+    data: {
+      agentId: manager.id,
+      name: 'שני ואלכס',
+      phone: '050-5559200',
+      email: null,
+      interestType: 'PRIVATE',
+      lookingFor: 'BUY',
+      city: 'תל אביב',
+      neighborhood: 'פלורנטין',
+      rooms: '3',
+      priceRangeLabel: 'עד 2,000,000',
+      budget: 2_000_000,
+      preApproval: true,
+      status: 'WARM',
+      source: 'הפניה',
+      notes: 'זוג צעיר, תקציב נוקשה עד 2 מיליון. מעדיפים פלורנטין/שפירא, לא חייב רחוב מסוים. ביקשו לא לקבל הצעות מעל התקציב.',
+      brokerageSignedAt: atOffset(-7),
+      brokerageExpiresAt: atOffset(180),
+      lastContact: atOffset(-1, 14, 30),
+    },
+  });
 
   // 5. Deals on the manager — 6 rows with mixed statuses. Two are
   // SIGNED in Q2-2026 with closedPrice + commission + signedAt so the
