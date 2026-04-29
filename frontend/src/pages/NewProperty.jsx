@@ -264,6 +264,7 @@ const INITIAL_FORM = {
   commissionTerms: '',     // free-form commission shape e.g. "חודש + מע״מ"
   landlordCommission: '',  // when landlord-side pays, how much (free-form)
   coBrokered: false,       // false = own listing, true = handed over by another brokerage
+  priority: 0,             // higher floats to top of /properties (0 = default)
 };
 
 // ─── Cream & Gold DT tokens ────────────────────────────────────────────
@@ -640,6 +641,7 @@ export default function NewProperty() {
           commissionTerms: p.commissionTerms || '',
           landlordCommission: p.landlordCommission || '',
           coBrokered: !!p.coBrokered,
+          priority: Number(p.priority) || 0,
         });
         setExistingMeta({
           street: p.street,
@@ -796,6 +798,7 @@ export default function NewProperty() {
       marketingPrice: Number(form.marketingPrice) || 0,
       sqm: Number(form.sqm) || 0,
       coBrokered: !!form.coBrokered,
+      priority: Number(form.priority) || 0,
     };
     if (form.propertyOwnerId) {
       body.propertyOwnerId = form.propertyOwnerId;
@@ -899,6 +902,7 @@ export default function NewProperty() {
     commissionTerms: form.commissionTerms || null,
     landlordCommission: form.landlordCommission || null,
     coBrokered: !!form.coBrokered,
+    priority: Number(form.priority) || 0,
   });
   const buildFullEditBody = () => ({ ...buildStep1Body(), ...buildStep2Body() });
 
@@ -1209,7 +1213,7 @@ export default function NewProperty() {
                 />
               </div>
             </div>
-            <div className="form-row">
+            <div className="form-row form-row-2">
               <div className="form-group">
                 <label className="form-label">מקור הנכס</label>
                 <div className="toggle-group">
@@ -1226,6 +1230,35 @@ export default function NewProperty() {
                     onClick={() => update('coBrokered', true)}
                   >
                     התקבל מסוכן אחר
+                  </button>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">קידום ברשימה</label>
+                <div className="toggle-group">
+                  <button
+                    type="button"
+                    className={`toggle-btn ${(form.priority ?? 0) === 0 ? 'active' : ''}`}
+                    onClick={() => update('priority', 0)}
+                    title="מיקום רגיל"
+                  >
+                    רגיל
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${form.priority === 50 ? 'active' : ''}`}
+                    onClick={() => update('priority', 50)}
+                    title="מקדמת"
+                  >
+                    מקדמת
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${form.priority === 100 ? 'active' : ''}`}
+                    onClick={() => update('priority', 100)}
+                    title="קידום מקסימלי — מופיע ראשון"
+                  >
+                    מקדמת מאוד
                   </button>
                 </div>
               </div>
@@ -1961,7 +1994,6 @@ export default function NewProperty() {
                   placeholder="בחר…"
                   options={[
                     'חודש + מע״מ',
-                    'חודשיים + מע״מ',
                     'אחוז קבוע',
                     'אחר',
                   ]}

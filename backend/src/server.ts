@@ -413,6 +413,14 @@ if (runAsMain) {
         './workers/marketDiscoveryReactor.js'
       );
       startMarketDiscoveryReactor();
+      // 2026-05-06 — batched lead-match digest. Drains
+      // NotificationDispatch every 30 minutes and emits ONE
+      // consolidated email per agent. Replaces the prior
+      // per-match firehose. Idempotent: a second `start()` is a no-op.
+      const { startMatchDigestScheduler } = await import(
+        './workers/matchDigest.js'
+      );
+      startMatchDigestScheduler();
       // 2026-04-27 — soft-delete purge. Hard-deletes users with
       // deletedAt < now - 30d and their S3 blobs. Honours the
       // privacy-policy promise that account-deletion is final after

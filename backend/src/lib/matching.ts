@@ -16,6 +16,12 @@ type LeadLike = {
   interestType?: 'PRIVATE' | 'COMMERCIAL' | null;
   lookingFor?: 'BUY' | 'RENT' | null;
   city?: string | null;
+  // 2026-04-30 — flat-form leads now carry a neighborhood preference
+  // (most agents capture neighborhood, only some specify a street).
+  // Used as a soft boost: a property in the requested neighborhood
+  // scores higher; a property in a *different* neighborhood is still
+  // accepted (city-level match is the gate).
+  neighborhood?: string | null;
   rooms?: string | null;
   budget?: number | null;
   searchProfiles?: ProfileLike[] | null;
@@ -72,9 +78,24 @@ function flatMatches(lead: LeadLike, property: PropertyLike, signal: MatchSignal
     signal.reasons.push('city');
   }
 
+  // Neighborhood is a soft signal — same neighborhood is a positive
+  // boost, but mismatch doesn't gate (agents often loosely set a
+  // neighborhood when the lead would also accept adjacent areas).
+  if (lead.neighborhood && property.neighborhood) {
+    if (String(lead.neighborhood).trim() === String(property.neighborhood).trim()) {
+      signal.score += 0.1;
+      signal.reasons.push('neighborhood');
+    }
+  }
+
   if (property.marketingPrice && lead.budget) {
+    // Hebrew agents enter `budget` as an upper ceiling ("עד 2 מיליון"),
+    // so treat it as a strict max (the previous +15% fudge surfaced
+    // 2.3 M properties for a 2 M lead, which is far above the cap the
+    // agent set). Keep a -15% lower band — slightly below-budget rows
+    // are still legitimate matches.
     const min = Math.round(lead.budget * 0.85);
-    const max = Math.round(lead.budget * 1.15);
+    const max = lead.budget;
     if (property.marketingPrice < min || property.marketingPrice > max) return false;
     signal.score += 0.2;
     signal.reasons.push('price');

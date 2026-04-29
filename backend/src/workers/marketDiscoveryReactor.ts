@@ -108,6 +108,7 @@ async function drainOnce() {
     // match, which is the duplicate-email source.
     type AgentMatch = {
       matchId: string;
+      leadId: string;
       leadName: string;
       leadStatus: string;
       score: number;
@@ -164,6 +165,7 @@ async function drainOnce() {
       const bucket = perAgent.get(profile.lead.agentId) ?? [];
       bucket.push({
         matchId: match.id,
+        leadId: profile.leadId,
         leadName: profile.lead.name,
         leadStatus: profile.lead.status,
         score: r.score,
@@ -207,46 +209,42 @@ async function drainOnce() {
         },
       });
 
-      // Phase 3 — opt-in external delivery. Look up the agent's
-      // preference; if email is enabled and the score meets their
-      // personal threshold, queue ONE PendingNotificationDelivery
-      // for the whole listing. Idempotency key is keyed on (listing,
-      // agent) — not on a single match.id — so a re-evaluation
-      // (reactedAt reset) can't re-queue the same email.
+      // 2026-05-06 — opt-in external delivery via the digest queue.
+      // Instead of queueing one PendingNotificationDelivery per
+      // (agent, listing) — which fired immediately and was the
+      // source of inbox-spam complaints — we write one
+      // NotificationDispatch row per (agent, lead, listing). A
+      // separate scheduler reads un-dispatched rows every 30
+      // minutes and sends ONE consolidated email per agent.
+      // Dedup is enforced by the unique index on the triple, so
+      // re-running the reactor (reactedAt reset) never resurfaces
+      // a pair we already mailed about.
       try {
         const pref = await prisma.userNotificationPreference.findUnique({
           where: { userId: agentUserId },
-          include: { user: { select: { email: true } } },
         });
         const topScore = Math.max(...matches.map((m) => m.score));
-        if (pref && topScore >= pref.minMatchScoreForExternalDelivery) {
-          if (pref.marketMatchEmailEnabled) {
-            // customDeliveryEmail wins when set — that's the address the
-            // agent typed into the "רישום להתראות מייל" popup. Falls
-            // back to the User's login email so the toggle still works
-            // without explicit override.
-            const recipient = pref.customDeliveryEmail || pref.user.email;
-            if (recipient) {
-              await prisma.pendingNotificationDelivery.create({
-                data: {
-                  userId: agentUserId,
-                  channel: 'email',
-                  type: 'market_listing_match',
-                  title,
-                  body: emailBody(listing, matches),
-                  link: `/market-discovery?match=${primary.matchId}`,
-                  recipientEmail: recipient,
-                  idempotencyKey: `market_listing_match:${listing.id}:${agentUserId}`,
-                },
-              });
-            }
-          }
+        if (
+          pref?.marketMatchEmailEnabled &&
+          topScore >= pref.minMatchScoreForExternalDelivery
+        ) {
+          // Persist every match (one row per lead). Skip duplicates so
+          // the reactor stays idempotent across re-evaluations.
+          await prisma.notificationDispatch.createMany({
+            data: matches.map((m) => ({
+              agentId: agentUserId,
+              leadId: m.leadId,
+              marketListingId: listing.id,
+              matchScore: m.score,
+            })),
+            skipDuplicates: true,
+          });
           // SMS branch intentionally not enabled — no provider yet.
         }
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn(
-          '[market-discovery-reactor] queue-delivery-failed',
+          '[market-discovery-reactor] queue-dispatch-failed',
           { listingId: listing.id, agentUserId, err: String(err) },
         );
       }
@@ -288,51 +286,7 @@ function notificationBody(
   return `נמצא נכס חדש${cityFrag} שמתאים ${leadFrag}${parts.length ? `: ${parts.join(', ')}` : ''}.`;
 }
 
-// Plain-text email body — multi-line, includes WHO matched, WHY, and
-// the original Yad2 link. The notificationDelivery worker appends a
-// "פתח באפליקציה" CTA line + URL after this.
-function emailBody(
-  l: {
-    city: string | null;
-    neighborhood: string | null;
-    rooms: number | null;
-    sizeSqm: number | null;
-    price: number | null;
-    propertyType: string | null;
-    originalUrl: string;
-  },
-  matches: { leadName: string; leadStatus: string; score: number; reasons: string[] }[],
-): string {
-  const lines: string[] = [];
-
-  const headline = matches.length === 1
-    ? 'נמצא נכס חדש שמתאים לליד פעיל שלך:'
-    : `נמצא נכס חדש שמתאים ל-${matches.length} לידים פעילים שלך:`;
-  lines.push(headline);
-  lines.push('');
-
-  // Listing block
-  const where = [l.city, l.neighborhood].filter(Boolean).join(' / ');
-  if (where) lines.push(`📍 ${where}`);
-  const specs = [
-    l.propertyType,
-    l.rooms != null ? `${l.rooms} חדרים` : null,
-    l.sizeSqm != null ? `${l.sizeSqm} מ״ר` : null,
-    l.price != null ? `₪${l.price.toLocaleString('he-IL')}` : null,
-  ].filter(Boolean);
-  if (specs.length) lines.push(specs.join(' · '));
-  lines.push(`🔗 קישור למודעה ביד2: ${l.originalUrl}`);
-  lines.push('');
-
-  // Matched leads
-  lines.push(matches.length === 1 ? 'ליד תואם:' : 'לידים תואמים:');
-  matches.forEach((m, i) => {
-    const idx = matches.length === 1 ? '' : `${i + 1}. `;
-    lines.push(`${idx}${m.leadName} — סטטוס: ${m.leadStatus} (התאמה ${m.score})`);
-    if (m.reasons.length > 0) {
-      lines.push(`   סיבות: ${m.reasons.join(', ')}`);
-    }
-  });
-
-  return lines.join('\n');
-}
+// 2026-05-06 — the previous per-match plain-text email body lived
+// here. It's now rendered by lib/matchDigest.ts when the digest
+// scheduler fires its 30-min batch, so the reactor itself no longer
+// composes any email content.

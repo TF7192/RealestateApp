@@ -27,6 +27,8 @@ import {
   Unlink,
   Trash2,
   X as XIcon,
+  MapPin,
+  Plus,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -35,6 +37,7 @@ import { inputPropsForName } from '../lib/inputProps';
 import { PhoneField } from '../components/SmartFields';
 import ShareDialog from '../components/ShareDialog';
 import Portal from '../components/Portal';
+import CityField from '../components/CityField';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -451,6 +454,12 @@ export default function Profile() {
             tied to the "שמור שינויים" form save above. */}
         <CalendarSection />
 
+        {/* 2026-05-06 — Per-agent specialty cities. Drives the
+            "מודעות חדשות בשוק" feed: when non-empty, the feed only
+            returns listings whose city is on this list. Empty list
+            ⇒ "show me everything" (legacy default). */}
+        <SpecialtyCitiesSection />
+
         {/* 2026-04-27 — Data Subject Right (PPL §13 / GDPR Art. 15).
             Hits GET /api/me/export and forces a JSON download of every
             row owned by this user. Independent action — own button. */}
@@ -792,6 +801,172 @@ function CalendarSection() {
           </button>
         </div>
       )}
+    </section>
+  );
+}
+
+// 2026-05-06 — Per-agent specialty cities. The "מודעות חדשות בשוק"
+// feed restricts itself to listings whose city is in this list. An
+// empty list keeps the legacy "show everything" behavior so existing
+// users see no regression.
+//
+// Persists via PATCH /api/me/specialty-cities (capped at 20 entries
+// server-side). Cities are picked from the same Population-Authority
+// dictionary the rest of the app uses (api.cities) so the canonical
+// names line up with what the watcher writes into MarketListing.city.
+function SpecialtyCitiesSection() {
+  const toast = useToast();
+  const [cities, setCities] = useState([]);
+  const [draft, setDraft] = useState('');
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getSpecialtyCities()
+      .then((res) => { if (!cancelled) setCities(res?.cities || []); })
+      .catch(() => { /* fall through — empty list is the legacy default */ })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    api.cities()
+      .then((res) => {
+        if (cancelled) return;
+        const names = (res?.cities || [])
+          .map((c) => c?.name)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b, 'he'));
+        setOptions(names);
+      })
+      .catch(() => { /* user can type freely */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Persist after every mutation (add/remove). Cheap call, immediate
+  // feedback — matches the rest of the page's "no explicit save" feel
+  // for ancillary settings (e.g. the analytics-consent toggle).
+  const persist = async (next) => {
+    setSaving(true);
+    try {
+      const res = await api.setSpecialtyCities(next);
+      setCities(res?.cities || next);
+    } catch (e) {
+      toast.error(e?.message || 'שמירה נכשלה');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addCity = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (cities.length >= 20) {
+      toast.error('ניתן להוסיף עד 20 ערים');
+      return;
+    }
+    if (cities.some((c) => c.toLowerCase() === v.toLowerCase())) {
+      setDraft('');
+      return;
+    }
+    const next = [...cities, v];
+    setDraft('');
+    persist(next);
+  };
+
+  const removeCity = (name) => {
+    const next = cities.filter((c) => c !== name);
+    persist(next);
+  };
+
+  return (
+    <section style={sectionCard()} aria-label="ערים שמעניינות אותי">
+      <h3 style={sectionTitle()}>
+        <MapPin size={16} /> ערים שמעניינות אותי
+        <span style={sectionSubtitle()}>
+          סינון פיד "מודעות חדשות בשוק" לפי אזורי ההתמחות שלך
+        </span>
+      </h3>
+      <p style={{
+        margin: '0 0 12px', fontSize: 13, color: DT.muted, lineHeight: 1.6,
+      }}>
+        בחר/י את הערים שמעניינות אותך — ופיד "מודעות חדשות בשוק"
+        יציג רק נכסים בערים האלו. אם הרשימה ריקה, יוצגו כל המודעות.
+      </p>
+
+      {/* Selected cities — removable chips */}
+      {cities.length > 0 && (
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12,
+        }}>
+          {cities.map((name) => (
+            <span
+              key={name}
+              style={{
+                ...FONT,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                background: DT.goldSoft,
+                border: `1px solid ${DT.border}`,
+                borderRadius: 999, padding: '4px 10px',
+                fontSize: 12, fontWeight: 700, color: DT.ink,
+              }}
+            >
+              <MapPin size={11} />
+              {name}
+              <button
+                type="button"
+                onClick={() => removeCity(name)}
+                disabled={saving}
+                aria-label={`הסר ${name}`}
+                style={{
+                  background: 'transparent', border: 'none',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  padding: 0, marginInlineStart: 2,
+                  color: DT.muted, display: 'inline-flex',
+                }}
+              >
+                <XIcon size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Add-city picker. Uses the shared CityField autocomplete so the
+          dropdown surfaces the canonical Population-Authority names — the
+          same source the watcher's MarketListing.city writes match. */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <CityField
+            value={draft}
+            onChange={setDraft}
+            options={options}
+            placeholder="הוסף/י עיר…"
+            inputProps={{
+              onKeyDown: (e) => { if (e.key === 'Enter') { e.preventDefault(); addCity(); } },
+            }}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={addCity}
+          disabled={!draft.trim() || saving || cities.length >= 20 || loading}
+          style={{
+            ...primaryBtn(),
+            opacity: !draft.trim() || saving || cities.length >= 20 || loading ? 0.5 : 1,
+            cursor: !draft.trim() || saving || cities.length >= 20 || loading
+              ? 'not-allowed' : 'pointer',
+          }}
+        >
+          <Plus size={14} />
+          הוסף
+        </button>
+      </div>
+
+      <div style={{
+        marginTop: 8, fontSize: 11, color: DT.muted, fontWeight: 700,
+        textAlign: 'end',
+      }}>
+        {cities.length} / 20
+      </div>
     </section>
   );
 }

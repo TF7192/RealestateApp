@@ -359,6 +359,14 @@ model User {
   // fetch wrapper catches the status and opens the "שדרגו" dialog.
   isPremium Boolean @default(false)
 
+  // 2026-05-06 — per-agent specialty cities. Drives the "מודעות חדשות
+  // בשוק" feed: when non-empty, the market-discovery endpoint filters
+  // listings to `city ∈ specialtyCities` (canonicalized via
+  // `normalizeCity`). Empty array ⇒ legacy behavior (show everything),
+  // so existing users see no regression. Capped to 20 entries by the
+  // PATCH /api/me/specialty-cities validator.
+  specialtyCities String[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -418,6 +426,12 @@ model User {
   notificationPreference UserNotificationPreference?
   // Phase 3 — pending email/SMS deliveries the worker drains.
   pendingDeliveries     PendingNotificationDelivery[]
+  // 2026-05-06 — per-(lead, marketListing) match dispatch ledger.
+  // Each row represents one match the digest scheduler may include
+  // in its next 30-min email. `dispatchedAt` flips when the row is
+  // included in a sent digest, which doubles as the dedup key so
+  // the same lead × listing pair is never emailed twice.
+  notificationDispatches NotificationDispatch[]
   // Sprint 6 — in-house digital contracts (exclusivity / brokerage /
   // offer) authored by this agent.
   contracts             Contract[]        @relation("AgentContracts")
@@ -692,6 +706,11 @@ model Property {
   // colour so the agent can spot them at a glance.
   coBrokered Boolean @default(false)
 
+  // 2026-04-30 — agent-set priority. Higher values float to the top of
+  // /properties so an agent can surface the listings they are actively
+  // pushing. Default 0 = no boost.
+  priority Int @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -938,6 +957,7 @@ model Lead {
   interestType       LeadInterestType @default(PRIVATE)
   lookingFor         LeadLookingFor   @default(BUY)
   city               String?
+  neighborhood       String?
   street             String?
   rooms              String?
   priceRangeLabel    String?
@@ -1935,6 +1955,38 @@ model PendingNotificationDelivery {
   @@index([status, createdAt])
   @@index([userId, status])
   @@index([idempotencyKey])
+}
+
+// 2026-05-06 — digest ledger for batched lead-match emails.
+//
+// Replaces the old "one PendingNotificationDelivery per (agent,
+// listing)" path with a coarser-grained queue: every match the
+// reactor wants the agent to know about gets one row here. A
+// scheduler runs every 30 minutes, groups undispatched rows by
+// agent, sends ONE email per agent listing all of them, and stamps
+// `dispatchedAt`. The unique index on (agentId, leadId, marketListingId)
+// is the dedup contract — if the reactor re-evaluates a listing it
+// can call createMany({ skipDuplicates: true }) and never resurface
+// a pair we already mailed about.
+model NotificationDispatch {
+  id              String    @id @default(cuid())
+  agentId         String
+  agent           User      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  leadId          String
+  // Generic external-listing id; today this is MarketListing.id.
+  // Kept as a free-form string rather than a relation so the table
+  // works for future "internal Property"-driven matches without a
+  // schema migration.
+  marketListingId String
+  matchScore      Int       @default(0)
+  // Null until the row is included in a sent digest email; once set
+  // the row is "spent" and never appears in another digest.
+  dispatchedAt    DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@unique([agentId, leadId, marketListingId])
+  @@index([agentId, dispatchedAt])
+  @@index([dispatchedAt])
 }
 
 model MarketListingLeadMatch {

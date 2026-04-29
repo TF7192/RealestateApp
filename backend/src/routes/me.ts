@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { requireUser } from '../middleware/auth.js';
 import { putUpload } from '../lib/storage.js';
 import { assertAllowedMime } from '../lib/uploadGuards.js';
+import { normalizeCity } from '../lib/addressNormalize.js';
 
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAuth] }, async (req, reply) => {
@@ -224,6 +225,57 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
       user, properties, leads, owners, deals, prospects,
       reminders, meetings, contracts, agreements, documents, activity,
     };
+  });
+
+  // 2026-05-06 — per-agent specialty cities. Drives the
+  // "מודעות חדשות בשוק" feed filter. The feed only restricts results
+  // when the list is non-empty; an empty list keeps the legacy
+  // "show everything" behavior so existing users see no regression.
+  //
+  // Validation:
+  //   • each entry trimmed, max 80 chars (matches onboarding city)
+  //   • cap at 20 entries per agent — beyond that the filter
+  //     stops being meaningful and the UI becomes unwieldy
+  //   • duplicates collapsed (case-insensitive on the canonical name)
+  //   • empty / whitespace-only entries dropped silently
+  app.get('/specialty-cities', { onRequest: [app.requireAuth] }, async (req) => {
+    const uid = requireUser(req).id;
+    const u = await prisma.user.findUnique({
+      where: { id: uid },
+      select: { specialtyCities: true },
+    });
+    return { cities: u?.specialtyCities ?? [] };
+  });
+
+  const specialtyCitiesSchema = z.object({
+    cities: z.array(z.string().trim().min(1).max(80)).max(20),
+  });
+
+  app.patch('/specialty-cities', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const parse = specialtyCitiesSchema.safeParse(req.body);
+    if (!parse.success) {
+      const msg = parse.error.errors[0]?.message || 'רשימה לא תקינה';
+      return reply.code(400).send({ error: { message: msg } });
+    }
+    const uid = requireUser(req).id;
+    // Dedupe by canonical city name where possible — fall through to
+    // the raw trimmed value when the city isn't in the dictionary so
+    // agents can still type freeform names.
+    const seen = new Set<string>();
+    const cleaned: string[] = [];
+    for (const raw of parse.data.cities) {
+      const canon = normalizeCity(raw)?.value || raw.trim();
+      if (!canon) continue;
+      const key = canon.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      cleaned.push(canon);
+    }
+    await prisma.user.update({
+      where: { id: uid },
+      data: { specialtyCities: cleaned },
+    });
+    return { cities: cleaned };
   });
 
   // 2026-04-27 — analytics consent. Frontend writes here when the user

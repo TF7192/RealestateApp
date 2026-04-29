@@ -96,6 +96,7 @@ const INITIAL_FORM = {
   interestType: 'פרטי',
   lookingFor: 'buy',
   city: '',
+  neighborhood: '',
   street: '',
   roomsMin: '',
   roomsMax: '',
@@ -274,6 +275,7 @@ export default function NewLead() {
         interestType: form.interestType === 'מסחרי' ? 'COMMERCIAL' : 'PRIVATE',
         lookingFor: form.lookingFor === 'rent' ? 'RENT' : 'BUY',
         city: form.city || null,
+        neighborhood: form.neighborhood || null,
         street: form.street || null,
         roomsMin: form.roomsMin ? Number(form.roomsMin) : null,
         roomsMax: form.roomsMax ? Number(form.roomsMax) : null,
@@ -600,6 +602,19 @@ export default function NewLead() {
                 }}
               />
             </Field>
+            <Field label="שכונה (אופציונלי)">
+              <input
+                type="text"
+                className="form-input"
+                value={form.neighborhood}
+                onChange={(e) => update('neighborhood', e.target.value)}
+                placeholder="פלורנטין, רמת אביב, נווה צדק…"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </Field>
+          </div>
+          <div style={gridRow2()}>
             <Field label="רחוב (אופציונלי)">
               <SuggestPicker
                 options={streetOptions}
@@ -616,6 +631,7 @@ export default function NewLead() {
                 }}
               />
             </Field>
+            <div />
           </div>
           <Field label="קירבה לבית ספר">
             <SelectField

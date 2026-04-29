@@ -22,7 +22,7 @@ export const PROPERTY_STAGE_LABELS: Record<string, string> = {
   WATCHING:              'במעקב',
   PRE_ACQUISITION:       'לפני רכישה',
   IN_PROGRESS:           'נכס בטיפול',
-  SIGNED_NON_EXCLUSIVE:  'חתום אי-בלעדיות',
+  SIGNED_NON_EXCLUSIVE:  'בהסכמה',
   SIGNED_EXCLUSIVE:      'חתום בלעדיות',
   EXCLUSIVITY_ENDED:     'בלעדיות הסתיימה',
   REFUSED_BROKERAGE:     'סירב שיווק',

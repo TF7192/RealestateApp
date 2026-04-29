@@ -42,7 +42,7 @@ export const PROPERTY_STAGE_LABELS = {
   WATCHING:              'במעקב',
   PRE_ACQUISITION:       'טרום-קליטה',
   IN_PROGRESS:           'בתהליך',
-  SIGNED_NON_EXCLUSIVE:  'חתום — לא בלעדי',
+  SIGNED_NON_EXCLUSIVE:  'בהסכמה',
   SIGNED_EXCLUSIVE:      'חתום — בלעדי',
   EXCLUSIVITY_ENDED:     'סיום בלעדיות',
   REFUSED_BROKERAGE:     'סירב לתיווך',

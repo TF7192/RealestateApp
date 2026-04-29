@@ -11,6 +11,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { getUser } from '../middleware/auth.js';
+import { normalizeCity } from '../lib/addressNormalize.js';
 
 const listFiltersSchema = z.object({
   city:           z.string().trim().min(1).optional(),
@@ -66,6 +67,28 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     }
     const f = parse.data;
     const where: Record<string, unknown> = {};
+    // Per-agent specialty-city filter. When the agent has a non-empty
+    // `specialtyCities` list, restrict the feed to listings whose city
+    // matches one of those entries — canonicalised via `normalizeCity`
+    // both sides so "תל אביב" picks up rows stored as "תל אביב יפו".
+    // Empty list ⇒ legacy behavior (no extra filter), so existing
+    // users see no regression.
+    //
+    // Skipped when the caller already passed an explicit `?city=` —
+    // an explicit filter beats the global preference, and we don't
+    // want to silently 0-out the request.
+    const userId = getUser(req)!.id;
+    if (!f.city) {
+      const me = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { specialtyCities: true },
+      });
+      const list = me?.specialtyCities ?? [];
+      if (list.length > 0) {
+        const canon = list.map((c) => normalizeCity(c)?.value ?? c);
+        where.city = { in: canon };
+      }
+    }
     // Substring match (case-insensitive) for free-text fields — agents
     // shouldn't have to type the canonical Yad2 city name ("תל אביב יפו")
     // to match; "תל אביב" should be enough. Same for neighborhood and
@@ -133,7 +156,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     // Per-page (not catalog-wide) so pagination stays sane: page 1
     // surfaces the agent's hottest matches; deeper pages still serve
     // the chosen sort. With f.limit ≤ 100 the second query is cheap.
-    const userId = getUser(req)!.id;
+    // (`userId` is captured above, before the where-clause is built.)
     const ids = rawItems.map((x) => x.id);
     const [myMatches, myDuplicates] = await Promise.all([
       ids.length

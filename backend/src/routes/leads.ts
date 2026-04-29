@@ -11,12 +11,27 @@ import { buildAnthropic } from '../lib/anthropic.js';
 import { recordAnthropic } from '../lib/aiUsage.js';
 
 const leadInput = z.object({
-  name: z.string().min(1).max(120),
-  phone: z.string().min(3).max(40),
-  email: z.string().email().nullable().optional(),
+  // Relaxed: drop `.min(1)` / `.min(3)` so PATCH bodies that resend
+  // every field (CustomerEditDialog ships `name: form.name?.trim() ||
+  // ''` and `phone: form.phone?.trim() || ''`) don't fail on rows that
+  // legitimately carry empty strings — mirrors the 2026-04-30
+  // ownerPhone fix on Property. The FE keeps its own guard for
+  // create-time required-ness; max() length caps still apply.
+  name: z.string().max(120),
+  // `.nullable()` so the existing NewLead path (`phone: form.phone ||
+  // null`) also passes when the agent leaves the phone blank.
+  phone: z.string().max(40).nullable().optional(),
+  // Allow `''` so AI-edit / import paths that emit empty strings don't
+  // trip `email()`. CustomerEditDialog already coerces to null; this is
+  // belt-and-braces.
+  email: z.string().email().or(z.literal('')).nullable().optional(),
   interestType: z.enum(['PRIVATE', 'COMMERCIAL']),
   lookingFor: z.enum(['BUY', 'RENT']),
   city: z.string().max(80).nullable().optional(),
+  // 2026-04-30 — most leads describe a neighborhood, only some specify
+  // a street; previously this was forced into `notes` and ignored by
+  // the matcher. Now first-class.
+  neighborhood: z.string().max(80).nullable().optional(),
   street: z.string().max(120).nullable().optional(),
   rooms: z.string().max(20).nullable().optional(),
   priceRangeLabel: z.string().max(120).nullable().optional(),
@@ -482,7 +497,11 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
 
 function normalize(body: Partial<z.infer<typeof leadInput>>) {
   const data: any = { ...body };
+  // 2026-04-30 — `email` zod now accepts `''`; map it to null here so
+  // we never persist an empty string into a `String?` column.
+  if (data.email === '') data.email = null;
   for (const k of ['brokerageSignedAt', 'brokerageExpiresAt', 'lastContact'] as const) {
+    if (data[k] === '') data[k] = null;
     if (data[k]) data[k] = new Date(data[k]);
     if (data[k] === null) data[k] = null;
   }

@@ -70,9 +70,13 @@ const propertyInput = z.object({
   status: z
     .enum(['ACTIVE', 'PAUSED', 'SOLD', 'RENTED', 'ARCHIVED', 'INACTIVE', 'CANCELLED', 'IN_DEAL'])
     .optional(),
-  type: z.string().min(1).max(60),
-  street: z.string().min(1).max(120),
-  city: z.string().min(1).max(80),
+  // Relaxed (2026-04-30): drop `.min(1)` so PATCH bodies that resend
+  // every field don't fail on Yad2-imported rows whose `type`/`street`/
+  // `city` came in empty. Same shape as the earlier `ownerPhone` fix.
+  // Length caps stay; FE retains its own create-time guards.
+  type: z.string().max(60),
+  street: z.string().max(120),
+  city: z.string().max(80),
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
   // Task 3 · validated structured-address metadata. Supplied by the client
@@ -88,13 +92,18 @@ const propertyInput = z.object({
   // valid rows. Length caps stay; missing data is permitted.
   owner: z.string().max(120),
   ownerPhone: z.string().max(40),
-  ownerEmail: z.string().email().nullable().optional(),
+  // Allow `''` defensively — current FE guards via `if (form.ownerEmail)`
+  // but AI-edit / import paths can emit empty strings.
+  ownerEmail: z.string().email().or(z.literal('')).nullable().optional(),
   // New: link this property to an existing Owner record (the canonical
   // persona table). When omitted, an Owner row is created/looked up from
   // the inline `owner` + `ownerPhone` fields.
   propertyOwnerId: z.string().nullable().optional(),
-  exclusiveStart: z.string().datetime().nullable().optional(),
-  exclusiveEnd: z.string().datetime().nullable().optional(),
+  // `.or(z.literal(''))`: tolerate `""` from forms that haven't been
+  // null-coerced yet. `normalize()` only runs `new Date(x)` when x is
+  // truthy, so `''` falls through cleanly without producing Invalid Date.
+  exclusiveStart: z.string().datetime().or(z.literal('')).nullable().optional(),
+  exclusiveEnd: z.string().datetime().or(z.literal('')).nullable().optional(),
   marketingPrice: z.number().int().nonnegative(),
   closingPrice: z.number().int().nonnegative().nullable().optional(),
   offer: z.number().int().nonnegative().nullable().optional(),
@@ -155,7 +164,7 @@ const propertyInput = z.object({
   // 3.2 Commercial zone tag (e.g. "איזור תעשיה"). Residential rows keep NULL.
   commercialZone: z.string().max(60).nullable().optional(),
   // 1.3 Explicit listing-on-market date. When NULL the UI falls back to createdAt.
-  marketingStartDate: z.string().datetime().nullable().optional(),
+  marketingStartDate: z.string().datetime().or(z.literal('')).nullable().optional(),
   // Exclusivity agreement is set via its own upload endpoint, not here.
   marketingReminderFrequency: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).optional(),
   // Sprint 1 / MLS parity — Task J9. Pipeline admin block.
@@ -171,7 +180,7 @@ const propertyInput = z.object({
   // it off doesn't force a value on legacy rows.
   agentCommissionPct: z.number().min(0).max(100).nullable().optional(),
   primaryAgentId: z.string().nullable().optional(),
-  exclusivityExpire: z.string().datetime().nullable().optional(),
+  exclusivityExpire: z.string().datetime().or(z.literal('')).nullable().optional(),
   sellerSeriousness: z.enum(['NONE', 'SORT_OF', 'MEDIUM', 'VERY']).nullable().optional(),
   brokerNotes: z.string().max(4000).nullable().optional(),
 
@@ -209,6 +218,8 @@ const propertyInput = z.object({
   // brokerage. Default false (agent's own mandate). Surfaces a distinct
   // outline colour on Properties cards + the detail header.
   coBrokered: z.boolean().optional(),
+  // 2026-04-30 — agent-set ranking; higher floats to top of /properties.
+  priority: z.number().int().min(-1000).max(1000).optional(),
 
   images: z.array(z.string().url()).optional(),
 });
@@ -267,7 +278,10 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         marketingActions: true,
         propertyOwner: true,
       },
-      orderBy: { createdAt: 'desc' },
+      // Priority floats to the top so an agent can surface the
+       // listings they are actively pushing; createdAt is the secondary
+       // sort so the rest of the catalog still shows newest-first.
+      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
       take: take + 1,
       ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
     });
@@ -606,7 +620,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     amount:     z.number().int().nonnegative(),
     status:     z.enum(['NEW', 'NEGOTIATING', 'ACCEPTED', 'DECLINED', 'WITHDRAWN']).optional(),
     notes:      z.string().max(2000).nullable().optional(),
-    receivedAt: z.string().datetime().nullable().optional(),
+    receivedAt: z.string().datetime().or(z.literal('')).nullable().optional(),
   });
 
   app.get('/:id/offers', { onRequest: [app.requireAgent] }, async (req, reply) => {
@@ -1154,6 +1168,16 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
       : { disconnect: true };
     delete data.primaryAgentId;
   }
+  // 2026-04-30 — datetime fields now accept `''` at the zod layer to
+  // tolerate FE bodies that haven't been null-coerced. Treat `''` as
+  // null here so Prisma never sees an empty string for a DateTime?
+  // column (Prisma would reject it with a P2009-ish error).
+  for (const k of ['exclusiveStart', 'exclusiveEnd', 'exclusivityExpire', 'marketingStartDate'] as const) {
+    if (data[k] === '') data[k] = null;
+  }
+  // Same for ownerEmail — column is `String?`, but `''` is semantically
+  // "no email" and would clutter the DB. Keep nulls canonical.
+  if (data.ownerEmail === '') data.ownerEmail = null;
   if (data.exclusiveStart) data.exclusiveStart = new Date(data.exclusiveStart);
   if (data.exclusiveEnd) data.exclusiveEnd = new Date(data.exclusiveEnd);
   // Sprint 1 / MLS parity — Task J9. `exclusivityExpire` is orthogonal

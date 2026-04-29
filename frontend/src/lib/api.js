@@ -227,6 +227,11 @@ export const api = {
   // cancelled when the tour component returns null right after the
   // click, which is exactly what the user was seeing.
   completeTutorial: () => request('/me/tutorial/complete', { method: 'POST', keepalive: true }),
+  // 2026-05-06 — per-agent specialty cities. Drives the
+  // "מודעות חדשות בשוק" feed filter. Empty list ⇒ legacy "show all".
+  getSpecialtyCities: () => request('/me/specialty-cities'),
+  setSpecialtyCities: (cities) =>
+    request('/me/specialty-cities', { method: 'PATCH', body: { cities } }),
 
   // In-app chat (T11)
   chatMe: () => request('/chat/me'),
