@@ -1,10 +1,31 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import { requireUser } from '../middleware/auth.js';
+
+// SEC-010 admin override — platform ADMIN bypasses agent-ownership
+// filters so support/data-fix work doesn't require impersonating the
+// agent. Mirrors the override pattern in `requireAdmin` middleware and
+// chat.ts/ai.ts/aiQuota.ts. The audit log still records `actorId = u.id`
+// so admin actions remain traceable. Trusts the role on the JWT —
+// promoting an existing user to ADMIN requires them to re-login (or hit
+// any route that uses `requireAdmin`, which re-checks the DB) before the
+// override kicks in here.
+function propertyOwnershipFilter(req: FastifyRequest, id: string) {
+  const u = requireUser(req);
+  return u.role === 'ADMIN' ? { id } : { id, agentId: u.id };
+}
+function canActOnProperty<T extends { agentId: string }>(
+  req: FastifyRequest,
+  prop: T | null | undefined,
+): prop is T {
+  if (!prop) return false;
+  const u = requireUser(req);
+  return u.id === prop.agentId || u.role === 'ADMIN';
+}
 import { tryServiceTokenAuth } from '../middleware/service-token.js';
 import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
@@ -270,7 +291,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     // 404 for both "doesn't exist" and "belongs to another agent" — no
     // leak about whether the id is valid. Customer-facing share flow
     // has its own endpoint under /api/public/agents/:slug/properties/:slug.
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     return { property: serialize(property) };
@@ -369,7 +390,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     const body = propertyInput.partial().parse(req.body);
     const existing = await prisma.property.findUnique({ where: { id } });
-    if (!existing || existing.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, existing)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     // If owner fields changed (name/phone/email) AND no explicit
@@ -581,7 +602,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.get('/:id/offers', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const owns = await prisma.property.findFirst({
-      where: { id, agentId: requireUser(req).id },
+      where: propertyOwnershipFilter(req, id),
       select: { id: true },
     });
     if (!owns) return reply.code(404).send({ error: { message: 'Not found' } });
@@ -596,13 +617,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     const body = offerInput.parse(req.body);
     const owns = await prisma.property.findFirst({
-      where: { id, agentId: requireUser(req).id },
-      select: { id: true },
+      where: propertyOwnershipFilter(req, id),
+      select: { id: true, agentId: true },
     });
     if (!owns) return reply.code(404).send({ error: { message: 'Not found' } });
     if (body.leadId) {
       const lead = await prisma.lead.findFirst({
-        where: { id: body.leadId, agentId: requireUser(req).id },
+        where: { id: body.leadId, agentId: owns.agentId },
         select: { id: true },
       });
       if (!lead) return reply.code(403).send({ error: { message: 'הליד אינו של המשתמש' } });
@@ -620,7 +641,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     await logActivity({
-      agentId: requireUser(req).id, actorId: requireUser(req).id,
+      agentId: owns.agentId, actorId: requireUser(req).id,
       verb: 'created', entityType: 'PropertyOffer', entityId: created.id,
       summary: `התקבלה הצעה מ${created.buyerName}: ₪${created.amount.toLocaleString('he-IL')}`,
       metadata: { propertyId: id, status: created.status, amount: created.amount },
@@ -631,8 +652,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.patch('/:id/offers/:offerId', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id, offerId } = req.params as { id: string; offerId: string };
     const body = offerInput.partial().parse(req.body);
+    const u = requireUser(req);
     const offer = await prisma.propertyOffer.findFirst({
-      where: { id: offerId, propertyId: id, property: { agentId: requireUser(req).id } },
+      where: u.role === 'ADMIN'
+        ? { id: offerId, propertyId: id }
+        : { id: offerId, propertyId: id, property: { agentId: u.id } },
     });
     if (!offer) return reply.code(404).send({ error: { message: 'Not found' } });
     const updated = await prisma.propertyOffer.update({
@@ -647,8 +671,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete('/:id/offers/:offerId', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id, offerId } = req.params as { id: string; offerId: string };
+    const u = requireUser(req);
     const offer = await prisma.propertyOffer.findFirst({
-      where: { id: offerId, propertyId: id, property: { agentId: requireUser(req).id } },
+      where: u.role === 'ADMIN'
+        ? { id: offerId, propertyId: id }
+        : { id: offerId, propertyId: id, property: { agentId: u.id } },
       select: { id: true },
     });
     if (!offer) return reply.code(404).send({ error: { message: 'Not found' } });
@@ -659,7 +686,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.delete('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const existing = await prisma.property.findUnique({ where: { id } });
-    if (!existing || existing.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, existing)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     await prisma.property.delete({ where: { id } });
@@ -674,8 +701,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   // Sprint 5 / MLS parity — Task J10. Secondary assignee management.
   app.get('/:id/assignees', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const uid = requireUser(req).id;
-    const prop = await prisma.property.findFirst({ where: { id, agentId: uid } });
+    const prop = await prisma.property.findFirst({ where: propertyOwnershipFilter(req, id) });
     if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
     const items = await prisma.propertyAssignee.findMany({
       where: { propertyId: id },
@@ -692,12 +718,15 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.post('/:id/assignees', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const uid = requireUser(req).id;
-    const prop = await prisma.property.findFirst({ where: { id, agentId: uid } });
+    const prop = await prisma.property.findFirst({ where: propertyOwnershipFilter(req, id) });
     if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
     const body = assigneeInput.parse(req.body);
     // Assignee must belong to the same office (if any) so cross-office
-    // leakage is impossible.
-    const me = await prisma.user.findUnique({ where: { id: uid }, select: { officeId: true } });
+    // leakage is impossible. For ADMIN bypass we compare against the
+    // property agent's office rather than the admin's, because the
+    // admin themselves usually lives outside the customer agency.
+    const officeRefId = requireUser(req).role === 'ADMIN' ? prop.agentId : uid;
+    const me = await prisma.user.findUnique({ where: { id: officeRefId }, select: { officeId: true } });
     const target = await prisma.user.findUnique({
       where: { id: body.userId },
       select: { id: true, officeId: true },
@@ -723,7 +752,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.delete('/:id/assignees/:userId', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id, userId } = req.params as { id: string; userId: string };
     const uid = requireUser(req).id;
-    const prop = await prisma.property.findFirst({ where: { id, agentId: uid } });
+    const prop = await prisma.property.findFirst({ where: propertyOwnershipFilter(req, id) });
     if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
     await prisma.propertyAssignee.deleteMany({
       where: { propertyId: id, userId },
@@ -747,9 +776,8 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   // unchanged (FE renders `score` + `reasons` directly).
   app.get('/:id/matching-customers', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const uid = requireUser(req).id;
     const property = await prisma.property.findFirst({
-      where: { id, agentId: uid },
+      where: propertyOwnershipFilter(req, id),
     });
     if (!property) return reply.code(404).send({ error: { message: 'Property not found' } });
 
@@ -757,10 +785,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     // columns; we use OR-wrapped `null OR matches` patterns for nullable
     // columns so leads that haven't filled in (say) a city aren't
     // dropped — the JS scorer handles those gracefully.
+    // For ADMIN bypass: scope leads to the property's agent so we still
+    // return the right inbox (admin viewing someone else's property
+    // sees that agent's leads, not their own).
     const wantsLookingFor = property.category === 'SALE' ? 'BUY' : 'RENT';
     const interestType = property.assetClass === 'COMMERCIAL' ? 'COMMERCIAL' : 'PRIVATE';
     const where: any = {
-      agentId: uid,
+      agentId: property.agentId,
       // PERF-027 — skip closed-out customers. Mirrors public-matches.
       OR: [
         { customerStatus: null },
@@ -835,7 +866,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     const body = actionInput.parse(req.body);
     const property = await prisma.property.findUnique({ where: { id } });
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const action = await prisma.marketingAction.upsert({
@@ -862,7 +893,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.delete('/:id/images/:imageId', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id, imageId } = req.params as { id: string; imageId: string };
     const property = await prisma.property.findUnique({ where: { id } });
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const img = await prisma.propertyImage.findUnique({ where: { id: imageId } });
@@ -890,7 +921,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       include: { images: true },
     });
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const owned = new Set(property.images.map((i) => i.id));
@@ -917,7 +948,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.get('/:id/videos', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const property = await prisma.property.findFirst({
-      where: { id, agentId: requireUser(req).id },
+      where: propertyOwnershipFilter(req, id),
     });
     if (!property) return reply.code(404).send({ error: { message: 'Not found' } });
     const videos = await prisma.propertyVideo.findMany({
@@ -931,7 +962,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.post('/:id/videos', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const property = await prisma.property.findUnique({ where: { id } });
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const file = await req.file();
@@ -969,7 +1000,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     const body = externalSchema.parse(req.body);
     const property = await prisma.property.findUnique({ where: { id } });
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const existing = await prisma.propertyVideo.count({ where: { propertyId: id } });
@@ -989,7 +1020,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.delete('/:id/videos/:videoId', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id, videoId } = req.params as { id: string; videoId: string };
     const property = await prisma.property.findUnique({ where: { id } });
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const video = await prisma.propertyVideo.findUnique({ where: { id: videoId } });
@@ -1013,7 +1044,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.post('/:id/agreement', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const property = await prisma.property.findUnique({ where: { id } });
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const file = await req.file();
@@ -1034,7 +1065,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.delete('/:id/agreement', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const property = await prisma.property.findUnique({ where: { id } });
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     await prisma.property.update({
@@ -1060,7 +1091,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   app.post('/:id/images', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const property = await prisma.property.findUnique({ where: { id } });
-    if (!property || property.agentId !== requireUser(req).id) {
+    if (!canActOnProperty(req, property)) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const file = await req.file();
