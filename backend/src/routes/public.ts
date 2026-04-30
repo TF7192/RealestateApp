@@ -1,6 +1,9 @@
 import type { FastifyPluginAsync, FastifyReply } from 'fastify';
+import { createReadStream } from 'node:fs';
+import { stat as fsStat } from 'node:fs/promises';
 import { prisma } from '../lib/prisma.js';
 import { slugify, propertySlug, ensureUniqueSlug } from '../lib/slug.js';
+import { resolveUpload, urlToKey } from '../lib/storage.js';
 
 // Shared OG renderer used by both the slug-based and id-based property
 // endpoints. Generates a minimal HTML page with og: + twitter: meta
@@ -371,7 +374,68 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
           select: { url: true },
         });
     if (!asset?.url) return reply.code(404).send({ error: { message: 'Not found' } });
-    let upstream;
+
+    // Build a download filename. Pull the extension off the URL's
+    // pathname (the host has dots so a naive split('.').pop() on the
+    // full URL returned junk like "com/p"). Fall back to jpg/mp4.
+    let ext = kind === 'image' ? 'jpg' : 'mp4';
+    try {
+      const u = new URL(asset.url, 'https://placeholder.local');
+      const m = u.pathname.match(/\.([a-z0-9]{2,5})$/i);
+      if (m) ext = m[1].toLowerCase();
+    } catch { /* leave default */ }
+    const idx = (kind === 'image' && (asset as any).sortOrder != null)
+      ? String((asset as any).sortOrder + 1).padStart(2, '0')
+      : assetId.slice(-6);
+    const filename = `${kind}-${idx}.${ext}`;
+    const defaultCt = kind === 'image' ? 'image/jpeg' : 'video/mp4';
+
+    // Three URL shapes can land here:
+    //   1. /uploads/<key> — relative path the legacy storage emits.
+    //      Resolve via storage.ts which knows whether the bucket is
+    //      local-disk or S3.
+    //   2. https://<bucket>.s3.<region>.amazonaws.com/uploads/<key> —
+    //      absolute S3 URL the new variant pipeline emits. urlToKey
+    //      strips it back to the key for the same resolver.
+    //   3. anything else absolute (Unsplash placeholders on the seed
+    //      data, Yad2 cover URLs, etc.) — fetch directly.
+    // The previous implementation tried `fetch(asset.url)` first,
+    // which failed loudly on (1) because Node's fetch rejects
+    // relative URLs ("Invalid URL") and quietly returned 502 to the
+    // browser, masking that the file was actually local-disk all
+    // along.
+    const key = urlToKey(asset.url);
+    if (key) {
+      const resolved = await resolveUpload(key);
+      reply.header('Content-Type', defaultCt);
+      reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+      reply.header('Cache-Control', 'private, max-age=300');
+      if (resolved.kind === 'file') {
+        try {
+          const st = await fsStat(resolved.path);
+          reply.header('Content-Length', String(st.size));
+        } catch {
+          return reply.code(404).send({ error: { message: 'Not found on disk' } });
+        }
+        return reply.send(createReadStream(resolved.path));
+      }
+      // S3 → presigned redirect URL. Fetch through here so we keep
+      // control of the Content-Disposition header.
+      const r = await fetch(resolved.url);
+      if (!r.ok || !r.body) return reply.code(502).send({ error: { message: 'Asset unavailable' } });
+      const cl = r.headers.get('content-length');
+      const ct = r.headers.get('content-type');
+      if (ct) reply.header('Content-Type', ct);
+      if (cl) reply.header('Content-Length', cl);
+      const { Readable } = await import('node:stream');
+      return reply.send(Readable.fromWeb(r.body as any));
+    }
+
+    // Absolute non-S3 URL — must be http(s) so Node's fetch accepts it.
+    if (!/^https?:\/\//i.test(asset.url)) {
+      return reply.code(502).send({ error: { message: 'Asset URL not fetchable' } });
+    }
+    let upstream: Response;
     try {
       upstream = await fetch(asset.url);
     } catch {
@@ -380,28 +444,12 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     if (!upstream.ok || !upstream.body) {
       return reply.code(upstream.status || 502).send({ error: { message: 'Asset unavailable' } });
     }
-    const ct = upstream.headers.get('content-type') || (kind === 'image' ? 'image/jpeg' : 'video/mp4');
+    const ct = upstream.headers.get('content-type') || defaultCt;
     const cl = upstream.headers.get('content-length');
-    // Pull the extension off the URL's path (NOT the whole URL — the
-    // host has dots in it, so a naive split('.').pop() returned junk
-    // like "com/p" for s3.eu-north-1.amazonaws.com paths).
-    let ext = kind === 'image' ? 'jpg' : 'mp4';
-    try {
-      const path = new URL(asset.url).pathname;
-      const m = path.match(/\.([a-z0-9]{2,5})$/i);
-      if (m) ext = m[1].toLowerCase();
-    } catch { /* leave default */ }
-    const idx = (kind === 'image' && (asset as any).sortOrder != null)
-      ? String((asset as any).sortOrder + 1).padStart(2, '0')
-      : assetId.slice(-6);
-    const filename = `${kind}-${idx}.${ext}`;
     reply.header('Content-Type', ct);
     if (cl) reply.header('Content-Length', cl);
     reply.header('Content-Disposition', `attachment; filename="${filename}"`);
     reply.header('Cache-Control', 'private, max-age=300');
-    // Convert the Web ReadableStream from `fetch` to a Node Readable
-    // — Fastify's reply.send() pipes Node streams; passing the Web
-    // stream directly hangs the response on Node 22.
     const { Readable } = await import('node:stream');
     return reply.send(Readable.fromWeb(upstream.body as any));
   });
