@@ -382,10 +382,15 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     }
     const ct = upstream.headers.get('content-type') || (kind === 'image' ? 'image/jpeg' : 'video/mp4');
     const cl = upstream.headers.get('content-length');
-    const ext = (asset.url.split('.').pop() || (kind === 'image' ? 'jpg' : 'mp4'))
-      .split('?')[0]
-      .toLowerCase()
-      .slice(0, 5);
+    // Pull the extension off the URL's path (NOT the whole URL — the
+    // host has dots in it, so a naive split('.').pop() returned junk
+    // like "com/p" for s3.eu-north-1.amazonaws.com paths).
+    let ext = kind === 'image' ? 'jpg' : 'mp4';
+    try {
+      const path = new URL(asset.url).pathname;
+      const m = path.match(/\.([a-z0-9]{2,5})$/i);
+      if (m) ext = m[1].toLowerCase();
+    } catch { /* leave default */ }
     const idx = (kind === 'image' && (asset as any).sortOrder != null)
       ? String((asset as any).sortOrder + 1).padStart(2, '0')
       : assetId.slice(-6);
