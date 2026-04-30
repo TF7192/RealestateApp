@@ -29,6 +29,7 @@ export default function QuickEditDrawer({ property, onClose, onSaved }) {
     status: property?.status || 'ACTIVE',
     notes: property?.notes || '',
     vacancyDate: property?.vacancyDate || '',
+    priority: Number(property?.priority) || 0,
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
@@ -47,6 +48,7 @@ export default function QuickEditDrawer({ property, onClose, onSaved }) {
         status: form.status,
         notes: form.notes || null,
         vacancyDate: form.vacancyDate || null,
+        priority: Number(form.priority) || 0,
       };
       const { property: updated } = await api.updateProperty(property.id, body);
       haptics?.press?.();
@@ -107,6 +109,44 @@ export default function QuickEditDrawer({ property, onClose, onSaved }) {
                 onChange={(v) => update('status', v)}
                 options={STATUSES}
               />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">עדיפות</label>
+              <div className="toggle-group toggle-group-priority">
+                <button
+                  type="button"
+                  className={`toggle-btn ${form.priority === 200 ? 'active' : ''}`}
+                  onClick={() => update('priority', 200)}
+                  title="עדיפות גבוהה מאוד"
+                >
+                  גבוהה מאוד
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-btn ${form.priority === 100 ? 'active' : ''}`}
+                  onClick={() => update('priority', 100)}
+                  title="עדיפות גבוהה"
+                >
+                  גבוהה
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-btn ${form.priority === 50 ? 'active' : ''}`}
+                  onClick={() => update('priority', 50)}
+                  title="עדיפות בינונית"
+                >
+                  בינונית
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-btn ${(form.priority === 25 || form.priority === 0) ? 'active' : ''}`}
+                  onClick={() => update('priority', 25)}
+                  title="עדיפות נמוכה"
+                >
+                  נמוכה
+                </button>
+              </div>
             </div>
 
             <div className="form-group">

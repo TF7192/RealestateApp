@@ -1234,31 +1234,39 @@ export default function NewProperty() {
                 </div>
               </div>
               <div className="form-group">
-                <label className="form-label">קידום ברשימה</label>
-                <div className="toggle-group">
+                <label className="form-label">עדיפות</label>
+                <div className="toggle-group toggle-group-priority">
                   <button
                     type="button"
-                    className={`toggle-btn ${(form.priority ?? 0) === 0 ? 'active' : ''}`}
-                    onClick={() => update('priority', 0)}
-                    title="מיקום רגיל"
+                    className={`toggle-btn ${form.priority === 200 ? 'active' : ''}`}
+                    onClick={() => update('priority', 200)}
+                    title="עדיפות גבוהה מאוד — מופיע בראש הרשימה"
                   >
-                    רגיל
-                  </button>
-                  <button
-                    type="button"
-                    className={`toggle-btn ${form.priority === 50 ? 'active' : ''}`}
-                    onClick={() => update('priority', 50)}
-                    title="מקדמת"
-                  >
-                    מקדמת
+                    גבוהה מאוד
                   </button>
                   <button
                     type="button"
                     className={`toggle-btn ${form.priority === 100 ? 'active' : ''}`}
                     onClick={() => update('priority', 100)}
-                    title="קידום מקסימלי — מופיע ראשון"
+                    title="עדיפות גבוהה"
                   >
-                    מקדמת מאוד
+                    גבוהה
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${form.priority === 50 ? 'active' : ''}`}
+                    onClick={() => update('priority', 50)}
+                    title="עדיפות בינונית"
+                  >
+                    בינונית
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${(form.priority ?? 0) === 25 || (form.priority ?? 0) === 0 ? 'active' : ''}`}
+                    onClick={() => update('priority', 25)}
+                    title="עדיפות נמוכה"
+                  >
+                    נמוכה
                   </button>
                 </div>
               </div>

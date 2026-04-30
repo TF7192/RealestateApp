@@ -296,6 +296,25 @@
   box-shadow: 0 0 0 1px rgba(44, 138, 166, 0.18), var(--shadow-lg);
 }
 
+/* Priority badge — appears next to the address on each card. Tone
+   colours map to the four buckets in lib/priorityLabels.js so the
+   chip is glanceable: red = critical, amber = high, gold = medium,
+   muted = low. */
+.pri-badge {
+  display: inline-flex; align-items: center;
+  margin-inline-start: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  border: 1px solid currentColor;
+  letter-spacing: 0.2px;
+  vertical-align: middle;
+}
+.pri-badge.pri-critical { color: #c2410c; background: rgba(194, 65, 12, 0.10); }
+.pri-badge.pri-high     { color: #b45309; background: rgba(180, 83, 9, 0.10);  }
+.pri-badge.pri-medium   { color: #846020; background: rgba(180, 139, 76, 0.12);}
+.pri-badge.pri-low      { color: #6b7280; background: rgba(107, 114, 128, 0.10);}
+
 .property-card-link {
   text-decoration: none;
   color: inherit;

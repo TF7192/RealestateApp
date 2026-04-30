@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
+import { priorityShort, priorityTone } from '../lib/priorityLabels';
 import { useAuth } from '../lib/auth';
 import ConfirmDialog from '../components/ConfirmDialog';
 import QuickEditDrawer from '../components/QuickEditDrawer';
@@ -300,6 +301,9 @@ export default function Properties() {
   // flow back via setSearchParams below.
   const [filter, setFilter] = useState(() => searchParams.get('cat') || 'all');
   const [assetClassFilter, setAssetClassFilter] = useState(() => searchParams.get('ac') || 'all');
+  // 2026-04-30 — quick priority filter: "all" / "200" / "100" / "50" /
+  // "25". Numeric strings so it round-trips through searchParams.
+  const [priorityFilter, setPriorityFilter] = useState(() => searchParams.get('pri') || 'all');
   const [search, setSearch] = useState(() => searchParams.get('q') || '');
   const [showAdvanced, setShowAdvanced] = useState(() => searchParams.get('adv') === '1');
   const [copiedLink, setCopiedLink] = useState(false);
@@ -619,6 +623,18 @@ export default function Properties() {
         if (filter === 'RENT' && p.category !== 'RENT') return false;
         if (assetClassFilter === 'RESIDENTIAL' && p.assetClass !== 'RESIDENTIAL') return false;
         if (assetClassFilter === 'COMMERCIAL' && p.assetClass !== 'COMMERCIAL') return false;
+        if (priorityFilter !== 'all') {
+          // The toggle stores the numeric floor of each bucket; we
+          // include rows at-or-above so "גבוהה" surfaces both 100 and
+          // 200. Bucketing intentionally collapses 0 + 25 into "נמוכה".
+          const priFloor = Number(priorityFilter);
+          const pri = Number(p.priority) || 0;
+          if (priFloor === 25) {
+            if (pri >= 50) return false;
+          } else if (pri < priFloor) {
+            return false;
+          }
+        }
         if (advFilters.city && p.city !== advFilters.city) return false;
         if (advFilters.minPrice && p.marketingPrice < Number(advFilters.minPrice)) return false;
         if (advFilters.maxPrice && p.marketingPrice > Number(advFilters.maxPrice)) return false;
@@ -650,7 +666,7 @@ export default function Properties() {
         if (a._distance != null && b._distance != null) return a._distance - b._distance;
         return 0;
       });
-  }, [items, filter, assetClassFilter, advFilters, debouncedSearch, locationCenter, locationRadius, unmarketedOnly, onlyFavorites, favoriteIds]);
+  }, [items, filter, assetClassFilter, priorityFilter, advFilters, debouncedSearch, locationCenter, locationRadius, unmarketedOnly, onlyFavorites, favoriteIds]);
 
   // Split pagination by view mode (product call):
   //   - Card grid → infinite scroll, 8 cards at a time. The agent's
@@ -1035,6 +1051,17 @@ export default function Properties() {
             { k: 'RENT', label: 'השכרה' },
           ]}
         />
+        <DtPillRow
+          value={priorityFilter}
+          onChange={setPriorityFilter}
+          items={[
+            { k: 'all', label: 'כל העדיפויות' },
+            { k: '200', label: 'גבוהה מאוד' },
+            { k: '100', label: 'גבוהה' },
+            { k: '50',  label: 'בינונית' },
+            { k: '25',  label: 'נמוכה' },
+          ]}
+        />
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
@@ -1313,6 +1340,14 @@ export default function Properties() {
                                 · {prop.assetClass === 'COMMERCIAL' ? 'יח׳' : 'דירה'} {prop.unitNumber}
                               </span>
                             ) : null}
+                            {priorityShort(prop.priority) && (
+                              <span
+                                className={`pri-badge pri-${priorityTone(prop.priority)}`}
+                                title={`עדיפות ${priorityShort(prop.priority)}`}
+                              >
+                                {priorityShort(prop.priority)}
+                              </span>
+                            )}
                           </div>
                           <div className="pc-compact-price">
                             {formatPrice(prop.marketingPrice)}
@@ -1554,6 +1589,14 @@ export default function Properties() {
                             · {prop.assetClass === 'COMMERCIAL' ? 'יחידה' : 'דירה'} {prop.unitNumber}
                           </span>
                         ) : null}
+                        {priorityShort(prop.priority) && (
+                          <span
+                            className={`pri-badge pri-${priorityTone(prop.priority)}`}
+                            title={`עדיפות ${priorityShort(prop.priority)}`}
+                          >
+                            {priorityShort(prop.priority)}
+                          </span>
+                        )}
                       </span>
                     </div>
                     <div className="property-specs">

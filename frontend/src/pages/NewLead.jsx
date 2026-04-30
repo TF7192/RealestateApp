@@ -12,7 +12,9 @@ import {
 } from 'lucide-react';
 import VoiceCaptureDialog from '../components/VoiceCaptureDialog';
 import api from '../lib/api';
-import { cityNames, streetNames } from '../data/mockData';
+import { cityNames as fallbackCityNames, streetNames } from '../data/mockData';
+import CityField from '../components/CityField';
+import NeighborhoodField from '../components/NeighborhoodField';
 import { useToast } from '../lib/toast';
 import useBeforeUnload from '../hooks/useBeforeUnload';
 import StickyActionBar from '../components/StickyActionBar';
@@ -163,6 +165,21 @@ export default function NewLead() {
   const [draftBanner, setDraftBanner] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  // 2026-04-30 — full city registry (1,300+ rows). Mirrors NewProperty
+  // so the lead address fields use identical autocomplete behavior.
+  const [cityOptions, setCityOptions] = useState(fallbackCityNames);
+  useEffect(() => {
+    let cancelled = false;
+    api.cities().then((res) => {
+      if (cancelled) return;
+      const names = (res?.cities || [])
+        .map((c) => c?.name)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'he'));
+      if (names.length) setCityOptions(names);
+    }).catch(() => { /* keep fallback */ });
+    return () => { cancelled = true; };
+  }, []);
   // F-14 — once we successfully save, disarm the beforeunload prompt so
   // closing the tab after a save doesn't pop "יש שינויים שלא נשמרו".
   const savedRef = useRef(false);
@@ -581,36 +598,33 @@ export default function NewLead() {
               />
             </Field>
           </div>
+          {/* 2026-04-30 — match the /properties/new address stack
+              exactly: עיר → שכונה → רחוב, RTL right-to-left. CityField
+              + NeighborhoodField + the street SuggestPicker share the
+              same autocomplete UX as the property form. Clearing the
+              city wipes the neighborhood since the dictionary is
+              city-scoped. */}
           <div style={gridRow2()}>
             <Field label="עיר מבוקשת">
-              <SuggestPicker
-                options={cityNames}
+              <CityField
                 value={form.city}
-                onChange={(v) => update('city', v)}
-                placeholder="תל אביב, ירושלים, חיפה…"
-                label="עיר"
-                inputProps={{ ...inputPropsForCity(), autoComplete: 'off' }}
-                asyncFetch={async (q) => {
-                  // Backend caps `limit` at 15 (zod rejects anything
-                  // higher). The picker's maxVisible already clamps
-                  // what we render; 12 leaves headroom for duplicates
-                  // the filter step strips.
-                  const res = await api.geoSearch({ q, limit: 12 });
-                  return (res?.items || [])
-                    .map((r) => r.city || r.label)
-                    .filter(Boolean);
+                onChange={(v) => {
+                  if (v !== form.city) {
+                    update('city', v);
+                    if (form.neighborhood) update('neighborhood', '');
+                  }
                 }}
+                options={cityOptions}
+                placeholder="תל אביב, ירושלים, חיפה…"
+                inputProps={{ ...inputPropsForCity(), autoComplete: 'off' }}
               />
             </Field>
             <Field label="שכונה (אופציונלי)">
-              <input
-                type="text"
-                className="form-input"
+              <NeighborhoodField
+                city={form.city}
                 value={form.neighborhood}
-                onChange={(e) => update('neighborhood', e.target.value)}
+                onChange={(v) => update('neighborhood', v)}
                 placeholder="פלורנטין, רמת אביב, נווה צדק…"
-                autoComplete="off"
-                spellCheck={false}
               />
             </Field>
           </div>
