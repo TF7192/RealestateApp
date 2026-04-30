@@ -64,31 +64,36 @@ function buildBrief(p) {
   return lines.join('\n');
 }
 
-// Sequentially fetches each URL as a blob and triggers a save dialog
-// via a hidden anchor. Browsers throttle parallel downloads from a
-// single origin and Safari often drops them silently if you fire
-// many at once, so the await chain plus a tiny gap keeps it stable.
-async function downloadAll(urls, baseName) {
-  for (let i = 0; i < urls.length; i++) {
-    const url = urls[i];
+// Sequentially clicks an anchor pointing at our same-origin proxy
+// endpoint, which streams the S3 file through with `Content-
+// Disposition: attachment`. We used to `fetch()` the S3 URL directly,
+// but the bucket's CORS policy rejected the cross-origin reads, so
+// every download silently failed while the toast said "saved". Going
+// through our origin sidesteps CORS entirely. Returns the count we
+// actually triggered so the caller can be honest in the toast.
+async function downloadAll(specs) {
+  let triggered = 0;
+  for (let i = 0; i < specs.length; i++) {
+    const { proxyHref } = specs[i];
     try {
-      const r = await fetch(url, { credentials: 'omit' });
-      if (!r.ok) continue;
-      const blob = await r.blob();
-      const ext = (url.split('.').pop() || 'jpg').split('?')[0].slice(0, 5);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${baseName}-${i + 1}.${ext}`;
+      a.href = proxyHref;
+      // Same-origin + Content-Disposition on the response means the
+      // browser saves the file instead of navigating to it. The
+      // `download` attribute is a fallback hint for the filename when
+      // the response doesn't set Content-Disposition (it does, here).
+      a.rel = 'noopener';
+      a.target = '_self';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      // Free memory on the next tick so Safari doesn't hold the blob
-      // in the DOM after we re-enter the loop.
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-      // Small breath so Safari doesn't drop subsequent triggers.
-      await new Promise((res) => setTimeout(res, 250));
-    } catch { /* skip — keep downloading the rest */ }
+      triggered += 1;
+      // Safari drops subsequent .click()s if they fire on the exact
+      // same task; a small gap keeps the queue moving.
+      await new Promise((res) => setTimeout(res, 350));
+    } catch { /* skip — keep going so one bad asset doesn't block the rest */ }
   }
+  return triggered;
 }
 
 export default function AgentTransferView() {
@@ -115,6 +120,7 @@ export default function AgentTransferView() {
   const brief = useMemo(() => buildBrief(property), [property]);
   const images = property?.images || [];
   const videos = property?.videos || [];
+  const imageList = property?.imageList || [];
 
   // Document title without agent name — keeps the receiving agent's
   // tab clean too.
@@ -128,14 +134,24 @@ export default function AgentTransferView() {
     if (busy) return;
     setBusy(true);
     try {
-      const urls = [...images, ...videos.map((v) => v.url)].filter(Boolean);
-      const base = (property?.street || 'property').replace(/\s+/g, '-');
-      await downloadAll(urls, base);
+      const specs = [
+        ...imageList.map((img) => ({
+          proxyHref: `/api/public/transfer/property/${property.id}/asset/image/${img.id}`,
+        })),
+        ...videos.map((v) => ({
+          proxyHref: `/api/public/transfer/property/${property.id}/asset/video/${v.id}`,
+        })),
+      ];
+      const triggered = await downloadAll(specs);
       try {
         await navigator.clipboard.writeText(brief);
-        toast?.success?.('הקבצים הורדו וההודעה הועתקה');
+        toast?.success?.(triggered > 0
+          ? `${triggered} קבצים מורדים וההודעה הועתקה`
+          : 'ההודעה הועתקה (אין קבצים להורדה)');
       } catch {
-        toast?.success?.('הקבצים הורדו (העתקת טקסט נכשלה)');
+        toast?.success?.(triggered > 0
+          ? `${triggered} קבצים מורדים (העתקת טקסט נכשלה)`
+          : 'העתקת טקסט נכשלה');
       }
     } finally {
       setBusy(false);

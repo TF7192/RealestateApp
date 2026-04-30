@@ -346,6 +346,61 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     return { property: flat };
   });
 
+  // 2026-04-30 — proxy a single image/video for the agent-to-agent
+  // download flow. The frontend used to `fetch()` the S3 URL directly,
+  // but the bucket doesn't include the /t/:id origin in its CORS
+  // policy, so every fetch was silently rejected and the "files
+  // downloaded" toast lied. Streaming through our origin sidesteps
+  // CORS entirely and lets us set `Content-Disposition: attachment`
+  // so the browser actually saves the file instead of navigating to
+  // it. `kind` is `image` or `video`; `assetId` must belong to the
+  // requested property — that scoping is the entire authorization
+  // story for this public endpoint.
+  app.get('/transfer/property/:id/asset/:kind/:assetId', async (req, reply) => {
+    const { id, kind, assetId } = req.params as { id: string; kind: string; assetId: string };
+    if (kind !== 'image' && kind !== 'video') {
+      return reply.code(400).send({ error: { message: 'Invalid asset kind' } });
+    }
+    const asset = kind === 'image'
+      ? await prisma.propertyImage.findFirst({
+          where: { id: assetId, propertyId: id },
+          select: { url: true, sortOrder: true },
+        })
+      : await prisma.propertyVideo.findFirst({
+          where: { id: assetId, propertyId: id },
+          select: { url: true },
+        });
+    if (!asset?.url) return reply.code(404).send({ error: { message: 'Not found' } });
+    let upstream;
+    try {
+      upstream = await fetch(asset.url);
+    } catch {
+      return reply.code(502).send({ error: { message: 'Asset fetch failed' } });
+    }
+    if (!upstream.ok || !upstream.body) {
+      return reply.code(upstream.status || 502).send({ error: { message: 'Asset unavailable' } });
+    }
+    const ct = upstream.headers.get('content-type') || (kind === 'image' ? 'image/jpeg' : 'video/mp4');
+    const cl = upstream.headers.get('content-length');
+    const ext = (asset.url.split('.').pop() || (kind === 'image' ? 'jpg' : 'mp4'))
+      .split('?')[0]
+      .toLowerCase()
+      .slice(0, 5);
+    const idx = (kind === 'image' && (asset as any).sortOrder != null)
+      ? String((asset as any).sortOrder + 1).padStart(2, '0')
+      : assetId.slice(-6);
+    const filename = `${kind}-${idx}.${ext}`;
+    reply.header('Content-Type', ct);
+    if (cl) reply.header('Content-Length', cl);
+    reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+    reply.header('Cache-Control', 'private, max-age=300');
+    // Convert the Web ReadableStream from `fetch` to a Node Readable
+    // — Fastify's reply.send() pipes Node streams; passing the Web
+    // stream directly hangs the response on Node 22.
+    const { Readable } = await import('node:stream');
+    return reply.send(Readable.fromWeb(upstream.body as any));
+  });
+
   /** Slug lookup helper — given an internal id, return the public URL.
    *  Public (no auth) so the dashboard can call it without elevation; the
    *  result only contains a slug pair, which is itself public anyway. */
