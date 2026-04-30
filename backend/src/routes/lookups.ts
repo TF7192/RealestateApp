@@ -172,17 +172,36 @@ export const registerLookupRoutes: FastifyPluginAsync = async (app) => {
     // statistical-area join, this branch will filter `entries` by
     // matching code.
     if (neighborhood) {
-      const hood = await prisma.neighborhood.findFirst({
+      // Exact match first; fall back to normKey-matched row so that
+      // punctuation/qualifier variants ("הדר" vs "הדר הכרמל",
+      // "תל-אביב" maqaf vs hyphen) still resolve. The DB doesn't
+      // store a normalized name column yet so we pull the city's hoods
+      // and match in-process — typically <100 rows per city, cheap.
+      let hood: { streetCodes: number[] } | null = null;
+      const exact = await prisma.neighborhood.findFirst({
         where: { city: city.trim(), name: neighborhood.trim() },
         select: { streetCodes: true },
       });
+      if (exact) {
+        hood = exact;
+      } else {
+        const k = normKey(neighborhood);
+        if (k) {
+          const all = await prisma.neighborhood.findMany({
+            where: { city: city.trim() },
+            select: { name: true, streetCodes: true },
+          });
+          const fuzzy = all.find((h) => normKey(h.name) === k);
+          if (fuzzy) hood = { streetCodes: fuzzy.streetCodes };
+        }
+      }
       if (hood?.streetCodes && hood.streetCodes.length > 0) {
         const codes = new Set(hood.streetCodes);
         entries = entries.filter((e) => codes.has(e.code));
       }
-      // No streetCodes yet (legacy row or build-script not yet run for
-      // this city) → fall through and serve the city-scoped list so
-      // the agent isn't blocked.
+      // No streetCodes yet (legacy row, node-only hood, or build-script
+      // not yet run for this city) → fall through and serve the city-
+      // scoped list so the agent isn't blocked.
     }
     // Empty q → return the first 50 streets in registry order. The
     // dataset isn't ranked, but the population-authority order is
