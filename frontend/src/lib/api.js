@@ -553,6 +553,11 @@ export const api = {
   // so the dashboard can build a marketable URL. Auth-free.
   lookupPropertySlug: (id) =>
     request(`/public/lookup/property/${encodeURIComponent(id)}`),
+  // Agent-to-agent transfer view payload — same property data the
+  // public flow returns, but stripped of any agent identity so the
+  // receiving agent doesn't see who originated the listing.
+  transferProperty: (id) =>
+    request(`/public/transfer/property/${encodeURIComponent(id)}`),
   // Per-asset landing-page inquiry form. Public, no auth — called by
   // the /l/:agentSlug/:propertySlug landing page when a prospect
   // submits the contact form. Stored as a PropertyInquiry row.

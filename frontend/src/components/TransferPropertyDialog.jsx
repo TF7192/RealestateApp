@@ -273,9 +273,14 @@ function buildPropertyBrief(p) {
     lines.push('');
     lines.push(`📝 ${p.notes}`);
   }
-  if (p.images?.length) {
+  // 2026-04-30 — link to the agent-to-agent transfer view (/t/:id),
+  // not the customer-facing /p/:id. The transfer view strips agent
+  // identity and exposes a "הורד נכס לשיתוף" button so the receiving
+  // agent can re-share without dragging the originator's branding
+  // along.
+  if (p.images?.length || p.videos?.length) {
     lines.push('');
-    lines.push(`📷 תמונות: ${window.location.origin}/p/${p.id}`);
+    lines.push(`📷 תמונות והורדת נכס: ${window.location.origin}/t/${p.id}`);
   }
   return lines.join('\n');
 }

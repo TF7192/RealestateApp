@@ -32,6 +32,7 @@ const DealDetail = lazy(() => import('./pages/DealDetail'));
 const AgentPortal = lazy(() => import('./pages/AgentPortal'));
 const PropertyLandingPage = lazy(() => import('./pages/PropertyLandingPage'));
 const CustomerPropertyView = lazy(() => import('./pages/CustomerPropertyView'));
+const AgentTransferView = lazy(() => import('./pages/AgentTransferView'));
 const ProspectSign = lazy(() => import('./pages/ProspectSign'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -317,6 +318,7 @@ function AppRoutes() {
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
           <Route path="/p/:id" element={<CustomerPropertyView />} />
           <Route path="/a/:agentId" element={<AgentPortal />} />
+          <Route path="/t/:id" element={<AgentTransferView />} />
           {/* D-6 — anything else is a protected authed route. Redirect
               the URL to /login?from=<pathname> so that (a) the address
               bar reflects the fact that the user needs to log in, and
@@ -501,6 +503,7 @@ function AppRoutes() {
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
           <Route path="/p/:id" element={<CustomerPropertyView />} />
           <Route path="/a/:agentId" element={<AgentPortal />} />
+          <Route path="/t/:id" element={<AgentTransferView />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

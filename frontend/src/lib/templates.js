@@ -286,9 +286,17 @@ export function buildVariables(property, agent, opts = {}) {
 
   // Prefer the SEO slug URL when available (set by /api/public/lookup/...
   // or by the agent's own user.slug). Falls back to the legacy /p/<id>.
-  const slugPath = property.slug && (agent?.slug || property.agentSlug)
-    ? `/agents/${encodeURI(agent?.slug || property.agentSlug)}/${encodeURI(property.slug)}`
-    : `/p/${property.id}`;
+  // When the caller asks to strip agent identity (TRANSFER template
+  // shared between two agents), we also strip the slug URL — the
+  // slug page renders the source agent's branding and listings, which
+  // defeats the purpose. Point at /t/<id> instead, which renders the
+  // agent-to-agent transfer view (no agent info, plus a download
+  // button for the receiving agent).
+  const slugPath = stripAgent
+    ? `/t/${property.id}`
+    : (property.slug && (agent?.slug || property.agentSlug)
+        ? `/agents/${encodeURI(agent?.slug || property.agentSlug)}/${encodeURI(property.slug)}`
+        : `/p/${property.id}`);
   const pUrl = typeof window !== 'undefined'
     ? `${window.location.origin}${slugPath}`
     : slugPath;

@@ -289,6 +289,63 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(201).send({ ok: true });
   });
 
+  // 2026-04-30 — agent-to-agent transfer view. The WhatsApp-handover
+  // dialog (TransferPropertyDialog) used to point at /p/:id which is
+  // the customer-facing page, complete with the listing agent's
+  // branding + a contact form. That leaks the originator's identity
+  // into the receiving agent's chat thread, which defeats the whole
+  // point of "I'm transferring this lead — take it from here." This
+  // endpoint returns the same property payload but strips agent
+  // identity so the /t/:id page can render media + details with no
+  // back-channel to the source agent.
+  app.get('/transfer/property/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const property = await prisma.property.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        videos: true,
+      },
+    });
+    if (!property) return reply.code(404).send({ error: { message: 'Not found' } });
+    const imageRows = property.images || [];
+    const flat: any = {
+      id: property.id,
+      assetClass: property.assetClass,
+      category: property.category,
+      type: property.type,
+      city: property.city,
+      neighborhood: property.neighborhood,
+      street: property.street,
+      houseNumber: (property as any).houseNumber ?? null,
+      sqm: property.sqm,
+      sqmNet: (property as any).sqmNet ?? null,
+      rooms: property.rooms,
+      floor: property.floor,
+      totalFloors: (property as any).totalFloors ?? null,
+      balconySize: (property as any).balconySize ?? null,
+      marketingPrice: property.marketingPrice,
+      parking: (property as any).parking ?? null,
+      storage: (property as any).storage ?? null,
+      ac: (property as any).ac ?? null,
+      elevator: (property as any).elevator ?? null,
+      safeRoom: (property as any).safeRoom ?? null,
+      renovated: (property as any).renovated ?? null,
+      vacancyDate: (property as any).vacancyDate ?? null,
+      airDirections: (property as any).airDirections ?? null,
+      sqmArnona: (property as any).sqmArnona ?? null,
+      notes: (property as any).notes ?? null,
+      images: imageRows.map((i: any) => i.url),
+      imageList: imageRows.map((i: any) => ({
+        id: i.id, url: i.url, urlCard: i.urlCard, urlThumb: i.urlThumb,
+      })),
+      videos: (property.videos || []).map((v: any) => ({ id: v.id, url: v.url })),
+    };
+    // Agent identity intentionally omitted — caller is another agent
+    // who already knows the originator from the WhatsApp handoff.
+    return { property: flat };
+  });
+
   /** Slug lookup helper — given an internal id, return the public URL.
    *  Public (no auth) so the dashboard can call it without elevation; the
    *  result only contains a slug pair, which is itself public anyway. */
