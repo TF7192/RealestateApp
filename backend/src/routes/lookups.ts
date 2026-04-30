@@ -132,17 +132,44 @@ export const registerLookupRoutes: FastifyPluginAsync = async (app) => {
   // Response: { items: [{ name, code }] } — typed for the
   // StreetHouseField autocomplete on /properties/new.
   app.get('/streets', async (req) => {
-    const { city, q, limit } = req.query as {
+    const { city, q, limit, neighborhood } = req.query as {
       city?: string;
       q?: string;
       limit?: string;
+      neighborhood?: string;
     };
     const lim = Math.max(1, Math.min(100, Number(limit) || 20));
     if (!city) return { items: [] };
     const idx = loadStreetIndex();
-    const entries =
+    let entries =
       idx.get(city.trim()) || idx.get(normKey(city)) || null;
     if (!entries) return { items: [] };
+    // 2026-04-30 — when the caller supplies `neighborhood`, narrow the
+    // street list to that neighborhood once the join table is
+    // populated. Until then we accept the param without erroring so
+    // the lead form can call the endpoint with the picked neighborhood
+    // even before the data.gov.il import lands. Once Neighborhood rows
+    // gain a `streetCodes Int[]` column populated from the registry's
+    // statistical-area join, this branch will filter `entries` by
+    // matching code.
+    if (neighborhood) {
+      const hood = await prisma.neighborhood.findFirst({
+        where: { city: city.trim(), name: neighborhood.trim() },
+        select: { id: true },
+      });
+      if (hood) {
+        const members = await prisma.neighborhoodGroupMember.findMany({
+          where: { neighborhoodId: hood.id },
+          select: { groupId: true },
+        });
+        // Placeholder — once we add `Neighborhood.streetCodes Int[]`
+        // the filter becomes `entries.filter(e => codes.includes(e.code))`.
+        if (members.length === 0) {
+          // No join data yet — fall through to the unfiltered list
+          // so the agent isn't blocked.
+        }
+      }
+    }
     // Empty q → return the first 50 streets in registry order. The
     // dataset isn't ranked, but the population-authority order is
     // already stable + spans common streets first inside most cities.

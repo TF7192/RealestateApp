@@ -450,10 +450,11 @@ export const api = {
   // Backed by the in-memory population-registry index — see
   // backend/src/routes/lookups.ts. Returns { items: [{ name, code }] }.
   // `q` may be empty to fetch the first 50 streets in the registry.
-  lookupStreets: ({ city, q = '', limit = 20 } = {}) => {
+  lookupStreets: ({ city, q = '', neighborhood, limit = 20 } = {}) => {
     if (!city) return Promise.resolve({ items: [] });
     const params = new URLSearchParams({ city, limit: String(limit) });
     if (q) params.set('q', q);
+    if (neighborhood) params.set('neighborhood', neighborhood);
     return request(`/lookups/streets?${params.toString()}`);
   },
 

@@ -314,6 +314,10 @@
 .pri-badge.pri-high     { color: #b45309; background: rgba(180, 83, 9, 0.10);  }
 .pri-badge.pri-medium   { color: #846020; background: rgba(180, 139, 76, 0.12);}
 .pri-badge.pri-low      { color: #6b7280; background: rgba(107, 114, 128, 0.10);}
+.pri-badge.pri-co-brokered {
+  color: #2c8aa6; background: rgba(44, 138, 166, 0.12);
+  border-color: #2c8aa6;
+}
 
 .property-card-link {
   text-decoration: none;

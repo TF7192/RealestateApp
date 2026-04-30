@@ -624,16 +624,19 @@ export default function Properties() {
         if (assetClassFilter === 'RESIDENTIAL' && p.assetClass !== 'RESIDENTIAL') return false;
         if (assetClassFilter === 'COMMERCIAL' && p.assetClass !== 'COMMERCIAL') return false;
         if (priorityFilter !== 'all') {
-          // The toggle stores the numeric floor of each bucket; we
-          // include rows at-or-above so "גבוהה" surfaces both 100 and
-          // 200. Bucketing intentionally collapses 0 + 25 into "נמוכה".
+          // Exact-bucket match — clicking "בינונית" must show only
+          // בינונית rows, not also גבוהה / גבוהה מאוד. The toggle's
+          // value is the numeric floor of the bucket; we include
+          // every priority that bucket-maps to that floor (200 → 200,
+          // 100 → 100..199, 50 → 50..99, 25 → 0..49 incl. legacy 0).
           const priFloor = Number(priorityFilter);
           const pri = Number(p.priority) || 0;
-          if (priFloor === 25) {
-            if (pri >= 50) return false;
-          } else if (pri < priFloor) {
-            return false;
-          }
+          let bucket;
+          if (pri >= 200) bucket = 200;
+          else if (pri >= 100) bucket = 100;
+          else if (pri >= 50) bucket = 50;
+          else bucket = 25;
+          if (bucket !== priFloor) return false;
         }
         if (advFilters.city && p.city !== advFilters.city) return false;
         if (advFilters.minPrice && p.marketingPrice < Number(advFilters.minPrice)) return false;
@@ -1348,6 +1351,14 @@ export default function Properties() {
                                 {priorityShort(prop.priority)}
                               </span>
                             )}
+                            {prop.coBrokered && (
+                              <span
+                                className="pri-badge pri-co-brokered"
+                                title="הנכס התקבל מסוכן אחר — בשותפות"
+                              >
+                                בשותפות
+                              </span>
+                            )}
                           </div>
                           <div className="pc-compact-price">
                             {formatPrice(prop.marketingPrice)}
@@ -1595,6 +1606,14 @@ export default function Properties() {
                             title={`עדיפות ${priorityShort(prop.priority)}`}
                           >
                             {priorityShort(prop.priority)}
+                          </span>
+                        )}
+                        {prop.coBrokered && (
+                          <span
+                            className="pri-badge pri-co-brokered"
+                            title="הנכס התקבל מסוכן אחר — בשותפות"
+                          >
+                            בשותפות
                           </span>
                         )}
                       </span>

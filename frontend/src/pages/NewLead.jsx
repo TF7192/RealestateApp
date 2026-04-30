@@ -3,7 +3,7 @@
 // Preserves every existing field, handler, draft autosave, clipboard
 // phone peek, and the full POST body shape consumed by api.createLead.
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Save, Clipboard, X, Check, Loader2,
@@ -12,9 +12,10 @@ import {
 } from 'lucide-react';
 import VoiceCaptureDialog from '../components/VoiceCaptureDialog';
 import api from '../lib/api';
-import { cityNames as fallbackCityNames, streetNames } from '../data/mockData';
+import { cityNames as fallbackCityNames } from '../data/mockData';
 import CityField from '../components/CityField';
 import NeighborhoodField from '../components/NeighborhoodField';
+import StreetField from '../components/StreetField';
 import { useToast } from '../lib/toast';
 import useBeforeUnload from '../hooks/useBeforeUnload';
 import StickyActionBar from '../components/StickyActionBar';
@@ -24,7 +25,6 @@ import { relLabel } from '../lib/relativeDate';
 import {
   inputPropsForName,
   inputPropsForCity,
-  inputPropsForAddress,
 } from '../lib/inputProps';
 import { NumberField, PhoneField, PriceRange, Segmented, SelectField } from '../components/SmartFields';
 import {
@@ -366,12 +366,6 @@ export default function NewLead() {
     }
   };
 
-  // Street autocomplete is narrowed by the selected city when there's a match
-  const streetOptions = useMemo(() => {
-    if (!form.city) return streetNames;
-    return streetNames;
-  }, [form.city]);
-
   return (
     <div
       dir="rtl"
@@ -630,19 +624,12 @@ export default function NewLead() {
           </div>
           <div style={gridRow2()}>
             <Field label="רחוב (אופציונלי)">
-              <SuggestPicker
-                options={streetOptions}
+              <StreetField
                 value={form.street}
                 onChange={(v) => update('street', v)}
+                city={form.city}
+                neighborhood={form.neighborhood}
                 placeholder="רוטשילד, אלנבי…"
-                label="רחוב"
-                inputProps={{ ...inputPropsForAddress(), autoComplete: 'off' }}
-                asyncFetch={async (q) => {
-                  const res = await api.geoSearch({ q, city: form.city, limit: 12 });
-                  return (res?.items || [])
-                    .map((r) => r.street || r.label)
-                    .filter(Boolean);
-                }}
               />
             </Field>
             <div />
