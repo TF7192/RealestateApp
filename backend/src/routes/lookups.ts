@@ -155,20 +155,15 @@ export const registerLookupRoutes: FastifyPluginAsync = async (app) => {
     if (neighborhood) {
       const hood = await prisma.neighborhood.findFirst({
         where: { city: city.trim(), name: neighborhood.trim() },
-        select: { id: true },
+        select: { streetCodes: true },
       });
-      if (hood) {
-        const members = await prisma.neighborhoodGroupMember.findMany({
-          where: { neighborhoodId: hood.id },
-          select: { groupId: true },
-        });
-        // Placeholder — once we add `Neighborhood.streetCodes Int[]`
-        // the filter becomes `entries.filter(e => codes.includes(e.code))`.
-        if (members.length === 0) {
-          // No join data yet — fall through to the unfiltered list
-          // so the agent isn't blocked.
-        }
+      if (hood?.streetCodes && hood.streetCodes.length > 0) {
+        const codes = new Set(hood.streetCodes);
+        entries = entries.filter((e) => codes.has(e.code));
       }
+      // No streetCodes yet (legacy row or build-script not yet run for
+      // this city) → fall through and serve the city-scoped list so
+      // the agent isn't blocked.
     }
     // Empty q → return the first 50 streets in registry order. The
     // dataset isn't ranked, but the population-authority order is

@@ -1387,6 +1387,12 @@ model Neighborhood {
   city      String
   name      String
   aliases   String[] @default([])
+  // 2026-04-30 — registry street codes that fall inside this
+  // neighborhood (per OSM polygons + nearest-neighbor fallback). Built
+  // offline via `scripts/build-neighborhood-streets.ts`. Used by the
+  // street-autocomplete endpoint to narrow results when the agent
+  // has picked a neighborhood for a lead.
+  streetCodes Int[]  @default([])
   createdAt DateTime @default(now())
 
   // Sprint 7 / MLS parity — Task G2. Reverse relation so cascading
