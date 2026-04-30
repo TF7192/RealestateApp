@@ -51,6 +51,9 @@ export default function Customers() {
   // maxBudget/minRooms/maxRooms` into `advanced` (below), which the
   // memoized filter stage reads alongside `filter`.
   const [filter, setFilter] = useState('all');
+  // 2026-04-30 — BUYER (ליד מתעניין) / SELLER (ליד גיוס) toggle. 'all'
+  // is the default and matches the legacy "see everything" behavior.
+  const [kindFilter, setKindFilter] = useState('all');
   const [advanced, setAdvanced] = useState({
     lookingFor: '', interestType: '', city: '',
     minBudget: null, maxBudget: null, minRooms: null, maxRooms: null,
@@ -111,6 +114,9 @@ export default function Customers() {
         if (!haystack.includes(qq)) return false;
       }
       const status = (l.status || '').toUpperCase();
+      const kind = (l.kind || 'BUYER').toUpperCase();
+      if (kindFilter === 'buyer'  && kind !== 'BUYER')  return false;
+      if (kindFilter === 'seller' && kind !== 'SELLER') return false;
       if (filter === 'hot'  && status !== 'HOT')  return false;
       if (filter === 'warm' && status !== 'WARM') return false;
       if (filter === 'cold' && status !== 'COLD') return false;
@@ -130,7 +136,17 @@ export default function Customers() {
       if (advanced.maxRooms != null && l.rooms && Number(l.rooms) > advanced.maxRooms) return false;
       return true;
     });
-  }, [leads, filter, q, advanced]);
+  }, [leads, filter, kindFilter, q, advanced]);
+
+  const kindCounts = useMemo(() => {
+    const c = { buyer: 0, seller: 0 };
+    for (const l of leads) {
+      const k = (l.kind || 'BUYER').toUpperCase();
+      if (k === 'SELLER') c.seller++;
+      else c.buyer++;
+    }
+    return c;
+  }, [leads]);
 
   const pillCount = (k) => {
     if (k === 'all')  return leads.length;
@@ -197,6 +213,36 @@ export default function Customers() {
             <Plus size={14} /> ליד חדש
           </Link>
         </div>
+      </div>
+
+      {/* Kind toggle — splits the list into ליד מתעניין vs ליד גיוס.
+          'all' shows both with no filtering. */}
+      <div style={{
+        display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center',
+        flexWrap: 'wrap',
+      }}>
+        {[
+          { k: 'all',    label: 'כל הלידים', n: leads.length },
+          { k: 'buyer',  label: 'ליד מתעניין', n: kindCounts.buyer },
+          { k: 'seller', label: 'ליד גיוס',    n: kindCounts.seller },
+        ].map((t) => {
+          const on = kindFilter === t.k;
+          return (
+            <button
+              key={t.k}
+              type="button"
+              onClick={() => setKindFilter(t.k)}
+              style={{
+                ...FONT,
+                background: on ? DT.gold : DT.white,
+                color: on ? DT.ink : DT.muted,
+                border: `1px solid ${on ? DT.gold : DT.border}`,
+                padding: '6px 12px', borderRadius: 99,
+                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}
+            >{t.label} · {t.n}</button>
+          );
+        })}
       </div>
 
       {/* Filter pills + search. On mobile (<820px) the pill row collapses

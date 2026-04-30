@@ -92,6 +92,10 @@ function applyVoicePrefillLead(setForm, fields) {
 const PURPOSE_OPTIONS = Object.keys(CUSTOMER_PURPOSE_LABELS);
 
 const INITIAL_FORM = {
+  // 2026-04-30 — BUYER = ליד מתעניין (legacy default), SELLER = ליד
+  // גיוס. SELLER renders the slim form: name/phone + city/hood/street
+  // + price/rooms + notes. Everything else is BUYER-only.
+  kind: 'BUYER',
   // Legacy — kept so the existing save path still works.
   name: '',
   phone: '',
@@ -287,6 +291,7 @@ export default function NewLead() {
     try {
       // Map checkbox flags to the API's expected requirement fields.
       const body = {
+        kind: form.kind === 'SELLER' ? 'SELLER' : 'BUYER',
         name: form.name.trim(),
         phone: form.phone || null,
         interestType: form.interestType === 'מסחרי' ? 'COMMERCIAL' : 'PRIVATE',
@@ -514,6 +519,31 @@ export default function NewLead() {
       <form id="lead-form" onSubmit={handleSubmit} style={{
         display: 'flex', flexDirection: 'column', gap: 14,
       }}>
+        {/* Section 0 — kind toggle. Drives whether the rest of the
+            form renders the full BUYER (interested-party) brief or the
+            slim SELLER (listing-recruitment) one. */}
+        <section style={sectionCard()} aria-label="סוג הליד">
+          <h3 style={sectionTitle()}>
+            <Sparkles size={16} /> סוג הליד
+          </h3>
+          <Segmented
+            value={form.kind}
+            onChange={(v) => update('kind', v)}
+            options={[
+              { value: 'BUYER',  label: 'ליד מתעניין' },
+              { value: 'SELLER', label: 'ליד גיוס' },
+            ]}
+            ariaLabel="סוג הליד"
+          />
+          <p style={{
+            fontSize: 12, color: DT.muted, margin: '8px 0 0', lineHeight: 1.6,
+          }}>
+            {form.kind === 'SELLER'
+              ? 'ליד של בעל נכס שאתה רוצה לגייס לרשימת המכירה / השכרה.'
+              : 'ליד של לקוח שמחפש נכס לקנייה או שכירות.'}
+          </p>
+        </section>
+
         {/* Section 1 — פרטי לקוח (identity + contact) */}
         <section style={sectionCard()} aria-label="פרטים אישיים">
           <h3 style={sectionTitle()}>
@@ -536,6 +566,7 @@ export default function NewLead() {
               />
             </Field>
           </div>
+          {form.kind === 'BUYER' && (
           <div style={gridRow2()}>
             <Field label="מקור הליד">
               {/* F-5 — grouped sources. Flat 9-option dropdown hurt
@@ -565,13 +596,17 @@ export default function NewLead() {
               />
             </Field>
           </div>
+          )}
         </section>
 
-        {/* Section 2 — מה הוא מחפש (search preferences: purpose, type, city/street) */}
+        {/* Section 2 — address. For BUYER this is "what they're looking
+            for"; for SELLER it's the property being recruited.  */}
         <section style={sectionCard()} aria-label="העדפות חיפוש">
           <h3 style={sectionTitle()}>
-            <Search size={16} /> העדפות חיפוש
+            <Search size={16} />
+            {form.kind === 'SELLER' ? 'כתובת הנכס' : 'העדפות חיפוש'}
           </h3>
+          {form.kind === 'BUYER' && (
           <div style={gridRow2()}>
             <Field label="קנייה / שכירות">
               <Segmented
@@ -592,6 +627,23 @@ export default function NewLead() {
               />
             </Field>
           </div>
+          )}
+          {form.kind === 'SELLER' && (
+          <div style={gridRow2()}>
+            <Field label="למכירה / להשכרה">
+              <Segmented
+                value={form.lookingFor}
+                onChange={(v) => update('lookingFor', v)}
+                options={[
+                  { value: 'buy', label: 'למכירה' },
+                  { value: 'rent', label: 'להשכרה' },
+                ]}
+                ariaLabel="סוג העסקה"
+              />
+            </Field>
+            <div />
+          </div>
+          )}
           {/* 2026-04-30 — match the /properties/new address stack
               exactly: עיר → שכונה → רחוב, RTL right-to-left. CityField
               + NeighborhoodField + the street SuggestPicker share the
@@ -634,6 +686,7 @@ export default function NewLead() {
             </Field>
             <div />
           </div>
+          {form.kind === 'BUYER' && (
           <Field label="קירבה לבית ספר">
             <SelectField
               value={form.schoolProximity}
@@ -642,12 +695,16 @@ export default function NewLead() {
               options={['עד 200 מטר', 'עד 500 מטר', 'הליכה', 'עד ק״מ']}
             />
           </Field>
+          )}
         </section>
 
-        {/* Section 3 — תקציב וחדרים */}
+        {/* Section 3 — תקציב וחדרים. For SELLER, the same controls
+            describe the asking price and the rooms count of the
+            property being recruited. */}
         <section style={sectionCard()} aria-label="טווח מחיר">
           <h3 style={sectionTitle()}>
-            <Home size={16} /> טווח חדרים · טווח מחיר
+            <Home size={16} />
+            {form.kind === 'SELLER' ? 'מחיר ומספר חדרים' : 'טווח חדרים · טווח מחיר'}
           </h3>
           {/* UX review F-5.3 — one labeled "טווח חדרים" group instead
               of two stacked selectors with literal-translation labels
@@ -678,6 +735,7 @@ export default function NewLead() {
           </Field>
         </section>
 
+        {form.kind === 'BUYER' && (<>
         {/* Section 4 — דרישות נוספות (amenities) */}
         <section style={sectionCard()} aria-label="מרפסת">
           <h3 style={sectionTitle()}>
@@ -995,6 +1053,7 @@ export default function NewLead() {
             />
           </div>
         </section>
+        </>)}
 
         {/* Section 7 — הערות */}
         <section style={sectionCard()} aria-label="הערות">

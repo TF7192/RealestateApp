@@ -27,6 +27,11 @@ const leadInput = z.object({
   email: z.string().email().or(z.literal('')).nullable().optional(),
   interestType: z.enum(['PRIVATE', 'COMMERCIAL']),
   lookingFor: z.enum(['BUY', 'RENT']),
+  // BUYER = ליד מתעניין (default), SELLER = ליד גיוס. The SELLER form
+  // is intentionally minimal — name/phone + the property's city/
+  // neighborhood/street + budget (asking price) + rooms — so it
+  // reuses the same columns rather than introducing a parallel set.
+  kind: z.enum(['BUYER', 'SELLER']).optional(),
   city: z.string().max(80).nullable().optional(),
   // 2026-04-30 — most leads describe a neighborhood, only some specify
   // a street; previously this was forced into `notes` and ignored by
@@ -157,6 +162,7 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
     if (q.status) where.status = q.status;
     if (q.lookingFor) where.lookingFor = q.lookingFor;
     if (q.interestType) where.interestType = q.interestType;
+    if (q.kind === 'BUYER' || q.kind === 'SELLER') where.kind = q.kind;
     if (q.search) {
       const s = String(q.search);
       where.OR = [

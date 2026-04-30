@@ -124,6 +124,18 @@ enum LeadInterestType {
   COMMERCIAL
 }
 
+// 2026-04-30 — leads split into two kinds. BUYER (legacy/default) is
+// the classic "interested party" — someone briefing the agent on what
+// they want to buy/rent. SELLER is a "ליד גיוס" — an owner the agent
+// wants to recruit as a listing; the city/neighborhood/street/rooms/
+// budget fields on Lead double as the property snapshot for those
+// rows (no separate Property row is created until the recruitment
+// converts).
+enum LeadKind {
+  BUYER
+  SELLER
+}
+
 enum LeadLookingFor {
   BUY
   RENT
@@ -956,6 +968,12 @@ model Lead {
   email              String?
   interestType       LeadInterestType @default(PRIVATE)
   lookingFor         LeadLookingFor   @default(BUY)
+  // 2026-04-30 — distinguishes ליד מתעניין (BUYER) from ליד גיוס
+  // (SELLER). For SELLER rows the city/neighborhood/street/rooms/budget
+  // describe the property the agent wants to recruit, not the lead's
+  // criteria — same columns, opposite reading. Default BUYER keeps
+  // the legacy semantics for every existing row.
+  kind               LeadKind         @default(BUYER)
   city               String?
   neighborhood       String?
   street             String?
