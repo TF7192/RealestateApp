@@ -64,33 +64,35 @@ function buildBrief(p) {
   return lines.join('\n');
 }
 
-// Sequentially clicks an anchor pointing at our same-origin proxy
-// endpoint, which streams the S3 file through with `Content-
-// Disposition: attachment`. We used to `fetch()` the S3 URL directly,
-// but the bucket's CORS policy rejected the cross-origin reads, so
-// every download silently failed while the toast said "saved". Going
-// through our origin sidesteps CORS entirely. Returns the count we
-// actually triggered so the caller can be honest in the toast.
+// Sequentially fetches each asset through our same-origin proxy
+// (no CORS preflight, no S3 redirect dance) and triggers a real save
+// dialog via a blob URL. We tried direct anchor.click() with target
+// _self on the proxy URL — the browser kept canceling mid-stream
+// because the React route changed under it, and Cloudflare returned
+// 502 for the half-open upstream. fetch+blob keeps the lifecycle in
+// JS and avoids the navigation race. Same-origin so the bucket's
+// CORS policy doesn't apply. Returns how many actually saved.
 async function downloadAll(specs) {
   let triggered = 0;
   for (let i = 0; i < specs.length; i++) {
-    const { proxyHref } = specs[i];
+    const { proxyHref, filename } = specs[i];
     try {
+      const r = await fetch(proxyHref, { credentials: 'same-origin' });
+      if (!r.ok) continue;
+      const blob = await r.blob();
+      const objUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = proxyHref;
-      // Same-origin + Content-Disposition on the response means the
-      // browser saves the file instead of navigating to it. The
-      // `download` attribute is a fallback hint for the filename when
-      // the response doesn't set Content-Disposition (it does, here).
-      a.rel = 'noopener';
-      a.target = '_self';
+      a.href = objUrl;
+      a.download = filename || `asset-${i + 1}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      // Free the blob on the next tick so Safari doesn't hold the
+      // memory while we re-enter the loop on a video.
+      setTimeout(() => URL.revokeObjectURL(objUrl), 1500);
       triggered += 1;
-      // Safari drops subsequent .click()s if they fire on the exact
-      // same task; a small gap keeps the queue moving.
-      await new Promise((res) => setTimeout(res, 350));
+      // Small gap so Safari doesn't drop subsequent clicks.
+      await new Promise((res) => setTimeout(res, 250));
     } catch { /* skip — keep going so one bad asset doesn't block the rest */ }
   }
   return triggered;
@@ -134,12 +136,21 @@ export default function AgentTransferView() {
     if (busy) return;
     setBusy(true);
     try {
+      const base = (property?.street || 'property').replace(/[^\w֐-׿-]+/g, '-');
+      const extOf = (url) => {
+        try {
+          const m = new URL(url, window.location.origin).pathname.match(/\.([a-z0-9]{2,5})$/i);
+          return m ? m[1].toLowerCase() : null;
+        } catch { return null; }
+      };
       const specs = [
-        ...imageList.map((img) => ({
+        ...imageList.map((img, i) => ({
           proxyHref: `/api/public/transfer/property/${property.id}/asset/image/${img.id}`,
+          filename: `${base}-${String(i + 1).padStart(2, '0')}.${extOf(img.url) || 'jpg'}`,
         })),
-        ...videos.map((v) => ({
+        ...videos.map((v, i) => ({
           proxyHref: `/api/public/transfer/property/${property.id}/asset/video/${v.id}`,
+          filename: `${base}-video-${String(i + 1).padStart(2, '0')}.${extOf(v.url) || 'mp4'}`,
         })),
       ];
       const triggered = await downloadAll(specs);
