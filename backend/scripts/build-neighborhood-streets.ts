@@ -66,7 +66,11 @@ async function overpass(query: string): Promise<OsmResponse> {
   const body = new URLSearchParams({ data: query }).toString();
   const r = await fetch(OVERPASS, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json',
+      'User-Agent': 'EstiaCRM/1.0 (estia.co.il)',
+    },
     body,
   });
   if (!r.ok) throw new Error(`overpass ${r.status} ${r.statusText}`);
@@ -77,18 +81,29 @@ async function overpass(query: string): Promise<OsmResponse> {
 // for Hebrew names, so we resolve cities to their wikidata id when
 // possible and fall back to a name-tag bbox search. Returns null if
 // the city can't be located — callers skip those cities.
+// Nominatim is more forgiving than Overpass on Hebrew name variants
+// (it folds maqaf / em-dash / spaces internally), so we use it for
+// the city → bbox lookup. Free public endpoint; required UA header
+// per their usage policy. Rate-limited to ~1 req/sec, so the caller
+// must serialise.
+const NOMINATIM_UA = 'EstiaCRM/1.0 (estia.co.il)';
 async function findCityBounds(name: string): Promise<{ s: number; w: number; n: number; e: number } | null> {
-  const q = `[out:json][timeout:25];
-(
-  relation["boundary"="administrative"]["admin_level"~"^(8|7|6)$"]["name:he"="${name}"];
-  relation["boundary"="administrative"]["admin_level"~"^(8|7|6)$"]["name"="${name}"];
-);
-out bb 1;`;
+  const q = new URLSearchParams({
+    city: name,
+    country: 'Israel',
+    format: 'json',
+    limit: '1',
+  }).toString();
   try {
-    const r = await overpass(q);
-    const el = r.elements[0];
-    if (!el?.bounds) return null;
-    return { s: el.bounds.minlat, w: el.bounds.minlon, n: el.bounds.maxlat, e: el.bounds.maxlon };
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?${q}`, {
+      headers: { 'User-Agent': NOMINATIM_UA },
+    });
+    if (!r.ok) return null;
+    const arr = (await r.json()) as Array<{ boundingbox?: string[] }>;
+    const bb = arr[0]?.boundingbox;
+    if (!bb || bb.length !== 4) return null;
+    // Nominatim order: [south, north, west, east]
+    return { s: Number(bb[0]), n: Number(bb[1]), w: Number(bb[2]), e: Number(bb[3]) };
   } catch { return null; }
 }
 

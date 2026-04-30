@@ -45,6 +45,13 @@ export default function StreetField({
   const debounceRef = useRef(null);
   const reqIdRef = useRef(0);
   const pickedLabelRef = useRef('');
+  // Only auto-open the dropdown when our own input is the active
+  // element. Without this, every prop change (including the parent's
+  // `neighborhood` prop while the user types in a *different* field)
+  // re-fires the fetch and pops our dropdown into view — which is
+  // why typing in the שכונה field above used to surface a list of
+  // streets here.
+  const focusedRef = useRef(false);
 
   // Debounced street lookup. Re-fires when city or neighborhood
   // changes — different city/neighborhood means a different namespace.
@@ -65,7 +72,7 @@ export default function StreetField({
         const res = await api.lookupStreets({ city, q, neighborhood, limit: 20 });
         if (id2 !== reqIdRef.current) return;
         setResults(Array.isArray(res?.items) ? res.items : []);
-        setOpen(true);
+        if (focusedRef.current) setOpen(true);
       } catch (e) {
         if (id2 !== reqIdRef.current) return;
         setErr(e?.message || 'חיפוש רחובות נכשל');
@@ -137,8 +144,14 @@ export default function StreetField({
         className="addr-field-input form-input"
         value={value || ''}
         onChange={(e) => handleChange(e.target.value)}
-        onFocus={() => { if (results.length) setOpen(true); }}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onFocus={() => {
+          focusedRef.current = true;
+          if (results.length) setOpen(true);
+        }}
+        onBlur={() => {
+          focusedRef.current = false;
+          setTimeout(() => setOpen(false), 150);
+        }}
         onKeyDown={handleKey}
         placeholder={!city ? 'בחר/י עיר תחילה' : placeholder}
         autoComplete="address-line1"
