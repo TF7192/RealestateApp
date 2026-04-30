@@ -56,6 +56,25 @@ function loadRegistryCities(): string[] {
   return REGISTRY_CITIES || [];
 }
 
+// Re-exported for the matcher: given free-text street + city, return
+// the canonical registry code (or null). Uses the same in-memory
+// index this module's autocomplete consumes — no extra reads. Strips
+// trailing house numbers ("הרצל 15" → "הרצל") via `normKey`, which
+// drops digits/punct as part of its normalization pipeline.
+export function resolveStreetCode(city: string, streetText: string): number | null {
+  if (!city || !streetText) return null;
+  const idx = loadStreetIndex();
+  const entries = idx.get(city.trim()) || idx.get(normKey(city)) || null;
+  if (!entries) return null;
+  const k = normKey(streetText);
+  if (!k) return null;
+  // `normKey` already strips house numbers + qualifiers, and the
+  // registry stores the bare street name, so an exact key match is
+  // enough — both sides are folded to the same canonical form.
+  const hit = entries.find((e) => e.key === k);
+  return hit ? hit.code : null;
+}
+
 function loadStreetIndex(): Map<string, StreetIndexEntry[]> {
   if (STREET_INDEX) return STREET_INDEX;
   const idx = new Map<string, StreetIndexEntry[]>();

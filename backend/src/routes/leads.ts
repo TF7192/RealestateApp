@@ -479,8 +479,29 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       where,
       include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
     });
+
+    // 2026-04-30 — pre-resolve the lead's neighborhood streetCodes
+    // (when set) and each candidate property's registry street code,
+    // so the scorer's neighborhood↔street join check fires for
+    // properties that don't carry an explicit `neighborhood` field.
+    let leadHoodCodes: number[] | null = null;
+    if (lead.city && lead.neighborhood) {
+      const hood = await prisma.neighborhood.findFirst({
+        where: { city: lead.city, name: lead.neighborhood },
+        select: { streetCodes: true },
+      });
+      leadHoodCodes = hood?.streetCodes?.length ? hood.streetCodes : null;
+    }
+    const { resolveStreetCode } = await import('./lookups.js');
+
     const scored = props
-      .map((p: any) => ({ p, sig: evaluateLeadProperty(lead as any, p) }))
+      .map((p: any) => ({
+        p,
+        sig: evaluateLeadProperty(
+          { ...(lead as any), neighborhoodStreetCodes: leadHoodCodes },
+          { ...p, streetCode: p.city && p.street ? resolveStreetCode(p.city, p.street) : null },
+        ),
+      }))
       .filter((r) => r.sig.matches)
       .sort((a, b) => b.sig.score - a.sig.score)
       .map((r) => ({

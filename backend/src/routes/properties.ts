@@ -850,11 +850,50 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       include: { searchProfiles: true },
     });
 
+    // 2026-04-30 — neighborhood↔street join. For every lead with a
+    // `neighborhood` preference, fetch the corresponding Neighborhood
+    // row's `streetCodes` so the scorer can also accept properties
+    // whose street falls inside that neighborhood (even when their
+    // `neighborhood` field is empty / spelled differently).
+    const hoodKeys = new Set<string>();
+    for (const l of leads) {
+      if (l.city && l.neighborhood) hoodKeys.add(`${l.city.trim()}|${l.neighborhood.trim()}`);
+    }
+    const hoodMap = new Map<string, number[]>();
+    if (hoodKeys.size) {
+      const rows = await prisma.neighborhood.findMany({
+        where: {
+          OR: [...hoodKeys].map((k) => {
+            const [city, name] = k.split('|');
+            return { city, name };
+          }),
+        },
+        select: { city: true, name: true, streetCodes: true },
+      });
+      for (const r of rows) hoodMap.set(`${r.city}|${r.name}`, r.streetCodes);
+    }
+
+    // Pre-resolve the property's registry street code once — same code
+    // path the lookups endpoint uses, no extra DB hit.
+    const { resolveStreetCode } = await import('./lookups.js');
+    const propStreetCode = property.city && property.street
+      ? resolveStreetCode(property.city, property.street)
+      : null;
+
+    const scoreLead = (l: any) => {
+      const key = l.city && l.neighborhood ? `${l.city.trim()}|${l.neighborhood.trim()}` : null;
+      const codes = key ? hoodMap.get(key) : undefined;
+      return evaluateLeadProperty(
+        { ...l, neighborhoodStreetCodes: codes ?? null },
+        { ...(property as any), streetCode: propStreetCode },
+      );
+    };
+
     // Rooms ±1 lives in JS — Lead.rooms is a free-form string ("3-4",
     // "3.5+") so a SQL range clause would miss legitimate matches. The
     // JS scorer already does the right thing.
     const scored = leads
-      .map((l: any) => ({ l, sig: evaluateLeadProperty(l, property as any) }))
+      .map((l: any) => ({ l, sig: scoreLead(l) }))
       .filter((r) => r.sig.matches)
       .sort((a, b) => b.sig.score - a.sig.score)
       .map((r) => ({

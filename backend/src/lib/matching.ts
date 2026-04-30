@@ -22,6 +22,13 @@ type LeadLike = {
   // scores higher; a property in a *different* neighborhood is still
   // accepted (city-level match is the gate).
   neighborhood?: string | null;
+  // OSM-backed street ↔ neighborhood join. When the matcher caller
+  // pre-resolves the lead's neighborhood via the Neighborhood table,
+  // it can pass the row's `streetCodes` here so a property whose
+  // street resolves to one of those codes is treated as a
+  // neighborhood match — even if Property.neighborhood is empty or
+  // spelled differently from Lead.neighborhood.
+  neighborhoodStreetCodes?: number[] | null;
   rooms?: string | null;
   budget?: number | null;
   searchProfiles?: ProfileLike[] | null;
@@ -46,6 +53,11 @@ type PropertyLike = {
   type?: string | null;
   city?: string | null;
   neighborhood?: string | null;
+  // Caller may pre-resolve the registry street code from
+  // `Property.street` (we don't store it on the row) — when present
+  // and the lead has `neighborhoodStreetCodes`, the matcher uses it
+  // for the neighborhood↔street join check.
+  streetCode?: number | null;
   rooms?: number | null;
   marketingPrice?: number | null;
 };
@@ -81,8 +93,26 @@ function flatMatches(lead: LeadLike, property: PropertyLike, signal: MatchSignal
   // Neighborhood is a soft signal — same neighborhood is a positive
   // boost, but mismatch doesn't gate (agents often loosely set a
   // neighborhood when the lead would also accept adjacent areas).
-  if (lead.neighborhood && property.neighborhood) {
-    if (String(lead.neighborhood).trim() === String(property.neighborhood).trim()) {
+  // Two paths award the boost:
+  //   1. Direct string match on `Property.neighborhood`.
+  //   2. OSM-backed join: lead carries `neighborhoodStreetCodes`
+  //      (pre-resolved from `Neighborhood.streetCodes`), and the
+  //      property's street resolves to one of those codes. This lets
+  //      properties without an explicit neighborhood field match the
+  //      lead's preference based on street geography alone.
+  if (lead.neighborhood) {
+    let hood = false;
+    if (property.neighborhood &&
+        String(lead.neighborhood).trim() === String(property.neighborhood).trim()) {
+      hood = true;
+    } else if (
+      lead.neighborhoodStreetCodes?.length &&
+      property.streetCode != null &&
+      lead.neighborhoodStreetCodes.includes(property.streetCode)
+    ) {
+      hood = true;
+    }
+    if (hood) {
       signal.score += 0.1;
       signal.reasons.push('neighborhood');
     }
