@@ -19,6 +19,11 @@ export default defineConfig([
     'ios',
     'android',
     'node_modules',
+    // Landing-page demo bundles served as static assets from /public.
+    // They use `/* global React, ... */` and import from a CDN at
+    // runtime; linting them as ESM source produces dozens of false
+    // "defined but never used" errors. Tracked in BACKLOG.md.
+    'public/landing',
   ]),
   {
     files: ['**/*.{js,jsx}'],
@@ -37,7 +42,21 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // ESLint's core no-unused-vars doesn't recognize JSX usages — for
+      // patterns like `{stats.map(({ icon: Icon }) => <Icon />)}` the
+      // local `Icon` is "unused" by the linter even though JSX renders
+      // it. We don't pull in eslint-plugin-react just for this; instead
+      // we ignore destructured/arg locals starting with a capital letter
+      // (the React component convention) the same way `varsIgnorePattern`
+      // does for top-level vars.
+      'no-unused-vars': [
+        'error',
+        {
+          varsIgnorePattern: '^[A-Z_]',
+          argsIgnorePattern: '^[A-Z_]',
+          destructuredArrayIgnorePattern: '^[A-Z_]',
+        },
+      ],
       // Context providers legitimately co-export their component + hook
       // in one file; downgrade to warn so they don't block CI.
       'react-refresh/only-export-components': 'warn',
