@@ -89,12 +89,16 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
     const propertyWhere = (extra: Record<string, unknown>) => ({
       agentId, status: 'ACTIVE' as const, ...extra,
     });
+    // PERF — 2026-05-01 v3: Promise.all over $transaction. 13 read-only
+    // count/aggregate queries — atomicity isn't needed; parallelism
+    // brings wall-clock from ~80ms (sequential RDS round-trips) to
+    // ~25ms (max single query).
     const [
       resTotal, resSale, resRent,
       comTotal, comSale, comRent,
       leadsTotal, leadsHot, leadsWarm, leadsCold,
       dealsTotal, dealsSigned, signedCommissionAgg,
-    ] = await prisma.$transaction([
+    ] = await Promise.all([
       prisma.property.count({ where: propertyWhere({ assetClass: 'RESIDENTIAL' }) }),
       prisma.property.count({ where: propertyWhere({ assetClass: 'RESIDENTIAL', category: 'SALE' }) }),
       prisma.property.count({ where: propertyWhere({ assetClass: 'RESIDENTIAL', category: 'RENT' }) }),

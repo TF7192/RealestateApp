@@ -279,7 +279,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     // entire propertyOwner relation, etc. Dropping them shrinks
     // per-row payload from ~3.5 KB → ~600 bytes. The detail endpoint
     // (GET /:id below) still returns the full row with `include`.
-    const take = q.take ?? 200;
+    // 2026-05-01 v3 — default take 200 → 50. Properties.jsx uses
+    // infinite-scroll + cursor; the FE doesn't pass `take`, so the
+    // default determines the first-page payload size. 50 cards is
+    // 2-3 viewport heights — plenty for first paint, and ~75% smaller
+    // wire payload than the prior 200 default. The FE still calls
+    // again with the returned nextCursor when the user scrolls.
+    const take = q.take ?? 50;
     const items = await prisma.property.findMany({
       where,
       select: {

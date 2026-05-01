@@ -182,7 +182,12 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
     // PERF-002 — pagination. `take` defaults to 200 so the legacy FE
     // (no pagination yet) keeps getting full pages. `cursor` is an
     // id-based cursor: the id of the last lead from the previous page.
-    const takeRaw = q.take != null ? Number(q.take) : 200;
+    // 2026-05-01 v3 — default take 200 → 50 (cap stays 200 for callers
+    // that explicitly request more). Customers.jsx renders ~20 cards
+    // per viewport; 50 is plenty for first paint at ~75% smaller
+    // payload. nextCursor still returned for the FE to paginate when
+    // the user scrolls.
+    const takeRaw = q.take != null ? Number(q.take) : 50;
     const take = Number.isFinite(takeRaw)
       ? Math.max(1, Math.min(200, Math.floor(takeRaw)))
       : 200;

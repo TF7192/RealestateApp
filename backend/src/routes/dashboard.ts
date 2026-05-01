@@ -80,6 +80,13 @@ export const registerDashboardRoutes: FastifyPluginAsync = async (app) => {
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+    // PERF — 2026-05-01 v3: Promise.all instead of $transaction. The
+    // 10 queries here are all read-only count/findMany — they don't
+    // need transactional consistency. $transaction runs them
+    // sequentially over a single DB connection (each waits for the
+    // previous query's RDS round-trip); Promise.all opens 10 pool
+    // connections and runs them truly in parallel. Wall-clock drops
+    // from ~70ms (sum of round-trips) to ~20ms (max single query).
     const [
       propertiesCount,
       leadsCount,
@@ -91,7 +98,7 @@ export const registerDashboardRoutes: FastifyPluginAsync = async (app) => {
       todayMeetingsRows,
       stuckDealsRows,
       stalePropertiesRows,
-    ] = await prisma.$transaction([
+    ] = await Promise.all([
       prisma.property.count({ where: { agentId } }),
       prisma.lead.count({ where: { agentId } }),
       prisma.deal.count({ where: { agentId } }),
@@ -218,7 +225,9 @@ export const registerTopbarRoutes: FastifyPluginAsync = async (app) => {
     const u = requireUser(req);
 
     const payload = await topbarCache.wrap(u.id, async () => {
-      const [unreadNotifications, publicMatchesCount, openChat] = await prisma.$transaction([
+      // PERF — 2026-05-01 v3: Promise.all over $transaction (read-only,
+      // no need for atomicity). 3 round-trips become parallel.
+      const [unreadNotifications, publicMatchesCount, openChat] = await Promise.all([
         prisma.notification.count({
           where: { userId: u.id, readAt: null },
         }),
