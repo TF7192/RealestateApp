@@ -59,7 +59,9 @@ export function stopNotificationDeliveryWorker() {
   timer = null;
 }
 
-async function drainOnce() {
+// Exported so integration tests can invoke a single drain directly
+// instead of waiting for the 60s setInterval to fire.
+export async function drainOnce() {
   const rows = await prisma.pendingNotificationDelivery.findMany({
     where: { status: 'pending', attemptCount: { lt: MAX_ATTEMPTS } },
     orderBy: { createdAt: 'asc' },

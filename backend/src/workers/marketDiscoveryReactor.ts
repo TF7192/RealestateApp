@@ -62,7 +62,9 @@ export function stopMarketDiscoveryReactor() {
   timer = null;
 }
 
-async function drainOnce() {
+// Exported so integration tests can invoke a single drain directly
+// without the 30s setInterval.
+export async function drainOnce() {
   // Auto-seed missing LeadSearchProfile rows. Most agents never open the
   // dedicated profile editor, so without this fallback the matching
   // pipeline runs against an empty profile set and never fires.

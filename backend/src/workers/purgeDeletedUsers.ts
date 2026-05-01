@@ -27,7 +27,9 @@ const THIRTY_DAYS_MS = 30 * 24 * ONE_HOUR_MS;
 let timer: NodeJS.Timeout | null = null;
 let bootTimer: NodeJS.Timeout | null = null;
 
-async function purgeOnce(): Promise<void> {
+// Exported so integration tests can invoke a single purge directly
+// without the hourly setInterval.
+export async function purgeOnce(): Promise<void> {
   const cutoff = new Date(Date.now() - THIRTY_DAYS_MS);
   const stale = await prisma.user.findMany({
     where: { deletedAt: { lt: cutoff } },
