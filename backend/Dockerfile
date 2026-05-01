@@ -25,9 +25,14 @@ COPY package.json package-lock.json ./
 # --no-save keeps the resulting node_modules consistent with the
 # lockfile for everything else.
 RUN echo "deps cachebust: $DEPS_CACHEBUST" \
-  && npm ci --no-audit --no-fund \
-  && npm install --no-audit --no-fund --no-save openai@6.34.0 @anthropic-ai/sdk@0.91.0 \
+  && npm ci --no-audit --no-fund --ignore-scripts \
+  && npm install --no-audit --no-fund --no-save --ignore-scripts openai@6.34.0 @anthropic-ai/sdk@0.91.0 \
   && node -e "require.resolve('openai'); require.resolve('@anthropic-ai/sdk'); console.log('deps ok')"
+# --ignore-scripts skips the backend/package.json `postinstall: prisma generate`
+# (added 2026-04-30 in f82e0c3). The prisma schema isn't COPY'd into the
+# deps stage — only the build stage has prisma/. The build stage's
+# explicit `npx prisma generate` covers that case; postinstall is for
+# local dev convenience.
 
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
