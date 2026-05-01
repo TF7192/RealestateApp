@@ -22,6 +22,7 @@ import { registerReportRoutes } from './routes/reports.js';
 import { registerMeRoutes } from './routes/me.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerAdminRoutes } from './routes/admin.js';
+import { instrumentFastify, metricsRegistry } from './lib/metrics.js';
 import { registerYad2Routes } from './routes/yad2.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerMarketRoutes } from './routes/market.js';
@@ -233,6 +234,22 @@ export async function build(opts: BuildOptions = {}) {
     } catch (e: any) {
       return reply.code(503).send({ ok: false, error: e?.message || 'db_unreachable' });
     }
+  });
+
+  // Prometheus scrape endpoint. Token-gated by METRICS_TOKEN env var
+  // so leaking the route doesn't leak per-route latency back to the
+  // public internet. Prometheus scrapes with a fixed Authorization
+  // header set in its config; if METRICS_TOKEN is unset (e.g. in
+  // local dev) the route 503s rather than serving anonymous metrics.
+  // Per-request histogram + counter live in lib/metrics.ts.
+  instrumentFastify(app);
+  app.get('/api/metrics', async (req, reply) => {
+    const expected = process.env.METRICS_TOKEN;
+    if (!expected) return reply.code(503).send({ error: 'metrics_disabled' });
+    const got = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
+    if (got !== expected) return reply.code(401).send({ error: 'unauthorized' });
+    reply.header('content-type', metricsRegistry.contentType);
+    return metricsRegistry.metrics();
   });
 
   // Install the error handler BEFORE routes so Fastify's encapsulation

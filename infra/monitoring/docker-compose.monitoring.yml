@@ -25,9 +25,15 @@ services:
     # runs in network_mode: host).
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Join estia-new_default so the `backend:4000` upstream resolves
+    # via Docker DNS — same pattern Grafana uses.
+    networks:
+      - default
+      - estia
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./rules.yml:/etc/prometheus/rules.yml:ro
+      - ./metrics_token:/run/secrets/metrics_token:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -114,6 +120,23 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+  # Slack reporter — every 15 min, queries Prometheus for the latency
+  # quantiles over the last 15 min and posts a summary to the Slack
+  # webhook in monitoring/.env (SLACK_WEBHOOK_URL). Uses Alpine + bash
+  # + curl + jq — no Node/Python dep.
+  perf_reporter:
+    image: alpine:3.20
+    restart: unless-stopped
+    env_file: ./.env
+    depends_on:
+      - prometheus
+    volumes:
+      - ./perf-reporter.sh:/perf-reporter.sh:ro
+    command: ["sh", "-c", "apk add --no-cache curl jq bash >/dev/null 2>&1 && bash /perf-reporter.sh"]
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "3" }
 
 networks:
   default:

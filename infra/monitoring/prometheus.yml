@@ -18,6 +18,26 @@ scrape_configs:
         labels:
           db: 'estia-prod'
 
+  # Estia backend — 3 replicas. Each replica exposes /api/metrics
+  # token-gated by METRICS_TOKEN. We scrape via the frontend nginx
+  # which already round-robins (DNS resolver=valid=1s) — across 15s
+  # scrape intervals each replica gets one scrape per cycle on
+  # average, so all 3 replicas' metrics get collected.
+  #
+  # We could also scrape `backend:4000` directly via Docker DNS (this
+  # container joined estia-new_default for the grafana proxy), but
+  # going through nginx makes scrape failures correlate with what
+  # users actually see.
+  - job_name: 'estia-backend'
+    metrics_path: /api/metrics
+    bearer_token_file: /run/secrets/metrics_token
+    scrape_interval: 15s
+    scrape_timeout: 5s
+    static_configs:
+      - targets: ['backend:4000']
+        labels:
+          service: 'estia-backend'
+
   - job_name: 'node'
     # node_exporter runs in network_mode: host so we hit it on the
     # EC2's loopback as observed from another container. The
