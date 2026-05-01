@@ -34,45 +34,41 @@ const USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
 // the OAuth result back into the app from SFSafariViewController.
 const NATIVE_SCHEME = 'com.estia.agent';
 
-// In-memory one-time code store for the native exchange step. We keep
-// tokens short-lived (2 minutes) and single-use to minimize blast radius.
-// An in-process Map is acceptable because the native flow is:
-//    1. open Safari → 2. user signs in → 3. Safari redirects to
-//    com.estia.agent://auth?code=X → 4. app POSTs /native-exchange
-// all within seconds on the same backend process. If we ever scale
-// horizontally, move this to Redis or a short-lived DB row.
-type PendingExchange = { userId: string; expires: number };
-const pendingCodes = new Map<string, PendingExchange>();
-// Native polling map — keyed by the client-supplied `nativeState`. Once
-// OAuth completes, we drop the one-time `code` here so the app can
-// fetch it via /native-poll. Same TTL + cap policy as pendingCodes.
-type PendingPollEntry = { code: string; expires: number };
-const pendingPolls = new Map<string, PendingPollEntry>();
-// SEC-021 — hard cap so a misbehaving / hostile caller burning native
-// flow attempts can't unboundedly grow this Map. Map iteration order is
-// insertion order, so evicting the first key drops the oldest entry.
-const MAX_PENDING = 10_000;
-function issueNativeCode(userId: string): string {
-  // Purge expired entries opportunistically (cheap, bounded map size).
-  const now = Date.now();
-  for (const [k, v] of pendingCodes) if (v.expires < now) pendingCodes.delete(k);
-  // After expiry-sweep, if we're still at the cap, evict the oldest entry.
-  // The 2-minute TTL means we shouldn't normally reach here in practice;
-  // the cap is a backstop against pathological burst traffic.
-  if (pendingCodes.size >= MAX_PENDING) {
-    const oldest = pendingCodes.keys().next().value;
-    if (oldest) pendingCodes.delete(oldest);
-  }
-  const code = crypto.randomBytes(24).toString('base64url');
-  pendingCodes.set(code, { userId, expires: now + 120_000 });
-  return code;
+// One-time code for the native exchange step. The flow is:
+//   1. open Safari → 2. user signs in → 3. Safari redirects to
+//   com.estia.agent://auth?code=X → 4. app POSTs /native-exchange
+//
+// 2026-05-02 — moved from an in-memory Map to a JWT signed with the
+// shared JWT_SECRET. Reason: 2026-05-01 prod scaled to 2 backend
+// replicas behind DNS round-robin (commit b5246aa). With per-process
+// state the issuing replica and the exchanging replica were almost
+// always different — the exchange step returned "invalid or expired
+// code" and Google login silently broke for native users. JWTs are
+// stateless across replicas because every replica has the same
+// JWT_SECRET, so the verify-side works regardless of which one
+// handled the OAuth callback.
+//
+// The token is short-lived (60s, far shorter than any session) and
+// scoped via a `kind: 'native_exchange'` claim so it can't be reused
+// as a session cookie even if it leaked. Single-use enforcement is
+// deliberately omitted: it would re-introduce per-process state
+// (the same problem we're fixing). The 60-second window + single
+// successful exchange producing a real session cookie is the
+// blast-radius bound.
+function issueNativeCode(app: { jwt: { sign: (p: object, o: object) => string } }, userId: string): string {
+  return app.jwt.sign(
+    { sub: userId, kind: 'native_exchange', jti: crypto.randomBytes(8).toString('base64url') },
+    { expiresIn: '60s' },
+  );
 }
-function consumeNativeCode(code: string): string | null {
-  const entry = pendingCodes.get(code);
-  if (!entry) return null;
-  pendingCodes.delete(code);
-  if (entry.expires < Date.now()) return null;
-  return entry.userId;
+function consumeNativeCode(app: { jwt: { verify: (t: string) => { sub: string; kind?: string } } }, code: string): string | null {
+  try {
+    const decoded = app.jwt.verify(code);
+    if (!decoded || decoded.kind !== 'native_exchange' || !decoded.sub) return null;
+    return decoded.sub;
+  } catch {
+    return null;
+  }
 }
 
 function isConfigured(): boolean {
@@ -119,18 +115,10 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
     const q = (req.query || {}) as Record<string, unknown>;
     const rt = q.redirect;
     const native = q.native === '1' || q.native === 'true';
-    // `nativeState` is a client-supplied opaque token (UUID) the
-    // Capacitor app uses to poll for completion. Validated for shape so
-    // it can't be used as a giant key in pendingPolls.
-    const rawNs = typeof q.nativeState === 'string' ? q.nativeState : '';
-    const nativeState = /^[A-Za-z0-9_-]{8,128}$/.test(rawNs) ? rawNs : '';
     const payload = JSON.stringify({
       s: state,
       r: typeof rt === 'string' ? rt : '/',
       n: native ? 1 : 0,
-      // Carry the polling state through Google's redirect via the
-      // signed state cookie + encoded state param, just like `r` and `n`.
-      ps: nativeState || undefined,
     });
     const encoded = Buffer.from(payload).toString('base64url');
 
@@ -167,7 +155,7 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       return reply.redirect('/?auth=google_missing_state');
     }
 
-    let decoded: { s: string; r: string; n?: number; ps?: string };
+    let decoded: { s: string; r: string; n?: number };
     try {
       decoded = JSON.parse(Buffer.from(encodedState, 'base64url').toString('utf8'));
     } catch {
@@ -177,7 +165,6 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       return reply.redirect('/?auth=google_state_mismatch');
     }
     const isNative = decoded.n === 1;
-    const pollState = typeof decoded.ps === 'string' ? decoded.ps : '';
 
     // Exchange authorization code for an access token + id_token
     let tokens: any;
@@ -265,64 +252,15 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
     if (isNative) {
       // Native (iPhone app) flow: don't set a cookie here — we're
       // running in SFSafariViewController, whose cookie jar is isolated
-      // from the app's WKWebView. Polling design:
-      //   1. App opens Browser.open with `?nativeState=<uuid>`.
-      //   2. After OAuth completes here, we drop the one-time code
-      //      into pendingPolls keyed by that UUID and render a
-      //      "התחברת" page that just sits there.
-      //   3. The app polls /api/auth/google/native-poll?state=<uuid>.
-      //   4. On hit, the app calls Browser.close() (auto-dismissing
-      //      SFSafariViewController) and POSTs to /native-exchange.
-      //
-      // Older iOS versions could rely on a server 302 to
-      // `com.estia.agent://auth?code=…`. iOS 26 silently drops both
-      // server-issued non-https redirects from SFSafariViewController
-      // *and* user-tapped <a> links to custom schemes. Polling is the
-      // only mechanism that doesn't depend on Apple-honored redirects.
-      const oneTime = issueNativeCode(user.id);
-      if (pollState) {
-        // Same TTL/cap policy as pendingCodes (see issueNativeCode).
-        const now = Date.now();
-        for (const [k, v] of pendingPolls) if (v.expires < now) pendingPolls.delete(k);
-        if (pendingPolls.size >= MAX_PENDING) {
-          const oldest = pendingPolls.keys().next().value;
-          if (oldest) pendingPolls.delete(oldest);
-        }
-        pendingPolls.set(pollState, { code: oneTime, expires: now + 120_000 });
-      }
-      reply.header('Content-Type', 'text/html; charset=utf-8');
-      return reply.send(`<!doctype html>
-<html lang="he" dir="rtl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Estia</title>
-<style>
-  html, body { margin: 0; height: 100%; }
-  body {
-    background: #f7f3ec; color: #1e1a14;
-    font-family: -apple-system, BlinkMacSystemFont, 'Assistant', sans-serif;
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; padding: 24px; gap: 14px; text-align: center;
-  }
-  h1 { font-size: 22px; font-weight: 800; margin: 0; }
-  p { font-size: 14px; color: #6b6356; margin: 0; }
-  .spinner {
-    width: 36px; height: 36px; margin-top: 12px;
-    border-radius: 50%;
-    border: 3px solid rgba(180, 139, 76, 0.2);
-    border-top-color: #b48b4c;
-    animation: spin 0.9s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
-</head>
-<body>
-  <div class="spinner" aria-hidden="true"></div>
-  <h1>התחברת בהצלחה</h1>
-  <p>חוזר אל Estia…</p>
-</body>
-</html>`);
+      // from the app's WKWebView. Mint a single-use exchange code and
+      // 302 to the app's custom URL scheme; the app's appUrlOpen
+      // listener catches it and POSTs /native-exchange to mint the
+      // real session. This is the path that worked before 2026-05-01
+      // and continues to work — the prior breakage was the issuing
+      // replica differing from the exchanging replica (in-memory Map
+      // not shared), now fixed by switching the code to a JWT.
+      const oneTime = issueNativeCode(app, user.id);
+      return reply.redirect(`${NATIVE_SCHEME}://auth?code=${encodeURIComponent(oneTime)}`);
     }
 
     // Web flow (same origin as the WebView): set the JWT cookie directly.
@@ -356,7 +294,7 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post('/google/native-exchange', async (req, reply) => {
     const { code } = (req.body || {}) as { code?: string };
     if (!code) return reply.code(400).send({ error: { message: 'missing code' } });
-    const userId = consumeNativeCode(code);
+    const userId = consumeNativeCode(app, code);
     if (!userId) return reply.code(400).send({ error: { message: 'invalid or expired code' } });
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return reply.code(400).send({ error: { message: 'user not found' } });
@@ -384,28 +322,4 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
-  // ── Step 2.5 (native only): polling endpoint for the Capacitor app.
-  //
-  // The app polls this every ~750ms after opening Browser.open. Once
-  // the SFSafariViewController-side OAuth callback fires, the
-  // pendingPolls Map gets a `code` keyed by the app's `state`; the
-  // next poll consumes that code, the app closes the in-app browser,
-  // and POSTs to /native-exchange to finalize.
-  //
-  // Read-only — returns either { code } or { pending: true }. Single
-  // consumption: the entry is deleted on first successful return so a
-  // stale poll can't grab the same code twice.
-  app.get<{ Querystring: { state?: string } }>('/google/native-poll', async (req, reply) => {
-    const state = (req.query?.state || '').toString();
-    if (!/^[A-Za-z0-9_-]{8,128}$/.test(state)) {
-      return reply.code(400).send({ error: { message: 'invalid state' } });
-    }
-    const entry = pendingPolls.get(state);
-    if (!entry) return reply.send({ pending: true });
-    pendingPolls.delete(state);
-    if (entry.expires < Date.now()) {
-      return reply.code(400).send({ error: { message: 'expired' } });
-    }
-    return reply.send({ code: entry.code });
-  });
 };
