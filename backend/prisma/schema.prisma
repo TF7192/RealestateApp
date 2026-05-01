@@ -836,6 +836,15 @@ model Property {
   // { createdAt: 'desc' } })` which is the dominant Property query
   // (Properties list, Dashboard, sidebar favorites hydration).
   @@index([agentId, createdAt(sort: Desc)])
+  // 2026-05-01 PERF-30user — Properties list orders by [priority desc,
+  // createdAt desc] under an agentId filter; without this composite,
+  // Postgres falls back to (agentId, createdAt) and sorts by priority
+  // in memory. With ~200-row pages that's a 50ms+ cost in the hot path.
+  @@index([agentId, priority(sort: Desc), createdAt(sort: Desc)])
+  // 2026-05-01 PERF-30user — Dashboard staleProperties query filters
+  // by (agentId, status='ACTIVE', updatedAt < cutoff) and orders by
+  // updatedAt asc. Dedicated composite avoids a sort step.
+  @@index([agentId, status, updatedAt])
   @@index([city])
   @@index([assetClass, category, status])
   @@index([propertyOwnerId])
