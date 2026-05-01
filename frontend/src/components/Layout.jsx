@@ -24,7 +24,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home, Users, Building2, MessageSquare, Crown, CalendarDays, BellRing, Sparkles,
   BarChart2, Banknote, Upload, UsersRound, Settings,
-  Bell, Search, Plus, MessageCircle, LogOut, Menu, X,
+  Bell, Search, MessageCircle, LogOut, Menu, X,
   ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
   Activity as ActivityIcon, Tag, Download as DownloadIcon, Heart,
   Star, FolderOpen, HelpCircle, IdCard, Megaphone, ShieldCheck,
@@ -304,8 +304,6 @@ export default function Layout({ onLogout }) {
         <Topbar
           narrow={narrow}
           onOpenPalette={openPalette}
-          onNewLead={() => navigate('/customers/new')}
-          onNewProperty={() => navigate('/properties/new')}
           onOpenChat={() => window.dispatchEvent(new Event('estia:open-chat'))}
           user={user}
           isAdmin={isAdmin}
@@ -326,7 +324,7 @@ export default function Layout({ onLogout }) {
         <RouteProgressBar />
       </div>
 
-      {narrow && <QuickCreateFab />}
+      <QuickCreateFab />
       {narrow && (
         <MobileTabBar
           primary={primary}
@@ -704,7 +702,7 @@ function NavRow({ item, active, tight, collapsed }) {
 }
 
 // ═══ Topbar ══════════════════════════════════════════════════════
-function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, user, isAdmin }) {
+function Topbar({ narrow, onOpenPalette, onOpenChat, user, isAdmin }) {
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
@@ -817,28 +815,6 @@ function Topbar({ narrow, onOpenPalette, onNewLead, onNewProperty, onOpenChat, u
       <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
         {!narrow && !isAdmin && (
           <>
-            <button
-              type="button"
-              onClick={onNewLead}
-              {...preloadOn('/customers/new')}
-              style={{
-                ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
-                padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
-                color: DT.ink, display: 'inline-flex', gap: 6, alignItems: 'center',
-                fontSize: 12, fontWeight: 700,
-              }}
-            ><Plus size={14} /> ליד חדש</button>
-            <button
-              type="button"
-              onClick={onNewProperty}
-              {...preloadOn('/properties/new')}
-              style={{
-                ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
-                padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
-                color: DT.ink, display: 'inline-flex', gap: 6, alignItems: 'center',
-                fontSize: 12, fontWeight: 700,
-              }}
-            ><Plus size={14} /> נכס חדש</button>
             {/* AI quick-create — opens the voice ingest flow; detected
                 kind (lead vs property) routes to the right form with
                 the extracted fields pre-filled. */}
