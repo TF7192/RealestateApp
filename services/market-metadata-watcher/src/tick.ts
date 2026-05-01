@@ -1,4 +1,9 @@
-import type { PrismaClient } from '@prisma/client';
+import type {
+  MarketListingKind,
+  MarketListingPosterType,
+  MarketListingStatus,
+  PrismaClient,
+} from '@prisma/client';
 import type { Logger } from 'pino';
 import { config } from './config.js';
 import { metadataHash, type HashableListing } from './hash.js';
@@ -165,9 +170,14 @@ export async function runWatcherTick(
             floor: item.floor,
             price: item.price,
             pricePerSqm: item.pricePerSqm,
-            kind: item.kind,
-            posterType: item.posterType,
-            status: item.status || 'active',
+            // HashableListing types these as `string | null` to keep the
+            // hash function generic; Prisma's enums are strict. Cast at
+            // the boundary — the source extractors emit only valid
+            // lowercase enum values ('forsale'|'rent', 'private'|'agency',
+            // 'active'|'removed'|'unknown').
+            kind: item.kind as MarketListingKind | null,
+            posterType: item.posterType as MarketListingPosterType | null,
+            status: (item.status || 'active') as MarketListingStatus,
             metadataHash: hash,
             // reactedAt deliberately left NULL — backend reactor
             // processes new rows on its 30s poll cadence.
@@ -201,9 +211,9 @@ export async function runWatcherTick(
                   floor: item.floor,
                   price: item.price,
                   pricePerSqm: item.pricePerSqm,
-                  kind: item.kind,
-                  posterType: item.posterType,
-                  status: item.status || existing.status,
+                  kind: item.kind as MarketListingKind | null,
+                  posterType: item.posterType as MarketListingPosterType | null,
+                  status: (item.status || existing.status) as MarketListingStatus,
                   metadataHash: hash,
                   // Reset reactor cursor on metadata change so the
                   // reactor re-evaluates against possibly-affected
@@ -220,7 +230,7 @@ export async function runWatcherTick(
               marketListingId: existing.id,
               price: item.price ?? null,
               pricePerSqm: item.pricePerSqm ?? null,
-              status: item.status || existing.status,
+              status: (item.status || existing.status) as MarketListingStatus,
               metadataHash: hash,
             },
           });
