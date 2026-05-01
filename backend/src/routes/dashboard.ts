@@ -64,8 +64,11 @@ export const registerDashboardRoutes: FastifyPluginAsync = async (app) => {
   // Returns: { counts, hotLeads, todayMeetings, stuckDeals, staleProperties }
   // - counts: high-level KPIs via prisma.count() — no row scans.
   // - the four lists are tight selectors with `take: 5` each.
-  app.get('/summary', { onRequest: [app.requireAgent] }, async (req) => {
+  app.get('/summary', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const agentId = requireUser(req).id;
+    // Browser-side cache match the in-process LRU TTL — second mount
+    // within 30s is served from disk cache (zero network).
+    reply.header('Cache-Control', 'private, max-age=30');
     return dashboardSummaryCache.wrap(agentId, async () => buildSummary(agentId));
   });
 
@@ -197,8 +200,9 @@ export const registerDashboardRoutes: FastifyPluginAsync = async (app) => {
   // + listProperties + listDeals + listReminders), so KPIs render at
   // ~50ms on cache hits and pipeline/AI priorities fill in ~200ms
   // later. Endpoint kept (not deleted) so older FE builds still work.
-  app.get('/full', { onRequest: [app.requireAgent] }, async (req) => {
+  app.get('/full', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const agentId = requireUser(req).id;
+    reply.header('Cache-Control', 'private, max-age=30');
     return dashboardSummaryCache.wrap(agentId, async () => buildSummary(agentId));
   });
 

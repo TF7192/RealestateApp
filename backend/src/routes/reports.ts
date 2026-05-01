@@ -82,8 +82,9 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
   // that's hundreds of KB of unused row data marshaled out of Postgres.
   // Response shape is byte-for-byte identical to the previous version
   // so the frontend doesn't need to change.
-  app.get('/dashboard', { onRequest: [app.requireAgent] }, async (req) => {
+  app.get('/dashboard', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const agentId = requireUser(req).id;
+    reply.header('Cache-Control', 'private, max-age=60');
     return reportsDashboardCache.wrap(agentId, async () => {
     const propertyWhere = (extra: Record<string, unknown>) => ({
       agentId, status: 'ACTIVE' as const, ...extra,
