@@ -358,15 +358,15 @@ export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
   // by the parent prefix) and a wildcard for the rest.
   const GRAFANA_TARGET = process.env.GRAFANA_INTERNAL_URL || 'http://grafana:3000';
   const proxyHandler = async (req: any, reply: any) => {
-    // Strip the /admin/grafana prefix the FE hits us on; Grafana
-    // expects to see /admin/grafana/<rest> because it's configured to
-    // serve from that sub-path. So we forward the original URL.
-    const url = req.url; // '/admin/grafana/api/...' (relative to /api)
-    // req.url under a route prefix is '/grafana/...' — we need to
-    // rebuild the path Grafana sees. Since GF serves from /admin/grafana,
-    // we rewrite '/grafana/...' → '/admin/grafana/...'.
-    const downstreamPath = url.replace(/^\/grafana/, '/admin/grafana');
-    const target = `${GRAFANA_TARGET}${downstreamPath}`;
+    // req.url is the full path Fastify saw, including any prefix from
+    // nginx — e.g. `/api/admin/grafana/d/estia-overview/estia-overview`.
+    // Grafana itself is configured (GF_SERVER_ROOT_URL +
+    // GF_SERVER_SERVE_FROM_SUB_PATH) to serve from /admin/grafana, so
+    // we forward `/admin/grafana/<rest>` to it. Strip the
+    // `/api/admin/grafana` prefix the FE/nginx layer used and put back
+    // `/admin/grafana` for the upstream.
+    const rest = (req.url as string).replace(/^\/api\/admin\/grafana/, '');
+    const target = `${GRAFANA_TARGET}/admin/grafana${rest}`;
 
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) {
