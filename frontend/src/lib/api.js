@@ -648,12 +648,19 @@ export const api = {
   // Admin platform observability — gated on role=ADMIN server-side
   // (SEC-010; was an email allowlist).
   adminOverview:       () => request('/admin/overview'),
+  adminMonitoring:     () => request('/admin/monitoring'),
   // PERF-007 — single round-trip dashboard load. Returns:
   //   { counts: {properties, leads, deals, reminders, hotLeadsCount, todayMeetings},
   //     hotLeads, todayMeetings, stuckDeals, staleProperties }
   // All lists are ≤5 rows, server-aggregated. Replaces the 4 unbounded
   // list calls Dashboard.jsx used to fire on mount.
   dashboardSummary:    () => request('/dashboard/summary'),
+  // PERF — 2026-05-01: bundled dashboard call. Returns counts +
+  // hotLeads/todayMeetings/stuckDeals/staleProperties (same as
+  // dashboardSummary) PLUS leads/properties/deals/reminders so a single
+  // round-trip can hydrate the entire Dashboard page. Replaces the
+  // 5-call Promise.all in Dashboard.jsx.
+  dashboardFull:       () => request('/dashboard/full'),
   // PERF-019 — combined topbar counts. Returns
   //   { unreadNotifications, publicMatches, hasOpenChat }
   // Replaces the 3-way fan-out Layout.jsx used to do

@@ -109,30 +109,49 @@ export default function Dashboard() {
   const [meetings, setMeetings] = useState([]);
   const [premiumOpen, setPremiumOpen] = useState(false);
 
-  // PERF-007 — pull the aggregated summary in parallel with the four
-  // list endpoints. The summary is used ONLY for the KPI counts (its
-  // count() queries don't bloat the wire); the lists themselves still
-  // come from the legacy endpoints because the page renders a deals
-  // pipeline (needs every deal, not just stuck ones) and a reminders
-  // panel (Reminder rows, not LeadMeeting calendar rows the summary
-  // returns under `todayMeetings`). Mixing the two domains caused
-  // "0 תזכורות" + a broken pipeline on the prior wiring.
+  // PERF — 2026-05-01: single bundled call replaces the prior 5-call
+  // fan-out (dashboardSummary + listLeads + listProperties + listDeals
+  // + listReminders). All five queries still run server-side via
+  // $transaction, but on one HTTP round-trip with one JWT verify and
+  // one connection acquisition. Falls back to the legacy fan-out if
+  // dashboardFull is missing (older backend builds).
   const [summary, setSummary] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      api.dashboardSummary?.().catch(() => null),
-      api.listLeads?.().catch(() => null),
-      api.listProperties?.({ mine: '1' }).catch(() => null),
-      api.listDeals?.().catch(() => null),
-      (api.listReminders?.({ upcoming: '1' }) || Promise.resolve(null)).catch(() => null),
-    ]).then(([s, lRes, pRes, dRes, mRes]) => {
+    const fetchBundle = async () => {
+      const full = await api.dashboardFull?.().catch(() => null);
+      if (full?.counts) {
+        return {
+          summary: full,
+          leads: full.leads?.items || [],
+          properties: full.properties?.items || [],
+          deals: full.deals?.items || [],
+          meetings: full.reminders?.items || [],
+        };
+      }
+      // Fallback: legacy 5-call path (works against pre-bundle backends).
+      const [s, lRes, pRes, dRes, mRes] = await Promise.all([
+        api.dashboardSummary?.().catch(() => null),
+        api.listLeads?.().catch(() => null),
+        api.listProperties?.({ mine: '1' }).catch(() => null),
+        api.listDeals?.().catch(() => null),
+        (api.listReminders?.({ upcoming: '1' }) || Promise.resolve(null)).catch(() => null),
+      ]);
+      return {
+        summary: s?.counts ? s : null,
+        leads: lRes?.items || [],
+        properties: pRes?.items || [],
+        deals: dRes?.items || [],
+        meetings: mRes?.items || [],
+      };
+    };
+    fetchBundle().then((r) => {
       if (cancelled) return;
-      if (s?.counts) setSummary(s);
-      setLeads(lRes?.items || []);
-      setProperties(pRes?.items || []);
-      setDeals(dRes?.items || []);
-      setMeetings(mRes?.items || []);
+      if (r.summary) setSummary(r.summary);
+      setLeads(r.leads);
+      setProperties(r.properties);
+      setDeals(r.deals);
+      setMeetings(r.meetings);
     });
     return () => { cancelled = true; };
   }, []);

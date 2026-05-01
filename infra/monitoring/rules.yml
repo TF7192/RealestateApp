@@ -1,0 +1,88 @@
+# Prometheus alert rules for the Estia stack.
+#
+# These run inside Prometheus itself (no Alertmanager wired yet — when
+# you do, it'll forward firing alerts to Slack/email). Until then, alert
+# state is visible at http://127.0.0.1:9090/alerts and the "Alerts" panel
+# in the Grafana dashboard.
+#
+# Severity convention:
+#   critical  → page someone now (production-impacting)
+#   warning   → investigate today (likely degradation)
+#   info      → track but don't alert (capacity-planning signal)
+
+groups:
+  - name: estia-postgres
+    interval: 30s
+    rules:
+      # Postgres pool exhaustion. With connection_limit=40 × 3 replicas =
+      # 120 logical Prisma connections feeding into RDS max_connections=79.
+      # If sum of active+idle stays >70 for 2 min, queue depth on Prisma
+      # is climbing and users are starting to see "Server is busy".
+      - alert: PostgresPoolHigh
+        expr: sum(pg_stat_activity_count{datname="estia"}) > 70
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Postgres pool {{ $value }}/79 connections — close to RDS max_connections"
+          description: "Sustained high connection count for 2+ min. Investigate slow queries / leaks. Bump RDS instance class if normal load."
+
+      - alert: PostgresPoolWarn
+        expr: sum(pg_stat_activity_count{datname="estia"}) > 50
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Postgres pool {{ $value }}/79 connections — elevated"
+
+      # A single transaction running >10s is the canonical signature of a
+      # bad query plan or a connection-leaked transaction. The backend's
+      # Fastify requestTimeout=5s means user-driven queries can't run that
+      # long; >10s implies a stuck idle-in-transaction or a worker.
+      - alert: PostgresLongTransaction
+        expr: pg_stat_activity_max_tx_duration{datname="estia"} > 10
+        for: 30s
+        labels: { severity: warning }
+        annotations:
+          summary: "Longest running tx is {{ $value }}s on estia DB"
+          description: "Likely a stuck idle-in-transaction. SELECT * FROM pg_stat_activity WHERE state = 'idle in transaction'."
+
+      # Deadlocks happen — but if they're recurring something's wrong.
+      - alert: PostgresDeadlocks
+        expr: rate(pg_stat_database_deadlocks{datname="estia"}[5m]) > 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "Postgres deadlocks {{ $value }}/sec"
+
+  - name: estia-host
+    interval: 30s
+    rules:
+      - alert: EC2HighCPU
+        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "EC2 CPU at {{ $value | humanize }}% — sustained 5+ min"
+          description: "Either a runaway worker, a load spike, or undersized instance. Check Grafana / top."
+
+      - alert: EC2HighMemory
+        expr: 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "EC2 memory at {{ $value | humanize }}% — sustained 5+ min"
+
+      - alert: EC2DiskHigh
+        expr: 100 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100) > 85
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Root filesystem at {{ $value | humanize }}% — clean Docker images / logs"
+          description: "EC2 root partition is 8GB. /data has the Docker data-root. If THIS alert fires, something is writing to / outside Docker."
+
+      # Disk filling up super fast — page someone immediately.
+      - alert: EC2DiskCritical
+        expr: 100 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100) > 95
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "EC2 root filesystem CRITICAL at {{ $value | humanize }}%"

@@ -103,6 +103,11 @@ const PRIMARY_NAV = [
   // Phase 4 — admin observability for the Market Discovery hourly
   // watcher (run log, success/failure history, ingestion counts).
   { k: 'admin-market-watcher', to: '/admin/market-watcher', label: 'Market Watcher · ריצות', Icon: ShieldCheck, adminOnly: true },
+  // 2026-05-01 — admin-only monitoring page wraps the self-hosted
+  // Grafana/Prometheus stack on EC2 (see infra/monitoring/). Surfaces
+  // RDS connection counts, slow queries, deadlocks, host CPU/mem/disk
+  // and any firing Prometheus alerts.
+  { k: 'admin-monitoring', to: '/admin/monitoring', label: 'ניטור · Monitoring', Icon: ActivityIcon, adminOnly: true },
 ];
 const TOOL_NAV = [
   // Single unified ייבוא entry — the /import landing page now offers
