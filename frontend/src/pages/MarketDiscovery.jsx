@@ -11,24 +11,21 @@
 //   - ListingRow/Card  → main feed; row layout by default, cards as toggle
 //   - ListingDrawer    → right-side detail panel on row click
 //   - MatchSendDialog  → WhatsApp template for matched leads
-//   - EmailSignupBanner→ contextual nudge when matches exist + pref off
+//   - Email signup → ⌘ button on the page header (labelled when off)
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Filter, Settings, Eye, EyeOff, List, Grid, X, Sparkles } from 'lucide-react';
+import { Building2, Filter, Mail, MailCheck, Eye, EyeOff, List, Grid, X, Sparkles } from 'lucide-react';
 import api from './../lib/api';
 import { useToast } from './../lib/toast';
 import { freshLabel } from './marketDiscovery/freshLabel';
 import EmptyState from './../components/EmptyState';
-import useInfiniteScroll from './../lib/useInfiniteScroll';
 import PulseStrip from './marketDiscovery/PulseStrip';
 import FilterRail from './marketDiscovery/FilterRail';
 import ListingRow from './marketDiscovery/ListingRow';
 import ListingCard from './marketDiscovery/ListingCard';
 import ListingDrawer from './marketDiscovery/ListingDrawer';
 import MatchSendDialog from './marketDiscovery/MatchSendDialog';
-import EmailSignupBanner from './marketDiscovery/EmailSignupBanner';
-import { shouldShowEmailBanner } from './marketDiscovery/emailBannerGate';
 import EmailSignupModal from './marketDiscovery/EmailSignupModal';
 import './MarketDiscovery.css';
 
@@ -66,6 +63,8 @@ export default function MarketDiscovery() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMoreServer, setHasMoreServer] = useState(false);
   const [error, setError] = useState(null);
   const [lastScan, setLastScan] = useState(null);
   const [pulse, setPulse] = useState(null);
@@ -84,7 +83,6 @@ export default function MarketDiscovery() {
     try { return new Set(JSON.parse(localStorage.getItem(VIEWED_KEY) || '[]')); }
     catch { return new Set(); }
   });
-  const [emailBannerHidden, setEmailBannerHidden] = useState(false);
 
   // Email pref state — same shape as the legacy page.
   const [emailPref, setEmailPref] = useState(null);
@@ -92,8 +90,7 @@ export default function MarketDiscovery() {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [emailDraft, setEmailDraft] = useState('');
 
-  const FETCH_LIMIT = 100;
-  const REVEAL_PAGE = 15;
+  const PAGE_SIZE = 25;
 
   // Persist viewMode.
   useEffect(() => {
@@ -150,28 +147,38 @@ export default function MarketDiscovery() {
     return () => { cancelled = true; };
   }, [matchId, toast]);
 
-  // Listings fetch — re-runs whenever server-side filters or sort change.
+  // Listings fetch — first page on filter/sort change.
+  //
+  // We do server-side pagination instead of one big 100-row pull because
+  // the row payload includes per-listing match-resolution that grows
+  // linearly with leads. Pulling 25 at a time keeps first-render under a
+  // second even on agents with hundreds of leads.
+  //
   // matchedOnly / hideViewed / hideDuplicated are post-filtered client-side
   // so changing them doesn't refetch.
+  const reqIdRef = useRef(0);
   useEffect(() => {
-    let cancelled = false;
+    const myReqId = ++reqIdRef.current;
     setLoading(true);
+    setItems([]);
+    setHasMoreServer(false);
     const serverFilters = stripClientFilters(filters);
-    api.listMarketListings({ ...serverFilters, sort, limit: FETCH_LIMIT, offset: 0 }).then(
+    api.listMarketListings({ ...serverFilters, sort, limit: PAGE_SIZE, offset: 0 }).then(
       (res) => {
-        if (cancelled) return;
-        setItems(res?.items || []);
+        if (myReqId !== reqIdRef.current) return;
+        const fetched = res?.items || [];
+        setItems(fetched);
         setTotal(res?.total || 0);
+        setHasMoreServer(fetched.length >= PAGE_SIZE && fetched.length < (res?.total || 0));
         setLoading(false);
         setError(null);
       },
       (err) => {
-        if (cancelled) return;
+        if (myReqId !== reqIdRef.current) return;
         setError(err?.message || 'טעינה נכשלה');
         setLoading(false);
       },
     );
-    return () => { cancelled = true; };
     // matchedOnly / hideViewed / hideDuplicated are client-side filters
     // (applied to `orderedItems` below) — they intentionally don't
     // re-trigger this fetch.
@@ -180,6 +187,35 @@ export default function MarketDiscovery() {
       filters.posterType, filters.minPrice, filters.maxPrice, filters.minRooms,
       filters.maxRooms, filters.minSqm, filters.maxSqm, filters.status,
       filters.firstSeenAfter, sort]);
+
+  // Fetch the next page of listings, appending to `items`. The stale-
+  // request check (req-id) prevents an in-flight next-page from clobbering
+  // a fresh full-reload triggered by a filter change.
+  const fetchMore = useCallback(async () => {
+    if (loading || loadingMore || !hasMoreServer) return;
+    const myReqId = reqIdRef.current;
+    setLoadingMore(true);
+    try {
+      const serverFilters = stripClientFilters(filters);
+      const res = await api.listMarketListings({
+        ...serverFilters, sort,
+        limit: PAGE_SIZE,
+        offset: items.length,
+      });
+      if (myReqId !== reqIdRef.current) return;
+      const fetched = res?.items || [];
+      setItems((prev) => prev.concat(fetched));
+      setTotal(res?.total || 0);
+      setHasMoreServer(
+        fetched.length >= PAGE_SIZE
+          && (items.length + fetched.length) < (res?.total || 0),
+      );
+    } catch (err) {
+      if (myReqId === reqIdRef.current) toast.error?.(err?.message || 'טעינה נכשלה');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loading, loadingMore, hasMoreServer, filters, sort, items.length, toast]);
 
   const updateFilters = useCallback((patch) => {
     setFilters((f) => {
@@ -230,15 +266,29 @@ export default function MarketDiscovery() {
   }, [items, filters.matchedOnly, filters.hideViewed, filters.hideDuplicated,
       viewedIds, matchedListingId, matchContext]);
 
-  const infinite = useInfiniteScroll(orderedItems.length, {
-    pageSize: REVEAL_PAGE,
-    initial: REVEAL_PAGE,
-    rootMargin: '300px',
-  });
-  const visibleItems = useMemo(
-    () => orderedItems.slice(0, infinite.visible),
-    [orderedItems, infinite.visible],
-  );
+  // Sentinel for "load next page from server". Triggers `fetchMore`
+  // when within 400px of the bottom; happy-dom doesn't ship
+  // IntersectionObserver, so the test environment skips the observer
+  // entirely and the page just doesn't auto-paginate there.
+  const sentinelRef = useRef(null);
+  useEffect(() => {
+    if (!hasMoreServer || loadingMore || loading) return undefined;
+    const node = sentinelRef.current;
+    if (!node) return undefined;
+    if (typeof IntersectionObserver === 'undefined') return undefined;
+    const obs = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          fetchMore();
+          break;
+        }
+      }
+    }, { rootMargin: '400px' });
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, [hasMoreServer, loadingMore, loading, fetchMore]);
+
+  const visibleItems = orderedItems;
 
   const markViewed = useCallback((listingId) => {
     setViewedIds((prev) => {
@@ -382,9 +432,6 @@ export default function MarketDiscovery() {
     }
   };
 
-  const showEmailBanner = !emailBannerHidden
-    && shouldShowEmailBanner(emailPref, pulse?.matchesForMe?.count);
-
   const isStale = !lastScan || (Date.now() - new Date(lastScan.startedAt).getTime()) > 90 * 60 * 1000;
 
   return (
@@ -409,20 +456,34 @@ export default function MarketDiscovery() {
           >
             {filters.hideViewed ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
-          <button
-            type="button"
-            className="md-icon-button"
-            onClick={openEmailModal}
-            aria-pressed={!!emailPref?.enabled}
-            title={emailPref?.enabled
-              ? `התראות מייל פעילות`
-              : 'הגדרות התראות'}
-            style={emailPref?.enabled
-              ? { borderColor: 'var(--success)', color: 'var(--success)', background: 'var(--success-bg)' }
-              : undefined}
-          >
-            <Settings size={16} />
-          </button>
+          {emailPref?.enabled ? (
+            <button
+              type="button"
+              className="md-icon-button"
+              onClick={openEmailModal}
+              aria-pressed
+              title="התראות מייל פעילות — לחצ/י לעדכון"
+              style={{
+                borderColor: 'var(--success)',
+                color: 'var(--success)',
+                background: 'var(--success-bg)',
+              }}
+            >
+              <MailCheck size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={openEmailModal}
+              disabled={emailPref == null}
+              title="קבל מייל בכל פעם שנמצאת התאמה לליד"
+              style={{ minHeight: 40, padding: '8px 14px', fontSize: 13 }}
+            >
+              <Mail size={14} />
+              הירשם להתראות מייל
+            </button>
+          )}
         </div>
       </div>
 
@@ -431,14 +492,6 @@ export default function MarketDiscovery() {
         loading={pulseLoading}
         onApply={(patch) => updateFilters(patch)}
       />
-
-      {showEmailBanner && (
-        <EmailSignupBanner
-          matchCount={pulse?.matchesForMe?.count || 0}
-          onActivate={openEmailModal}
-          onDismiss={() => setEmailBannerHidden(true)}
-        />
-      )}
 
       <div className="md-layout">
         <FilterRail
@@ -600,8 +653,21 @@ export default function MarketDiscovery() {
             </div>
           )}
 
-          {infinite.hasMore && !loading && (
-            <div ref={infinite.sentinelRef} aria-hidden style={{ height: 24 }} />
+          {hasMoreServer && !loading && (
+            <div
+              ref={sentinelRef}
+              aria-hidden
+              style={{
+                height: 64,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-muted)',
+                fontSize: 13,
+              }}
+            >
+              {loadingMore ? 'טוען עוד…' : ''}
+            </div>
           )}
         </div>
       </div>

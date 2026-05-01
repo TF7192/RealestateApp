@@ -8,18 +8,17 @@
 //   3) % פרטי           — share of private posters in the last 7d, with delta
 //   4) שכונות חמות       — top neighborhoods by raw count in last 3d (chip list)
 
-import { TrendingUp, TrendingDown, Sparkles, User, Building2, MapPin } from 'lucide-react';
+import { Sparkles, User, Building2, MapPin } from 'lucide-react';
 
 export default function PulseStrip({ pulse, loading, onApply }) {
   return (
     <div className="md-pulse-strip" aria-label="סיכום פעילות שוק">
       <Tile
         loading={loading}
-        label="חדש ב-24 שעות"
+        label="חדש היום"
         icon={<Sparkles size={14} />}
-        value={pulse?.newLast24h?.count}
-        delta={pulse?.newLast24h?.deltaPct}
-        sub="לחצ/י לסינון ל-24 שעות"
+        value={pulse?.newToday?.count}
+        sub="מאז חצות (שעון ישראל)"
         onClick={() => onApply?.({ firstSeenAfter: '24h' })}
       />
       <Tile
@@ -51,11 +50,7 @@ export default function PulseStrip({ pulse, loading, onApply }) {
   );
 }
 
-function Tile({ loading, label, icon, value, delta, deltaSuffix, sub, onClick, emphasize }) {
-  // Hide the delta when it's zero — "+0% מול תקופה קודמת" is noise; if
-  // the FE wants to surface "no change" it should be a different copy.
-  const hasDelta = delta != null && Number.isFinite(delta) && delta !== 0;
-  const dir = hasDelta ? (delta > 0 ? 'up' : 'down') : 'neutral';
+function Tile({ loading, label, icon, value, sub, onClick, emphasize }) {
   return (
     <button
       type="button"
@@ -72,13 +67,7 @@ function Tile({ loading, label, icon, value, delta, deltaSuffix, sub, onClick, e
       <div className="md-tile-value">
         {loading ? '…' : (value ?? '—')}
       </div>
-      {hasDelta && (
-        <div className={`md-tile-delta ${dir}`}>
-          {dir === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-          {`${delta > 0 ? '+' : ''}${delta}${deltaSuffix ? ` ${deltaSuffix}` : '%'} מול אתמול`}
-        </div>
-      )}
-      {sub && !hasDelta && <div className="md-tile-sub">{sub}</div>}
+      {sub && <div className="md-tile-sub">{sub}</div>}
     </button>
   );
 }

@@ -3,7 +3,7 @@
 //   2) GET /listings honors `firstSeenAfter=24h | 3d | 7d | all`.
 //   3) GET /pulse returns the expected shape and is agent-scoped for
 //      matchesForMe; respects the agent's specialtyCities filter when
-//      computing newLast24h / privatePct / hotNeighborhoods.
+//      computing newToday / privatePct / hotNeighborhoods.
 //   4) GET /pulse is auth-gated.
 //
 // The reactor and matching scorer have their own tests; this file is
@@ -133,7 +133,7 @@ describe('GET /api/market-discovery/pulse', () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json() as Record<string, unknown>;
-    expect(body).toHaveProperty('newLast24h');
+    expect(body).toHaveProperty('newToday');
     expect(body).toHaveProperty('matchesForMe');
     expect(body).toHaveProperty('privatePct');
     expect(body).toHaveProperty('hotNeighborhoods');
@@ -170,7 +170,7 @@ describe('GET /api/market-discovery/pulse', () => {
     expect(body.matchesForMe.count).toBe(0);
   });
 
-  it('respects the agent\'s specialtyCities when scoping newLast24h', async () => {
+  it('respects the agent\'s specialtyCities when scoping newToday', async () => {
     // The route canonicalises both sides via normalizeCity. The seeded
     // listing's `city` must match the canonicalised value the user's
     // specialtyCities reduce to — otherwise the where { in: [...] }
@@ -195,16 +195,16 @@ describe('GET /api/market-discovery/pulse', () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { newLast24h: { count: number } };
+    const body = res.json() as { newToday: { count: number } };
     // Listings inside the specialty city must count.
-    expect(body.newLast24h.count).toBeGreaterThanOrEqual(1);
+    expect(body.newToday.count).toBeGreaterThanOrEqual(1);
     // Listings outside the specialty city must NOT inflate the pulse —
     // the count must be strictly less than the global count over the
     // same window.
     const allCount = await prisma.marketListing.count({
       where: { firstSeenAt: { gte: new Date(Date.now() - DAY) } },
     });
-    expect(body.newLast24h.count).toBeLessThan(allCount);
+    expect(body.newToday.count).toBeLessThan(allCount);
   });
 
   it('401 without an agent cookie', async () => {

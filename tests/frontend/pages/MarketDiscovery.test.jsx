@@ -51,7 +51,7 @@ function defaultMarketHandlers({ items = [], pulse, pref } = {}) {
     ),
     http.get('/api/market-discovery/pulse', () =>
       HttpResponse.json(pulse || {
-        newLast24h: { count: 12, deltaPct: 5 },
+        newToday: { count: 12, deltaPct: 5 },
         matchesForMe: { count: 0 },
         privatePct: { value: 70, deltaPct: null },
         hotNeighborhoods: [],
@@ -100,7 +100,7 @@ describe('<MarketDiscovery> — pulse strip', () => {
   it('renders the KPI numbers from /pulse', async () => {
     server.use(...defaultMarketHandlers({
       pulse: {
-        newLast24h: { count: 42, deltaPct: 12 },
+        newToday: { count: 42, deltaPct: 12 },
         matchesForMe: { count: 3 },
         privatePct: { value: 75, deltaPct: -2 },
         hotNeighborhoods: [
@@ -164,35 +164,21 @@ describe('<MarketDiscovery> — drawer', () => {
   });
 });
 
-describe('<MarketDiscovery> — email signup banner', () => {
-  it('shows the soft banner when there are matches and prefs are off', async () => {
+describe('<MarketDiscovery> — email signup CTA in the page header', () => {
+  it('shows a labelled "הירשם להתראות מייל" button when prefs are off', async () => {
     server.use(...defaultMarketHandlers({
-      pulse: {
-        newLast24h: { count: 0, deltaPct: null },
-        matchesForMe: { count: 4 },
-        privatePct: { value: null, deltaPct: null },
-        hotNeighborhoods: [],
-      },
       pref: { marketMatchEmailEnabled: false, customDeliveryEmail: null },
     }));
     render(<MarketDiscovery />, { route: '/market-discovery' });
-    await screen.findByRole('button', { name: 'הפעל התראות' });
+    await screen.findByRole('button', { name: /הירשם להתראות מייל/ });
   });
 
-  it('does NOT show the banner when prefs are already on', async () => {
+  it('collapses to an icon button when prefs are already on', async () => {
     server.use(...defaultMarketHandlers({
-      pulse: {
-        newLast24h: { count: 0, deltaPct: null },
-        matchesForMe: { count: 4 },
-        privatePct: { value: null, deltaPct: null },
-        hotNeighborhoods: [],
-      },
       pref: { marketMatchEmailEnabled: true, customDeliveryEmail: null },
     }));
     render(<MarketDiscovery />, { route: '/market-discovery' });
-    // Wait for /pulse to settle — once the page-title row shows the
-    // "מודעות" subtitle, the parallel /pref fetch has resolved too.
     await screen.findByText(/מודעות חדשות בשוק/);
-    expect(screen.queryByRole('button', { name: 'הפעל התראות' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /הירשם להתראות מייל/ })).not.toBeInTheDocument();
   });
 });

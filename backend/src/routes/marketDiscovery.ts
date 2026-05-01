@@ -45,6 +45,34 @@ const listFiltersSchema = z.object({
   offset:         z.coerce.number().int().min(0).default(0),
 });
 
+// Compute "midnight (00:00:00.000) in Asia/Jerusalem", optionally
+// `daysAgo` calendar days ago (1 = yesterday's midnight). DST-aware:
+// derives the IL offset from `Intl.DateTimeFormat` for `now`, then
+// applies the same offset when constructing the IL-midnight instant —
+// good enough for the spring-forward / fall-back gap because the
+// midnight boundary itself is stable (the gap happens at 02:00).
+function ilMidnight(now: Date, daysAgo: number): Date {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
+  const parts = Object.fromEntries(
+    fmt.formatToParts(now).map((p) => [p.type, p.value]),
+  ) as Record<string, string>;
+  const y = Number(parts.year);
+  const m = Number(parts.month);
+  const d = Number(parts.day);
+  const h = parts.hour === '24' ? 0 : Number(parts.hour);
+  const mn = Number(parts.minute);
+  const s = Number(parts.second);
+  // The offset between the IL wall-clock representation of `now` and
+  // the actual UTC instant. Israel is UTC+2 (winter) or UTC+3 (summer).
+  const offsetMs = Date.UTC(y, m - 1, d, h, mn, s) - now.getTime();
+  // IL midnight on the requested calendar day, expressed as a UTC instant.
+  return new Date(Date.UTC(y, m - 1, d - daysAgo, 0, 0, 0) - offsetMs);
+}
+
 function sortToOrderBy(sort: string): { [k: string]: 'asc' | 'desc' }[] {
   switch (sort) {
     case 'price-asc':       return [{ price: 'asc' },       { firstSeenAt: 'desc' }];
@@ -334,13 +362,17 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
   // upstream watcher only runs hourly, so freshness < 1min is overkill.
   app.get('/pulse', async (req, reply) => {
     const userId = getUser(req)!.id;
-    const now = Date.now();
+    const now = new Date();
     const dayMs = 24 * 3600 * 1000;
-    const since1d = new Date(now - dayMs);
-    const since2d = new Date(now - 2 * dayMs);
-    const since3d = new Date(now - 3 * dayMs);
-    const since7d = new Date(now - 7 * dayMs);
-    const since14d = new Date(now - 14 * dayMs);
+    // "Today" + "yesterday" boundaries — Asia/Jerusalem since-midnight,
+    // not rolling-24h. Agents read "חדש היום" as "since I went to bed",
+    // not "in the last day". DST-aware via Intl.DateTimeFormat.
+    const startOfTodayIL = ilMidnight(now, 0);
+    const startOfYesterdayIL = ilMidnight(now, 1);
+    // Other windows stay rolling — privatePct is a 7d trend, not a
+    // calendar-week metric, and the matches feed is naturally 3d-rolling.
+    const since3d = new Date(now.getTime() - 3 * dayMs);
+    const since7d = new Date(now.getTime() - 7 * dayMs);
 
     // Honor the agent's specialty-cities filter when scoping the pulse —
     // the dashboard tiles should reflect the same catalogue the user
@@ -362,18 +394,23 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
       totalLast7,
       neighborhoodGroups,
     ] = await Promise.all([
-      prisma.marketListing.count({ where: { ...cityScope, firstSeenAt: { gte: since1d } } }),
+      prisma.marketListing.count({ where: { ...cityScope, firstSeenAt: { gte: startOfTodayIL } } }),
       prisma.marketListing.count({
-        where: { ...cityScope, firstSeenAt: { gte: since2d, lt: since1d } },
+        where: { ...cityScope, firstSeenAt: { gte: startOfYesterdayIL, lt: startOfTodayIL } },
       }),
       // matchesForMe: count DISTINCT listings (not match rows) so the
       // tile count agrees with the number of cards the agent will see
-      // when they click through to "matchedOnly".
+      // when they click through to "matchedOnly". Also gated by the
+      // agent's specialtyCities — the other 3 KPIs already respect
+      // that scope, so a divergent matchesForMe number was confusing.
       prisma.marketListingLeadMatch.findMany({
         where: {
           agentUserId: userId,
           status: { not: 'dismissed' },
           createdAt: { gte: since3d },
+          ...(specialty.length > 0
+            ? { marketListing: { is: { city: { in: specialty } } } }
+            : {}),
         },
         select: { marketListingId: true },
         distinct: ['marketListingId'],
@@ -395,20 +432,15 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
         take: 5,
       }),
     ]);
-    // Discard the unused 14-day window — we no longer report a delta on
-    // privatePct because "+0 נק׳" tiles were noisy without context.
-    void since14d;
-
     const newDeltaPct = newPrev24 > 0
       ? Math.round(((newLast24 - newPrev24) / newPrev24) * 100)
       : null;
     const privatePct = totalLast7 > 0 ? Math.round((privateLast7 / totalLast7) * 100) : null;
 
     return reply.send({
-      // 24-hour rolling window — labelled "ב-24 שעות" on the FE so the
-      // copy stops promising "since-midnight" semantics that the math
-      // doesn't deliver.
-      newLast24h:   { count: newLast24, deltaPct: newDeltaPct },
+      // Since-midnight in Asia/Jerusalem. The FE labels this "חדש היום"
+      // and the math finally agrees with the wall-clock the agent reads.
+      newToday:     { count: newLast24, deltaPct: newDeltaPct },
       matchesForMe: { count: matchedListingIds.length },
       privatePct:   { value: privatePct },
       hotNeighborhoods: neighborhoodGroups.map((g) => ({
