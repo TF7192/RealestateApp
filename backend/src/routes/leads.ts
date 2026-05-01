@@ -301,10 +301,17 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       }];
     }
 
+    // PERF — 2026-05-01: drop the include of viewings/agreements/
+    // searchProfiles from the LIST response. Those relations are only
+    // rendered on the lead-detail endpoint; on Customers.jsx /
+    // Dashboard.jsx the list cards just need name/phone/status/
+    // lookingFor/budget/etc. Dropping them shrinks per-row payload
+    // ~3× for an active lead with multiple viewings + agreements.
+    // Same pattern as the /api/properties list trim.
+    //
     // PERF-002 — overfetch by 1 to detect a next page.
     const items = await prisma.lead.findMany({
       where,
-      include: { viewings: true, agreements: true, searchProfiles: true },
       orderBy: { createdAt: 'desc' },
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

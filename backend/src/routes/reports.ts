@@ -3,6 +3,13 @@ import { z } from 'zod';
 import { Readable } from 'node:stream';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { createLru } from '../lib/lru.js';
+
+// 60s per-agent LRU for /api/reports/dashboard. The endpoint runs 13
+// count+aggregate queries in $transaction; counts don't change every
+// second, so absorbing repeat calls within a 60s window cuts ~13 DB
+// queries per dashboard remount to ~0 in the steady state.
+const reportsDashboardCache = createLru<string, any>({ max: 10_000, ttlMs: 60_000 });
 
 // Sprint 4 / MLS parity — Task E1 + B5. Range parser for date-bounded
 // reports and CSV exports. ISO strings; missing = no bound on that end.
@@ -77,6 +84,7 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
   // so the frontend doesn't need to change.
   app.get('/dashboard', { onRequest: [app.requireAgent] }, async (req) => {
     const agentId = requireUser(req).id;
+    return reportsDashboardCache.wrap(agentId, async () => {
     const propertyWhere = (extra: Record<string, unknown>) => ({
       agentId, status: 'ACTIVE' as const, ...extra,
     });
@@ -121,6 +129,7 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
         totalCommission: signedCommissionAgg._sum.commission || 0,
       },
     };
+    });
   });
 
   // Sprint 4 / MLS parity — Task E1. Five date-bounded reports mirroring

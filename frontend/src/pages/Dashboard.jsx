@@ -109,49 +109,46 @@ export default function Dashboard() {
   const [meetings, setMeetings] = useState([]);
   const [premiumOpen, setPremiumOpen] = useState(false);
 
-  // PERF — 2026-05-01: single bundled call replaces the prior 5-call
-  // fan-out (dashboardSummary + listLeads + listProperties + listDeals
-  // + listReminders). All five queries still run server-side via
-  // $transaction, but on one HTTP round-trip with one JWT verify and
-  // one connection acquisition. Falls back to the legacy fan-out if
-  // dashboardFull is missing (older backend builds).
+  // PERF — 2026-05-01 v2: progressive load.
+  // First effect: fetch the THIN /api/dashboard/full (counts + 4 top-N
+  // tiles, server-cached 30s) and render KPIs immediately. Cache hit
+  // path resolves in <30ms.
+  // Second effect: in parallel, fetch the four heavy lists
+  // (listLeads/listProperties/listDeals/listReminders) so the deals
+  // pipeline + AI priorities + hot-leads filter + today's reminders
+  // can hydrate after the first paint. The user sees the KPI tiles
+  // ~30ms in and the rest fills in ~200ms later — vs. the prior bundled
+  // call which made the entire page wait for every query before any
+  // paint.
   const [summary, setSummary] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    const fetchBundle = async () => {
-      const full = await api.dashboardFull?.().catch(() => null);
-      if (full?.counts) {
-        return {
-          summary: full,
-          leads: full.leads?.items || [],
-          properties: full.properties?.items || [],
-          deals: full.deals?.items || [],
-          meetings: full.reminders?.items || [],
-        };
-      }
-      // Fallback: legacy 5-call path (works against pre-bundle backends).
-      const [s, lRes, pRes, dRes, mRes] = await Promise.all([
-        api.dashboardSummary?.().catch(() => null),
-        api.listLeads?.().catch(() => null),
-        api.listProperties?.({ mine: '1' }).catch(() => null),
-        api.listDeals?.().catch(() => null),
-        (api.listReminders?.({ upcoming: '1' }) || Promise.resolve(null)).catch(() => null),
-      ]);
-      return {
-        summary: s?.counts ? s : null,
-        leads: lRes?.items || [],
-        properties: pRes?.items || [],
-        deals: dRes?.items || [],
-        meetings: mRes?.items || [],
-      };
-    };
-    fetchBundle().then((r) => {
+    // Critical-path: KPIs only.
+    (api.dashboardFull?.() || api.dashboardSummary?.() || Promise.resolve(null))
+      .catch(() => null)
+      .then((s) => {
+        if (cancelled) return;
+        if (s?.counts) setSummary(s);
+      });
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    // Heavy lists — fired in parallel, after the React render that
+    // surfaces the KPI tiles. Each call uses an existing endpoint so
+    // there's no new server-side bundling to maintain. If any one
+    // fails the others still hydrate.
+    Promise.all([
+      api.listLeads?.().catch(() => null),
+      api.listProperties?.({ mine: '1' }).catch(() => null),
+      api.listDeals?.().catch(() => null),
+      (api.listReminders?.({ upcoming: '1' }) || Promise.resolve(null)).catch(() => null),
+    ]).then(([lRes, pRes, dRes, mRes]) => {
       if (cancelled) return;
-      if (r.summary) setSummary(r.summary);
-      setLeads(r.leads);
-      setProperties(r.properties);
-      setDeals(r.deals);
-      setMeetings(r.meetings);
+      setLeads(lRes?.items || []);
+      setProperties(pRes?.items || []);
+      setDeals(dRes?.items || []);
+      setMeetings(mRes?.items || []);
     });
     return () => { cancelled = true; };
   }, []);

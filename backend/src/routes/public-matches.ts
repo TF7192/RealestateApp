@@ -13,6 +13,15 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
 import { logActivity } from '../lib/activity.js';
+import { createLru } from '../lib/lru.js';
+
+// 30s per-viewer cache for the badge count. The query is O(pool ×
+// leads) — well-scaled at small data sizes, but still avoidable to run
+// on every page nav. The freshness window matches the topbar-counts
+// cache so the chip behaves consistently.
+const publicMatchesCountCache = createLru<string, { count: number; cachedAt: number }>({
+  max: 10_000, ttlMs: 30_000,
+});
 import { evaluateLeadProperty } from '../lib/matching.js';
 
 // Publish note is the short blurb the publishing agent can attach —
@@ -219,6 +228,14 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
   // `/public-matches` which paginates on the way out.
   app.get('/count', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const u = requireUser(req);
+    // 30s per-viewer in-process cache (PERF — 2026-05-01). The badge
+    // is fine to be ≤30s stale; the inner O(pool × leads) loop is the
+    // hot spot we're avoiding.
+    const cached = publicMatchesCountCache.get(u.id);
+    if (cached) {
+      reply.header('Cache-Control', 'private, max-age=60');
+      return { count: cached.count };
+    }
     const [pool, leads, mySeen] = await Promise.all([
       prisma.property.findMany({
         where: { isPublicMatch: true, NOT: { agentId: u.id } },
@@ -262,6 +279,7 @@ export const registerPublicMatchRoutes: FastifyPluginAsync = async (app) => {
     // PERF-003 — 60s private cache so a session reloading three pages
     // in a minute doesn't re-run the inner loop on every nav.
     reply.header('Cache-Control', 'private, max-age=60');
+    publicMatchesCountCache.set(u.id, { count, cachedAt: Date.now() });
     return { count, poolSize: pool.length };
   });
 

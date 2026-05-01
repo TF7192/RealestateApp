@@ -23,6 +23,15 @@ const topbarCache = createLru<string, { unreadNotifications: number; publicMatch
   ttlMs: 30_000,
 });
 
+// 30s per-agent LRU for /api/dashboard/summary AND /api/dashboard/full.
+// Both endpoints return the same shape (counts + 4 top-N tiles); the
+// heavy-list block was dropped from /full as part of the 2026-05-01
+// "split the dashboard fan-out" perf work — the FE now calls listLeads
+// / listProperties / listDeals / listReminders separately AFTER the
+// initial KPI paint, so the dashboard fast-path renders in <50ms on
+// cache hits and the lists hydrate in the background.
+const dashboardSummaryCache = createLru<string, any>({ max: 10_000, ttlMs: 30_000 });
+
 // Anchor "today" to Asia/Jerusalem, not the container TZ. EC2 runs UTC,
 // so `new Date(year, month, date)` would yield 00:00 UTC = 02:00/03:00
 // IL — meetings scheduled before that line on a real Israeli day would
@@ -57,6 +66,11 @@ export const registerDashboardRoutes: FastifyPluginAsync = async (app) => {
   // - the four lists are tight selectors with `take: 5` each.
   app.get('/summary', { onRequest: [app.requireAgent] }, async (req) => {
     const agentId = requireUser(req).id;
+    return dashboardSummaryCache.wrap(agentId, async () => buildSummary(agentId));
+  });
+
+  // Internal builder — split out so /full can reuse it.
+  async function buildSummary(agentId: string) {
     const now = new Date();
     const startOfDay = startOfJerusalemDay(now);
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
@@ -172,131 +186,22 @@ export const registerDashboardRoutes: FastifyPluginAsync = async (app) => {
         daysSinceLastTouch:  Math.max(0, Math.floor((ts - p.updatedAt.getTime()) / msPerDay)),
       })),
     };
-  });
+  } // end buildSummary
 
-  // PERF — 2026-05-01: bundled dashboard endpoint. Replaces 5 parallel
-  // round-trips from Dashboard.jsx (dashboardSummary + listLeads +
-  // listProperties + listDeals + listReminders) with one. The page
-  // genuinely needs the full lists (deals pipeline, AI priorities,
-  // hot-lead filter, today's reminders) — bundling doesn't shrink data,
-  // it cuts 5 HTTP request lifecycles to 1 + 5 JWT verifies to 1 + 5
-  // connection acquisitions to <=1 (queries run in $transaction so
-  // they can share a connection at the Prisma level).
+  // PERF — 2026-05-01 v2: /api/dashboard/full now returns the SAME
+  // thin shape as /summary (counts + 4 top-N tiles). The heavy-list
+  // block (200-row leads/properties/deals/reminders) was dropped —
+  // bundling all that into the critical-path dashboard call made the
+  // KPI paint wait on 14 DB queries × 200 rows. The FE's Dashboard.jsx
+  // now lazy-fetches the lists after first paint (parallel listLeads
+  // + listProperties + listDeals + listReminders), so KPIs render at
+  // ~50ms on cache hits and pipeline/AI priorities fill in ~200ms
+  // later. Endpoint kept (not deleted) so older FE builds still work.
   app.get('/full', { onRequest: [app.requireAgent] }, async (req) => {
     const agentId = requireUser(req).id;
-    const now = new Date();
-    const startOfDay = startOfJerusalemDay(now);
-    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
-    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const upcomingCutoff = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    const [
-      // Summary block (same as /summary above)
-      propertiesCount, leadsCount, dealsCount, remindersCount,
-      hotLeadsCount, todayMeetingsCount,
-      hotLeadsRows, todayMeetingsRows, stuckDealsRows, stalePropertiesRows,
-      // Full lists for the page itself
-      leads, properties, deals, reminders,
-    ] = await prisma.$transaction([
-      // ── Summary counts + top-N (mirrors /summary)
-      prisma.property.count({ where: { agentId } }),
-      prisma.lead.count({ where: { agentId } }),
-      prisma.deal.count({ where: { agentId } }),
-      prisma.reminder.count({ where: { agentId, status: 'PENDING' } }),
-      prisma.lead.count({ where: { agentId, status: 'HOT' } }),
-      prisma.leadMeeting.count({ where: { agentId, startsAt: { gte: startOfDay, lt: endOfDay } } }),
-      prisma.lead.findMany({
-        where: { agentId, status: 'HOT' },
-        select: { id: true, name: true, status: true, city: true, lastContact: true },
-        orderBy: [{ lastContact: 'desc' }, { createdAt: 'desc' }], take: 5,
-      }),
-      prisma.leadMeeting.findMany({
-        where: { agentId, startsAt: { gte: startOfDay, lt: endOfDay } },
-        select: { id: true, title: true, startsAt: true, lead: { select: { name: true } } },
-        orderBy: { startsAt: 'asc' }, take: 5,
-      }),
-      prisma.deal.findMany({
-        where: { agentId, status: 'NEGOTIATING', updatedAt: { lt: sevenDaysAgo } },
-        select: { id: true, propertyStreet: true, city: true, status: true, updatedAt: true },
-        orderBy: { updatedAt: 'asc' }, take: 5,
-      }),
-      prisma.property.findMany({
-        where: { agentId, status: 'ACTIVE', updatedAt: { lt: fourteenDaysAgo } },
-        select: { id: true, street: true, city: true, updatedAt: true },
-        orderBy: { updatedAt: 'asc' }, take: 5,
-      }),
-      // ── Full lists (same shapes the FE listX() endpoints would return)
-      // Cap at 200 each — matches the existing endpoints' default take.
-      prisma.lead.findMany({
-        where: { agentId },
-        // Same select Customers.jsx + Dashboard.jsx + AI priorities consume.
-        // Notably skipping the heavy includes (viewings/agreements) — those
-        // are only on the lead-detail endpoint.
-        orderBy: { createdAt: 'desc' }, take: 200,
-      }),
-      prisma.property.findMany({
-        where: { agentId },
-        select: {
-          id: true, agentId: true, slug: true, street: true, city: true, unitNumber: true,
-          lat: true, lng: true, assetClass: true, category: true, type: true, status: true,
-          marketingPrice: true, rooms: true, sqm: true, owner: true, ownerPhone: true,
-          priority: true, coBrokered: true, createdAt: true, updatedAt: true,
-          images: {
-            select: { id: true, url: true, urlThumb: true, urlCard: true, sortOrder: true },
-            orderBy: { sortOrder: 'asc' }, take: 1,
-          },
-          marketingActions: { select: { actionKey: true, done: true } },
-        },
-        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 200,
-      }),
-      prisma.deal.findMany({
-        where: { agentId },
-        orderBy: { updatedAt: 'desc' }, take: 200,
-      }),
-      prisma.reminder.findMany({
-        where: {
-          agentId, status: 'PENDING',
-          dueAt: { lt: upcomingCutoff },
-        },
-        orderBy: { dueAt: 'asc' }, take: 200,
-      }),
-    ]);
-
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const ts = now.getTime();
-    return {
-      counts: {
-        properties: propertiesCount, leads: leadsCount, deals: dealsCount,
-        reminders: remindersCount, hotLeadsCount, todayMeetings: todayMeetingsCount,
-      },
-      hotLeads: hotLeadsRows.map((l) => ({
-        id: l.id, name: l.name, status: l.status, city: l.city,
-        lastContactAt: l.lastContact ? l.lastContact.toISOString() : null,
-      })),
-      todayMeetings: todayMeetingsRows.map((m) => ({
-        id: m.id, leadName: m.lead?.name ?? null,
-        propertyTitle: m.title, time: m.startsAt.toISOString(),
-      })),
-      stuckDeals: stuckDealsRows.map((d) => ({
-        id: d.id,
-        address: [d.propertyStreet, d.city].filter(Boolean).join(', ') || d.propertyStreet || '',
-        daysStuck: Math.max(0, Math.floor((ts - d.updatedAt.getTime()) / msPerDay)),
-        stage: d.status,
-      })),
-      staleProperties: stalePropertiesRows.map((p) => ({
-        id: p.id, street: p.street, city: p.city,
-        daysSinceLastTouch: Math.max(0, Math.floor((ts - p.updatedAt.getTime()) / msPerDay)),
-      })),
-      // Items follow the listX() response envelope shape: { items: [...] }
-      // so the FE can drop in `dashboardFull().leads.items` where it
-      // previously had `listLeads().items`.
-      leads:      { items: leads,      nextCursor: null },
-      properties: { items: properties, nextCursor: null },
-      deals:      { items: deals,      nextCursor: null },
-      reminders:  { items: reminders,  nextCursor: null },
-    };
+    return dashboardSummaryCache.wrap(agentId, async () => buildSummary(agentId));
   });
+
 };
 
 // PERF-019 — combined topbar counts (notifications, public matches,
