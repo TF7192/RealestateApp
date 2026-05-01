@@ -171,11 +171,21 @@ jobs:
           echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u token --password-stdin >/dev/null
           export ESTIA_TAG
           sudo -E docker compose -f docker-compose.prod.yml pull
-          sudo -E docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          # PERF — 2026-05-01: scale backend to 2 replicas. Frontend
+          # nginx upstream uses Docker's embedded DNS resolver (see
+          # frontend/nginx.conf) so adding/removing replicas takes
+          # effect within ~10s without an nginx reload. The exec call
+          # below targets backend-1 explicitly to run prisma migrate
+          # deploy exactly once (not per-replica).
+          sudo -E docker compose -f docker-compose.prod.yml up -d \
+            --scale backend=2 --remove-orphans
           if [ "$SKIP_MIGRATIONS" = "true" ]; then
             echo 'skip_migrations=true — not running prisma migrate deploy'
           else
-            sudo -E docker compose -f docker-compose.prod.yml exec -T backend npx prisma migrate deploy
+            # `compose exec backend` doesn't work cleanly when service
+            # has >1 replica (compose picks one but logs a warning).
+            # Target backend-1 directly via container name.
+            sudo docker exec -e DATABASE_URL="$(sudo grep -E '^DATABASE_URL=' .env | cut -d= -f2- | tr -d '\"')" estia-new-backend-1 npx prisma migrate deploy
           fi
           echo "$ESTIA_TAG" | sudo tee .deployed_sha >/dev/null
           sudo docker image prune -af >/dev/null 2>&1 || true

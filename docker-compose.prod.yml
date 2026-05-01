@@ -26,7 +26,14 @@ services:
       # routes writes to S3. See docker-compose.yml header note.
       UPLOADS_DIR: /app/uploads
     ports:
-      - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT:-6002}:4000"
+      # Port range so `docker compose up --scale backend=N` (PERF —
+      # 2026-05-01) auto-allocates a host-side port per replica. With
+      # a literal `:6002:4000`, the second replica fails to bind and
+      # only the first comes up. Range stays inside 127.0.0.1 so the
+      # backend remains internal-only — public traffic flows through
+      # the frontend nginx upstream `backend:4000` (which uses Docker's
+      # embedded DNS round-robin, see frontend/nginx.conf resolver).
+      - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT_RANGE:-6002-6003}:4000"
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
