@@ -1179,6 +1179,7 @@ export const api = {
   ),
   getMarketMatch:     (id)            => request(`/market-discovery/match/${encodeURIComponent(id)}`),
   getMarketLastScan:  ()              => request('/market-discovery/last-scan'),
+  getMarketPulse:     ()              => request('/market-discovery/pulse'),
   // Phase 4 — admin observability for the watcher.
   listMarketWatcherRuns: () => request('/admin/market-watcher/runs'),
   // Phase 3 — opt-in notification preferences.

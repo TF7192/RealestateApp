@@ -26,9 +26,10 @@ const listFiltersSchema = z.object({
   minSqm:         z.coerce.number().int().min(0).optional(),
   maxSqm:         z.coerce.number().int().min(0).optional(),
   status:         z.enum(['active', 'removed', 'unknown']).optional(),
-  // ISO date or "24h" / "7d" / "30d" / "all" shorthand. Default 24h:
-  // agents care about fresh deal flow, not 6-month-old listings.
-  firstSeenAfter: z.union([z.coerce.date(), z.enum(['24h', '7d', '30d', 'all'])]).optional(),
+  // ISO date or "24h" / "3d" / "7d" / "30d" / "all" shorthand. Default
+  // is 3 days — agents return to this page across a workday and want
+  // continuity, but not 6-month-old listings.
+  firstSeenAfter: z.union([z.coerce.date(), z.enum(['24h', '3d', '7d', '30d', 'all'])]).optional(),
   // Phase 2 sort options. Allowlisted enum so the orderBy mapping
   // below can't be tricked into ordering by a column that has no
   // index (every value here corresponds to a real index on
@@ -99,11 +100,12 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     if (f.kind) where.kind = f.kind;
     if (f.posterType) where.posterType = f.posterType;
     if (f.status) where.status = f.status;
-    // 24h is the default: an agent opens "מודעות חדשות בשוק" expecting
-    // *new* deal flow, not yesterday's leftovers. Pass `firstSeenAfter=all`
-    // to disable.
+    // 3d is the default: agents revisit this page across a workday and
+    // expect continuity (a hot listing seen at 9am should still be on
+    // the list at 4pm). Pass `firstSeenAfter=all` to disable.
     const sinceShorthand: Record<string, number | null> = {
       '24h': 24 * 3600 * 1000,
+      '3d':  3 * 24 * 3600 * 1000,
       '7d':  7 * 24 * 3600 * 1000,
       '30d': 30 * 24 * 3600 * 1000,
       'all': null,
@@ -114,8 +116,8 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     } else if (f.firstSeenAfter instanceof Date) {
       where.firstSeenAt = { gte: f.firstSeenAfter };
     } else {
-      // Default — last 24h.
-      where.firstSeenAt = { gte: new Date(Date.now() - 24 * 3600 * 1000) };
+      // Default — last 3 days.
+      where.firstSeenAt = { gte: new Date(Date.now() - 3 * 24 * 3600 * 1000) };
     }
     if (f.minPrice != null || f.maxPrice != null) {
       where.price = {
@@ -170,7 +172,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
             select: {
               id: true, score: true, reasonsJson: true,
               leadId: true, marketListingId: true,
-              lead: { select: { name: true } },
+              lead: { select: { id: true, name: true, phone: true } },
             },
           })
         : Promise.resolve([] as any[]),
@@ -204,11 +206,12 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     const items = rawItems.map((x) => {
       const ms = matchesByListing.get(x.id) || [];
       const matches = ms.slice(0, 5).map((m) => ({
-        id:       m.id,
-        score:    m.score,
-        reasons:  m.reasonsJson,
-        leadId:   m.leadId,
-        leadName: m.lead?.name || null,
+        id:        m.id,
+        score:     m.score,
+        reasons:   m.reasonsJson,
+        leadId:    m.leadId,
+        leadName:  m.lead?.name || null,
+        leadPhone: m.lead?.phone || null,
       }));
       return {
         ...x,
@@ -324,6 +327,103 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     return reply.send({ ok: true });
   });
 
+  // GET /api/market-discovery/pulse — Phase 5 dashboard tiles.
+  // Cheap aggregate counts for the redesigned page header. Agent-scoped
+  // where relevant (matchesForMe). Each query hits an existing index —
+  // no new schema work needed. 60s in-memory cache is acceptable; the
+  // upstream watcher only runs hourly, so freshness < 1min is overkill.
+  app.get('/pulse', async (req, reply) => {
+    const userId = getUser(req)!.id;
+    const now = Date.now();
+    const dayMs = 24 * 3600 * 1000;
+    const since1d = new Date(now - dayMs);
+    const since2d = new Date(now - 2 * dayMs);
+    const since3d = new Date(now - 3 * dayMs);
+    const since7d = new Date(now - 7 * dayMs);
+    const since14d = new Date(now - 14 * dayMs);
+
+    // Honor the agent's specialty-cities filter when scoping the pulse —
+    // the dashboard tiles should reflect the same catalogue the user
+    // sees in the row list, not the cross-country firehose.
+    const me = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { specialtyCities: true },
+    });
+    const specialty = (me?.specialtyCities ?? [])
+      .map((c) => normalizeCity(c)?.value ?? c)
+      .filter(Boolean);
+    const cityScope = specialty.length > 0 ? { city: { in: specialty } } : {};
+
+    const [
+      newLast24,
+      newPrev24,
+      matchesForMe,
+      privateLast7,
+      totalLast7,
+      privatePrev7,
+      totalPrev7,
+      neighborhoodGroups,
+    ] = await Promise.all([
+      prisma.marketListing.count({ where: { ...cityScope, firstSeenAt: { gte: since1d } } }),
+      prisma.marketListing.count({
+        where: { ...cityScope, firstSeenAt: { gte: since2d, lt: since1d } },
+      }),
+      prisma.marketListingLeadMatch.count({
+        where: {
+          agentUserId: userId,
+          status: { not: 'dismissed' },
+          createdAt: { gte: since3d },
+        },
+      }),
+      prisma.marketListing.count({
+        where: { ...cityScope, posterType: 'private', firstSeenAt: { gte: since7d } },
+      }),
+      prisma.marketListing.count({ where: { ...cityScope, firstSeenAt: { gte: since7d } } }),
+      prisma.marketListing.count({
+        where: {
+          ...cityScope,
+          posterType: 'private',
+          firstSeenAt: { gte: since14d, lt: since7d },
+        },
+      }),
+      prisma.marketListing.count({
+        where: { ...cityScope, firstSeenAt: { gte: since14d, lt: since7d } },
+      }),
+      // Hottest neighborhoods by raw listing count in last 3 days.
+      prisma.marketListing.groupBy({
+        by: ['neighborhood', 'city'],
+        where: {
+          ...cityScope,
+          firstSeenAt: { gte: since3d },
+          neighborhood: { not: null },
+        },
+        _count: { _all: true },
+        orderBy: { _count: { neighborhood: 'desc' } },
+        take: 5,
+      }),
+    ]);
+
+    const newDeltaPct = newPrev24 > 0
+      ? Math.round(((newLast24 - newPrev24) / newPrev24) * 100)
+      : null;
+    const privatePct = totalLast7 > 0 ? Math.round((privateLast7 / totalLast7) * 100) : null;
+    const privatePrevPct = totalPrev7 > 0 ? Math.round((privatePrev7 / totalPrev7) * 100) : null;
+    const privateDeltaPct = privatePct != null && privatePrevPct != null
+      ? privatePct - privatePrevPct
+      : null;
+
+    return reply.send({
+      newToday:     { count: newLast24, deltaPct: newDeltaPct },
+      matchesForMe: { count: matchesForMe },
+      privatePct:   { value: privatePct, deltaPct: privateDeltaPct },
+      hotNeighborhoods: neighborhoodGroups.map((g) => ({
+        neighborhood: g.neighborhood,
+        city: g.city,
+        count: g._count._all,
+      })),
+    });
+  });
+
   // GET /api/market-discovery/last-scan — Phase 4 observability.
   // Returns the latest successful MarketWatcherRun summary so the
   // /market-discovery page can show "נסרק לפני X דקות". All agents
@@ -351,7 +451,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
       where: { id: req.params.id, agentUserId: userId },
       include: {
         marketListing: true,
-        lead: { select: { id: true, name: true, city: true } },
+        lead: { select: { id: true, name: true, phone: true, city: true } },
       },
     });
     if (!match) return reply.code(404).send({ error: { message: 'Match not found' } });
