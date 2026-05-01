@@ -249,23 +249,77 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
     phTrack('login_completed', user.id, { role: user.role, provider: 'GOOGLE' });
 
     if (isNative) {
-      // Native (iPhone app) flow: don't set a cookie here — we're running
-      // in SFSafariViewController, whose cookie jar is isolated from the
-      // app's WKWebView. Instead, mint a single-use exchange code and
-      // hand it off via the app's custom URL scheme; the app will then
-      // POST to /native-exchange from its own WebView, where the Set-Cookie
-      // response _will_ stick.
+      // Native (iPhone app) flow: don't set a cookie here — we're
+      // running in SFSafariViewController, whose cookie jar is isolated
+      // from the app's WKWebView. Instead, mint a single-use exchange
+      // code and hand it off via the app's custom URL scheme; the app
+      // will then POST to /native-exchange from its own WebView, where
+      // the Set-Cookie response _will_ stick.
       //
-      // We use a plain 302 to the custom scheme. An HTML bounce with
-      // JS-triggered location.href would reliably fire on pre-iOS-17,
-      // but on iOS 17+ it surfaces an "Open in Estia?" confirmation
-      // dialog that didn't exist before. A server 302 to a non-http(s)
-      // Location is silently handled by SFSafariViewController (via the
-      // WKNavigationDelegate decidePolicyForNavigationAction hook — the
-      // scheme isn't allowed as a nav, so iOS passes it to UIApplication
-      // which opens the registered app). That's the quiet path.
+      // History: the original implementation issued a server 302 to
+      // `com.estia.agent://auth?code=…`. That worked on iOS ≤ 16 and
+      // fired the "Open in Estia?" prompt on iOS 17. iOS 26 (FB-tested
+      // on a user's iPhone 16 Pro Max running 26.2.1) silently swallows
+      // server-issued non-https redirects from SFSafariViewController —
+      // the page hangs and never opens the app. Apple is progressively
+      // requiring a user gesture to launch a registered scheme.
+      //
+      // The fix is a tiny interstitial HTML page with a single button.
+      // The button click counts as a user gesture, so iOS happily hands
+      // off to the app. We also kick off a JS-triggered location.href
+      // immediately on load — on builds where iOS still allows it
+      // (older iOS, and any future loosening), the page is invisible.
       const oneTime = issueNativeCode(user.id);
-      return reply.redirect(`${NATIVE_SCHEME}://auth?code=${encodeURIComponent(oneTime)}`);
+      const target = `${NATIVE_SCHEME}://auth?code=${encodeURIComponent(oneTime)}`;
+      reply.header('Content-Type', 'text/html; charset=utf-8');
+      return reply.send(`<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Estia · התחברות</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #f7f3ec; color: #1e1a14;
+    font-family: -apple-system, BlinkMacSystemFont, 'Assistant', sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 24px; gap: 18px; text-align: center;
+  }
+  h1 { font-size: 22px; font-weight: 800; margin: 0; }
+  p { font-size: 15px; color: #6b6356; margin: 0; max-width: 320px; line-height: 1.5; }
+  a.cta {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #b48b4c, #8a6932);
+    color: #f7f3ec; text-decoration: none;
+    padding: 14px 28px; border-radius: 12px;
+    font-size: 16px; font-weight: 800;
+    box-shadow: 0 8px 24px rgba(180,139,76,0.32);
+    min-width: 220px;
+  }
+  a.cta:active { transform: scale(0.97); }
+</style>
+</head>
+<body>
+  <h1>נכנסת בהצלחה</h1>
+  <p>לחצ/י כדי לפתוח את האפליקציה ולסיים את ההתחברות</p>
+  <a class="cta" id="open" href="${target}">פתח את Estia</a>
+  <script>
+    // Belt-and-braces: try the auto-redirect first. On the iOS
+    // versions that still honor JS-triggered location.href to a custom
+    // scheme this fires immediately and the user never sees the page.
+    // On iOS 26 it's swallowed and the user taps the button.
+    (function () {
+      try {
+        var t = ${JSON.stringify(target)};
+        // Tiny delay so the page paints first — otherwise a fast
+        // redirect on older iOS makes the screen flicker.
+        setTimeout(function () { window.location.href = t; }, 50);
+      } catch (e) { /* fall through to button */ }
+    })();
+  </script>
+</body>
+</html>`);
     }
 
     // Web flow (same origin as the WebView): set the JWT cookie directly.
