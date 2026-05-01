@@ -41,9 +41,15 @@ export const registerReminderRoutes: FastifyPluginAsync = async (app) => {
     }
     if (q.leadId)     where.leadId = q.leadId;
     if (q.propertyId) where.propertyId = q.propertyId;
+    // PERF — 2026-05-01: cap unbounded list. Pagination audit found
+    // /api/reminders had no take limit; an agent with 500+ reminders
+    // would pull the whole table per call. 100 is more than enough
+    // for the panel (Dashboard filters to "today's" / Reminders page
+    // shows top-of-list with "load more" affordances).
     const items = await prisma.reminder.findMany({
       where,
       orderBy: [{ status: 'asc' }, { dueAt: 'asc' }],
+      take: 100,
     });
     return { items };
   });

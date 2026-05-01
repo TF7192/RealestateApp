@@ -99,10 +99,15 @@ export const registerAgreementRoutes: FastifyPluginAsync = async (app) => {
     if (q.leadId) ands.push({ leadId: q.leadId });
     if (q.propertyId) ands.push({ propertyId: q.propertyId });
     if (ands.length) where.AND = ands;
+    // PERF — 2026-05-01: cap unbounded list. Same pagination-audit
+    // issue as /api/reminders. 100 covers the typical agent's signed
+    // agreement set; older ones can be fetched with a leadId/propertyId
+    // filter.
     const items = await prisma.agreement.findMany({
       where,
       include: { file: true },
       orderBy: { sentAt: 'desc' },
+      take: 100,
     });
     return { items };
   });
