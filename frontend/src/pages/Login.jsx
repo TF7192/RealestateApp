@@ -59,9 +59,13 @@ export default function Login() {
       const origin = window.location.origin.startsWith('http')
         ? window.location.origin
         : 'https://estia.co.il';
+      // No `presentationStyle: 'popover'` — popover is an iPad modal
+      // style; on iPhone it's documented to "fall back" to fullscreen
+      // but in practice (iOS 26.x) the SFSafariViewController stalls
+      // on first paint of cross-origin pages like accounts.google.com.
+      // Default fullscreen behaves correctly.
       await Browser.open({
         url: `${origin}/api/auth/google?native=1`,
-        presentationStyle: 'popover',
       });
       return;
     }
