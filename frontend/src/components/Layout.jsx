@@ -168,7 +168,6 @@ export default function Layout({ onLogout }) {
   }, [collapsed]);
 
   const location = useLocation();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const narrow = useIsNarrow();
   const isAdmin = isAdminUser(user);
