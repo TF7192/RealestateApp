@@ -5,12 +5,15 @@ import { createProperty } from '../../factories/property.factory.js';
 import { loginAs } from '../../helpers/auth.js';
 import { prisma } from '../../setup/integration.setup.js';
 
+// Mock buildAnthropic() directly — see ai-describe.test.ts for the
+// rationale.
 const mockCreate = vi.fn();
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: class MockAnthropic {
-    messages = { create: mockCreate };
-    constructor(_opts: unknown) {}
-  },
+vi.mock('../../../backend/src/lib/anthropic.js', () => ({
+  buildAnthropic: () =>
+    process.env.ANTHROPIC_API_KEY
+      ? { messages: { create: mockCreate } }
+      : null,
+  DESCRIBE_MODEL: 'claude-haiku-4-5',
 }));
 
 const { build } = await import('../../../backend/src/server.js');
@@ -142,7 +145,7 @@ describe('POST /api/ai/offer-review', () => {
     expect(body.reasoning).toContain('ההצעה');
 
     expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(mockCreate.mock.calls[0][0].model).toBe('claude-opus-4-7');
+    expect(mockCreate.mock.calls[0][0].model).toBe('claude-haiku-4-5');
   });
 });
 

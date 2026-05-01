@@ -109,16 +109,15 @@ describe('L-11 — meeting-dialog notes textarea is dir="rtl" with Hebrew font',
 });
 
 describe('L-13 — edit payload guards invalid email + non-integer budget', () => {
-  for (const rel of [
-    'frontend/src/components/CustomerEditDialog.jsx',
-    'frontend/src/pages/CustomerDetail.jsx',
-  ]) {
-    it(`${rel} coerces email + budget before submit`, () => {
-      const src = read(rel);
-      expect(src).toMatch(/isLikelyEmail/);
-      expect(src).toMatch(/Math\.round\(Number\(form\.budget\)\)/);
-    });
-  }
+  // CustomerDetail.jsx no longer carries the inline edit form — the
+  // page opens CustomerEditDialog for any field edits, so the email +
+  // budget coercion only needs to live there. The dialog is the only
+  // surface that submits.
+  it('CustomerEditDialog coerces email + budget before submit', () => {
+    const src = read('frontend/src/components/CustomerEditDialog.jsx');
+    expect(src).toMatch(/isLikelyEmail/);
+    expect(src).toMatch(/Math\.round\(Number\(form\.budget\)\)/);
+  });
 });
 
 describe('L-9 — right-column panels exit loading when their anchor prop is missing', () => {
@@ -136,17 +135,9 @@ describe('L-9 — right-column panels exit loading when their anchor prop is mis
   });
 });
 
-describe('L-A — Customers page renders the shared AdvancedFilters with lead-specific extras', () => {
-  const src = read('frontend/src/pages/Customers.jsx');
-  it('imports AdvancedFilters from the shared component', () => {
-    expect(src).toMatch(/import AdvancedFilters from ['"]\.\.\/components\/AdvancedFilters['"]/);
-  });
-  it('passes a `fields` config that includes city / price / rooms', () => {
-    expect(src).toMatch(/fields:\s*\[\s*['"]city['"],\s*['"]price['"],\s*['"]rooms['"]\s*\]/);
-  });
-  it('extras slot exposes lead-specific selects (seriousness, status, looking-for)', () => {
-    expect(src).toMatch(/רצינות/);
-    expect(src).toMatch(/סטטוס לקוח/);
-    expect(src).toMatch(/מחפש/);
-  });
-});
+// L-A — the prior test asserted that Customers.jsx imports
+// AdvancedFilters with a lead-specific fields config and a seriousness
+// / status / looking-for extras slot. The DLeads port (commit a61efd0)
+// dropped the AdvancedFilters integration entirely; mobile leads now
+// open LeadFiltersSheet, desktop leads use the inline pill row. The
+// test surface those describes asserted on no longer exists.

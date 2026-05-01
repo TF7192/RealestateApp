@@ -129,14 +129,19 @@ describe('POST /api/leads', () => {
     expect(created.agentId).toBe(agent.id);
   });
 
-  it('V — 400 on missing `name`', async () => {
+  it('V — empty `name` is allowed (lead name field was relaxed for Yad2 imports)', async () => {
+    // backend/src/routes/leads.ts:20 — `name: z.string().max(120)` —
+    // the prior `.min(1)` was relaxed so Yad2-imported leads (which
+    // arrive with anonymous "ליד מחבילה" placeholders) can round-trip
+    // through PATCH without bouncing. To exercise the 400 branch use
+    // an enum field instead (see the `interestType` test below).
     const agent = await createAgent(prisma);
     const cookie = await loginAs(app, agent.email, agent._plainPassword);
     const res = await app.inject({
       method: 'POST', url: '/api/leads', headers: { cookie },
       payload: { ...validBody, name: '' },
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(200);
   });
 
   it('V — 400 on invalid enum for interestType', async () => {

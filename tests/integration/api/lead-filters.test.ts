@@ -14,8 +14,13 @@ afterAll(async () => { await app.close(); });
 // GET /api/leads.
 describe('GET /api/leads — Nadlan-parity filters', () => {
   it('H — cities[] filter returns only leads in the allowed cities', async () => {
+    // backend/src/routes/leads.ts:216 — the cities[] filter passes
+    // each value through normalizeCity() before matching, which
+    // canonicalises e.g. "תל אביב" → "תל אביב - יפו". The factory
+    // creates leads with whatever value we pass, so we have to seed
+    // with the canonical form so the equality match lands.
     const agent = await createAgent(prisma);
-    const tlv = await createLead(prisma, { agentId: agent.id, city: 'תל אביב' });
+    const tlv = await createLead(prisma, { agentId: agent.id, city: 'תל אביב - יפו' });
     const hrz = await createLead(prisma, { agentId: agent.id, city: 'הרצליה' });
     await createLead(prisma, { agentId: agent.id, city: 'ירושלים' });
     const cookie = await loginAs(app, agent.email, agent._plainPassword);
@@ -153,8 +158,9 @@ describe('GET /api/leads — Nadlan-parity filters', () => {
 
   it('Az — filters still respect agent scope', async () => {
     const [a, b] = await Promise.all([createAgent(prisma), createAgent(prisma)]);
-    await createLead(prisma, { agentId: a.id, city: 'תל אביב' });
-    await createLead(prisma, { agentId: b.id, city: 'תל אביב' });
+    // Same canonicalisation as the cities[] test above.
+    await createLead(prisma, { agentId: a.id, city: 'תל אביב - יפו' });
+    await createLead(prisma, { agentId: b.id, city: 'תל אביב - יפו' });
     const cookie = await loginAs(app, a.email, a._plainPassword);
     const res = await app.inject({
       method: 'GET',

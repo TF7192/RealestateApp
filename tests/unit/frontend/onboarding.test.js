@@ -34,15 +34,26 @@ describe('A-4 — onboarding page + route guard', () => {
 
   it('Onboarding submit call includes license + optional title/agency/phone', () => {
     expect(onb).toMatch(/api\.submitOnboarding\(/);
-    expect(onb).toMatch(/license:\s*licenseDigits/);
-    expect(onb).toMatch(/title:\s*form\.title\s*\|\|\s*null/);
-    expect(onb).toMatch(/agency:\s*form\.agency\s*\|\|\s*null/);
-    expect(onb).toMatch(/phone:\s*form\.phone\s*\|\|\s*null/);
+    // The page no longer pre-extracts a `licenseDigits` local; the
+    // digit-strip is chained inline. Title is derived from a switch
+    // (office → 'סוכן', agency → 'מנהל משרד', else 'סוכן עצמאי')
+    // rather than passed through directly. agency / phone use
+    // .trim() to drop whitespace before the `|| null` fallback.
+    expect(onb).toMatch(/license:\s*form\.license\.replace\(\/\\D\/g,/);
+    expect(onb).toMatch(/title:\s*titleLabel/);
+    expect(onb).toMatch(/agency:\s*form\.agency\.trim\(\)\s*\|\|\s*null/);
+    expect(onb).toMatch(/phone:\s*form\.phone\.trim\(\)\s*\|\|\s*null/);
   });
 
-  it('Onboarding submit refreshes /me then navigates to /dashboard', () => {
-    expect(onb).toMatch(/await refresh\(\)/);
-    expect(onb).toMatch(/navigate\(['"`]\/dashboard['"`]/);
+  it('Onboarding submit settles via location.assign(destination)', () => {
+    // refresh() + navigate() racing against the App.jsx onboarding
+    // gate caused every card to bounce to /dashboard prematurely
+    // (frontend/src/pages/Onboarding.jsx:148-155). The page now uses
+    // setExiting(true) for a brief fade, then a hard window.location
+    // .assign(destination) so the new page mounts after the
+    // submission has settled. Assert that path instead.
+    expect(onb).toMatch(/setExiting\(true\)/);
+    expect(onb).toMatch(/window\.location\.assign\(destination\)/);
   });
 
   it('App.jsx route guard redirects authed agents without profileCompletedAt to /onboarding', () => {

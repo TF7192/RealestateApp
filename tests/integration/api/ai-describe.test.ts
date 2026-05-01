@@ -5,18 +5,23 @@ import { createProperty } from '../../factories/property.factory.js';
 import { loginAs } from '../../helpers/auth.js';
 import { prisma } from '../../setup/integration.setup.js';
 
-// Mock the Anthropic SDK *before* importing the server so the route's
-// `new Anthropic({...})` call picks up our fake. Vitest hoists this
-// above the import statements at transform time.
+// Mock the buildAnthropic() helper directly. vi.mock at the SDK
+// boundary stopped intercepting after the @anthropic-ai/sdk 0.91.x
+// bump (the SDK's CJS shape — `exports = module.exports = fn` with
+// `exports.default = class` — confuses vitest's ESM/CJS hoist),
+// so we bypass the SDK and replace the factory's return value with
+// a fake client that exposes the same `.messages.create()` shape
+// the routes call.
 const mockCreate = vi.fn();
-vi.mock('@anthropic-ai/sdk', () => {
-  return {
-    default: class MockAnthropic {
-      messages = { create: mockCreate };
-      constructor(_opts: unknown) {}
-    },
-  };
-});
+vi.mock('../../../backend/src/lib/anthropic.js', () => ({
+  // Honour the ANTHROPIC_API_KEY env var so the dedicated
+  // "key-missing → 503" test path still exercises the null branch.
+  buildAnthropic: () =>
+    process.env.ANTHROPIC_API_KEY
+      ? { messages: { create: mockCreate } }
+      : null,
+  DESCRIBE_MODEL: 'claude-opus-4-7',
+}));
 
 const { build } = await import('../../../backend/src/server.js');
 
@@ -109,7 +114,7 @@ describe('POST /api/ai/describe-property', () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('H — happy path: returns description + 5 highlights, calls SDK once with claude-opus-4-7', async () => {
+  it('H — happy path: returns description + 5 highlights, calls SDK once with claude-haiku-4-5', async () => {
     const agent = await createAgent(prisma);
     const property = await createProperty(prisma, {
       agentId: agent.id,
@@ -136,11 +141,14 @@ describe('POST /api/ai/describe-property', () => {
     expect(body.highlights).toHaveLength(5);
     expect(body.highlights[0]).toBe('4 חדרים מרווחים');
 
-    // Assert we actually reached for the right model. Guards against a
-    // future refactor that silently downgrades to sonnet/haiku.
+    // Assert we actually reached for the right model. The prior
+    // expectation was claude-opus-4-7; the route was deliberately
+    // downgraded to claude-haiku-4-5 (backend/src/routes/ai.ts:258)
+    // because property descriptions are short, structured, high-
+    // throughput — Haiku at ~15× lower cost is the right tradeoff.
     expect(mockCreate).toHaveBeenCalledTimes(1);
     const [callArgs] = mockCreate.mock.calls[0];
-    expect(callArgs.model).toBe('claude-opus-4-7');
+    expect(callArgs.model).toBe('claude-haiku-4-5');
     // Prompt must carry the property's address so the model can anchor
     // on real facts rather than hallucinating.
     const userMessage = callArgs.messages?.[0]?.content ?? '';

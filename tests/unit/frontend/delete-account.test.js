@@ -23,7 +23,11 @@ const apiSrc = readFileSync(apiPath, 'utf8');
 describe('A-1 — delete account UI scaffolding', () => {
   it('Profile page exposes a "מחק חשבון" destructive button', () => {
     expect(src).toMatch(/מחק חשבון/);
-    expect(src).toMatch(/btn-danger/);
+    // The page redesign moved off the canonical `.btn .btn-danger`
+    // class set onto an inline-styled `dangerBtn()` helper. Assert
+    // the helper's presence instead so the button stays visibly
+    // destructive.
+    expect(src).toMatch(/dangerBtn\(\)/);
   });
 
   it('confirmation dialog declares role="dialog" + aria-modal="true"', () => {
@@ -58,14 +62,18 @@ describe('A-1 — delete account UI scaffolding', () => {
     expect(apiSrc).toMatch(/deleteAccount:\s*\(\)\s*=>\s*request\(['"`]\/auth\/delete-account['"`]/);
   });
 
-  it('cancel button uses the safe secondary style, not destructive', () => {
-    // The dialog's Cancel (ביטול) must not be red — it's the safe default.
+  it('cancel button uses the safe (non-destructive) style', () => {
+    // The dialog's Cancel (ביטול) must not be red. The redesign
+    // dropped the canonical `.btn-secondary` class for an inline-
+    // styled secondary helper, so assert that the cancel area does
+    // NOT pick up the dangerBtn() helper rather than asserting on
+    // a class that no longer ships.
     const dialogStart = src.indexOf('function DeleteAccountDialog');
     const tail = src.slice(dialogStart);
-    // "ביטול" appears near btn-secondary.
     const cancelIdx = tail.indexOf('ביטול');
     expect(cancelIdx).toBeGreaterThan(-1);
     const window200 = tail.slice(Math.max(0, cancelIdx - 200), cancelIdx);
-    expect(window200).toMatch(/btn-secondary/);
+    expect(window200).not.toMatch(/dangerBtn\(\)/);
+    expect(window200).not.toMatch(/btn-danger/);
   });
 });

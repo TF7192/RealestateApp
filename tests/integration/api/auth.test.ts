@@ -97,6 +97,10 @@ describe('POST /api/auth/signup', () => {
         password: 'StrongPass1!',
         role: 'AGENT',
         displayName: 'חדש',
+        // PPL §11 — signup now requires explicit terms + privacy
+        // consent. The Zod schema is a `z.literal(true)` so any payload
+        // missing this field gets a 400 ("יש לאשר את תנאי השימוש…").
+        acceptedTerms: true,
       },
     });
     expect(res.statusCode).toBe(200);
@@ -108,7 +112,7 @@ describe('POST /api/auth/signup', () => {
   it('V — 400 on weak password (< 8 chars)', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/auth/signup',
-      payload: { email: 'x@y.com', password: 'short', role: 'AGENT' },
+      payload: { email: 'x@y.com', password: 'short', role: 'AGENT', acceptedTerms: true },
     });
     expect(res.statusCode).toBe(400);
   });
@@ -116,7 +120,7 @@ describe('POST /api/auth/signup', () => {
   it('V — 400 on invalid email', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/auth/signup',
-      payload: { email: 'not-an-email', password: 'StrongPass1!', role: 'AGENT' },
+      payload: { email: 'not-an-email', password: 'StrongPass1!', role: 'AGENT', acceptedTerms: true },
     });
     expect(res.statusCode).toBe(400);
   });
@@ -127,7 +131,7 @@ describe('POST /api/auth/signup', () => {
       method: 'POST', url: '/api/auth/signup',
       payload: {
         email: existing.email, password: 'StrongPass1!',
-        role: 'AGENT', displayName: 'dup',
+        role: 'AGENT', displayName: 'dup', acceptedTerms: true,
       },
     });
     expect(res.statusCode).toBe(409);

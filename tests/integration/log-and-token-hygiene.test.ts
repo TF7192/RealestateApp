@@ -123,6 +123,7 @@ describe('SEC-031 — auth response bodies no longer carry the JWT', () => {
         password: 'StrongPass1!',
         role: 'AGENT',
         displayName: 'SEC-031 שם',
+        acceptedTerms: true,
       },
     });
     expect(res.statusCode).toBe(200);

@@ -53,31 +53,9 @@ describe('E-1 — create deal UI + API wiring', () => {
   });
 });
 
-describe('E-2 — chip label order is "0 פעילות" / "0 נחתמו" (count first)', () => {
-  // The label order fix renders the count first, then the word. Before
-  // the fix the JSX was `{t.label}<span>{t.count}</span>`; after, it's
-  // `<span>{t.count}</span>{t.label}`.
-  it('renders the count element before the label text', () => {
-    expect(src).toMatch(/filter-count[^>]*>\{t\.count\}<\/span>\s*\{t\.label\}/);
-    expect(src).not.toMatch(/\{t\.label\}\s*<span className="filter-count"/);
-  });
-});
-
-describe('E-3 — Deals table view via ViewToggle + DataTable', () => {
-  it('imports ViewToggle and DataTable from components', () => {
-    expect(src).toMatch(/from\s+['"][^'"]*components\/ViewToggle['"]/);
-    expect(src).toMatch(/from\s+['"][^'"]*components\/DataTable['"]/);
-  });
-
-  it('uses the useViewMode persistence hook keyed on "deals"', () => {
-    expect(src).toMatch(/useViewMode\(\s*['"]deals['"]/);
-  });
-
-  it('renders a DataTable with at least address, status, and commission columns', () => {
-    // We don't assert the exact column set — just that a DataTable is
-    // conditionally rendered in table mode and pulls these core fields.
-    expect(src).toMatch(/<DataTable/);
-    expect(src).toMatch(/propertyStreet/);
-    expect(src).toMatch(/commission/);
-  });
-});
+// E-2 / E-3 — the prior tests asserted on a `.filter-count` chip
+// layout and a ViewToggle + DataTable table-view path. The DLeads
+// redesign (frontend/src/pages/Deals.jsx) replaced the table view
+// with a kanban + cards layout (no DataTable / ViewToggle /
+// useViewMode); the chip-count layout was retired with it. The core
+// E-1 assertions above still cover the create flow.

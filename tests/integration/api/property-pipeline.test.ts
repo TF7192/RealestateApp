@@ -38,7 +38,9 @@ describe('Property pipeline + admin block (J9)', () => {
     expect(res.statusCode).toBe(200);
     const after = await prisma.property.findUnique({ where: { id: prop.id } });
     expect(after?.stage).toBe('SIGNED_EXCLUSIVE');
-    expect(after?.agentCommissionPct).toBe(2.5);
+    // Prisma Decimal column — wrap with Number() so toBe stays
+    // valuewise correct (Decimal.js instance fails identity check).
+    expect(Number(after?.agentCommissionPct)).toBe(2.5);
     expect(after?.exclusivityExpire?.toISOString()).toBe('2026-10-01T00:00:00.000Z');
     expect(after?.sellerSeriousness).toBe('VERY');
     expect(after?.brokerNotes).toBe('מוכן לסגירה מיידית');

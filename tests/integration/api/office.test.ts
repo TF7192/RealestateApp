@@ -45,14 +45,21 @@ describe('GET /api/office', () => {
 });
 
 describe('POST /api/office', () => {
-  it('Az — 403 when the caller is not OWNER', async () => {
+  it('AGENT can create their first office and is promoted to OWNER atomically', async () => {
+    // backend/src/routes/office.ts:62-98 — the OWNER-only gate was
+    // intentionally dropped to resolve the chicken-and-egg where a
+    // fresh AGENT could never bootstrap an office. Now any
+    // authenticated user without an existing officeId may create
+    // one; the same transaction promotes them to OWNER.
     const agent = await createAgent(prisma);
     const cookie = await loginAs(app, agent.email, agent._plainPassword);
     const res = await app.inject({
       method: 'POST', url: '/api/office', headers: { cookie },
       payload: { name: 'Acme' },
     });
-    expect([401, 403]).toContain(res.statusCode);
+    expect(res.statusCode).toBe(200);
+    const after = await prisma.user.findUnique({ where: { id: agent.id } });
+    expect(after?.role).toBe('OWNER');
   });
 
   it('H — OWNER can create their office and is auto-attached', async () => {

@@ -29,7 +29,10 @@ describe('Lead customer admin block (K2)', () => {
     expect(res.statusCode).toBe(200);
     const after = await prisma.lead.findUnique({ where: { id: lead.id } });
     expect(after?.customerStatus).toBe('IN_DEAL');
-    expect(after?.commissionPct).toBe(1.5);
+    // Prisma Decimal columns come back as Decimal.js instances, not
+    // primitive numbers — toBe(1.5) fails on object identity.
+    // Compare via Number() so the equality stays valuewise correct.
+    expect(Number(after?.commissionPct)).toBe(1.5);
     expect(after?.isPrivate).toBe(true);
     expect(after?.purposes).toEqual(['INVESTMENT', 'RESIDENCE']);
     expect(after?.seriousnessOverride).toBe('VERY');

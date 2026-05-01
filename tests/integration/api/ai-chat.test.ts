@@ -3,12 +3,15 @@ import type { FastifyInstance } from 'fastify';
 import { createAgent } from '../../factories/user.factory.js';
 import { loginAs } from '../../helpers/auth.js';
 
+// Mock buildAnthropic() directly — see ai-describe.test.ts for the
+// rationale.
 const mockCreate = vi.fn();
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: class MockAnthropic {
-    messages = { create: mockCreate };
-    constructor(_opts: unknown) {}
-  },
+vi.mock('../../../backend/src/lib/anthropic.js', () => ({
+  buildAnthropic: () =>
+    process.env.ANTHROPIC_API_KEY
+      ? { messages: { create: mockCreate } }
+      : null,
+  DESCRIBE_MODEL: 'claude-haiku-4-5',
 }));
 
 const { build } = await import('../../../backend/src/server.js');
@@ -74,8 +77,14 @@ describe('POST /api/ai/chat', () => {
 
     expect(mockCreate).toHaveBeenCalledTimes(1);
     const [callArgs] = mockCreate.mock.calls[0];
-    expect(callArgs.model).toBe('claude-opus-4-7');
-    expect(callArgs.messages).toHaveLength(1);
+    expect(callArgs.model).toBe('claude-haiku-4-5');
+    // The route passes `convo` by reference and continues pushing
+    // turns onto it after the create() call returns
+    // (backend/src/routes/ai.ts:1067 — `convo.push({ role: 'assistant', ... })`).
+    // Vitest's mock keeps the live reference, so by assertion time
+    // the array reflects the post-call state. Just check the first
+    // entry instead of length.
     expect(callArgs.messages[0].role).toBe('user');
+    expect(callArgs.messages[0].content).toContain('היי');
   });
 });

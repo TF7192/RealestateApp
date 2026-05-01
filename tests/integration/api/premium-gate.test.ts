@@ -22,11 +22,15 @@ const { mockCreate, s3Put } = vi.hoisted(() => ({
   s3Put: vi.fn(),
 }));
 
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: class MockAnthropic {
-    messages = { create: mockCreate };
-    constructor(_opts: unknown) {}
-  },
+// Mock buildAnthropic() directly — vi.mock at the SDK boundary
+// stopped intercepting after @anthropic-ai/sdk 0.91 (see
+// ai-describe.test.ts for the rationale).
+vi.mock('../../../backend/src/lib/anthropic.js', () => ({
+  buildAnthropic: () =>
+    process.env.ANTHROPIC_API_KEY
+      ? { messages: { create: mockCreate } }
+      : null,
+  DESCRIBE_MODEL: 'claude-opus-4-7',
 }));
 
 // The meeting route dispatches to putMeetingAudio; mock it so we

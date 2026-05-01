@@ -32,9 +32,13 @@ describe('SEC-035 — Neighborhoods POST is admin-only', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('H — admin email creates a neighborhood (200)', async () => {
+  it('H — admin role creates a neighborhood (200)', async () => {
+    // SEC-010 (backend/prisma/schema.prisma — enum UserRole) replaced
+    // the brittle ADMIN_EMAILS allowlist with a real role=ADMIN. The
+    // route now uses app.requireAdmin which checks JWT role, not the
+    // user's email.
     const admin = await createUser(prisma, {
-      role: UserRole.OWNER,
+      role: UserRole.ADMIN,
       email: ADMIN_EMAIL,
     });
     const cookie = await loginAs(app, admin.email, admin._plainPassword);
@@ -92,9 +96,9 @@ describe('SEC-035 — NeighborhoodGroup POST/PATCH/DELETE are admin-only', () =>
     expect(res.statusCode).toBe(403);
   });
 
-  it('H — admin email POSTs / PATCHes / DELETEs cleanly', async () => {
+  it('H — admin role POSTs / PATCHes / DELETEs cleanly', async () => {
     const admin = await createUser(prisma, {
-      role: UserRole.OWNER,
+      role: UserRole.ADMIN,
       email: ADMIN_EMAIL,
     });
     const cookie = await loginAs(app, admin.email, admin._plainPassword);

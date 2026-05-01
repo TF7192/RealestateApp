@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { build } from '../../../backend/src/server.js';
 import { prisma } from '../../setup/integration.setup.js';
 import { createAgent } from '../../factories/user.factory.js';
 
@@ -11,14 +10,28 @@ import { createAgent } from '../../factories/user.factory.js';
 // AUTH_RATE_LIMIT_DISABLED so the limiter is live and we can assert 429.
 
 let app: FastifyInstance;
+const ORIGINAL_RATE_LIMIT_DISABLED = process.env.AUTH_RATE_LIMIT_DISABLED;
 
 beforeAll(async () => {
+  // The integration runner sets AUTH_RATE_LIMIT_DISABLED=1 globally so
+  // most suites don't trip per-route limiters. This test deliberately
+  // exercises the limiter — and the auth module reads the env var
+  // ONCE at module-load time (backend/src/routes/auth.ts:95), so by
+  // the time other tests have already imported build(), the cached
+  // value sticks. vi.resetModules() forces a fresh load of server.js
+  // (and its transitive auth.js) so the AUTH_RL_DISABLED constant
+  // re-reads the now-unset env var.
+  delete process.env.AUTH_RATE_LIMIT_DISABLED;
+  vi.resetModules();
+  const { build } = await import('../../../backend/src/server.js');
   app = await build();
   await app.ready();
 });
 
 afterAll(async () => {
   await app.close();
+  if (ORIGINAL_RATE_LIMIT_DISABLED === undefined) delete process.env.AUTH_RATE_LIMIT_DISABLED;
+  else process.env.AUTH_RATE_LIMIT_DISABLED = ORIGINAL_RATE_LIMIT_DISABLED;
 });
 
 describe('POST /api/auth/reset-password — per-route rate limit (SEC-001)', () => {

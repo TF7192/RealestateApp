@@ -11,12 +11,16 @@ beforeAll(async () => { app = await build(); await app.ready(); });
 afterAll(async () => { await app.close(); });
 
 describe('GET /api/properties', () => {
-  it('H — PUBLIC list returns all active properties (no auth required)', async () => {
-    // Properties list is deliberately public — the customer-facing agent
-    // portal uses the same endpoint.
+  it('H — list returns the agent\'s properties', async () => {
+    // GET /api/properties moved behind requireAgent (see
+    // backend/src/routes/properties.ts:228) — the public read surface
+    // moved to /api/public/agents/:slug. Tests now log in.
     const agent = await createAgent(prisma);
     await createProperty(prisma, { agentId: agent.id, city: 'תל אביב' });
-    const res = await app.inject({ method: 'GET', url: '/api/properties' });
+    const cookie = await loginAs(app, agent.email, agent._plainPassword);
+    const res = await app.inject({
+      method: 'GET', url: '/api/properties', headers: { cookie },
+    });
     expect(res.statusCode).toBe(200);
     const items = res.json().items;
     expect(Array.isArray(items)).toBe(true);
@@ -39,15 +43,24 @@ describe('GET /api/properties', () => {
 });
 
 describe('GET /api/properties/:id', () => {
-  it('H — returns the property publicly', async () => {
+  it('H — returns the property to the agent', async () => {
+    // /:id is now requireAgent (properties.ts:342). Public read for
+    // the customer-facing portal goes through /api/public/* routes.
     const agent = await createAgent(prisma);
     const prop = await createProperty(prisma, { agentId: agent.id });
-    const res = await app.inject({ method: 'GET', url: `/api/properties/${prop.id}` });
+    const cookie = await loginAs(app, agent.email, agent._plainPassword);
+    const res = await app.inject({
+      method: 'GET', url: `/api/properties/${prop.id}`, headers: { cookie },
+    });
     expect(res.statusCode).toBe(200);
   });
 
   it('404 — returns 404 for unknown id', async () => {
-    const res = await app.inject({ method: 'GET', url: '/api/properties/never-existed' });
+    const agent = await createAgent(prisma);
+    const cookie = await loginAs(app, agent.email, agent._plainPassword);
+    const res = await app.inject({
+      method: 'GET', url: '/api/properties/never-existed', headers: { cookie },
+    });
     expect(res.statusCode).toBe(404);
   });
 });
@@ -80,18 +93,27 @@ describe('POST /api/properties', () => {
     expect(res.statusCode).toBe(200);
     const created = res.json().property;
     expect(created.agentId).toBe(agent.id);
-    expect(created.city).toBe('תל אביב');
+    // The city normaliser canonicalises Tel Aviv to "תל אביב - יפו"
+    // so search + Yad2 imports converge on a single value. Match the
+    // canonical form rather than the raw input.
+    expect(created.city).toMatch(/^תל אביב/);
     // Owner should have been auto-created or linked
     const props = await prisma.property.findMany({ where: { agentId: agent.id } });
     expect(props).toHaveLength(1);
   });
 
-  it('V — 400 on missing required field', async () => {
+  it('V — 400 when assetClass is missing entirely', async () => {
+    // The schema deliberately accepts empty strings for street / city /
+    // owner / ownerPhone (see properties.ts:73-94 — Yad2-imported rows
+    // arrive with blanks and the form re-sends them on edit, so a
+    // strict .min(1) blocks legitimate PATCHes). To exercise the 400
+    // branch we drop a truly required enum field.
     const agent = await createAgent(prisma);
     const cookie = await loginAs(app, agent.email, agent._plainPassword);
+    const { assetClass: _drop, ...incomplete } = valid;
     const res = await app.inject({
       method: 'POST', url: '/api/properties', headers: { cookie },
-      payload: { ...valid, street: '' }, // empty required
+      payload: incomplete,
     });
     expect(res.statusCode).toBe(400);
   });

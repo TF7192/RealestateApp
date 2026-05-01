@@ -254,6 +254,7 @@ describe('auth auto-accept on login/signup', () => {
         password: 'Password1!',
         role: 'AGENT',
         displayName: 'New Agent',
+        acceptedTerms: true,
       },
     });
     expect(res.statusCode).toBe(200);

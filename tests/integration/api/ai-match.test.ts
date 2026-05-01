@@ -6,18 +6,20 @@ import { createLead } from '../../factories/lead.factory.js';
 import { loginAs } from '../../helpers/auth.js';
 import { prisma } from '../../setup/integration.setup.js';
 
-// Mock the Anthropic SDK *before* importing the server so the routes'
-// `new Anthropic(...)` call (via backend/src/lib/anthropic.ts) picks up
-// our fake. Vitest hoists vi.mock() above imports at transform time.
+// Mock buildAnthropic() directly. After @anthropic-ai/sdk 0.91.x the
+// SDK's CJS shape (`exports = module.exports = fn` with
+// `exports.default = class`) stopped getting intercepted by
+// vi.mock at the SDK boundary — bypassing it via the helper module
+// is the reliable path. Honour ANTHROPIC_API_KEY so the dedicated
+// "key-missing → 503" tests still exercise the null branch.
 const mockCreate = vi.fn();
-vi.mock('@anthropic-ai/sdk', () => {
-  return {
-    default: class MockAnthropic {
-      messages = { create: mockCreate };
-      constructor(_opts: unknown) {}
-    },
-  };
-});
+vi.mock('../../../backend/src/lib/anthropic.js', () => ({
+  buildAnthropic: () =>
+    process.env.ANTHROPIC_API_KEY
+      ? { messages: { create: mockCreate } }
+      : null,
+  DESCRIBE_MODEL: 'claude-haiku-4-5',
+}));
 
 const { build } = await import('../../../backend/src/server.js');
 
@@ -152,7 +154,7 @@ describe('GET /api/ai/match-leads', () => {
     // Guard against a silent model downgrade.
     expect(mockCreate).toHaveBeenCalledTimes(1);
     const [callArgs] = mockCreate.mock.calls[0];
-    expect(callArgs.model).toBe('claude-opus-4-7');
+    expect(callArgs.model).toBe('claude-haiku-4-5');
     // The prompt must ship the candidate inventory so Claude can pick.
     const userMessage = callArgs.messages?.[0]?.content ?? '';
     expect(userMessage).toContain(lead1.id);
@@ -218,7 +220,7 @@ describe('GET /api/ai/match-properties', () => {
     expect(body.matches[1].property.id).toBe(p2.id);
 
     expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(mockCreate.mock.calls[0][0].model).toBe('claude-opus-4-7');
+    expect(mockCreate.mock.calls[0][0].model).toBe('claude-haiku-4-5');
   });
 });
 
