@@ -70,7 +70,9 @@ describe('<Yad2ScanBanner>', () => {
       ...currentState, status: 'done', result: { listings: [{}] },
     };
     const { container } = render(<Yad2ScanBanner />);
-    await user.click(screen.getByRole('button', { name: 'סגור' }));
+    // Close button's full aria-label is "סגור התראה"; the shorter
+    // "סגור" was extended for clarity during the banner refactor.
+    await user.click(screen.getByRole('button', { name: 'סגור התראה' }));
     expect(container.querySelector('.y2b')).toBeNull();
   });
 });

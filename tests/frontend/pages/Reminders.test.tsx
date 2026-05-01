@@ -5,12 +5,19 @@ import { server } from '../setup/msw-server';
 import Reminders from '@estia/frontend/pages/Reminders.jsx';
 
 describe('<Reminders>', () => {
-  it('renders the heading, inline form and the three status tabs', async () => {
+  it('renders the heading + status tabs; the composer opens on demand', async () => {
+    const user = userEvent.setup();
     render(<Reminders />);
     expect(await screen.findByRole('heading', { name: 'תזכורות' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /פתוחות/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /הושלמו/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /בוטלו/ })).toBeInTheDocument();
+    // The inline composer is collapsed by default — click the toggle
+    // ("הוסף תזכורת") to expand it before the תיאור input is in scope.
+    expect(screen.queryByLabelText('תיאור תזכורת')).toBeNull();
+    // Multiple "הוסף תזכורת" matches on the page (the empty-state CTA
+    // duplicates the header button); pick the first.
+    await user.click(screen.getAllByRole('button', { name: /הוסף תזכורת/ })[0]);
     expect(screen.getByLabelText('תיאור תזכורת')).toBeInTheDocument();
   });
 
@@ -54,9 +61,13 @@ describe('<Reminders>', () => {
       })
     );
     render(<Reminders />);
+    // Expand the composer first — the page-level toggle is labelled
+    // "הוסף תזכורת" / "סגור טופס"; the form's actual submit button is
+    // the differently-named "צור תזכורת".
+    await user.click(screen.getAllByRole('button', { name: /הוסף תזכורת/ })[0]);
     const titleInput = await screen.findByLabelText('תיאור תזכורת');
     await user.type(titleInput, 'שיחה');
-    await user.click(screen.getByRole('button', { name: /הוסף תזכורת/ }));
+    await user.click(screen.getByRole('button', { name: /צור תזכורת/ }));
     await waitFor(() => expect(posted).toBeTruthy());
     expect((posted as { title: string }).title).toBe('שיחה');
   });

@@ -107,11 +107,17 @@ describe('<Settings>', () => {
     expect(link).toHaveAttribute('href', '/templates');
   });
 
-  it('cards use the canonical .btn .btn-secondary classes', async () => {
+  it('each card renders as a link, not a generic div', async () => {
     asAgent();
     render(<Settings />);
+    // The Settings cards were redesigned in the cream/gold port to be
+    // inline-styled link cards (display:flex column, gold hover ring),
+    // not classic .btn .btn-secondary buttons. The canonical button
+    // system from CLAUDE.md still applies to actual buttons elsewhere
+    // in the app — these are full-tile navigation cards. Assert the
+    // accessible affordance (link role + correct href) instead.
     const link = await screen.findByRole('link', { name: /תגיות/ });
-    expect(link).toHaveClass('btn');
-    expect(link).toHaveClass('btn-secondary');
+    expect(link.tagName).toBe('A');
+    expect(link).toHaveAttribute('href', '/settings/tags');
   });
 });

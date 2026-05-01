@@ -26,7 +26,7 @@ describe('<Office>', () => {
   it('as OWNER with no office, shows the create form', async () => {
     asOwner();
     render(<Office />);
-    expect(await screen.findByRole('heading', { name: 'משרד' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'המשרד שלי' })).toBeInTheDocument();
     expect(screen.getByLabelText('שם המשרד')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /צור משרד/ })).toBeInTheDocument();
   });
@@ -60,49 +60,63 @@ describe('<Office>', () => {
 
   it('renders the office name + members when the office exists', async () => {
     asOwner();
+    // PERF-018: Office now reads members off `office.members` (single
+    // round-trip) — the legacy top-level `members` array no longer
+    // hydrates the list.
+    const members = [
+      { id: 'u1', email: 'owner@estia.app',  displayName: 'יוסי כהן', role: 'OWNER' },
+      { id: 'u2', email: 'member@estia.app', displayName: 'דני שמש',  role: 'MEMBER' },
+    ];
     server.use(
       http.get('/api/office', () =>
         HttpResponse.json({
-          office: { id: 'o1', name: 'נדלן הגולן' },
-          members: [
-            { id: 'u1', email: 'owner@estia.app',   displayName: 'יוסי', role: 'OWNER' },
-            { id: 'u2', email: 'member@estia.app',  displayName: 'דני',  role: 'MEMBER' },
-          ],
-        })
-      )
+          office: { id: 'o1', name: 'נדלן הגולן', members },
+          members,
+        }),
+      ),
     );
     render(<Office />);
-    expect(await screen.findByRole('heading', { name: 'נדלן הגולן' })).toBeInTheDocument();
-    expect(screen.getByText('יוסי')).toBeInTheDocument();
-    expect(screen.getByText('דני')).toBeInTheDocument();
-    expect(screen.getByLabelText(/הסר את דני/)).toBeInTheDocument();
+    // Office page header is "ניהול המשרד" once an office exists; the
+    // office's actual name renders as the h2 inside the identity card.
+    expect(await screen.findByRole('heading', { level: 1, name: 'ניהול המשרד' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'נדלן הגולן' })).toBeInTheDocument();
+    // Members are listed by displayName. Use distinctive display names
+    // ("יוסי כהן" / "דני שמש") so we don't collide with the demo seed.
+    expect(screen.getByText('דני שמש')).toBeInTheDocument();
+    expect(screen.getByLabelText(/הסר את דני שמש/)).toBeInTheDocument();
   });
 
-  it('invite form looks up the agent by email and POSTs the userId', async () => {
+  it('invite form sends the email through /api/office/invites (no agent-lookup hop)', async () => {
     asOwner();
     const user = userEvent.setup();
     let invited: unknown = null;
+    // Both "existing-agent" and "by-email" modes now funnel through
+    // the same OfficeInvite record (frontend/src/pages/Office.jsx:166).
+    // The previous /api/transfers/agents/search → /api/office/members
+    // two-hop flow was retired so the recipient always accepts
+    // explicitly — no silent OWNER carry-over.
     server.use(
       http.get('/api/office', () =>
         HttpResponse.json({
-          office: { id: 'o1', name: 'Acme' },
-          members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+          office: {
+            id: 'o1', name: 'Acme',
+            members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+          },
         })
       ),
-      http.get('/api/transfers/agents/search', () =>
-        HttpResponse.json({ agent: { id: 'u9', email: 'new@estia.app', displayName: 'חדש' } })
-      ),
-      http.post('/api/office/members', async ({ request }) => {
+      http.post('/api/office/invites', async ({ request }) => {
         invited = await request.json();
-        return HttpResponse.json({ member: { id: 'm9', userId: 'u9', role: 'MEMBER' } });
-      })
+        return HttpResponse.json({
+          invite: { id: 'inv-9', email: 'new@estia.app', inviteUrl: 'https://example.test/accept-invite?token=inv-9' },
+        });
+      }),
     );
     render(<Office />);
     const emailInput = await screen.findByLabelText('אימייל הסוכן');
     await user.type(emailInput, 'new@estia.app');
     await user.click(screen.getByRole('button', { name: /הזמן/ }));
     await waitFor(() => expect(invited).toBeTruthy());
-    expect((invited as { userId: string }).userId).toBe('u9');
+    expect((invited as { email: string }).email).toBe('new@estia.app');
   });
 
   it('email-invite mode POSTs to /office/invites and shows the copy link', async () => {
@@ -112,8 +126,10 @@ describe('<Office>', () => {
     server.use(
       http.get('/api/office', () =>
         HttpResponse.json({
-          office: { id: 'o1', name: 'Acme' },
-          members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+          office: {
+            id: 'o1', name: 'Acme',
+            members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+          },
         })
       ),
       http.post('/api/office/invites', async ({ request }) => {
@@ -153,8 +169,10 @@ describe('<Office>', () => {
     server.use(
       http.get('/api/office', () =>
         HttpResponse.json({
-          office: { id: 'o1', name: 'Acme' },
-          members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+          office: {
+            id: 'o1', name: 'Acme',
+            members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+          },
         })
       ),
       http.post('/api/office/invites', () =>
@@ -185,8 +203,10 @@ describe('<Office>', () => {
     server.use(
       http.get('/api/office', () =>
         HttpResponse.json({
-          office: { id: 'o1', name: 'Acme' },
-          members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+          office: {
+            id: 'o1', name: 'Acme',
+            members: [{ id: 'u1', email: 'owner@estia.app', displayName: 'יוסי', role: 'OWNER' }],
+          },
         })
       ),
       http.get('/api/office/invites', () =>

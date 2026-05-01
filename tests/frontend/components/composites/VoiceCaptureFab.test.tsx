@@ -95,22 +95,25 @@ describe('<VoiceCaptureFab>', () => {
     });
   });
 
-  it('second click stops and opens the review dialog with extracted fields', async () => {
+  it('second click stops and opens the premium-gate dialog (free tier)', async () => {
+    // VC-6 (frontend/src/components/VoiceCaptureFab.jsx:64-74) — voice
+    // extraction was moved behind the premium gate. When recording
+    // finishes the FAB opens a "פיצ׳ר פרימיום" ConfirmDialog instead
+    // of uploading to the AI endpoint. The full review-dialog flow
+    // (with extracted-field inputs) is now exercised end-to-end only
+    // for premium users; this test covers the free-tier path.
     const user = userEvent.setup();
     render(<VoiceCaptureFab />, { route: '/' });
     await user.click(screen.getByRole('button', { name: 'הקלטת ליד' }));
     const stopBtn = await screen.findByRole('button', { name: 'עצור הקלטה' });
     await user.click(stopBtn);
-    // Dialog portals into body — screen.findByRole still sees it.
-    const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveAttribute('aria-modal', 'true');
-    // Extracted fields appear after the upload resolves.
-    await waitFor(
-      () => {
-        expect(screen.getByLabelText('שם הלקוח')).toHaveValue('יוסי');
-      },
-      { timeout: 3000 },
-    );
+    // Premium upsell shows up after the blob arrives.
+    expect(await screen.findByText('פיצ׳ר פרימיום')).toBeInTheDocument();
+    expect(
+      screen.getByText(/הקלטת ליד קולית.*זמינה במסלולי פרימיום/),
+    ).toBeInTheDocument();
+    // The "create lead" review surface must NOT have rendered.
+    expect(screen.queryByLabelText('שם הלקוח')).not.toBeInTheDocument();
   });
 
   it('permission denial surfaces a toast and stays idle', async () => {

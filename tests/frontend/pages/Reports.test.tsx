@@ -35,11 +35,16 @@ describe('<Reports>', () => {
       ),
     );
     render(<Reports />);
-    await waitFor(() => expect(screen.getByText('4')).toBeInTheDocument());
-    expect(screen.getByText('7')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('9')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    // Counts now share their tile container with the byStatus row
+    // ("OPEN: 1", "WON: 1") — those "1"s collide with the deals tile's
+    // own count of 2 if we use bare getByText. Scope each assertion to
+    // the .report-tile-count node so duplicates elsewhere on the page
+    // don't break the matcher.
+    await waitFor(() => {
+      const tiles = Array.from(document.querySelectorAll('.report-tile-count'))
+        .map((el) => el.textContent?.trim());
+      expect(tiles).toEqual(expect.arrayContaining(['4', '7', '2', '9', '3']));
+    });
     // Total commission tile sub-line
     expect(screen.getByText(/עמלה כוללת/)).toBeInTheDocument();
     // byStatus breakdown rendered

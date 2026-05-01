@@ -9,7 +9,18 @@ import NewProperty from '@estia/frontend/pages/NewProperty.jsx';
 // already exercised elsewhere by the existing create test suite.
 
 describe('<NewProperty> — edit mode', () => {
-  it('hydrates J4-J7 + J9 fields from the property and shows them in step 2', async () => {
+  it('hydrates the property in edit mode and lands on the rich step-2 form', async () => {
+    // P-10/P-11 (NewProperty.jsx:1868-1874) — the explicit J4-J7 +
+    // J9 fields surfaced as "מצב הנכס" / "שלב הנכס" / "הערות מתווך"
+    // were removed. The condition row was a duplicate of the primary
+    // "מצב" select earlier in the form (which is now backed by
+    // form.renovated with Hebrew option strings rather than a
+    // RENOVATED/NEW/etc enum), and the pipeline / broker-notes block
+    // was dropped from the create-edit wizard. The fields still ship
+    // through the API payload for back-compat (NewProperty.jsx:877).
+    // Keep this test honest by only asserting what the post-redesign
+    // wizard actually renders: edit-mode hydrates the basics and
+    // lands on step 2.
     server.use(
       http.get('/api/properties/:id', ({ params }) =>
         HttpResponse.json({
@@ -23,48 +34,24 @@ describe('<NewProperty> — edit mode', () => {
             sqm: 120,
             type: 'דירה',
             rooms: 4,
-            // J4-J7 fields below:
-            condition: 'RENOVATED',
-            heatingTypes: ['gas', 'solar'],
-            halfRooms: 1,
-            masterBedroom: true,
-            bathrooms: 2,
-            toilets: 2,
-            furnished: true,
-            petFriendly: false,
-            doormenService: false,
-            gym: false,
-            pool: false,
-            gatedCommunity: false,
-            accessibility: true,
-            utilityRoom: false,
-            listingSource: 'yad2',
-            // J9 pipeline
-            stage: 'SIGNED_EXCLUSIVE',
-            agentCommissionPct: 2,
-            primaryAgentId: null,
-            exclusivityExpire: '2026-10-01T00:00:00.000Z',
-            sellerSeriousness: 'VERY',
-            brokerNotes: 'דחוף למכור',
+            heatingTypes: [],
             imageList: [],
           },
-        })
-      )
+        }),
+      ),
     );
-    const user = userEvent.setup();
     render(<NewProperty />, { route: '/properties/p1/edit', path: '/properties/:id/edit' });
-    // Wait for edit-mode hydration.
-    await waitFor(() => expect(screen.getByText(/עריכת נכס|עריכה — חבילת שיווק/)).toBeInTheDocument());
-    // Step-2 is the wider form. Click step-2 tab.
-    await user.click(screen.getByRole('button', { name: /חבילת שיווק/ }));
-    // J4 condition renders as a select with RENOVATED.
-    const conditionSelect = await screen.findByLabelText('מצב הנכס') as HTMLSelectElement;
-    expect(conditionSelect.value).toBe('RENOVATED');
-    // J9 stage via the pipeline block.
-    const stageSelect = screen.getByLabelText('שלב הנכס') as HTMLSelectElement;
-    expect(stageSelect.value).toBe('SIGNED_EXCLUSIVE');
-    // Broker notes hydrate.
-    expect((screen.getByLabelText('הערות מתווך') as HTMLTextAreaElement).value).toBe('דחוף למכור');
+    // Edit-mode lands directly on step 2 ("חבילת שיווק") per
+    // NewProperty.jsx:445-450 — no manual nav needed.
+    await waitFor(() =>
+      expect(screen.getByText(/עריכת נכס|עריכה — חבילת שיווק/)).toBeInTheDocument(),
+    );
+    // Step 2's page header surfaces the hydrated address as a
+    // "{street}, {city}" subtitle below the "עריכה — חבילת שיווק"
+    // heading — that's the most stable signal that the property
+    // payload landed and the page accepted it. (The step-2 form body
+    // doesn't carry street/city inputs; those live on step 1.)
+    expect(await screen.findByText(/הרצל 15, רמלה/)).toBeInTheDocument();
   });
 
   it('includes J4-J7 + J9 fields in the PATCH body on step-2 save', async () => {

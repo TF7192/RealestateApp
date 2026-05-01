@@ -53,8 +53,9 @@ describe('<CustomerDetail>', () => {
     expect((await screen.findAllByRole('heading', { name: /תזכורות/ })).length).toBeGreaterThan(0);
     expect((await screen.findAllByRole('heading', { name: /נכסים תואמים/ })).length).toBeGreaterThan(0);
     expect((await screen.findAllByRole('heading', { name: /יומן פעילות/ })).length).toBeGreaterThan(0);
-    expect((await screen.findAllByRole('heading', { name: /פרופילי חיפוש/ })).length).toBeGreaterThan(0);
-    // Tags region and "הוסף" attach button.
+    // The dedicated "פרופילי חיפוש" panel was retired during the
+    // CustomerDetail redesign — search profiles are now part of the
+    // lead-edit dialog, not a side panel.
     expect((await screen.findAllByRole('button', { name: 'הוסף תג' }))[0]).toBeInTheDocument();
   });
 
@@ -124,48 +125,13 @@ describe('<CustomerDetail>', () => {
     expect(screen.getByText('77')).toBeInTheDocument();
   });
 
-  it('updates K1/K2/L1 fields via PATCH /api/leads/:id', async () => {
-    mountLead(seedLead());
-    let patchBody = {};
-    server.use(
-      http.patch('/api/leads/:id', async ({ request }) => {
-        patchBody = await request.json();
-        return HttpResponse.json({ lead: { id: 'lead-1', ...patchBody } });
-      }),
-    );
-    const user = userEvent.setup();
-    render(<CustomerDetail />, { route: '/customers/lead-1', path: '/customers/:id' });
-    await screen.findByText('דני לוי');
-    // Toggle isPrivate (exists in the K2 block).
-    await user.click(screen.getByRole('checkbox', { name: /לקוח פרטי/ }));
-    // Set a lead-status.
-    await user.selectOptions(screen.getByLabelText('סטטוס ליד'), 'IN_PROGRESS');
-    await user.click(screen.getAllByRole('button', { name: /שמור שינויים/ })[0]);
-    await waitFor(() => {
-      expect(patchBody.isPrivate).toBe(true);
-      expect(patchBody.leadStatus).toBe('IN_PROGRESS');
-    });
-  });
-
-  it('lists search profiles and lets the agent add one', async () => {
-    mountLead(seedLead());
-    let created = false;
-    let listCalls = 0;
-    server.use(
-      http.get('/api/leads/:leadId/search-profiles', () => {
-        listCalls += 1;
-        return HttpResponse.json({ items: [] });
-      }),
-      http.post('/api/leads/:leadId/search-profiles', () => {
-        created = true;
-        return HttpResponse.json({ profile: { id: 'sp-new', label: 'חיפוש חדש', cities: [] } });
-      }),
-    );
-    const user = userEvent.setup();
-    render(<CustomerDetail />, { route: '/customers/lead-1', path: '/customers/:id' });
-    await screen.findByText('דני לוי');
-    await user.click(await screen.findByRole('button', { name: /פרופיל חדש/ }));
-    await waitFor(() => expect(created).toBe(true));
-    expect(listCalls).toBeGreaterThanOrEqual(1);
-  });
+  // Inline K1/K2/L1 editing was moved off the page in the redesign:
+  // CustomerDetail now opens a CustomerEditDialog modal for field
+  // edits instead of carrying a top-level inline form. The dialog
+  // already has its own coverage; this test no longer matches the
+  // surface it was meant to exercise. Same for "search profiles" —
+  // the dedicated side panel was retired and the surface is now part
+  // of the edit dialog. Both cases are covered indirectly through
+  // their respective dialog suites; keeping placeholder removals here
+  // would just duplicate that coverage.
 });

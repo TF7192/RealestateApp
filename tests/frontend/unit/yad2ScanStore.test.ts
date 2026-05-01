@@ -6,18 +6,60 @@ async function freshModule() {
   return import('@estia/frontend/lib/yad2ScanStore.js');
 }
 
-// Shim api.yad2AgencyPreview so the store's startScan() doesn't touch
-// real fetch/MSW. Each test can override the mock's behaviour.
-let apiMock: { yad2AgencyPreview: ReturnType<typeof vi.fn> };
+// Y-1: the store now drives Yad2 imports through an async job pattern
+// (yad2AgencyPreviewStart → polling yad2JobStatus → terminal result),
+// not a single synchronous yad2AgencyPreview call. Mock the three
+// methods explicitly so each one can return the shape the store
+// expects:
+//   - yad2AgencyPreviewStart(url) → { jobId }
+//   - yad2JobStatus(jobId)        → { status: 'done', result: {...} }
+//   - yad2AgencyImportStart       → not exercised here but stub for safety
+//
+// `apiMock.yad2AgencyPreview` is kept as the legacy alias the older
+// tests still call against — under the hood it shimmies the new job
+// flow so a single mockResolvedValue({ listings, quota }) carries
+// through to the terminal job result.
+let apiMock: {
+  yad2AgencyPreview: ReturnType<typeof vi.fn>;
+  yad2AgencyPreviewStart: ReturnType<typeof vi.fn>;
+  yad2JobStatus: ReturnType<typeof vi.fn>;
+  yad2AgencyImportStart: ReturnType<typeof vi.fn>;
+};
 vi.mock('@estia/frontend/lib/api.js', () => ({
   api: new Proxy({}, {
-    get: () => apiMock.yad2AgencyPreview,
+    get: (_t, key) => {
+      if (typeof key !== 'string') return undefined;
+      if (key in apiMock) return (apiMock as any)[key];
+      // Default: a stub that throws so an unexpected new method shows
+      // up in the test output instead of silently hanging.
+      return vi.fn(() => Promise.reject(new Error(`unmocked api.${key}`)));
+    },
   }),
 }));
 
 beforeEach(() => {
   sessionStorage.clear();
-  apiMock = { yad2AgencyPreview: vi.fn() };
+  // Default behaviour: the legacy `yad2AgencyPreview` setter feeds
+  // both Start (returning a jobId) and JobStatus (returning the
+  // terminal result with whatever shape the test set).
+  const legacy = vi.fn();
+  apiMock = {
+    yad2AgencyPreview: legacy,
+    yad2AgencyPreviewStart: vi.fn(async () => ({ jobId: 'job-1' })),
+    yad2JobStatus: vi.fn(async () => {
+      // Pull whatever the legacy mock would have produced for a
+      // direct call and surface it as the terminal job result. If
+      // the legacy mock was set up to reject, propagate the error
+      // shape pollJob() expects.
+      try {
+        const result = await legacy();
+        return { status: 'done', result };
+      } catch (e: any) {
+        return { status: 'error', error: { message: e?.message || 'failed' } };
+      }
+    }),
+    yad2AgencyImportStart: vi.fn(async () => ({ jobId: 'imp-1' })),
+  };
 });
 afterEach(() => { vi.clearAllMocks(); });
 

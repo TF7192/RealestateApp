@@ -57,19 +57,17 @@ describe('<NeighborhoodAdmin>', () => {
     expect(screen.getByRole('button', { name: /הוסף קבוצה/ })).toBeInTheDocument();
   });
 
-  it('AGENT is redirected away (OWNER gate)', async () => {
-    // Default /api/me handler returns an AGENT — render inside a
-    // MemoryRouter that includes a sentinel route so we can assert
-    // the redirect landed on "/".
-    const { container } = render(<NeighborhoodAdmin />, { route: '/settings/neighborhoods' });
-    // The Navigate component renders nothing; confirm the page heading
-    // never appears. findBy* would wait; we assert a short absence.
-    await waitFor(() => {
-      expect(
-        screen.queryByRole('heading', { name: 'קבוצות שכונות' })
-      ).not.toBeInTheDocument();
-    });
-    expect(container.textContent).not.toContain('קבוצות שכונות');
+  it('AGENT can land on the page; OWNER-only writes are gated server-side', async () => {
+    // The previous client-side OWNER redirect was dropped — the page
+    // renders for any authenticated agent and the backend gates the
+    // mutating endpoints (`POST /api/neighborhood-groups` etc.) via
+    // `app.requireOwner` (backend/src/routes/neighborhoodGroups.ts).
+    // Keeping a lightweight test here so we still catch a regression
+    // if the heading itself disappears.
+    render(<NeighborhoodAdmin />, { route: '/settings/neighborhoods' });
+    expect(
+      await screen.findByRole('heading', { name: 'קבוצות שכונות' }),
+    ).toBeInTheDocument();
   });
 
   it('renders the list of existing groups', async () => {

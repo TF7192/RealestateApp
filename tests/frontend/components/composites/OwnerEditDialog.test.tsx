@@ -82,7 +82,13 @@ describe('<OwnerEditDialog> — create mode', () => {
     render(<OwnerEditDialog onClose={onClose} onSaved={() => {}} />);
     await user.click(screen.getByPlaceholderText('ישראל ישראלי'));
     expect(onClose).not.toHaveBeenCalled();
-    await user.click(document.querySelector('.owner-dialog-backdrop') as HTMLElement);
+    // The backdrop is the parent of the role="dialog" panel — the
+    // outer Portal div with the inset:0 fixed positioning. The
+    // .owner-dialog-backdrop class was dropped during the dialog
+    // restyle (now inline-styled via the DT cream/gold palette), so
+    // walking up from the dialog gives us a stable handle.
+    const dialog = screen.getByRole('dialog');
+    await user.click(dialog.parentElement as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

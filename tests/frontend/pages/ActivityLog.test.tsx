@@ -32,9 +32,13 @@ describe('<ActivityLog>', () => {
       )
     );
     render(<ActivityLog />);
-    expect(await screen.findByText('יצירה')).toBeInTheDocument();
+    // Post-redesign (frontend/src/pages/ActivityLog.jsx:467-469): the
+    // verb chip prefixes with "· " so "יצירה" renders as "· יצירה" in
+    // its span. The actor name now appears in a <strong> with no
+    // "על ידי" prefix — assert the actorName itself instead.
+    expect(await screen.findByText(/יצירה/)).toBeInTheDocument();
     expect(screen.getByText('נוסף נכס חדש')).toBeInTheDocument();
-    expect(screen.getByText(/על ידי/)).toBeInTheDocument();
+    expect(screen.getByText('יוסי')).toBeInTheDocument();
   });
 
   it('filtering by entityType forwards the chosen type as a query param', async () => {
@@ -49,8 +53,12 @@ describe('<ActivityLog>', () => {
     );
     render(<ActivityLog />);
     await waitFor(() => expect(seen.length).toBeGreaterThan(0));
-    await user.click(screen.getByRole('button', { name: 'נכסים' }));
-    await waitFor(() => expect(seen).toContain('PROPERTY'));
+    // The properties filter button has its label inside a span next to
+    // the count chip, so the accessible name combines them — match
+    // loosely. The query param uses the Prisma model name "Property"
+    // (capitalized), not the all-caps enum value.
+    await user.click(screen.getByRole('button', { name: /^נכסים/ }));
+    await waitFor(() => expect(seen).toContain('Property'));
   });
 
   it('changing the limit dropdown refetches with the new value', async () => {

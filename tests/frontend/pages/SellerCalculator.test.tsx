@@ -5,13 +5,16 @@ import SellerCalculator from '@estia/frontend/pages/SellerCalculator.jsx';
 describe('<SellerCalculator>', () => {
   it('renders the header', () => {
     render(<SellerCalculator />);
-    expect(screen.getByRole('heading', { name: 'מחשבון מוכר' })).toBeInTheDocument();
+    // Heading trimmed to plain "מחשבון" in the redesign — the seller
+    // context is now carried by the hero label, not the page title.
+    expect(screen.getByRole('heading', { name: 'מחשבון' })).toBeInTheDocument();
   });
 
   it('entering a sale price computes a non-zero net amount in the hero', async () => {
     const user = userEvent.setup();
     render(<SellerCalculator />);
-    const price = screen.getByLabelText(/מחיר מכירה/);
+    // Forward-mode price field is labelled simply "מחיר".
+    const price = screen.getByLabelText('מחיר');
     await user.type(price, '2500000');
     // The hero label is "הסכום שיישאר לבעלים" in forward mode; under it
     // the formatted net appears. Wait for a number with thousand separator.

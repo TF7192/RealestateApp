@@ -39,11 +39,15 @@ describe('<NewLead>', () => {
     // Required — the name input has the placeholder "שם מלא".
     await user.type(screen.getByPlaceholderText('שם מלא'), 'דני לוי');
 
-    // K1 — fill a subset that proves the fields are wired up.
-    await user.type(screen.getByLabelText('שם פרטי'), 'דני');
-    await user.type(screen.getByLabelText('שם משפחה'), 'לוי');
-    await user.type(screen.getByLabelText('ת.ז / ח.פ'), '123456789');
-    await user.type(screen.getByLabelText('מיקוד'), '5252525');
+    // L-4 (frontend/src/pages/NewLead.jsx:894-897) dropped the
+    // separate שם פרטי / שם משפחה inputs in favour of the single
+    // שם מלא at the top of the form — the duplicate pair caused
+    // split saves and confused agents. Keep ID + zip — those are still
+    // in the מורחבים section. The Field wrapper renders the label
+    // alongside (not wrapping) the input and skips htmlFor, so
+    // getByLabelText can't bridge them; query by stable id instead.
+    await user.type(document.getElementById('k1-pid'), '123456789');
+    await user.type(document.getElementById('k1-zip'), '5252525');
 
     // K2 — pick a customerStatus other than ACTIVE.
     await user.selectOptions(screen.getByLabelText('סטטוס לקוח'), 'PAUSED');
@@ -56,8 +60,6 @@ describe('<NewLead>', () => {
 
     await waitFor(() => {
       expect(body.name).toBe('דני לוי');
-      expect(body.firstName).toBe('דני');
-      expect(body.lastName).toBe('לוי');
       expect(body.personalId).toBe('123456789');
       expect(body.zip).toBe('5252525');
       expect(body.customerStatus).toBe('PAUSED');

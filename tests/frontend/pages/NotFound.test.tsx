@@ -17,7 +17,7 @@ describe('<NotFound>', () => {
 
   it('renders the home + properties escape-hatch links', () => {
     render(<NotFound />, { route: '/x' });
-    expect(screen.getByRole('link', { name: /חזור לדשבורד/ })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: /חזור לדשבורד/ })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: /לרשימת הנכסים/ })).toHaveAttribute('href', '/properties');
   });
 

@@ -48,7 +48,12 @@ describe('<PropertyDetail> — MLS parity wiring', () => {
       )
     );
     renderDetail();
-    await waitFor(() => expect(screen.getByRole('heading', { name: /הרצל 15/ })).toBeInTheDocument());
+    // PropertyDetail renders the address as a heading in two surfaces:
+    // the page header and the PropertyHero card. Both intentionally
+    // duplicate the address — accept either by going through getAllBy.
+    await waitFor(() =>
+      expect(screen.getAllByRole('heading', { name: /הרצל 15/ }).length).toBeGreaterThan(0),
+    );
     expect(screen.getByText('צנרת תיווך')).toBeInTheDocument();
     expect(screen.getByText('מודעות פרסום')).toBeInTheDocument();
     expect(screen.getByText('שותפים לנכס')).toBeInTheDocument();
@@ -68,7 +73,12 @@ describe('<PropertyDetail> — MLS parity wiring', () => {
     );
     const user = userEvent.setup();
     renderDetail();
-    await waitFor(() => expect(screen.getByRole('heading', { name: /הרצל 15/ })).toBeInTheDocument());
+    // PropertyDetail renders the address as a heading in two surfaces:
+    // the page header and the PropertyHero card. Both intentionally
+    // duplicate the address — accept either by going through getAllBy.
+    await waitFor(() =>
+      expect(screen.getAllByRole('heading', { name: /הרצל 15/ }).length).toBeGreaterThan(0),
+    );
     // The card's action has an aria-label "ערוך צנרת תיווך"; panel opens
     // with the PropertyPipelineBlock.
     await user.click(screen.getByRole('button', { name: 'ערוך צנרת תיווך' }));
@@ -91,7 +101,12 @@ describe('<PropertyDetail> — MLS parity wiring', () => {
     );
     const user = userEvent.setup();
     renderDetail();
-    await waitFor(() => expect(screen.getByRole('heading', { name: /הרצל 15/ })).toBeInTheDocument());
+    // PropertyDetail renders the address as a heading in two surfaces:
+    // the page header and the PropertyHero card. Both intentionally
+    // duplicate the address — accept either by going through getAllBy.
+    await waitFor(() =>
+      expect(screen.getAllByRole('heading', { name: /הרצל 15/ }).length).toBeGreaterThan(0),
+    );
     await user.click(screen.getByRole('button', { name: 'נהל מודעות פרסום' }));
     // Panel content: click the primary CTA in the empty state.
     const newButtons = await screen.findAllByRole('button', { name: /מודעה חדשה/ });
@@ -118,7 +133,12 @@ describe('<PropertyDetail> — MLS parity wiring', () => {
     );
     const user = userEvent.setup();
     renderDetail();
-    await waitFor(() => expect(screen.getByRole('heading', { name: /הרצל 15/ })).toBeInTheDocument());
+    // PropertyDetail renders the address as a heading in two surfaces:
+    // the page header and the PropertyHero card. Both intentionally
+    // duplicate the address — accept either by going through getAllBy.
+    await waitFor(() =>
+      expect(screen.getAllByRole('heading', { name: /הרצל 15/ }).length).toBeGreaterThan(0),
+    );
     await user.click(screen.getByRole('button', { name: 'נהל שותפים לנכס' }));
     await waitFor(() => expect(screen.getByText('שותפה')).toBeInTheDocument());
   });

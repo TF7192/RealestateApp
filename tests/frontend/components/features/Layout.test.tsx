@@ -1,3 +1,13 @@
+// Layout — sidebar shell. The original suite asserted on the previous
+// nav surface: a "כלי ניהול" group, a "לקוחות" link, "תבניות הודעה",
+// "כווץ סרגל" / "יציאה" labels, and a `nav-favorites-empty` testid.
+// The current Layout (frontend/src/components/Layout.jsx) instead
+// renders three section labels — עבודה יומיומית / כלים / מועדפים — a
+// "לידים" link to /customers, a logout button labelled "התנתקות", and
+// a "כווץ תפריט" / "הרחב תפריט" collapse toggle. The empty-favorites
+// hint is plain Hebrew copy with no testid. This file covers the
+// current surface.
+
 import { describe, it, expect, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../setup/msw-server';
@@ -5,114 +15,119 @@ import { render, screen, userEvent, waitFor } from '../../setup/test-utils';
 import Layout from '@estia/frontend/components/Layout.jsx';
 
 describe('<Layout>', () => {
-  it('renders the sidebar navigation links', () => {
+  it('renders the primary navigation links', () => {
     render(<Layout onLogout={() => {}} />);
-    // At least one link per route; Layout renders both the desktop
-    // sidebar AND the mobile drawer so some labels match twice.
+    // Layout renders both the desktop sidebar and the mobile drawer,
+    // so labels match more than once. getAllByRole keeps the assertion
+    // robust against layout duplication.
     expect(screen.getAllByRole('link', { name: 'לוח בקרה' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'נכסים' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'לקוחות' }).length).toBeGreaterThan(0);
+    // Customers route is nav-labelled "לידים" (the route stays /customers).
+    expect(screen.getAllByRole('link', { name: 'לידים' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'עסקאות' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'תבניות הודעה' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'בעלים' }).length).toBeGreaterThan(0);
   });
 
-  it('fires onLogout when the יציאה button is clicked', async () => {
+  it('fires onLogout when the התנתקות button is clicked', async () => {
     const user = userEvent.setup();
     const onLogout = vi.fn();
     render(<Layout onLogout={onLogout} />);
-    await user.click(screen.getByRole('button', { name: /יציאה/ }));
+    await user.click(screen.getByRole('button', { name: 'התנתקות' }));
     expect(onLogout).toHaveBeenCalled();
   });
 
   it('sidebar-collapse button toggles the stored flag', async () => {
     const user = userEvent.setup();
     render(<Layout onLogout={() => {}} />);
-    const collapse = screen.getByRole('button', { name: /כווץ סרגל/ });
+    const collapse = screen.getByRole('button', { name: 'כווץ תפריט' });
     await user.click(collapse);
-    // After click, the label flips to "הרחב" because collapsed = true.
-    expect(screen.getByRole('button', { name: /הרחב סרגל/ })).toBeInTheDocument();
+    // Aria-label flips to "הרחב תפריט" once collapsed = true.
+    expect(screen.getByRole('button', { name: 'הרחב תפריט' })).toBeInTheDocument();
     expect(localStorage.getItem('estia-sidebar-collapsed')).toBe('1');
   });
 
-  // ─── Sprint 4 + Sprint 1 A2 sidebar entries ─────────────────────────
-  it('renders the "כלי ניהול" nav group with reports / activity / reminders / tag-settings links', () => {
+  it('renders the three sidebar section labels: עבודה יומיומית / כלים / מועדפים', () => {
     render(<Layout onLogout={() => {}} />);
-    // Group label visible at least once (desktop sidebar).
-    expect(screen.getAllByText('כלי ניהול').length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: /דוחות/ }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: /פעילות/ }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: /תזכורות/ }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: /תגיות/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('עבודה יומיומית').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('כלים').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('מועדפים').length).toBeGreaterThan(0);
   });
 
-  it('does NOT render the Office link for AGENT role', async () => {
+  it('exposes the major tools-rail entries', () => {
     render(<Layout onLogout={() => {}} />);
-    // Wait a tick so any async /api/me has had a chance to settle; the
-    // demo user in the default MSW handlers is role=AGENT.
-    await waitFor(() => {
-      expect(screen.queryByRole('link', { name: /משרד/ })).toBeNull();
-    });
+    // Tools rail anchors: import / calculator / marketing / team / settings / help.
+    for (const label of ['ייבוא', 'מחשבון', 'ניהול שיווקי', 'הצוות שלי', 'הגדרות', 'עזרה']) {
+      expect(screen.getAllByRole('link', { name: label }).length).toBeGreaterThan(0);
+    }
   });
 
-  it('renders the Office link for OWNER role', async () => {
-    server.use(
-      http.get('/api/me', () =>
-        HttpResponse.json({
-          user: {
-            id: 'test-owner-1',
-            email: 'owner@estia.app',
-            role: 'OWNER',
-            displayName: 'בעל משרד',
-            agentProfile: { agency: 'Acme', title: '', bio: '' },
-          },
-        })
-      )
+  it('exposes the major primary-rail entries (reports / reminders / transfers / documents)', () => {
+    render(<Layout onLogout={() => {}} />);
+    expect(screen.getAllByRole('link', { name: 'דוחות' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'תזכורות' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'העברות' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'מסמכים' }).length).toBeGreaterThan(0);
+  });
+
+  it('renders the Office link for AGENT and OWNER roles alike', async () => {
+    // The "המשרד שלי" tools-rail entry is unconditional — both AGENT
+    // (default seeded user) and OWNER see it. Office membership scoping
+    // happens server-side, not via the nav.
+    render(<Layout onLogout={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getAllByRole('link', { name: 'המשרד שלי' }).length).toBeGreaterThan(0),
     );
+  });
+
+  it('shows the empty-favorites hint when the user has no favorites', async () => {
     render(<Layout onLogout={() => {}} />);
+    // Hint copy lives directly in the sidebar tree (no testid). Match
+    // a stable substring that survives minor copy tweaks.
     await waitFor(() => {
-      expect(screen.getAllByRole('link', { name: /משרד/ }).length).toBeGreaterThan(0);
+      expect(
+        screen.getByText(/סמנו .* בלידים, נכסים ובעלים לגישה מהירה/),
+      ).toBeInTheDocument();
     });
   });
 
-  // ─── Sprint 7 B4 favorites strip ────────────────────────────────────
-  it('renders the favorites strip when the user has favorited entities', async () => {
+  it('renders favorited entities in the favorites section', async () => {
     server.use(
       http.get('/api/favorites', () =>
         HttpResponse.json({
           items: [
-            { entityType: 'PROPERTY', entityId: 'p-fav-1', createdAt: new Date().toISOString() },
+            {
+              entityType: 'PROPERTY',
+              entityId: 'p-fav-1',
+              createdAt: new Date().toISOString(),
+              // The Layout's favorites loader joins with the entity to
+              // produce { to, label }. If the API now embeds those
+              // fields directly, these are the ones it'd carry.
+              to: '/properties/p-fav-1',
+              label: 'רוטשילד 12, תל אביב',
+            },
           ],
-        })
+        }),
       ),
       http.get('/api/properties', () =>
         HttpResponse.json({
           items: [
-            { id: 'p-fav-1', street: 'רוטשילד', number: '12', city: 'תל אביב', type: 'APARTMENT' },
+            {
+              id: 'p-fav-1',
+              street: 'רוטשילד',
+              number: '12',
+              city: 'תל אביב',
+              type: 'APARTMENT',
+            },
           ],
-        })
-      )
+        }),
+      ),
     );
     render(<Layout onLogout={() => {}} />);
-    await waitFor(() => {
-      expect(screen.getAllByText('המועדפים').length).toBeGreaterThan(0);
-    });
-    // The favorite should link to its detail page
+    // Section header appears even when there's nothing favorited; here
+    // we additionally expect a link whose label includes "רוטשילד".
     await waitFor(() => {
       const links = screen.getAllByRole('link', { name: /רוטשילד/ });
       expect(links.length).toBeGreaterThan(0);
     });
-  });
-
-  it('N-15 — shows the favorites strip with an empty-state hint when the list is empty', async () => {
-    // Updated for N-15: the strip stays visible so the affordance is
-    // always discoverable. A muted Hebrew hint fills the slot that
-    // would otherwise list starred entities.
-    render(<Layout onLogout={() => {}} />);
-    await waitFor(() => {
-      // The empty-state hint is present in the DOM.
-      expect(screen.getByTestId('nav-favorites-empty')).toBeInTheDocument();
-    });
-    // Copy matches the product spec.
-    expect(screen.getByTestId('nav-favorites-empty')).toHaveTextContent('הוסף מועדפים לגישה מהירה');
   });
 });
