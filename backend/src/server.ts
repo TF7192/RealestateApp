@@ -123,6 +123,16 @@ export async function build(opts: BuildOptions = {}) {
             },
     trustProxy: true,
     bodyLimit: 10 * 1024 * 1024,
+    // PERF — fail-fast under sustained load. Stress test (2026-05-01)
+    // showed that without a timeout p95 latency walked from 280ms to
+    // 9700ms under 1000 concurrent VUs without ever returning 5xx —
+    // every request just waited. A 5s timeout converts that into 503s
+    // the FE's api.js retry layer can handle gracefully. Long-poll
+    // routes (/api/chat/ws upgrades) live on @fastify/websocket which
+    // doesn't go through this timer; cross-checked.
+    connectionTimeout: 60_000,
+    keepAliveTimeout: 60_000,
+    requestTimeout: 5_000,
   });
 
   // SEC-011 — JSON API responses don't render in a browser context, so

@@ -822,10 +822,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         { customerStatus: { notIn: ['CANCELLED', 'BOUGHT', 'RENTED'] } },
       ],
       // category match — wantsLookingFor is BUY for SALE / RENT for RENT.
+      // lookingFor + interestType are non-nullable enums in the schema;
+      // dead `null` arms removed (Prisma 5.22 strict-rejects them).
       AND: [
-        { OR: [{ lookingFor: null }, { lookingFor: wantsLookingFor }] },
-        // assetClass match (lead.interestType maps to PRIVATE/COMMERCIAL).
-        { OR: [{ interestType: null }, { interestType }] },
+        { lookingFor: wantsLookingFor },
+        { interestType },
       ],
     };
     // City: leads with a city filter must match the property's city.
