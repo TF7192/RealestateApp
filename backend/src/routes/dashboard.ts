@@ -11,6 +11,17 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
+import { createLru } from '../lib/lru.js';
+
+// Per-user 30s LRU for /api/topbar-counts. The endpoint already sets
+// Cache-Control: private, max-age=30 — this layer absorbs server-side
+// re-computation under SPA navigation bursts (Layout mounts the topbar
+// on every page change). Eviction is per-user so a notification-read
+// for one agent doesn't stale another agent's cache.
+const topbarCache = createLru<string, { unreadNotifications: number; publicMatches: number; hasOpenChat: boolean; cachedAt: number }>({
+  max: 10_000,
+  ttlMs: 30_000,
+});
 
 // Anchor "today" to Asia/Jerusalem, not the container TZ. EC2 runs UTC,
 // so `new Date(year, month, date)` would yield 00:00 UTC = 02:00/03:00
@@ -173,44 +184,56 @@ export const registerTopbarRoutes: FastifyPluginAsync = async (app) => {
   app.get('/topbar-counts', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const u = requireUser(req);
 
-    const [unreadNotifications, publicMatchesCount, openChat] = await prisma.$transaction([
-      prisma.notification.count({
-        where: { userId: u.id, readAt: null },
-      }),
-      // Mirrors the per-viewer pool count pattern in public-matches.ts
-      // but in narrow form — we only need the row count for the badge,
-      // not the matched-leads computation. The `/public-matches/count`
-      // endpoint stays canonical for the case where the FE wants the
-      // full O(pool×leads) evaluation; this is the cheap fallback that
-      // surfaces "anything new in the pool at all".
-      prisma.property.count({
-        where: {
-          isPublicMatch: true,
-          NOT: { agentId: u.id },
-        },
-      }),
-      // hasOpenChat: viewer has any conversation with at least one
-      // unread admin-side message. Cheap because Conversation has the
-      // userId @unique constraint and Message has (conversationId,
-      // createdAt) covering the per-convo scan.
-      prisma.message.findFirst({
-        where: {
-          conversation: { userId: u.id },
-          senderRole: 'admin',
-          readAt: null,
-        },
-        select: { id: true },
-      }),
-    ]);
+    const payload = await topbarCache.wrap(u.id, async () => {
+      const [unreadNotifications, publicMatchesCount, openChat] = await prisma.$transaction([
+        prisma.notification.count({
+          where: { userId: u.id, readAt: null },
+        }),
+        // Mirrors the per-viewer pool count pattern in public-matches.ts
+        // but in narrow form — we only need the row count for the badge,
+        // not the matched-leads computation. The `/public-matches/count`
+        // endpoint stays canonical for the case where the FE wants the
+        // full O(pool×leads) evaluation; this is the cheap fallback that
+        // surfaces "anything new in the pool at all".
+        prisma.property.count({
+          where: {
+            isPublicMatch: true,
+            NOT: { agentId: u.id },
+          },
+        }),
+        // hasOpenChat: viewer has any conversation with at least one
+        // unread admin-side message. Cheap because Conversation has the
+        // userId @unique constraint and Message has (conversationId,
+        // createdAt) covering the per-convo scan.
+        prisma.message.findFirst({
+          where: {
+            conversation: { userId: u.id },
+            senderRole: 'admin',
+            readAt: null,
+          },
+          select: { id: true },
+        }),
+      ]);
+      return {
+        unreadNotifications,
+        publicMatches: publicMatchesCount,
+        hasOpenChat: !!openChat,
+        cachedAt: Date.now(),
+      };
+    });
 
     // Cache for 30s — the topbar polls on every Layout mount today; a
     // short private cache absorbs SPA-route bounces without staling
     // the badge for too long.
     reply.header('Cache-Control', 'private, max-age=30');
-    return {
-      unreadNotifications,
-      publicMatches: publicMatchesCount,
-      hasOpenChat: !!openChat,
-    };
+    const { cachedAt: _cachedAt, ...rest } = payload;
+    return rest;
   });
 };
+
+// Test/diagnostic helper: invalidate a user's topbar cache (e.g. on
+// notification-mark-read). Not currently wired but exported for the
+// notifications route to call when a user reads a notification.
+export function invalidateTopbarCache(userId: string): void {
+  topbarCache.delete(userId);
+}

@@ -342,8 +342,14 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.post('/', { onRequest: [tryServiceTokenAuth, app.requireAgent] }, async (req) => {
+  app.post('/', { onRequest: [tryServiceTokenAuth, app.requireAgent] }, async (req, reply) => {
     const body = leadInput.parse(req.body);
+    // Prisma's Lead.phone is NOT NULL — Zod was relaxed for PATCH but
+    // create needs it. Without this guard Prisma 500s with a
+    // "Argument `phone` is missing" stack trace.
+    if (!body.phone || body.phone.trim() === '') {
+      return reply.code(400).send({ error: { message: 'מספר טלפון נדרש', code: 'phone_required', issues: [{ path: ['phone'], code: 'too_small', message: 'phone required' }] } });
+    }
     const agentId = requireUser(req).id;
     const created = await prisma.lead.create({
       data: {
