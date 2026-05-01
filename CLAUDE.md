@@ -82,8 +82,12 @@ Live at https://estia.co.il.
 - **Google Calendar consent is separate from Google login.** Agents
   who logged in via email can still connect Calendar via
   `/profile → "חבר Google Calendar"`.
-- **No E2E tests yet.** The pre-deploy gate is just typecheck +
-  build. A broken type reaches prod if typecheck passes.
+- **Pre-deploy gate**: lint + typecheck + build + Vitest unit +
+  Vitest frontend (~550 tests / 81 files) + Vitest integration (real
+  Postgres) + Playwright `@critical` E2E. Nightly adds the full E2E
+  suite across Chromium / Firefox / WebKit / mobile. CLAUDE.md used
+  to read "just typecheck + build" — that line was outdated by
+  several sprints' worth of test work.
 
 ## Things NOT to touch casually
 
