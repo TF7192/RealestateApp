@@ -27,6 +27,11 @@ export default function SavedSearchMenu({ entityType, currentFilters, onLoad }) 
   const [saving, setSaving] = useState(false);
   const wrapRef = useRef(null);
   const triggerRef = useRef(null);
+  // The popover lives inside a Portal — i.e. mounted at document.body
+  // — so it isn't a DOM-tree descendant of `wrapRef`. We need a
+  // separate ref to it so the outside-click handler below knows that
+  // clicks within the popover are NOT outside the menu.
+  const popRef = useRef(null);
   // When the popover is position: fixed, we compute its anchor each
   // time the menu opens (or when the trigger moves, e.g. on scroll).
   const [popPos, setPopPos] = useState(null);
@@ -79,7 +84,9 @@ export default function SavedSearchMenu({ entityType, currentFilters, onLoad }) 
   useEffect(() => {
     if (!open) return undefined;
     const onDocDown = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      const inWrap = wrapRef.current && wrapRef.current.contains(e.target);
+      const inPop = popRef.current && popRef.current.contains(e.target);
+      if (!inWrap && !inPop) setOpen(false);
     };
     const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onDocDown);
@@ -152,6 +159,7 @@ export default function SavedSearchMenu({ entityType, currentFilters, onLoad }) 
       {open && (
         <Portal>
         <div
+          ref={popRef}
           className="ss-menu-pop"
           role="menu"
           aria-label="חיפושים שמורים"

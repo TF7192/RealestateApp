@@ -520,8 +520,19 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
     // category: BUY → SALE / RENT → RENT.
     if (lead.lookingFor === 'BUY') where.category = 'SALE';
     else if (lead.lookingFor === 'RENT') where.category = 'RENT';
-    // city: when the lead has a city filter, only match properties in it.
-    if (lead.city) where.city = lead.city;
+    // city: when the lead has a city filter, match properties in it
+    // OR in any of the cities listed by the lead's search profiles
+    // (per-profile city lists override / extend the flat field — agents
+    // commonly file a lead with one home city and then add a profile
+    // saying "but they'd also consider רעננה / הרצליה").
+    const profileCities = Array.from(new Set(
+      lead.searchProfiles.flatMap((sp: any) => Array.isArray(sp.cities) ? sp.cities : []),
+    ));
+    if (profileCities.length) {
+      where.city = { in: lead.city ? [lead.city, ...profileCities] : profileCities };
+    } else if (lead.city) {
+      where.city = lead.city;
+    }
     // price band: ±15% of the lead's budget (matches the JS evaluator).
     if (lead.budget) {
       const lo = Math.round(lead.budget * 0.85);
