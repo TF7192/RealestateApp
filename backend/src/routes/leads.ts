@@ -145,6 +145,35 @@ function explainStatus(lead: any, suggested: string): string {
   return `${ruleExplain}. נתונים: ${parts.join(' · ')}`;
 }
 
+// Extract the FIRST top-level balanced JSON object from a model's
+// text response. Walks character by character, tracking string state
+// so braces inside string literals don't perturb the depth counter.
+// Returns the parsed object or null if no balanced object is found.
+function extractFirstJsonObject(text: string): any | null {
+  let inString = false;
+  let escape = false;
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\' && inString) { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (c === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        try { return JSON.parse(text.slice(start, i + 1)); }
+        catch { return null; }
+      }
+    }
+  }
+  return null;
+}
+
 export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { onRequest: [app.requireAgent] }, async (req) => {
     const q = req.query as any;
@@ -391,8 +420,13 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
         .filter((b: any) => b.type === 'text')
         .map((b: any) => b.text)
         .join('');
-      const match = text.match(/\{[\s\S]*\}/);
-      parsed = match ? JSON.parse(match[0]) : { updates: {} };
+      // Extract the FIRST balanced JSON object — not a greedy
+      // first-{-to-last-} match. The greedy form swallowed sibling
+      // commentary like `{...} explanation {something}` and parsed
+      // the wrong region, occasionally producing field updates the
+      // user never asked for.
+      const obj = extractFirstJsonObject(text);
+      parsed = obj ?? { updates: {} };
     } catch (e: any) {
       req.log.warn({ err: e }, 'lead ai-edit model call failed');
       return reply.code(502).send({ error: { message: 'שירות ה-AI לא זמין כרגע, נסו שוב' } });

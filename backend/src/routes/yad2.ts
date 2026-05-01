@@ -153,14 +153,64 @@ async function getYad2Quota(agentId: string): Promise<QuotaSnapshot> {
   };
 }
 
-async function recordYad2Attempt(agentId: string): Promise<void> {
-  await prisma.yad2ImportAttempt.create({ data: { agentId } });
-  // Self-cleanup so the table never grows past ~3 rows per agent. Done
-  // best-effort; a stray row doesn't hurt correctness because getYad2Quota
-  // already filters by the window.
-  prisma.yad2ImportAttempt.deleteMany({
-    where: { agentId, attemptedAt: { lt: new Date(Date.now() - YAD2_QUOTA_WINDOW_MS) } },
-  }).catch(() => { /* ignore */ });
+// Atomic check-and-insert: prevents the TOCTOU where two concurrent
+// requests both see remaining > 0 and both insert, blowing past the
+// rolling cap. Postgres advisory lock keyed on hashtext(agentId)
+// serializes the read+write within a transaction so concurrent
+// requests for the same agent queue behind each other; different
+// agents don't contend.
+async function tryReserveYad2Quota(
+  agentId: string,
+): Promise<{ reserved: boolean; quota: QuotaSnapshot }> {
+  const limit = await quotaLimitFor(agentId);
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(
+      `SELECT pg_advisory_xact_lock(hashtext($1))`,
+      agentId,
+    );
+    const since = new Date(Date.now() - YAD2_QUOTA_WINDOW_MS);
+    const attempts = await tx.yad2ImportAttempt.findMany({
+      where: { agentId, attemptedAt: { gt: since } },
+      orderBy: { attemptedAt: 'asc' },
+      select: { attemptedAt: true },
+      take: limit + 1,
+    });
+    const used = attempts.length;
+    const oldest = attempts[0]?.attemptedAt;
+    const resetAtMs = oldest ? oldest.getTime() + YAD2_QUOTA_WINDOW_MS : 0;
+    if (used >= limit) {
+      const msUntilReset = Math.max(0, resetAtMs - Date.now());
+      return {
+        reserved: false,
+        quota: {
+          limit,
+          used,
+          remaining: 0,
+          resetAt: new Date(resetAtMs).toISOString(),
+          msUntilReset,
+        },
+      };
+    }
+    await tx.yad2ImportAttempt.create({ data: { agentId } });
+    // Self-cleanup so the table doesn't grow unbounded. Best-effort,
+    // fire-and-forget outside the transaction; a stray row is harmless
+    // because the read above filters by the window.
+    prisma.yad2ImportAttempt.deleteMany({
+      where: { agentId, attemptedAt: { lt: since } },
+    }).catch(() => { /* ignore */ });
+    const usedAfter = used + 1;
+    const remaining = limit - usedAfter;
+    return {
+      reserved: true,
+      quota: {
+        limit,
+        used: usedAfter,
+        remaining,
+        resetAt: remaining === 0 ? new Date(resetAtMs).toISOString() : null,
+        msUntilReset: remaining === 0 ? Math.max(0, resetAtMs - Date.now()) : 0,
+      },
+    };
+  });
 }
 
 function quotaExceededReply(reply: any, quota: QuotaSnapshot) {
@@ -317,12 +367,10 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     if (agencyId) {
       const u = getUser(req);
       if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
-      const quota = await getYad2Quota(u.id);
-      if (quota.remaining === 0) return quotaExceededReply(reply, quota);
-      await recordYad2Attempt(u.id);
+      const reservation = await tryReserveYad2Quota(u.id);
+      if (!reservation.reserved) return quotaExceededReply(reply, reservation.quota);
       const report = await crawlAgency(agencyId);
-      const after = await getYad2Quota(u.id);
-      return { listings: report.listings, agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone }, sections: report.sections, truncated: report.truncated, quota: after };
+      return { listings: report.listings, agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone }, sections: report.sections, truncated: report.truncated, quota: reservation.quota };
     }
     return reply.code(400).send({ error: { message: 'נא להדביק כתובת של דף סוכנות (yad2.co.il/realestate/agency/...)' } });
   });
@@ -376,9 +424,9 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     // Quota check BEFORE the expensive crawl. We deliberately count the
     // attempt up-front (not on success) so a flaky Yad2 / WAF burst
     // doesn't let the agent retry their way around the limit.
-    const quotaBefore = await getYad2Quota(u.id);
-    if (quotaBefore.remaining === 0) return quotaExceededReply(reply, quotaBefore);
-    await recordYad2Attempt(u.id);
+    // The reserve is atomic so two concurrent requests can't both pass.
+    const reservation = await tryReserveYad2Quota(u.id);
+    if (!reservation.reserved) return quotaExceededReply(reply, reservation.quota);
     try {
       return await runAgencyPreview(agencyId, u.id, req.log);
     } catch (err: any) {
@@ -406,9 +454,8 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     }
     const u = getUser(req);
     if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
-    const quotaBefore = await getYad2Quota(u.id);
-    if (quotaBefore.remaining === 0) return quotaExceededReply(reply, quotaBefore);
-    await recordYad2Attempt(u.id);
+    const reservation = await tryReserveYad2Quota(u.id);
+    if (!reservation.reserved) return quotaExceededReply(reply, reservation.quota);
     const log = req.log;
     const job = startJob('agency-preview', u.id, async (report) => {
       try {

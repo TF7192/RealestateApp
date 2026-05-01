@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatPhone } from '../lib/phone';
-import { useViewportMobile } from '../hooks/mobile';
+import { useViewportMobile, useRefreshOnRefocus } from '../hooks/mobile';
 import LeadFiltersSheet from '../components/LeadFiltersSheet';
 import SwipeRow from '../components/SwipeRow';
 import PullRefresh from '../components/PullRefresh';
@@ -84,10 +84,16 @@ export default function Customers() {
     try {
       const res = await api.listLeads();
       setLeads(res?.items || []);
+      markFetched();
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Tab-refocus refetch so edits made on detail pages or in another
+  // tab show up here without a manual reload.
+  const markFetched = useRefreshOnRefocus(() => { load(); });
 
   useEffect(() => { load(); }, [load]);
 

@@ -73,6 +73,7 @@ import { track as phTrack, captureException as phCapture, shutdownAnalytics } fr
 import { getUser } from './middleware/auth.js';
 import crypto from 'node:crypto';
 import { authPlugin } from './middleware/auth.js';
+import { idempotencyPlugin } from './middleware/idempotency.js';
 
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -200,6 +201,9 @@ export async function build(opts: BuildOptions = {}) {
 
   await app.register(fastifyWebsocket);
   await app.register(authPlugin);
+  // F-IDP — cache create-endpoint responses by Idempotency-Key for 60s
+  // so a double-submit / retry returns the same lead/property/deal/owner.
+  await app.register(idempotencyPlugin);
 
   // F-12.2 — Liveness probe (is the process up?) vs readiness probe
   // (can it actually serve?). The readiness probe actually touches the

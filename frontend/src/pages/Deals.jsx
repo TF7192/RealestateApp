@@ -17,6 +17,7 @@ import { relativeDate } from '../lib/relativeDate';
 import { DateQuickChips } from '../components/MobilePickers';
 import { runMutation } from '../lib/mutations';
 import { useToast } from '../lib/toast';
+import { useRefreshOnRefocus } from '../hooks/mobile';
 // Modals still lean on the agreement-style backdrop/class set. Keep
 // the import so the create / edit dialogs render as centered modals
 // instead of inline divs.
@@ -86,7 +87,11 @@ export default function Deals() {
   const load = async () => {
     const res = await api.listDeals();
     setDeals(res.items || []);
+    markFetched();
   };
+
+  // Tab-refocus refetch.
+  const markFetched = useRefreshOnRefocus(() => { load(); });
 
   useEffect(() => {
     load().finally(() => setLoading(false));

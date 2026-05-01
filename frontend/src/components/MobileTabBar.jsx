@@ -107,7 +107,7 @@ export default function MobileTabBar({
         })}
         <button
           type="button"
-          onPointerUp={() => { haptics.press(); setSheetOpen(true); }}
+          onClick={() => { haptics.press(); setSheetOpen(true); }}
           aria-label="עוד"
           style={{
             ...FONT, border: 'none', background: 'transparent', cursor: 'pointer',

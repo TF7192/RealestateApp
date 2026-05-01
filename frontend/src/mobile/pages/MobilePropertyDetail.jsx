@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { properties, formatPrice, marketingActionLabels, getAssetClassLabel, agentProfile } from '../../data/mockData';
 import { formatFloor } from '../../lib/formatFloor';
+import { displayDate } from '../../lib/display';
 import { haptics, openExternal, shareSheet } from '../../native';
 import { telUrl, whatsappUrl, wazeUrl, publicPropertyUrl } from '../../native/actions';
 import { useToast } from '../components/Toast';
@@ -334,13 +335,9 @@ function Row({ icon, label, value, highlight }) {
   );
 }
 
-function formatDate(str) {
-  if (!str) return '—';
-  try {
-    const d = new Date(str);
-    return d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch { return str; }
-}
+// Canonical IL formatter via lib/display so the em-dash + locale match
+// the rest of the app and don't drift from the desktop view.
+const formatDate = displayDate;
 
 // Inline video tile — uploaded files use a native <video controls>
 // player; YouTube / Vimeo links embed via iframe; everything else

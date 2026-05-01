@@ -21,6 +21,7 @@ import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { getUser } from '../middleware/auth.js';
 import { autoLinkProspectToLead } from './prospect-pdf.js';
+import { sanitizeBrokerageTermsHtml } from '../lib/htmlSanitize.js';
 
 // Per-agent sequential order number for the brokerage-services PDF.
 // Called inside a transaction so concurrent creates serialise on the
@@ -201,7 +202,13 @@ export const registerProspectRoutes: FastifyPluginAsync = async (app) => {
             displayName:        agent.displayName,
             phone:              agent.phone,
             agency:             agent.agentProfile?.agency             || null,
-            brokerageTermsHtml: agent.agentProfile?.brokerageTermsHtml || null,
+            // SEC — sanitize HERE, not in the client. The client also
+            // sanitizes for defense in depth, but a malicious or
+            // tampered DB row must not be able to ship live JS to a
+            // public prospect's browser.
+            brokerageTermsHtml: agent.agentProfile?.brokerageTermsHtml
+              ? sanitizeBrokerageTermsHtml(agent.agentProfile.brokerageTermsHtml)
+              : null,
           }
         : null,
     };

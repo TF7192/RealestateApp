@@ -35,6 +35,7 @@ import {
   inputPropsForEmail,
 } from '../lib/inputProps';
 import { NumberField, PhoneField, SelectField, Segmented } from '../components/SmartFields';
+import { toE164 } from '../lib/phone';
 // VoiceCaptureButton removed — feature hidden until voice-to-lead
 // ships production-ready (see Layout.jsx note).
 import PageTour from '../components/PageTour';
@@ -449,6 +450,10 @@ export default function NewProperty() {
   const [step, setStep] = useState(isEdit ? 2 : 1);
   const [propertyId, setPropertyId] = useState(isEdit ? editId : null);
   const [submitting, setSubmitting] = useState(false);
+  // Synchronous re-entry guard for both step saves. setSubmitting is
+  // async; a fast double-tap can fire two onSubmit handlers before
+  // React re-renders, so the state check isn't enough on its own.
+  const submittingRef = useRef(false);
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [photoFiles, setPhotoFiles] = useState([]);
@@ -804,7 +809,10 @@ export default function NewProperty() {
       body.propertyOwnerId = form.propertyOwnerId;
     } else {
       body.owner = form.owner;
-      body.ownerPhone = form.ownerPhone;
+      // Canonicalize the owner phone to E.164 so dedup against
+      // existing Owner rows (and SMS dispatch) sees one shape.
+      const phoneRaw = form.ownerPhone ? String(form.ownerPhone).trim() : '';
+      body.ownerPhone = phoneRaw ? (toE164(phoneRaw) ?? phoneRaw) : '';
       if (form.ownerEmail) body.ownerEmail = form.ownerEmail;
     }
     return body;
@@ -909,6 +917,7 @@ export default function NewProperty() {
   // ── Step 1 save: creates the property ──────────────────────────────
   const saveStep1 = async (e) => {
     e?.preventDefault?.();
+    if (submittingRef.current) return;
     setError(null);
     try {
       if (!form.street || !form.city) throw new Error('חסר רחוב ועיר');
@@ -932,6 +941,7 @@ export default function NewProperty() {
       }
       if (!form.marketingPrice) throw new Error('חסר מחיר שיווק');
       if (!form.sqm) throw new Error('חסר שטח במ״ר');
+      submittingRef.current = true;
       setSubmitting(true);
       if (isEdit) {
         // Send the full union so step-2-only fields can't get dropped
@@ -949,6 +959,7 @@ export default function NewProperty() {
     } catch (e2) {
       setError(e2.message || 'שמירה נכשלה');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -957,7 +968,9 @@ export default function NewProperty() {
   const saveStep2 = async (e) => {
     e?.preventDefault?.();
     if (!propertyId) return;
+    if (submittingRef.current) return;
     setError(null);
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       // Edit mode: send the full union too, so a save from step 2 never
@@ -983,6 +996,7 @@ export default function NewProperty() {
       navigate(`/properties/${propertyId}`);
     } catch (e2) {
       setError(e2.message || 'שמירה נכשלה');
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };

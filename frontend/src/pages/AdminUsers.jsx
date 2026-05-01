@@ -4,6 +4,7 @@ import { Search, X, Download, ArrowUp, ArrowDown, Users as UsersIcon, ChevronRig
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { relativeTime } from '../lib/time';
+import { displayDate } from '../lib/display';
 import './AdminUsers.css';
 
 // SEC-010 — bounces non-admins client-side before the backend's
@@ -16,11 +17,9 @@ function roleLabel(role) {
   return { AGENT: 'סוכן', ADMIN: 'מנהל', CUSTOMER: 'לקוח' }[role] || role;
 }
 
-function fmtDate(iso) {
-  if (!iso) return '—';
-  try { return new Date(iso).toLocaleDateString('he-IL'); }
-  catch { return '—'; }
-}
+// Routes through the canonical displayDate helper for consistency
+// with the agent-facing pages.
+const fmtDate = displayDate;
 
 // Tiny debounce hook — copied pattern from CommandPalette.
 function useDebounced(value, ms = 300) {

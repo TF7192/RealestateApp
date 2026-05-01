@@ -44,7 +44,7 @@ import WhatsAppIcon from '../components/WhatsAppIcon';
 import StickyActionBar from '../components/StickyActionBar';
 import Portal from '../components/Portal';
 import { OverflowSheet } from '../components/MobilePickers';
-import { useViewportMobile, useDelayedFlag } from '../hooks/mobile';
+import { useViewportMobile, useDelayedFlag, useRefreshOnRefocus } from '../hooks/mobile';
 import PageTour from '../components/PageTour';
 import { pageCache } from '../lib/pageCache';
 import { shareSheet, openWhatsApp, shareWithPhotos } from '../native/share';
@@ -570,9 +570,14 @@ export default function Properties() {
       const next = res.items || [];
       setItems(next);
       pageCache.set('properties', next);
+      markFetched();
     } catch { /* ignore */ }
     setLoading(false);
   };
+
+  // Refresh on tab refocus so the list reflects edits made on a
+  // detail page or in another tab without a manual reload.
+  const markFetched = useRefreshOnRefocus(() => { load(); });
 
   useEffect(() => { load(); }, []);
 

@@ -61,13 +61,19 @@ function broadcastUnauthorized() {
 
 async function request(path, {
   method = 'GET', body, headers = {}, raw, keepalive,
-  timeoutMs, retries,
+  timeoutMs, retries, signal: externalSignal,
 } = {}) {
   const phId = posthogDistinctId();
   const isWrite = method !== 'GET' && method !== 'HEAD';
   const controller = new AbortController();
   const timeout = timeoutMs ?? (isWrite ? DEFAULT_TIMEOUT_WRITE_MS : DEFAULT_TIMEOUT_GET_MS);
   const timer = setTimeout(() => controller.abort(), timeout);
+  // Forward an external abort to our internal controller so the caller
+  // can cancel an in-flight request when its component unmounts.
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
 
   const init = {
     method,
@@ -181,6 +187,20 @@ function safeParse(text) {
   try { return JSON.parse(text); } catch { return text; }
 }
 
+// F-IDP — generate an Idempotency-Key for create endpoints. If the
+// network or the user double-fires the same submit, the backend sees
+// the same key inside its dedup window and returns the cached
+// response instead of creating a second row.
+function makeIdempotencyKey() {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  } catch { /* fallthrough */ }
+  return `idk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+function withIdempotency(headers = {}) {
+  return { 'Idempotency-Key': makeIdempotencyKey(), ...headers };
+}
+
 export const api = {
   // Sprint 5.1 — public contact form. POSTs { subject, body,
   // fromName?, fromEmail? }; backend mails support@estia.co.il via
@@ -264,7 +284,7 @@ export const api = {
     return request(`/properties${qs ? `?${qs}` : ''}`);
   },
   getProperty: (id) => request(`/properties/${id}`),
-  createProperty: (body) => request('/properties', { method: 'POST', body }),
+  createProperty: (body) => request('/properties', { method: 'POST', body, headers: withIdempotency() }),
   updateProperty: (id, body) => request(`/properties/${id}`, { method: 'PATCH', body }),
   // 2026-04-26 — Free-form Hebrew instruction → AI-extracted partial patch.
   aiEditProperty: (id, instruction) =>
@@ -398,7 +418,7 @@ export const api = {
     return request(`/leads${qs ? `?${qs}` : ''}`);
   },
   getLead: (id) => request(`/leads/${id}`),
-  createLead: (body) => request('/leads', { method: 'POST', body }),
+  createLead: (body) => request('/leads', { method: 'POST', body, headers: withIdempotency() }),
   updateLead: (id, body) => request(`/leads/${id}`, { method: 'PATCH', body }),
   aiEditLead: (id, instruction) =>
     request(`/leads/${id}/ai-edit`, { method: 'POST', body: { instruction } }),
@@ -409,7 +429,7 @@ export const api = {
     return request(`/deals${qs ? `?${qs}` : ''}`);
   },
   getDeal: (id) => request(`/deals/${id}`),
-  createDeal: (body) => request('/deals', { method: 'POST', body }),
+  createDeal: (body) => request('/deals', { method: 'POST', body, headers: withIdempotency() }),
   updateDeal: (id, body) => request(`/deals/${id}`, { method: 'PATCH', body }),
 
   listAgreements: (params = {}) => {
@@ -570,7 +590,7 @@ export const api = {
   // Owners
   listOwners:        () => request('/owners'),
   getOwner:          (id) => request(`/owners/${id}`),
-  createOwner:       (body) => request('/owners', { method: 'POST', body }),
+  createOwner:       (body) => request('/owners', { method: 'POST', body, headers: withIdempotency() }),
   updateOwner:       (id, body) => request(`/owners/${id}`, { method: 'PATCH', body }),
   deleteOwner:       (id) => request(`/owners/${id}`, { method: 'DELETE' }),
   searchOwners:      (q) => request(`/owners/search?q=${encodeURIComponent(q)}`),

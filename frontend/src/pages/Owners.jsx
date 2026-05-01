@@ -20,7 +20,7 @@ import { relativeDate } from '../lib/relativeDate';
 import OwnerEditDialog from '../components/OwnerEditDialog';
 import SwipeRow from '../components/SwipeRow';
 import PullRefresh from '../components/PullRefresh';
-import { useViewportMobile } from '../hooks/mobile';
+import { useViewportMobile, useRefreshOnRefocus } from '../hooks/mobile';
 import { telUrl, waUrl } from '../lib/waLink';
 
 const DT = {
@@ -51,11 +51,16 @@ export default function Owners() {
     try {
       const res = await api.listOwners();
       if (mounted.current) setOwners(res?.items || []);
+      markFetched();
     } catch (e) {
       toast?.error?.(e?.message || 'טעינת בעלי הנכסים נכשלה');
       if (mounted.current) setOwners([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast]);
+
+  // Tab-refocus refetch.
+  const markFetched = useRefreshOnRefocus(() => { load(); });
 
   useEffect(() => {
     mounted.current = true;

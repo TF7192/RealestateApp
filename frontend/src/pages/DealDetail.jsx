@@ -20,6 +20,7 @@ import { DealEditModal } from './Deals';
 import { relativeDate } from '../lib/relativeDate';
 import { absoluteTime } from '../lib/time';
 import { formatPhone } from '../lib/phone';
+import { displayPrice, displayDate } from '../lib/display';
 import OfferReviewPanel from '../components/OfferReviewPanel';
 
 const DT = {
@@ -47,10 +48,14 @@ const STATUS_LABELS = {
 
 function assetLabel(ac) { return ac === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'; }
 function categoryLabel(c) { return c === 'SALE' ? 'מכירה' : 'השכרה'; }
+// Routed through the canonical displayPrice — kept as a thin wrapper
+// because the rent-magnitude "/חודש" suffix is a deal-page-specific
+// affordance that the global helper doesn't carry.
 function formatPrice(price) {
-  if (price == null) return '—';
-  if (price < 10000) return `₪${price.toLocaleString('he-IL')}/חודש`;
-  return `₪${price.toLocaleString('he-IL')}`;
+  if (price == null || price === '') return '—';
+  const base = displayPrice(price);
+  if (Number(price) < 10000) return `${base}/חודש`;
+  return base;
 }
 function statusAccent(status) {
   if (status === 'SIGNED' || status === 'CLOSED') {
@@ -64,10 +69,9 @@ function statusAccent(status) {
   }
   return { bg: DT.goldSoft, fg: DT.goldDark, icon: null };
 }
-function formatDate(d) {
-  if (!d) return '—';
-  try { return new Date(d).toLocaleDateString('he-IL'); } catch { return '—'; }
-}
+// Routed through the canonical displayDate so the em-dash + IL locale
+// behavior matches the rest of the app.
+const formatDate = displayDate;
 
 export default function DealDetail() {
   const { id } = useParams();

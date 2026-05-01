@@ -42,6 +42,8 @@ import { popoutCurrentRoute } from '../lib/popout';
 import { printPage } from '../lib/print';
 import api from '../lib/api';
 import { formatFloor } from '../lib/formatFloor';
+import { inputPropsForPrice } from '../lib/inputProps';
+import { displayPrice } from '../lib/display';
 import { PROPERTY_STAGE_LABELS } from '../lib/mlsLabels';
 import PropertyPublicMatchBlock from '../components/PropertyPublicMatchBlock';
 import { useAuth } from '../lib/auth';
@@ -257,10 +259,15 @@ const MARKETING_GROUPS = [
 // Channels that get a quick "✓ / ◯" preview on the marketing card
 const MARKETING_HIGHLIGHTS = ['facebook', 'yad2', 'madlan', 'iList'];
 
+// Local wrapper around the canonical displayPrice helper. The only
+// extra logic here is the "/חודש" suffix for rent-magnitude prices —
+// the heuristic stays for back-compat (a future cleanup can switch
+// to property.category === 'RENT' once every caller passes a property).
 function formatPrice(price) {
-  if (!price) return '—';
-  if (price < 10000) return `₪${price.toLocaleString('he-IL')}/חודש`;
-  return `₪${price.toLocaleString('he-IL')}`;
+  if (price == null || price === '') return '—';
+  const base = displayPrice(price);
+  if (Number(price) < 10000) return `${base}/חודש`;
+  return base;
 }
 
 function buildFullWhatsAppMessage(prop, agent, opts = {}) {
@@ -586,7 +593,29 @@ export default function PropertyDetail() {
       toast?.success?.('קישור דף הנחיתה הועתק');
       setTimeout(() => setLandingCopied(false), 1800);
     } catch {
-      window.prompt('העתק את הקישור:', url);
+      // Legacy execCommand fallback — covers contexts where the async
+      // Clipboard API is unavailable. window.prompt would also work
+      // but doesn't render in iOS WKWebView, leaving the user stuck.
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) {
+          setLandingCopied(true);
+          toast?.success?.('קישור דף הנחיתה הועתק');
+          setTimeout(() => setLandingCopied(false), 1800);
+        } else {
+          toast?.error?.('ההעתקה נכשלה — נסה שוב');
+        }
+      } catch {
+        toast?.error?.('ההעתקה נכשלה — נסה שוב');
+      }
     }
   };
 
@@ -2392,11 +2421,12 @@ function PropertyOffers({ propertyId }) {
             className="form-input"
           />
           <input
-            type="number" placeholder="סכום הצעה (₪) *" min="0"
+            {...inputPropsForPrice()}
+            placeholder="סכום הצעה (₪) *"
             value={draft.amount}
-            onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+            onChange={(e) => setDraft({ ...draft, amount: e.target.value.replace(/[^\d]/g, '') })}
             className="form-input"
-            style={{ gridColumn: '1 / -1' }}
+            style={{ gridColumn: '1 / -1', textAlign: 'right' }}
           />
           <textarea
             placeholder="הערות — תנאי מימון, התנייה במשכנתא, וכו׳"

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -68,6 +69,8 @@ export default function Documents() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver]   = useState(false);
   const [tagsInput, setTagsInput] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const fileInputRef = useRef(null);
 
   // Stable ref so the load callback doesn't re-fire on every toast
@@ -140,15 +143,21 @@ export default function Documents() {
     e.target.value = '';
   };
 
-  const onDelete = async (id) => {
-    const ok = window.confirm?.('למחוק את הקובץ?');
-    if (!ok) return;
+  const onDelete = (id) => setConfirmDeleteId(id);
+
+  const confirmDelete = async () => {
+    const id = confirmDeleteId;
+    if (!id) return;
+    setDeleteBusy(true);
     try {
       await api.deleteDocument(id);
       setItems((p) => p.filter((d) => d.id !== id));
       toast.success('הקובץ נמחק');
+      setConfirmDeleteId(null);
     } catch (e) {
       toast.error(e?.message || 'שגיאה במחיקה');
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -304,6 +313,18 @@ export default function Documents() {
             <DocumentCard key={d.id} doc={d} onDelete={() => onDelete(d.id)} />
           ))}
         </div>
+      )}
+      {confirmDeleteId && (
+        <ConfirmDialog
+          title="מחיקת קובץ"
+          message="למחוק את הקובץ?"
+          confirmLabel="מחק"
+          cancelLabel="ביטול"
+          danger
+          busy={deleteBusy}
+          onConfirm={confirmDelete}
+          onClose={() => { if (!deleteBusy) setConfirmDeleteId(null); }}
+        />
       )}
     </div>
   );

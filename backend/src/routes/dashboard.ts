@@ -12,6 +12,32 @@ import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
 
+// Anchor "today" to Asia/Jerusalem, not the container TZ. EC2 runs UTC,
+// so `new Date(year, month, date)` would yield 00:00 UTC = 02:00/03:00
+// IL — meetings scheduled before that line on a real Israeli day would
+// silently fall outside the bucket. DST-aware via Intl.formatToParts.
+function startOfJerusalemDay(now: Date): Date {
+  const tz = 'Asia/Jerusalem';
+  const dateParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const dp: Record<string, string> = {};
+  for (const p of dateParts) dp[p.type] = p.value;
+  const y = Number(dp.year), m = Number(dp.month), d = Number(dp.day);
+  // Probe: take UTC midnight of (y,m,d) and ask what IL clock shows
+  // at that instant. That offset is what we subtract to get IL
+  // midnight expressed in UTC ms.
+  const utcMidnight = Date.UTC(y, m - 1, d);
+  const probeParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(utcMidnight);
+  const pp: Record<string, string> = {};
+  for (const p of probeParts) pp[p.type] = p.value;
+  const offsetMs =
+    Number(pp.hour) * 3_600_000 + Number(pp.minute) * 60_000;
+  return new Date(utcMidnight - offsetMs);
+}
+
 export const registerDashboardRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/dashboard/summary
   //
@@ -21,7 +47,7 @@ export const registerDashboardRoutes: FastifyPluginAsync = async (app) => {
   app.get('/summary', { onRequest: [app.requireAgent] }, async (req) => {
     const agentId = requireUser(req).id;
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfDay = startOfJerusalemDay(now);
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

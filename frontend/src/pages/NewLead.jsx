@@ -27,6 +27,7 @@ import {
   inputPropsForCity,
 } from '../lib/inputProps';
 import { NumberField, PhoneField, PriceRange, Segmented, SelectField } from '../components/SmartFields';
+import { toE164 } from '../lib/phone';
 import {
   CUSTOMER_STATUS_LABELS,
   QUICK_LEAD_STATUS_LABELS,
@@ -168,6 +169,10 @@ export default function NewLead() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [draftBanner, setDraftBanner] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  // Synchronous re-entry guard. setSubmitting is async; a fast double-tap
+  // can fire two onSubmit handlers before React re-renders, so the state
+  // check above isn't enough on its own.
+  const submittingRef = useRef(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   // 2026-04-30 — full city registry (1,300+ rows). Mirrors NewProperty
   // so the lead address fields use identical autocomplete behavior.
@@ -282,18 +287,28 @@ export default function NewLead() {
   // lead. Wire up api.createLead and surface success/failure properly.
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (submitting) return;
+    if (submittingRef.current) return;
     if (!form.name?.trim()) {
       toast.error('שם הלקוח הוא שדה חובה');
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
+    // Canonicalize Israeli phones to E.164 BEFORE sending so dedup
+    // and SMS dispatch on the backend see one consistent shape no
+    // matter how the agent typed the number.
+    const canonPhone = (raw) => {
+      if (!raw) return null;
+      const trimmed = String(raw).trim();
+      if (!trimmed) return null;
+      return toE164(trimmed) ?? trimmed;
+    };
     try {
       // Map checkbox flags to the API's expected requirement fields.
       const body = {
         kind: form.kind === 'SELLER' ? 'SELLER' : 'BUYER',
         name: form.name.trim(),
-        phone: form.phone || null,
+        phone: canonPhone(form.phone),
         interestType: form.interestType === 'מסחרי' ? 'COMMERCIAL' : 'PRIVATE',
         lookingFor: form.lookingFor === 'rent' ? 'RENT' : 'BUY',
         city: form.city || null,
@@ -339,9 +354,9 @@ export default function NewLead() {
         address:     form.address?.trim()     || null,
         cityText:    form.cityText?.trim()    || null,
         zip:         form.zip?.trim()         || null,
-        primaryPhone: form.primaryPhone?.trim() || null,
-        phone1:      form.phone1?.trim()      || null,
-        phone2:      form.phone2?.trim()      || null,
+        primaryPhone: canonPhone(form.primaryPhone),
+        phone1:      canonPhone(form.phone1),
+        phone2:      canonPhone(form.phone2),
         fax:         form.fax?.trim()         || null,
         personalId:  form.personalId?.trim()  || null,
         description: form.description?.trim() || null,
@@ -367,6 +382,7 @@ export default function NewLead() {
       else navigate('/customers');
     } catch (err) {
       toast.error(err?.message || 'שמירת הליד נכשלה');
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
