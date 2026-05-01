@@ -15,12 +15,11 @@ import { cleanup } from '@testing-library/react';
 import { faker } from '@faker-js/faker';
 import { installBrowserApiMocks } from '../mocks/browser-apis';
 import { server } from './msw-server';
-// Side-effect import: initializes the app's i18next instance so any
-// component that calls useTranslation() during a test resolves keys
-// against the real Hebrew bundle. Without this, components render the
-// raw key strings (e.g. `auth.fields.email` instead of `אימייל`) and
-// assertions on rendered copy fail.
-import '@estia/frontend/i18n';
+// PERF-004 (commit 789538f, 2026-04-25) removed react-i18next: the
+// app is Hebrew-only and the three callers of useTranslation() were
+// ported to inline Hebrew copy. The previous side-effect import of
+// `@estia/frontend/i18n` here now points at a deleted module and
+// breaks every frontend test at module-resolve time.
 
 
 expect.extend(matchers);

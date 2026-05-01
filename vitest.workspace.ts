@@ -41,6 +41,10 @@ export default defineWorkspace([
         { find: /^react-router-dom$/, replacement: path.join(frontendRoot, 'node_modules/react-router-dom') },
         { find: /^react-router$/,     replacement: path.join(frontendRoot, 'node_modules/react-router') },
         { find: /^lucide-react$/,     replacement: path.join(frontendRoot, 'node_modules/lucide-react') },
+        // SEC-012 — exceljs replaced xlsx; the lib lives only in
+        // frontend/node_modules, so the unit-frontend project (rooted
+        // at repo root) needs an explicit alias to resolve it.
+        { find: /^exceljs$/,          replacement: path.join(frontendRoot, 'node_modules/exceljs') },
       ],
     },
     test: {

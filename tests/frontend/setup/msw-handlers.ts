@@ -103,6 +103,101 @@ export const defaultHandlers = [
     })
   ),
 
+  // PERF-019 — bundled dashboard endpoints (replaced 5 parallel listX
+  // calls + the topbar-counts triplet on /dashboard mount). Backed by
+  // backend/src/routes/dashboard.ts; default returns empty / zeroed
+  // shapes so component tests render the empty state cleanly.
+  http.get('/api/dashboard/summary', () =>
+    HttpResponse.json({
+      counts: {
+        properties: 0, leads: 0, deals: 0, reminders: 0,
+        hotLeadsCount: 0, todayMeetings: 0,
+      },
+      hotLeads: [],
+      todayMeetings: [],
+      stuckDeals: [],
+      staleProperties: [],
+    })
+  ),
+  http.get('/api/dashboard/full', () =>
+    HttpResponse.json({
+      counts: {
+        properties: 0, leads: 0, deals: 0, reminders: 0,
+        hotLeadsCount: 0, todayMeetings: 0,
+      },
+      hotLeads: [],
+      todayMeetings: [],
+      stuckDeals: [],
+      staleProperties: [],
+      leads:      { items: [], nextCursor: null },
+      properties: { items: [], nextCursor: null },
+      deals:      { items: [], nextCursor: null },
+      reminders:  { items: [], nextCursor: null },
+    })
+  ),
+  http.get('/api/dashboard/topbar-counts', () =>
+    HttpResponse.json({
+      unreadNotifications: 0,
+      publicMatchesCount: 0,
+      hasOpenChat: false,
+    })
+  ),
+
+  // Notifications (Layout polls this on mount via api.listNotifications)
+  http.get('/api/notifications', () => HttpResponse.json({ items: [] })),
+  http.post('/api/notifications/:id/read', () => HttpResponse.json({ ok: true })),
+  http.post('/api/notifications/read-all', () => HttpResponse.json({ ok: true })),
+
+  // Public matches — Layout's promotion badge + Properties detail panel
+  http.get('/api/public-matches', () => HttpResponse.json({ items: [] })),
+  http.get('/api/public-matches/count', () =>
+    HttpResponse.json({ count: 0 })
+  ),
+  http.get('/api/public-matches/property/:id/copies', () =>
+    HttpResponse.json({ items: [] })
+  ),
+
+  // Lead PATCH — inline editors on lead cards / detail panes call this.
+  http.patch('/api/leads/:id', async ({ params, request }) => {
+    const body: any = await request.json().catch(() => ({}));
+    return HttpResponse.json({
+      lead: { id: params.id, agentId: DEMO_AGENT.id, ...body },
+    });
+  }),
+
+  // Documents — PropertyDetail's documents tab queries by propertyId.
+  http.get('/api/documents', () => HttpResponse.json({ items: [] })),
+
+  // Calendar — meetings list scoped per-lead (CustomerDetail/PropertyDetail).
+  http.get('/api/integrations/calendar/leads/:leadId/meetings', () =>
+    HttpResponse.json({ items: [] })
+  ),
+  http.get('/api/meetings', () => HttpResponse.json({ items: [] })),
+
+  // Market enrichment (PropertyDetail's market panel).
+  http.get('/api/market/property/:id', () =>
+    HttpResponse.json({
+      listing: null,
+      lastFetchedAt: null,
+      // Empty insights so the panel renders its idle state.
+      insights: { medianPrice: null, sampleSize: 0 },
+    })
+  ),
+
+  // Property offers + prospects (PropertyDetail tabs).
+  http.get('/api/properties/:id/offers', () => HttpResponse.json({ items: [] })),
+  http.get('/api/properties/:propertyId/prospects', () =>
+    HttpResponse.json({ items: [] })
+  ),
+
+  // Public lookup — PropertyDetail uses it to show the public-share state.
+  http.get('/api/public/lookup/property/:id', () =>
+    HttpResponse.json({ property: null })
+  ),
+
+  // Office invites — Layout / Profile poll mine to surface pending invites.
+  http.get('/api/office/invites/mine', () => HttpResponse.json({ items: [] })),
+
   // Yad2 integration
   http.get('/api/integrations/yad2/quota', () =>
     HttpResponse.json({ limit: 3, remaining: 3, used: 0, resetAt: null, msUntilReset: 0 })
