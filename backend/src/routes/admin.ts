@@ -338,7 +338,83 @@ export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
       links: {
         grafana_local: 'http://localhost:3000',
         prometheus_local: 'http://localhost:9090',
+        grafana_proxied: '/admin/grafana',
       },
     };
   });
+
+  // Grafana reverse-proxy. Forwards every request under /api/admin/grafana/*
+  // to the Grafana container at http://grafana:3000/admin/grafana/* (Grafana
+  // is configured with GF_SERVER_SERVE_FROM_SUB_PATH=true + ROOT_URL pointing
+  // at /admin/grafana so its self-generated links resolve correctly).
+  //
+  // Estia's admin JWT gate is the only auth — Grafana itself runs anonymous-
+  // Admin behind this proxy. Non-admin Estia users get 403 before traffic
+  // ever reaches Grafana.
+  //
+  // The frontend nginx routes external `/admin/grafana/*` to the SPA, but
+  // the SPA's <iframe src="/api/admin/grafana/..."> embeds this proxy
+  // directly. We register on '/grafana' (mounted at /api/admin/grafana
+  // by the parent prefix) and a wildcard for the rest.
+  const GRAFANA_TARGET = process.env.GRAFANA_INTERNAL_URL || 'http://grafana:3000';
+  const proxyHandler = async (req: any, reply: any) => {
+    // Strip the /admin/grafana prefix the FE hits us on; Grafana
+    // expects to see /admin/grafana/<rest> because it's configured to
+    // serve from that sub-path. So we forward the original URL.
+    const url = req.url; // '/admin/grafana/api/...' (relative to /api)
+    // req.url under a route prefix is '/grafana/...' — we need to
+    // rebuild the path Grafana sees. Since GF serves from /admin/grafana,
+    // we rewrite '/grafana/...' → '/admin/grafana/...'.
+    const downstreamPath = url.replace(/^\/grafana/, '/admin/grafana');
+    const target = `${GRAFANA_TARGET}${downstreamPath}`;
+
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(req.headers)) {
+      // Pass through everything except hop-by-hop + Cookie (which
+      // carries Estia's JWT — Grafana's running anonymous, doesn't
+      // need it; passing it leaks a credential to a different service).
+      if (['host', 'connection', 'cookie', 'content-length', 'transfer-encoding'].includes(k.toLowerCase())) continue;
+      if (typeof v === 'string') headers[k] = v;
+    }
+
+    const init: RequestInit = {
+      method: req.method,
+      headers,
+      // Pass body for non-GET. Fastify's req.body is parsed; for proxy
+      // we want the raw stream — use req.raw.
+      ...(req.method !== 'GET' && req.method !== 'HEAD'
+        ? { body: req.body ? JSON.stringify(req.body) : undefined }
+        : {}),
+      redirect: 'manual',
+    };
+
+    let upstream: Response;
+    try {
+      upstream = await fetch(target, init);
+    } catch (e: any) {
+      reply.code(502).send({ error: { message: `grafana upstream unreachable: ${e?.message ?? e}` } });
+      return;
+    }
+
+    reply.code(upstream.status);
+    upstream.headers.forEach((value, key) => {
+      // Strip headers that interfere with our reverse proxy. CSP
+      // can break iframe embedding so allow Grafana's own.
+      if (['content-encoding', 'content-length', 'connection', 'transfer-encoding'].includes(key.toLowerCase())) return;
+      reply.header(key, value);
+    });
+
+    if (!upstream.body) {
+      reply.send();
+      return;
+    }
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    reply.send(buf);
+  };
+
+  // Grafana's HTML + assets + API + WebSocket-fallback live across many
+  // paths. Match all of them with a single wildcard. /grafana matches the
+  // bare root; /grafana/* matches everything else.
+  app.all('/grafana', { onRequest: [app.requireAdmin] }, proxyHandler);
+  app.all('/grafana/*', { onRequest: [app.requireAdmin] }, proxyHandler);
 };

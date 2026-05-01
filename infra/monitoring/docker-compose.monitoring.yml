@@ -81,12 +81,21 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       # First-run admin password — can be reset later via the UI.
-      # Comes from monitoring.env (a small companion file the operator
-      # writes when bringing the stack up). If unset, Grafana defaults
-      # to admin/admin.
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # 2026-05-01 PERF — public access via /admin/grafana proxy.
+      # Grafana is gated by Estia's admin JWT (the backend proxy
+      # rejects non-admin requests before they reach this container).
+      # Anonymous Admin role lets us skip Grafana's own login screen.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_BASIC_ENABLED: "false"
+      # Sub-path serving so /admin/grafana/d/estia-overview works.
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/admin/grafana"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SERVER_DOMAIN: estia.co.il
+      # Allow iframe embedding within the Estia admin shell.
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_INSTALL_PLUGINS: ""
     volumes:
       - grafana_data:/var/lib/grafana
@@ -95,9 +104,22 @@ services:
     depends_on:
       - prometheus
       - postgres_exporter
+    # Join the estia-new_default network so the Estia backend can
+    # reach grafana by DNS (`http://grafana:3000`) for the proxy
+    # forwarder. The default network for this compose project keeps
+    # prometheus + postgres_exporter on their own bridge.
+    networks:
+      - default
+      - estia
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+networks:
+  default:
+  estia:
+    name: estia-new_default
+    external: true
 
 volumes:
   prometheus_data:

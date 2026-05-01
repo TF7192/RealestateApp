@@ -259,9 +259,14 @@ export default function Layout({ onLogout }) {
   // sees the regular agent nav with `adminOnly` items hidden.
   const primary = isAdmin
     ? [
-        { k: 'admin',       to: '/admin',        label: 'סקירה כוללת', Icon: ShieldCheck },
-        { k: 'admin-users', to: '/admin/users',  label: 'משתמשים',     Icon: UsersRound },
-        { k: 'admin-chats', to: '/admin/chats',  label: 'שיחות תמיכה', Icon: MessageSquare },
+        { k: 'admin',            to: '/admin',            label: 'סקירה כוללת', Icon: ShieldCheck },
+        { k: 'admin-users',      to: '/admin/users',      label: 'משתמשים',     Icon: UsersRound },
+        // 2026-05-01 — admin-only monitoring surfaces. Lightweight
+        // tile view + the full embedded Grafana dashboard, sandwiched
+        // between Users and Support Chats per the user's preference.
+        { k: 'admin-monitoring', to: '/admin/monitoring', label: 'ניטור · תקציר',  Icon: ActivityIcon },
+        { k: 'admin-grafana',    to: '/admin/grafana',    label: 'Grafana',        Icon: ActivityIcon },
+        { k: 'admin-chats',      to: '/admin/chats',      label: 'שיחות תמיכה',   Icon: MessageSquare },
       ]
     : PRIMARY_NAV.filter((it) => !it.adminOnly || isAdmin);
   const tools = isAdmin ? [] : TOOL_NAV;
