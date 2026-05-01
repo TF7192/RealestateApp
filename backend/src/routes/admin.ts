@@ -258,4 +258,87 @@ export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
       })),
     };
   });
+
+  // GET /api/admin/monitoring — live snapshot for the /admin/monitoring
+  // page. Reads pg_stat_activity / pg_stat_database directly via
+  // Prisma raw queries (the same source postgres_exporter scrapes), so
+  // it works even if the Prometheus stack is down. If PROMETHEUS_URL is
+  // set in env, it also pulls active firing alerts.
+  app.get('/monitoring', { onRequest: [app.requireAdmin] }, async () => {
+    const rows = await prisma.$queryRawUnsafe<Array<{ state: string | null; count: bigint }>>(
+      `SELECT state, count(*)::bigint AS count
+         FROM pg_stat_activity
+         WHERE datname = current_database()
+         GROUP BY state`,
+    );
+    const conn: Record<string, number> = {};
+    for (const r of rows) {
+      const k = (r.state || 'unknown').replace(/\s+/g, '_');
+      conn[k] = Number(r.count);
+    }
+
+    const longRow = await prisma.$queryRawUnsafe<Array<{ longest_seconds: number | null }>>(
+      `SELECT COALESCE(EXTRACT(EPOCH FROM max(now() - xact_start)), 0)::float AS longest_seconds
+         FROM pg_stat_activity
+         WHERE datname = current_database()
+           AND state IN ('active', 'idle in transaction')`,
+    );
+    const longestSec = Number(longRow[0]?.longest_seconds ?? 0);
+
+    const deadlocksRow = await prisma.$queryRawUnsafe<Array<{ deadlocks: bigint }>>(
+      `SELECT deadlocks::bigint AS deadlocks FROM pg_stat_database WHERE datname = current_database()`,
+    );
+    const deadlocksTotal = Number(deadlocksRow[0]?.deadlocks ?? 0);
+
+    const maxConnRow = await prisma.$queryRawUnsafe<Array<{ setting: string }>>(
+      `SHOW max_connections`,
+    );
+    const maxConnections = Number(maxConnRow[0]?.setting ?? 0);
+
+    let firingAlerts: Array<{ name: string; severity: string; summary: string; activeAt: string }> = [];
+    let promReachable = false;
+    if (process.env.PROMETHEUS_URL) {
+      try {
+        const r = await fetch(`${process.env.PROMETHEUS_URL.replace(/\/$/, '')}/api/v1/alerts`, {
+          signal: AbortSignal.timeout(2000),
+        });
+        if (r.ok) {
+          promReachable = true;
+          const j = (await r.json()) as { data?: { alerts?: Array<{ state: string; labels: Record<string, string>; annotations: Record<string, string>; activeAt?: string }> } };
+          firingAlerts = (j.data?.alerts || [])
+            .filter((a) => a.state === 'firing')
+            .map((a) => ({
+              name: a.labels?.alertname ?? '?',
+              severity: a.labels?.severity ?? 'unknown',
+              summary: a.annotations?.summary ?? '',
+              activeAt: a.activeAt ?? '',
+            }));
+        }
+      } catch { /* prometheus unreachable; degrade gracefully */ }
+    }
+
+    return {
+      capturedAt: new Date().toISOString(),
+      db: {
+        connections: {
+          total: Object.values(conn).reduce((a, b) => a + b, 0),
+          active: conn.active ?? 0,
+          idle: conn.idle ?? 0,
+          idle_in_transaction: conn.idle_in_transaction ?? 0,
+          waiting: conn.waiting ?? 0,
+        },
+        maxConnections,
+        longestRunningTxSeconds: longestSec,
+        deadlocksSinceBoot: deadlocksTotal,
+      },
+      alerts: {
+        prometheus_reachable: promReachable,
+        firing: firingAlerts,
+      },
+      links: {
+        grafana_local: 'http://localhost:3000',
+        prometheus_local: 'http://localhost:9090',
+      },
+    };
+  });
 };

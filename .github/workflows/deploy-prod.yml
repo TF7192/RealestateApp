@@ -178,7 +178,7 @@ jobs:
           # below targets backend-1 explicitly to run prisma migrate
           # deploy exactly once (not per-replica).
           sudo -E docker compose -f docker-compose.prod.yml up -d \
-            --scale backend=2 --remove-orphans
+            --scale backend=3 --remove-orphans
           if [ "$SKIP_MIGRATIONS" = "true" ]; then
             echo 'skip_migrations=true — not running prisma migrate deploy'
           else

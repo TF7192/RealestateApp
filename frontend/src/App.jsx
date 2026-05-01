@@ -70,6 +70,7 @@ const AdminMarketWatcher = lazy(() => import('./pages/AdminMarketWatcher'));
 const SettingsNotifications = lazy(() => import('./pages/SettingsNotifications'));
 const AdminChats = lazy(() => import('./pages/AdminChats'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
+const AdminMonitoring = lazy(() => import('./pages/AdminMonitoring'));
 const Admin = lazy(() => import('./pages/Admin'));
 const SellerCalculator = lazy(() => import('./pages/SellerCalculator'));
 const Yad2Import = lazy(() => import('./pages/Yad2Import'));
@@ -413,6 +414,7 @@ function AppRoutes() {
             <Route path="/admin" element={user?.role === 'ADMIN' ? <Admin /> : <Navigate to="/dashboard" replace />} />
             <Route path="/admin/chats" element={user?.role === 'ADMIN' ? <AdminChats /> : <Navigate to="/dashboard" replace />} />
             <Route path="/admin/users" element={user?.role === 'ADMIN' ? <AdminUsers /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/admin/monitoring" element={user?.role === 'ADMIN' ? <AdminMonitoring /> : <Navigate to="/dashboard" replace />} />
             <Route path="/calculator" element={<SellerCalculator />} />
             <Route path="/integrations/yad2" element={<Yad2Import />} />
             <Route path="/import" element={<ImportPicker />} />

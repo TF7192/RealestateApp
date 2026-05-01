@@ -270,13 +270,48 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     // payload; Commit B will pass an explicit lower default plus the
     // returned `nextCursor` for "load more". `+1` overfetch lets us
     // detect "more rows exist" without a second count query.
+    // PERF — 2026-05-01: convert the LIST endpoint from `include` to a
+    // tight `select` of only the fields the FE actually reads. Audit
+    // confirmed Properties.jsx, Dashboard.jsx, Customers.jsx, Map.jsx,
+    // Deals.jsx and AgentCard.jsx never read >35 of the Property
+    // columns — closingPrice, offer, floor, totalFloors, all the
+    // *Required booleans, gush/helka, commercial-only flags, the
+    // entire propertyOwner relation, etc. Dropping them shrinks
+    // per-row payload from ~3.5 KB → ~600 bytes. The detail endpoint
+    // (GET /:id below) still returns the full row with `include`.
     const take = q.take ?? 200;
     const items = await prisma.property.findMany({
       where,
-      include: {
-        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-        marketingActions: true,
-        propertyOwner: true,
+      select: {
+        id:               true,
+        agentId:          true,
+        slug:             true,
+        street:           true,
+        city:             true,
+        unitNumber:       true,
+        lat:              true,
+        lng:              true,
+        assetClass:       true,
+        category:         true,
+        type:             true,
+        status:           true,
+        marketingPrice:   true,
+        rooms:            true,
+        sqm:              true,
+        owner:            true,
+        ownerPhone:       true,
+        priority:         true,
+        coBrokered:       true,
+        createdAt:        true,
+        updatedAt:        true,
+        images: {
+          select: { id: true, url: true, urlThumb: true, urlCard: true, sortOrder: true },
+          orderBy: { sortOrder: 'asc' },
+          take: 1,
+        },
+        marketingActions: {
+          select: { actionKey: true, done: true },
+        },
       },
       // Priority floats to the top so an agent can surface the
        // listings they are actively pushing; createdAt is the secondary

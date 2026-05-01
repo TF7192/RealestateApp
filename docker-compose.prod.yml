@@ -33,7 +33,7 @@ services:
       # backend remains internal-only — public traffic flows through
       # the frontend nginx upstream `backend:4000` (which uses Docker's
       # embedded DNS round-robin, see frontend/nginx.conf resolver).
-      - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT_RANGE:-6002-6003}:4000"
+      - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT_RANGE:-6002-6004}:4000"
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
