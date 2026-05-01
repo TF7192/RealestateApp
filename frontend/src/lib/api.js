@@ -216,6 +216,11 @@ export const api = {
   googleMock: (body) => request('/auth/google/mock', { method: 'POST', body }),
   googleNativeExchange: (code) =>
     request('/auth/google/native-exchange', { method: 'POST', body: { code } }),
+  // Native polling — Capacitor app polls this every ~750ms after
+  // opening Browser.open with `?nativeState=<uuid>`. Returns either
+  // { code } (consume once) or { pending: true }.
+  googleNativePoll: (state) =>
+    request(`/auth/google/native-poll?state=${encodeURIComponent(state)}`),
   // Sign in with Apple — native-only. The iOS app calls
   // AuthenticationServices via the @capacitor-community/apple-sign-in
   // plugin and forwards the resulting payload here; the backend

@@ -59,14 +59,52 @@ export default function Login() {
       const origin = window.location.origin.startsWith('http')
         ? window.location.origin
         : 'https://estia.co.il';
-      // No `presentationStyle: 'popover'` — popover is an iPad modal
-      // style; on iPhone it's documented to "fall back" to fullscreen
-      // but in practice (iOS 26.x) the SFSafariViewController stalls
-      // on first paint of cross-origin pages like accounts.google.com.
-      // Default fullscreen behaves correctly.
+      // Polling design: open SFSafariViewController for the OAuth
+      // dance, then poll the backend for the one-time exchange code.
+      // When the code arrives we close the in-app browser and POST to
+      // /native-exchange to finalize the session — no extra page, no
+      // extra tap, the user never sees a different website.
+      const state = (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`)
+        .replace(/[^A-Za-z0-9_-]/g, '');
       await Browser.open({
-        url: `${origin}/api/auth/google?native=1`,
+        url: `${origin}/api/auth/google?native=1&nativeState=${encodeURIComponent(state)}`,
       });
+      // Poll every 750ms for up to 2 minutes. Stops on success, on
+      // expiry, on any 4xx, or when the user hits Cancel which
+      // closes SFSafariViewController and fires browserFinished.
+      const STARTED = Date.now();
+      let stopped = false;
+      const cleanup = async () => {
+        stopped = true;
+        try { await Browser.close(); } catch { /* ignore */ }
+      };
+      let finishedSub;
+      try {
+        finishedSub = await Browser.addListener?.('browserFinished', () => { stopped = true; });
+      } catch { /* not all platforms support the listener */ }
+      const poll = async () => {
+        if (stopped) return;
+        if (Date.now() - STARTED > 120_000) { await cleanup(); return; }
+        try {
+          const res = await api.googleNativePoll(state);
+          if (res?.code) {
+            await api.googleNativeExchange(res.code);
+            await cleanup();
+            window.location.replace(`${window.location.origin}/dashboard`);
+            return;
+          }
+        } catch (err) {
+          // 4xx → state expired or invalid. Bail without spamming.
+          if (err?.status >= 400 && err?.status < 500) { await cleanup(); return; }
+          // Network blip → try again on the next tick.
+        }
+        if (!stopped) setTimeout(poll, 750);
+      };
+      setTimeout(poll, 750);
+      // Best-effort listener cleanup once the flow ends.
+      setTimeout(() => { try { finishedSub?.remove?.(); } catch { /* ignore */ } }, 130_000);
       return;
     }
     const here = window.location.pathname + window.location.search;

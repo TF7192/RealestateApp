@@ -43,6 +43,11 @@ const NATIVE_SCHEME = 'com.estia.agent';
 // horizontally, move this to Redis or a short-lived DB row.
 type PendingExchange = { userId: string; expires: number };
 const pendingCodes = new Map<string, PendingExchange>();
+// Native polling map — keyed by the client-supplied `nativeState`. Once
+// OAuth completes, we drop the one-time `code` here so the app can
+// fetch it via /native-poll. Same TTL + cap policy as pendingCodes.
+type PendingPollEntry = { code: string; expires: number };
+const pendingPolls = new Map<string, PendingPollEntry>();
 // SEC-021 — hard cap so a misbehaving / hostile caller burning native
 // flow attempts can't unboundedly grow this Map. Map iteration order is
 // insertion order, so evicting the first key drops the oldest entry.
@@ -114,10 +119,18 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
     const q = (req.query || {}) as Record<string, unknown>;
     const rt = q.redirect;
     const native = q.native === '1' || q.native === 'true';
+    // `nativeState` is a client-supplied opaque token (UUID) the
+    // Capacitor app uses to poll for completion. Validated for shape so
+    // it can't be used as a giant key in pendingPolls.
+    const rawNs = typeof q.nativeState === 'string' ? q.nativeState : '';
+    const nativeState = /^[A-Za-z0-9_-]{8,128}$/.test(rawNs) ? rawNs : '';
     const payload = JSON.stringify({
       s: state,
       r: typeof rt === 'string' ? rt : '/',
       n: native ? 1 : 0,
+      // Carry the polling state through Google's redirect via the
+      // signed state cookie + encoded state param, just like `r` and `n`.
+      ps: nativeState || undefined,
     });
     const encoded = Buffer.from(payload).toString('base64url');
 
@@ -154,7 +167,7 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       return reply.redirect('/?auth=google_missing_state');
     }
 
-    let decoded: { s: string; r: string; n?: number };
+    let decoded: { s: string; r: string; n?: number; ps?: string };
     try {
       decoded = JSON.parse(Buffer.from(encodedState, 'base64url').toString('utf8'));
     } catch {
@@ -164,6 +177,7 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
       return reply.redirect('/?auth=google_state_mismatch');
     }
     const isNative = decoded.n === 1;
+    const pollState = typeof decoded.ps === 'string' ? decoded.ps : '';
 
     // Exchange authorization code for an access token + id_token
     let tokens: any;
@@ -251,73 +265,62 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
     if (isNative) {
       // Native (iPhone app) flow: don't set a cookie here — we're
       // running in SFSafariViewController, whose cookie jar is isolated
-      // from the app's WKWebView. Instead, mint a single-use exchange
-      // code and hand it off via the app's custom URL scheme; the app
-      // will then POST to /native-exchange from its own WebView, where
-      // the Set-Cookie response _will_ stick.
+      // from the app's WKWebView. Polling design:
+      //   1. App opens Browser.open with `?nativeState=<uuid>`.
+      //   2. After OAuth completes here, we drop the one-time code
+      //      into pendingPolls keyed by that UUID and render a
+      //      "התחברת" page that just sits there.
+      //   3. The app polls /api/auth/google/native-poll?state=<uuid>.
+      //   4. On hit, the app calls Browser.close() (auto-dismissing
+      //      SFSafariViewController) and POSTs to /native-exchange.
       //
-      // History: the original implementation issued a server 302 to
-      // `com.estia.agent://auth?code=…`. That worked on iOS ≤ 16 and
-      // fired the "Open in Estia?" prompt on iOS 17. iOS 26 (FB-tested
-      // on a user's iPhone 16 Pro Max running 26.2.1) silently swallows
-      // server-issued non-https redirects from SFSafariViewController —
-      // the page hangs and never opens the app. Apple is progressively
-      // requiring a user gesture to launch a registered scheme.
-      //
-      // The fix is a tiny interstitial HTML page with a single button.
-      // The button click counts as a user gesture, so iOS happily hands
-      // off to the app. We also kick off a JS-triggered location.href
-      // immediately on load — on builds where iOS still allows it
-      // (older iOS, and any future loosening), the page is invisible.
+      // Older iOS versions could rely on a server 302 to
+      // `com.estia.agent://auth?code=…`. iOS 26 silently drops both
+      // server-issued non-https redirects from SFSafariViewController
+      // *and* user-tapped <a> links to custom schemes. Polling is the
+      // only mechanism that doesn't depend on Apple-honored redirects.
       const oneTime = issueNativeCode(user.id);
-      const target = `${NATIVE_SCHEME}://auth?code=${encodeURIComponent(oneTime)}`;
+      if (pollState) {
+        // Same TTL/cap policy as pendingCodes (see issueNativeCode).
+        const now = Date.now();
+        for (const [k, v] of pendingPolls) if (v.expires < now) pendingPolls.delete(k);
+        if (pendingPolls.size >= MAX_PENDING) {
+          const oldest = pendingPolls.keys().next().value;
+          if (oldest) pendingPolls.delete(oldest);
+        }
+        pendingPolls.set(pollState, { code: oneTime, expires: now + 120_000 });
+      }
       reply.header('Content-Type', 'text/html; charset=utf-8');
       return reply.send(`<!doctype html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Estia · התחברות</title>
+<title>Estia</title>
 <style>
   html, body { margin: 0; height: 100%; }
   body {
     background: #f7f3ec; color: #1e1a14;
     font-family: -apple-system, BlinkMacSystemFont, 'Assistant', sans-serif;
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; padding: 24px; gap: 18px; text-align: center;
+    justify-content: center; padding: 24px; gap: 14px; text-align: center;
   }
   h1 { font-size: 22px; font-weight: 800; margin: 0; }
-  p { font-size: 15px; color: #6b6356; margin: 0; max-width: 320px; line-height: 1.5; }
-  a.cta {
-    display: inline-flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #b48b4c, #8a6932);
-    color: #f7f3ec; text-decoration: none;
-    padding: 14px 28px; border-radius: 12px;
-    font-size: 16px; font-weight: 800;
-    box-shadow: 0 8px 24px rgba(180,139,76,0.32);
-    min-width: 220px;
+  p { font-size: 14px; color: #6b6356; margin: 0; }
+  .spinner {
+    width: 36px; height: 36px; margin-top: 12px;
+    border-radius: 50%;
+    border: 3px solid rgba(180, 139, 76, 0.2);
+    border-top-color: #b48b4c;
+    animation: spin 0.9s linear infinite;
   }
-  a.cta:active { transform: scale(0.97); }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-  <h1>נכנסת בהצלחה</h1>
-  <p>לחצ/י כדי לפתוח את האפליקציה ולסיים את ההתחברות</p>
-  <a class="cta" id="open" href="${target}">פתח את Estia</a>
-  <script>
-    // Belt-and-braces: try the auto-redirect first. On the iOS
-    // versions that still honor JS-triggered location.href to a custom
-    // scheme this fires immediately and the user never sees the page.
-    // On iOS 26 it's swallowed and the user taps the button.
-    (function () {
-      try {
-        var t = ${JSON.stringify(target)};
-        // Tiny delay so the page paints first — otherwise a fast
-        // redirect on older iOS makes the screen flicker.
-        setTimeout(function () { window.location.href = t; }, 50);
-      } catch (e) { /* fall through to button */ }
-    })();
-  </script>
+  <div class="spinner" aria-hidden="true"></div>
+  <h1>התחברת בהצלחה</h1>
+  <p>חוזר אל Estia…</p>
 </body>
 </html>`);
     }
@@ -379,5 +382,30 @@ export const registerGoogleOAuthRoutes: FastifyPluginAsync = async (app) => {
         displayName: user.displayName,
       },
     });
+  });
+
+  // ── Step 2.5 (native only): polling endpoint for the Capacitor app.
+  //
+  // The app polls this every ~750ms after opening Browser.open. Once
+  // the SFSafariViewController-side OAuth callback fires, the
+  // pendingPolls Map gets a `code` keyed by the app's `state`; the
+  // next poll consumes that code, the app closes the in-app browser,
+  // and POSTs to /native-exchange to finalize.
+  //
+  // Read-only — returns either { code } or { pending: true }. Single
+  // consumption: the entry is deleted on first successful return so a
+  // stale poll can't grab the same code twice.
+  app.get<{ Querystring: { state?: string } }>('/google/native-poll', async (req, reply) => {
+    const state = (req.query?.state || '').toString();
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(state)) {
+      return reply.code(400).send({ error: { message: 'invalid state' } });
+    }
+    const entry = pendingPolls.get(state);
+    if (!entry) return reply.send({ pending: true });
+    pendingPolls.delete(state);
+    if (entry.expires < Date.now()) {
+      return reply.code(400).send({ error: { message: 'expired' } });
+    }
+    return reply.send({ code: entry.code });
   });
 };
