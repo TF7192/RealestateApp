@@ -7,6 +7,7 @@ import { X, ExternalLink, Copy as CopyIcon, CheckCircle2, MessageCircle, Sparkle
 import Portal from '../../components/Portal';
 import { displayPriceShort } from '../../lib/display';
 import { freshLabel } from './freshLabel';
+import { floorLabel } from './floorLabel';
 
 export default function ListingDrawer({ listing, onClose, onDuplicate, onOpenMine, onSendToLead, onDismissMatch }) {
   const dialogRef = useRef(null);
@@ -21,16 +22,22 @@ export default function ListingDrawer({ listing, onClose, onDuplicate, onOpenMin
   const matches = (Array.isArray(listing.matches) ? listing.matches : []).filter(Boolean);
   const isDuplicated = !!listing.duplicatedByMe;
 
+  // pricePerSqm is meaningful for sale listings (₪/m²) but for rent
+  // it's monthly-₪/m² which is borderline noise — hide on rentals so
+  // the drawer doesn't show a confusingly small "₪54" number.
+  const showPricePerSqm = listing.kind !== 'rent' && listing.pricePerSqm != null;
   const specs = [
     { label: 'סוג נכס',  value: listing.propertyType || '—' },
     { label: 'חדרים',    value: listing.rooms != null ? listing.rooms : '—' },
     { label: 'שטח',      value: listing.sizeSqm != null ? `${listing.sizeSqm} מ״ר` : '—' },
-    { label: 'קומה',     value: listing.floor != null ? listing.floor : '—' },
-    { label: 'מ״ר/₪',    value: listing.pricePerSqm != null ? `₪${Number(listing.pricePerSqm).toLocaleString('he-IL')}` : '—' },
+    { label: 'קומה',     value: floorLabel(listing.floor) ?? '—' },
+    showPricePerSqm
+      ? { label: '₪ / מ״ר', value: `₪${Number(listing.pricePerSqm).toLocaleString('he-IL')}` }
+      : null,
     { label: 'מפרסם',    value: listing.posterType === 'agency' ? 'תיווך' : listing.posterType === 'private' ? 'פרטי' : '—' },
     { label: 'נראה ראשון', value: freshLabel(listing.firstSeenAt) },
-    { label: 'מקור',     value: listing.source || '—' },
-  ];
+    { label: 'מקור',     value: listing.source === 'yad2' ? 'יד2' : (listing.source || '—') },
+  ].filter(Boolean);
 
   return (
     <Portal>

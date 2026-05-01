@@ -32,6 +32,11 @@
   align-items: center;
   gap: 8px;
 }
+.md-subtitle > span + span::before {
+  content: '·';
+  margin-inline-end: 6px;
+  color: var(--text-muted);
+}
 .md-pulse-dot {
   display: inline-block;
   width: 7px;

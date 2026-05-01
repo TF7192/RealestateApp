@@ -357,38 +357,31 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     const [
       newLast24,
       newPrev24,
-      matchesForMe,
+      matchedListingIds,
       privateLast7,
       totalLast7,
-      privatePrev7,
-      totalPrev7,
       neighborhoodGroups,
     ] = await Promise.all([
       prisma.marketListing.count({ where: { ...cityScope, firstSeenAt: { gte: since1d } } }),
       prisma.marketListing.count({
         where: { ...cityScope, firstSeenAt: { gte: since2d, lt: since1d } },
       }),
-      prisma.marketListingLeadMatch.count({
+      // matchesForMe: count DISTINCT listings (not match rows) so the
+      // tile count agrees with the number of cards the agent will see
+      // when they click through to "matchedOnly".
+      prisma.marketListingLeadMatch.findMany({
         where: {
           agentUserId: userId,
           status: { not: 'dismissed' },
           createdAt: { gte: since3d },
         },
+        select: { marketListingId: true },
+        distinct: ['marketListingId'],
       }),
       prisma.marketListing.count({
         where: { ...cityScope, posterType: 'private', firstSeenAt: { gte: since7d } },
       }),
       prisma.marketListing.count({ where: { ...cityScope, firstSeenAt: { gte: since7d } } }),
-      prisma.marketListing.count({
-        where: {
-          ...cityScope,
-          posterType: 'private',
-          firstSeenAt: { gte: since14d, lt: since7d },
-        },
-      }),
-      prisma.marketListing.count({
-        where: { ...cityScope, firstSeenAt: { gte: since14d, lt: since7d } },
-      }),
       // Hottest neighborhoods by raw listing count in last 3 days.
       prisma.marketListing.groupBy({
         by: ['neighborhood', 'city'],
@@ -402,20 +395,22 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
         take: 5,
       }),
     ]);
+    // Discard the unused 14-day window — we no longer report a delta on
+    // privatePct because "+0 נק׳" tiles were noisy without context.
+    void since14d;
 
     const newDeltaPct = newPrev24 > 0
       ? Math.round(((newLast24 - newPrev24) / newPrev24) * 100)
       : null;
     const privatePct = totalLast7 > 0 ? Math.round((privateLast7 / totalLast7) * 100) : null;
-    const privatePrevPct = totalPrev7 > 0 ? Math.round((privatePrev7 / totalPrev7) * 100) : null;
-    const privateDeltaPct = privatePct != null && privatePrevPct != null
-      ? privatePct - privatePrevPct
-      : null;
 
     return reply.send({
-      newToday:     { count: newLast24, deltaPct: newDeltaPct },
-      matchesForMe: { count: matchesForMe },
-      privatePct:   { value: privatePct, deltaPct: privateDeltaPct },
+      // 24-hour rolling window — labelled "ב-24 שעות" on the FE so the
+      // copy stops promising "since-midnight" semantics that the math
+      // doesn't deliver.
+      newLast24h:   { count: newLast24, deltaPct: newDeltaPct },
+      matchesForMe: { count: matchedListingIds.length },
+      privatePct:   { value: privatePct },
       hotNeighborhoods: neighborhoodGroups.map((g) => ({
         neighborhood: g.neighborhood,
         city: g.city,

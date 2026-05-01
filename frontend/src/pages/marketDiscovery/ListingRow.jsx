@@ -7,8 +7,9 @@ import { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Copy as CopyIcon, MoreHorizontal, CheckCircle2, Sparkles, User, Briefcase } from 'lucide-react';
 import { displayPriceShort } from '../../lib/display';
 import { freshLabel } from './freshLabel';
+import { floorLabel } from './floorLabel';
 
-export default function ListingRow({ listing, isMatched, isDuplicated, onOpen, onDuplicate, onOverflow }) {
+export default function ListingRow({ listing, isMatched, isDuplicated, onOpen, onOpenMine, onDuplicate, onOverflow }) {
   const accent = isDuplicated ? 'duplicated' : isMatched ? 'matched' : null;
   const matched = (Array.isArray(listing.matches) ? listing.matches : []).filter(Boolean);
   const namesShown = matched.slice(0, 3).map((m) => m.leadName).filter(Boolean).join(', ');
@@ -51,7 +52,7 @@ export default function ListingRow({ listing, isMatched, isDuplicated, onOpen, o
             listing.propertyType,
             listing.rooms != null ? `${listing.rooms} חד׳` : null,
             listing.sizeSqm != null ? `${listing.sizeSqm} מ״ר` : null,
-            listing.floor != null ? `קומה ${listing.floor}` : null,
+            floorLabel(listing.floor),
           ].filter(Boolean).join(' · ') || '—'}
         </div>
 
@@ -81,9 +82,9 @@ export default function ListingRow({ listing, isMatched, isDuplicated, onOpen, o
         )}
         <RowActions
           isDuplicated={isDuplicated}
-          onOpen={(e) => { e.stopPropagation(); onOpen?.(listing); }}
+          onOpenMine={(e) => { e.stopPropagation(); onOpenMine?.(listing); }}
           onDuplicate={(e) => { e.stopPropagation(); onDuplicate?.(listing); }}
-          onOverflow={(e, anchor) => { e.stopPropagation(); onOverflow?.(listing, anchor); }}
+          onOverflow={(action) => { onOverflow?.(listing, action); }}
           source={listing.originalUrl}
         />
       </div>
@@ -91,7 +92,7 @@ export default function ListingRow({ listing, isMatched, isDuplicated, onOpen, o
   );
 }
 
-function RowActions({ isDuplicated, onOpen, onDuplicate, onOverflow, source }) {
+function RowActions({ isDuplicated, onOpenMine, onDuplicate, onOverflow, source }) {
   return (
     <div className="md-row-actions" onClick={(e) => e.stopPropagation()}>
       <a
@@ -103,12 +104,12 @@ function RowActions({ isDuplicated, onOpen, onDuplicate, onOverflow, source }) {
         onClick={(e) => e.stopPropagation()}
       >
         <ExternalLink size={14} />
-        פתח
+        פתח במקור
       </a>
       {isDuplicated ? (
-        <button type="button" className="btn btn-primary btn-sm" onClick={onOpen} title="פתח אצלי">
+        <button type="button" className="btn btn-primary btn-sm" onClick={onOpenMine} title="פתח את הנכס שלך">
           <CheckCircle2 size={14} />
-          אצלי
+          הנכס שלי
         </button>
       ) : (
         <button type="button" className="btn btn-primary btn-sm" onClick={onDuplicate} title="שכפל לנכסים שלי">
@@ -163,7 +164,7 @@ function RowOverflow({ onOverflow }) {
             <OverflowItem
               key={action}
               action={action}
-              onPick={(a) => { setOpen(false); onOverflow?.({}, a); }}
+              onPick={(a) => { setOpen(false); onOverflow?.(a); }}
             />
           ))}
         </div>
@@ -171,6 +172,7 @@ function RowOverflow({ onOverflow }) {
     </div>
   );
 }
+
 
 function OverflowItem({ action, onPick }) {
   const labels = {

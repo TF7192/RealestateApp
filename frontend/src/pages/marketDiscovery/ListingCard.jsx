@@ -5,8 +5,9 @@
 import { ExternalLink, Copy as CopyIcon, CheckCircle2, Sparkles, User, Briefcase } from 'lucide-react';
 import { displayPriceShort } from '../../lib/display';
 import { freshLabel } from './freshLabel';
+import { floorLabel } from './floorLabel';
 
-export default function ListingCard({ listing, isMatched, isDuplicated, onOpen, onDuplicate }) {
+export default function ListingCard({ listing, isMatched, isDuplicated, onOpen, onOpenMine, onDuplicate }) {
   const matched = (Array.isArray(listing.matches) ? listing.matches : []).filter(Boolean);
   const namesShown = matched.slice(0, 3).map((m) => m.leadName).filter(Boolean).join(', ');
   const namesOverflow = matched.length > 3 ? matched.length - 3 : 0;
@@ -48,7 +49,7 @@ export default function ListingCard({ listing, isMatched, isDuplicated, onOpen, 
             listing.propertyType,
             listing.rooms != null ? `${listing.rooms} חד׳` : null,
             listing.sizeSqm != null ? `${listing.sizeSqm} מ״ר` : null,
-            listing.floor != null ? `קומה ${listing.floor}` : null,
+            floorLabel(listing.floor),
           ].filter(Boolean).join(' · ') || '—'}
         </div>
       </div>
@@ -97,10 +98,11 @@ export default function ListingCard({ listing, isMatched, isDuplicated, onOpen, 
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            onClick={(e) => { e.stopPropagation(); onOpen?.(listing); }}
+            onClick={(e) => { e.stopPropagation(); onOpenMine?.(listing); }}
             style={{ justifyContent: 'center' }}
+            title="פתח את הנכס שלך בעריכה"
           >
-            <CheckCircle2 size={14} /> פתח אצלי
+            <CheckCircle2 size={14} /> הנכס שלי
           </button>
         ) : (
           <button

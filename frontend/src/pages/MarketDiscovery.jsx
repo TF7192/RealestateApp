@@ -18,7 +18,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Filter, Settings, Eye, EyeOff, List, Grid, X, Sparkles } from 'lucide-react';
 import api from './../lib/api';
 import { useToast } from './../lib/toast';
-import { relLabel } from './../lib/relativeDate';
+import { freshLabel } from './marketDiscovery/freshLabel';
 import EmptyState from './../components/EmptyState';
 import useInfiniteScroll from './../lib/useInfiniteScroll';
 import PulseStrip from './marketDiscovery/PulseStrip';
@@ -182,7 +182,16 @@ export default function MarketDiscovery() {
       filters.firstSeenAfter, sort]);
 
   const updateFilters = useCallback((patch) => {
-    setFilters((f) => ({ ...f, ...patch }));
+    setFilters((f) => {
+      // Pulse-tile shortcut: clicking "פרטי השבוע" should toggle between
+      // private-only and all posters. We intercept the sentinel value
+      // here so the consumer can stay declarative.
+      if (patch.posterType === 'all-toggle') {
+        const next = { ...patch, posterType: f.posterType === 'private' ? '' : 'private' };
+        return { ...f, ...next };
+      }
+      return { ...f, ...patch };
+    });
   }, []);
 
   const clearFilters = useCallback(() => {
@@ -268,7 +277,7 @@ export default function MarketDiscovery() {
   }, [navigate]);
 
   const handleOverflow = useCallback(async (listing, action) => {
-    const target = listing?.id ? listing : drawerListing;
+    const target = listing && listing.id ? listing : drawerListing;
     if (action === 'mark-viewed' && target) markViewed(target.id);
     else if (action === 'copy-link' && target?.originalUrl) {
       try {
@@ -300,11 +309,27 @@ export default function MarketDiscovery() {
   const handleDismissMatchInDrawer = useCallback(async (match) => {
     try {
       await api.dismissMarketMatch(match.id);
-      setItems((rows) => rows.map((r) => (
-        r.matches?.some((m) => m.id === match.id)
-          ? { ...r, matches: r.matches.filter((m) => m.id !== match.id) }
-          : r
-      )));
+      setItems((rows) => rows.map((r) => {
+        if (!r.matches?.some((m) => m.id === match.id)) return r;
+        const remaining = r.matches.filter((m) => m.id !== match.id);
+        // Reset topMatch too — otherwise the row stays styled as
+        // "matched" even after the only match was dismissed.
+        return {
+          ...r,
+          matches: remaining,
+          topMatch: remaining.length > 0 ? remaining[0] : null,
+        };
+      }));
+      // Keep the drawer in sync with the freshly-mutated row.
+      setDrawerListing((cur) => {
+        if (!cur || !cur.matches?.some((m) => m.id === match.id)) return cur;
+        const remaining = cur.matches.filter((m) => m.id !== match.id);
+        return {
+          ...cur,
+          matches: remaining,
+          topMatch: remaining.length > 0 ? remaining[0] : null,
+        };
+      });
       toast.success?.('ההתאמה נדחתה');
     } catch (err) {
       toast.error?.(err?.message || 'שגיאה');
@@ -369,10 +394,8 @@ export default function MarketDiscovery() {
           <h1>מודעות חדשות בשוק</h1>
           <div className="md-subtitle">
             {!isStale && <span className="md-pulse-dot" aria-hidden />}
-            {loading
-              ? 'טוען…'
-              : `${total.toLocaleString('he-IL')} מודעות`}
-            {lastScan && <span>· נסרק {relLabel(lastScan.startedAt)}</span>}
+            <span>{loading ? 'טוען…' : `${total.toLocaleString('he-IL')} מודעות`}</span>
+            {lastScan && <span>נסרק {freshLabel(lastScan.startedAt)}</span>}
           </div>
         </div>
 
@@ -553,8 +576,9 @@ export default function MarketDiscovery() {
                   isMatched={isMatchedListing(l, matchedListingId)}
                   isDuplicated={!!l.duplicatedByMe}
                   onOpen={handleOpenListing}
+                  onOpenMine={handleOpenMine}
                   onDuplicate={handleDuplicate}
-                  onOverflow={(target, action) => handleOverflow(target.id ? target : l, action)}
+                  onOverflow={(target, action) => handleOverflow(target, action)}
                 />
               ))}
             </div>
@@ -569,6 +593,7 @@ export default function MarketDiscovery() {
                   isMatched={isMatchedListing(l, matchedListingId)}
                   isDuplicated={!!l.duplicatedByMe}
                   onOpen={handleOpenListing}
+                  onOpenMine={handleOpenMine}
                   onDuplicate={handleDuplicate}
                 />
               ))}

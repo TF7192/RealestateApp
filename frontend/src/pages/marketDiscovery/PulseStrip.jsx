@@ -15,42 +15,47 @@ export default function PulseStrip({ pulse, loading, onApply }) {
     <div className="md-pulse-strip" aria-label="סיכום פעילות שוק">
       <Tile
         loading={loading}
-        label="חדש היום"
+        label="חדש ב-24 שעות"
         icon={<Sparkles size={14} />}
-        value={pulse?.newToday?.count}
-        delta={pulse?.newToday?.deltaPct}
+        value={pulse?.newLast24h?.count}
+        delta={pulse?.newLast24h?.deltaPct}
+        sub="לחצ/י לסינון ל-24 שעות"
         onClick={() => onApply?.({ firstSeenAfter: '24h' })}
       />
       <Tile
         loading={loading}
-        label="התאמות ללידים"
+        label="נכסים תואמי לידים"
         icon={<User size={14} />}
         value={pulse?.matchesForMe?.count}
         sub={pulse?.matchesForMe?.count > 0 ? '3 ימים אחרונים' : 'אין התאמות חדשות'}
-        onClick={() => onApply?.({ matchedOnly: true })}
+        onClick={() => onApply?.({ matchedOnly: true, posterType: '' })}
         emphasize={pulse?.matchesForMe?.count > 0}
       />
       <Tile
         loading={loading}
-        label="פרטי בלבד"
+        label="פרטי השבוע"
         icon={<Building2 size={14} />}
         value={pulse?.privatePct?.value != null ? `${pulse.privatePct.value}%` : null}
-        delta={pulse?.privatePct?.deltaPct}
-        deltaSuffix="נק׳"
-        onClick={() => onApply?.({ posterType: 'private' })}
+        sub="חלק הפרטיים בשוק"
+        // Default poster filter is already 'private'; clicking the tile
+        // surfaces the "all" view so the user can compare. A second
+        // click returns to private. Stateful toggle, not a no-op.
+        onClick={() => onApply?.({ posterType: 'all-toggle' })}
       />
       <HotNeighborhoodsTile
         loading={loading}
         items={pulse?.hotNeighborhoods}
-        onPick={(n) => onApply?.({ neighborhood: n.neighborhood, city: n.city })}
+        onPick={(n) => onApply?.({ neighborhood: n.neighborhood, city: n.city, posterType: '' })}
       />
     </div>
   );
 }
 
 function Tile({ loading, label, icon, value, delta, deltaSuffix, sub, onClick, emphasize }) {
-  const hasDelta = delta != null && Number.isFinite(delta);
-  const dir = hasDelta ? (delta > 0 ? 'up' : delta < 0 ? 'down' : 'neutral') : 'neutral';
+  // Hide the delta when it's zero — "+0% מול תקופה קודמת" is noise; if
+  // the FE wants to surface "no change" it should be a different copy.
+  const hasDelta = delta != null && Number.isFinite(delta) && delta !== 0;
+  const dir = hasDelta ? (delta > 0 ? 'up' : 'down') : 'neutral';
   return (
     <button
       type="button"
@@ -69,8 +74,8 @@ function Tile({ loading, label, icon, value, delta, deltaSuffix, sub, onClick, e
       </div>
       {hasDelta && (
         <div className={`md-tile-delta ${dir}`}>
-          {dir === 'up' ? <TrendingUp size={12} /> : dir === 'down' ? <TrendingDown size={12} /> : null}
-          {`${delta > 0 ? '+' : ''}${delta}${deltaSuffix ? ` ${deltaSuffix}` : '%'} מול תקופה קודמת`}
+          {dir === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+          {`${delta > 0 ? '+' : ''}${delta}${deltaSuffix ? ` ${deltaSuffix}` : '%'} מול אתמול`}
         </div>
       )}
       {sub && !hasDelta && <div className="md-tile-sub">{sub}</div>}

@@ -51,7 +51,7 @@ function defaultMarketHandlers({ items = [], pulse, pref } = {}) {
     ),
     http.get('/api/market-discovery/pulse', () =>
       HttpResponse.json(pulse || {
-        newToday: { count: 12, deltaPct: 5 },
+        newLast24h: { count: 12, deltaPct: 5 },
         matchesForMe: { count: 0 },
         privatePct: { value: 70, deltaPct: null },
         hotNeighborhoods: [],
@@ -100,7 +100,7 @@ describe('<MarketDiscovery> — pulse strip', () => {
   it('renders the KPI numbers from /pulse', async () => {
     server.use(...defaultMarketHandlers({
       pulse: {
-        newToday: { count: 42, deltaPct: 12 },
+        newLast24h: { count: 42, deltaPct: 12 },
         matchesForMe: { count: 3 },
         privatePct: { value: 75, deltaPct: -2 },
         hotNeighborhoods: [
@@ -168,7 +168,7 @@ describe('<MarketDiscovery> — email signup banner', () => {
   it('shows the soft banner when there are matches and prefs are off', async () => {
     server.use(...defaultMarketHandlers({
       pulse: {
-        newToday: { count: 0, deltaPct: null },
+        newLast24h: { count: 0, deltaPct: null },
         matchesForMe: { count: 4 },
         privatePct: { value: null, deltaPct: null },
         hotNeighborhoods: [],
@@ -182,7 +182,7 @@ describe('<MarketDiscovery> — email signup banner', () => {
   it('does NOT show the banner when prefs are already on', async () => {
     server.use(...defaultMarketHandlers({
       pulse: {
-        newToday: { count: 0, deltaPct: null },
+        newLast24h: { count: 0, deltaPct: null },
         matchesForMe: { count: 4 },
         privatePct: { value: null, deltaPct: null },
         hotNeighborhoods: [],
