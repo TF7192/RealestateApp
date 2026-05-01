@@ -403,6 +403,14 @@ export const registerAdminRoutes: FastifyPluginAsync = async (app) => {
       if (['content-encoding', 'content-length', 'connection', 'transfer-encoding'].includes(key.toLowerCase())) return;
       reply.header(key, value);
     });
+    // Override the global Helmet CSP (`frame-ancestors 'none'`) and
+    // X-Frame-Options=DENY for THIS proxy only — without this the
+    // iframe in /admin/grafana refuses to render. Same-origin embed
+    // is fine because Estia controls the wrapper page.
+    reply.removeHeader('content-security-policy');
+    reply.header('content-security-policy', "frame-ancestors 'self' https://estia.co.il");
+    reply.removeHeader('x-frame-options');
+    reply.header('x-frame-options', 'SAMEORIGIN');
 
     if (!upstream.body) {
       reply.send();
