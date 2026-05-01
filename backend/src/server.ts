@@ -74,6 +74,7 @@ import { getUser } from './middleware/auth.js';
 import crypto from 'node:crypto';
 import { authPlugin } from './middleware/auth.js';
 import { idempotencyPlugin } from './middleware/idempotency.js';
+import { prisma } from './lib/prisma.js';
 
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -380,9 +381,24 @@ export async function build(opts: BuildOptions = {}) {
     });
   });
 
-  // Flush PostHog events before the process exits
+  // P0-1 — release Prisma connections when Fastify shuts down. The
+  // onClose hook fires for both `app.close()` (called from the signal
+  // handler below) and Vitest's per-test teardown via `app.inject`.
+  // Without this, every restart leaks the pool and RDS runs out of
+  // connection slots after a handful of deploys.
+  app.addHook('onClose', async () => {
+    try { await prisma.$disconnect(); } catch { /* noop */ }
+  });
+
+  // Flush PostHog events + workers + Prisma before the process exits.
+  // Order matters: stop workers first so they can't fire queries after
+  // we've torn down the pool.
+  let shuttingDown = false;
   for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     process.on(sig, async () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      try { await stopWorkers(); } catch { /* noop */ }
       try { await shutdownAnalytics(); } catch { /* noop */ }
       try { await app.close(); } catch { /* noop */ }
       process.exit(0);
@@ -390,6 +406,17 @@ export async function build(opts: BuildOptions = {}) {
   }
 
   return app;
+}
+
+// P1-3 — registered worker shutdown handlers. Populated by the
+// runAsMain block when each worker boots; SIGTERM walks the array in
+// reverse to stop them. Tests don't start workers, so this stays empty.
+const workerStops: Array<() => void> = [];
+async function stopWorkers(): Promise<void> {
+  while (workerStops.length) {
+    const stop = workerStops.pop();
+    try { stop?.(); } catch { /* noop */ }
+  }
 }
 
 // Only auto-listen when run as the entrypoint (node dist/server.js /
@@ -403,36 +430,40 @@ if (runAsMain) {
       // Polls PendingNotificationDelivery every 60s, sends pending
       // emails via SES, marks rows as sent/failed. Idempotent: safe
       // if the start function is called twice.
-      const { startNotificationDeliveryWorker } = await import(
+      const { startNotificationDeliveryWorker, stopNotificationDeliveryWorker } = await import(
         './workers/notificationDelivery.js'
       );
       startNotificationDeliveryWorker();
+      workerStops.push(stopNotificationDeliveryWorker);
       // SOLID refactor (Phase 3+) — reactor processes new
       // MarketListing rows: matches against active LeadSearchProfiles,
       // creates Notifications + queues email delivery. The Yad2
       // watcher service is now pure discovery — every CRM-domain
       // concern (lead, agent, notification, email) lives here.
       // Polls every 30s; cursor is `MarketListing.reactedAt IS NULL`.
-      const { startMarketDiscoveryReactor } = await import(
+      const { startMarketDiscoveryReactor, stopMarketDiscoveryReactor } = await import(
         './workers/marketDiscoveryReactor.js'
       );
       startMarketDiscoveryReactor();
+      workerStops.push(stopMarketDiscoveryReactor);
       // 2026-05-06 — batched lead-match digest. Drains
       // NotificationDispatch every 30 minutes and emits ONE
       // consolidated email per agent. Replaces the prior
       // per-match firehose. Idempotent: a second `start()` is a no-op.
-      const { startMatchDigestScheduler } = await import(
+      const { startMatchDigestScheduler, stopMatchDigestScheduler } = await import(
         './workers/matchDigest.js'
       );
       startMatchDigestScheduler();
+      workerStops.push(stopMatchDigestScheduler);
       // 2026-04-27 — soft-delete purge. Hard-deletes users with
       // deletedAt < now - 30d and their S3 blobs. Honours the
       // privacy-policy promise that account-deletion is final after
       // 30 days. Hourly cadence with a 90s stagger from boot.
-      const { startPurgeDeletedUsersWorker } = await import(
+      const { startPurgeDeletedUsersWorker, stopPurgeDeletedUsersWorker } = await import(
         './workers/purgeDeletedUsers.js'
       );
       startPurgeDeletedUsersWorker();
+      workerStops.push(stopPurgeDeletedUsersWorker);
       return app.listen({ port: PORT, host: HOST }).then(() => {
         app.log.info(`Estia API listening on ${HOST}:${PORT}`);
       });

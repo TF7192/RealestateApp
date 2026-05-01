@@ -110,28 +110,34 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
     const existing = await prisma.owner.findFirst({ where: { id, agentId: u.id } });
     if (!existing) return reply.code(404).send({ error: { message: 'Owner not found' } });
 
-    const updated = await prisma.owner.update({
-      where: { id },
-      data: {
-        ...(body.name        !== undefined ? { name: body.name.trim() } : {}),
-        ...(body.phone       !== undefined ? { phone: body.phone.trim() } : {}),
-        ...(body.email       !== undefined ? { email: body.email?.trim() || null } : {}),
-        ...(body.notes       !== undefined ? { notes: body.notes?.trim() || null } : {}),
-        ...(body.relationship !== undefined ? { relationship: body.relationship?.trim() || null } : {}),
-      },
-    });
-
-    // Keep the denormalized inline columns on every linked property in sync
-    if (body.name !== undefined || body.phone !== undefined || body.email !== undefined) {
-      await prisma.property.updateMany({
-        where: { propertyOwnerId: id, agentId: u.id },
+    // P1-4 — atomic owner-update + Property denorm sync. If the
+    // updateMany fails after the update succeeds we'd be left with a
+    // mutated Owner row and stale `Property.owner / ownerPhone /
+    // ownerEmail` columns. Wrap in a transaction so both land or
+    // neither does.
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.owner.update({
+        where: { id },
         data: {
-          ...(body.name  !== undefined ? { owner: updated.name } : {}),
-          ...(body.phone !== undefined ? { ownerPhone: updated.phone } : {}),
-          ...(body.email !== undefined ? { ownerEmail: updated.email } : {}),
+          ...(body.name        !== undefined ? { name: body.name.trim() } : {}),
+          ...(body.phone       !== undefined ? { phone: body.phone.trim() } : {}),
+          ...(body.email       !== undefined ? { email: body.email?.trim() || null } : {}),
+          ...(body.notes       !== undefined ? { notes: body.notes?.trim() || null } : {}),
+          ...(body.relationship !== undefined ? { relationship: body.relationship?.trim() || null } : {}),
         },
       });
-    }
+      if (body.name !== undefined || body.phone !== undefined || body.email !== undefined) {
+        await tx.property.updateMany({
+          where: { propertyOwnerId: id, agentId: u.id },
+          data: {
+            ...(body.name  !== undefined ? { owner: next.name } : {}),
+            ...(body.phone !== undefined ? { ownerPhone: next.phone } : {}),
+            ...(body.email !== undefined ? { ownerEmail: next.email } : {}),
+          },
+        });
+      }
+      return next;
+    });
     await logActivity({
       agentId: u.id, actorId: u.id,
       verb: 'updated', entityType: 'Owner', entityId: updated.id,
@@ -149,7 +155,18 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     const existing = await prisma.owner.findFirst({ where: { id, agentId: u.id } });
     if (!existing) return reply.code(404).send({ error: { message: 'Owner not found' } });
-    await prisma.owner.delete({ where: { id } });
+    // P1-6 — clear the Property.owner / ownerPhone / ownerEmail
+    // denorm columns alongside the FK SetNull so we don't leave stale
+    // contact details behind on the orphaned rows. Both writes go in
+    // one transaction; a partial failure would otherwise leave the
+    // FK null but the strings still pointing at a deleted owner.
+    await prisma.$transaction([
+      prisma.property.updateMany({
+        where: { propertyOwnerId: id, agentId: u.id },
+        data: { owner: '', ownerPhone: '', ownerEmail: null },
+      }),
+      prisma.owner.delete({ where: { id } }),
+    ]);
     await logActivity({
       agentId: u.id, actorId: u.id,
       verb: 'deleted', entityType: 'Owner', entityId: id,

@@ -356,12 +356,15 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
     const perFeature = new Map<string, { costUsd: number; callCount: number }>();
     let totalUsd = 0;
     for (const r of rows) {
-      totalUsd += r.costUsd || 0;
+      // P0-4 — costUsd is Prisma.Decimal post-migration. Convert to
+      // Number once at the boundary; downstream is plain JS arithmetic.
+      const cost = Number(r.costUsd) || 0;
+      totalUsd += cost;
       const m = perMember.get(r.userId) || { costUsd: 0, callCount: 0 };
-      m.costUsd += r.costUsd || 0; m.callCount += 1;
+      m.costUsd += cost; m.callCount += 1;
       perMember.set(r.userId, m);
       const f = perFeature.get(r.feature) || { costUsd: 0, callCount: 0 };
-      f.costUsd += r.costUsd || 0; f.callCount += 1;
+      f.costUsd += cost; f.callCount += 1;
       perFeature.set(r.feature, f);
     }
     const memberRows = members.map((m) => {

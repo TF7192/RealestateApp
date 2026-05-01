@@ -12,6 +12,26 @@ import { PrismaClient, type Prisma } from '@prisma/client';
 // or are pulling unbounded rows. See performance_tasks.md PERF-028.
 const SLOW_QUERY_MS = 200;
 
+// P0-2 / P0-3 — production DATABASE_URL must carry an explicit pool
+// size and SSL mode. Defaults are dangerous: connection_limit=3 on a
+// 1-vCPU box (Prisma default = num_cpus*2+1) starves the 4 background
+// workers, and an un-encrypted RDS connection is MITM-able in transit.
+// We refuse to boot prod without both.
+if (process.env.NODE_ENV === 'production') {
+  const url = process.env.DATABASE_URL || '';
+  const missing: string[] = [];
+  if (!/[?&]connection_limit=\d+/.test(url)) missing.push('connection_limit');
+  if (!/[?&]sslmode=(require|verify-ca|verify-full)/.test(url)) missing.push('sslmode=require');
+  if (missing.length) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[startup] DATABASE_URL is missing required production parameters: ${missing.join(', ')}. ` +
+      `See backend/src/lib/prisma.ts for the rationale.`,
+    );
+    process.exit(1);
+  }
+}
+
 export const prisma = new PrismaClient({
   log: [
     { emit: 'event', level: 'query' },

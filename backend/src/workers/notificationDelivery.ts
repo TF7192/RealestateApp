@@ -67,32 +67,30 @@ async function drainOnce() {
   });
   if (rows.length === 0) return;
 
+  // P1-5 — group by outcome and use updateMany. The previous loop
+  // fired one update() per row (up to 25 per drain), serially. Email
+  // sends still happen sequentially because SES rate-limits per-account,
+  // but the bookkeeping writes now collapse into 4 batched queries.
+  const skippedSms: string[] = [];          // sms — no provider
+  const failedNoEmail: { id: string; reason: string }[] = [];
+  const sentIds: string[] = [];
+  const failedAfterSend: { id: string; err: string; attemptCount: number }[] = [];
+  const retryAfterSend: { id: string; err: string }[] = [];
+
   for (const row of rows) {
     if (row.channel === 'sms') {
-      // No SMS provider integrated yet — mark skipped so the row
-      // doesn't churn the queue forever. When a provider is wired,
-      // flip this back to a real send.
-      await prisma.pendingNotificationDelivery.update({
-        where: { id: row.id },
-        data: { status: 'skipped', errorMessage: 'sms provider not configured' },
-      });
+      skippedSms.push(row.id);
       continue;
     }
-
     if (row.channel !== 'email' || !row.recipientEmail) {
-      await prisma.pendingNotificationDelivery.update({
-        where: { id: row.id },
-        data: {
-          status: 'failed',
-          errorMessage: row.channel !== 'email'
-            ? `unknown channel: ${row.channel}`
-            : 'recipientEmail missing',
-          attemptCount: { increment: 1 },
-        },
+      failedNoEmail.push({
+        id: row.id,
+        reason: row.channel !== 'email'
+          ? `unknown channel: ${row.channel}`
+          : 'recipientEmail missing',
       });
       continue;
     }
-
     try {
       await sendNotificationEmail({
         to:        row.recipientEmail,
@@ -103,20 +101,60 @@ async function drainOnce() {
           : null,
         linkLabel: 'פתח באפליקציה',
       });
-      await prisma.pendingNotificationDelivery.update({
-        where: { id: row.id },
-        data: { status: 'sent', sentAt: new Date(), attemptCount: { increment: 1 } },
-      });
+      sentIds.push(row.id);
     } catch (err) {
       const newAttempt = row.attemptCount + 1;
-      await prisma.pendingNotificationDelivery.update({
-        where: { id: row.id },
-        data: {
-          status: newAttempt >= MAX_ATTEMPTS ? 'failed' : 'pending',
-          errorMessage: String(err).slice(0, 1000),
-          attemptCount: { increment: 1 },
-        },
-      });
+      const errStr = String(err).slice(0, 1000);
+      if (newAttempt >= MAX_ATTEMPTS) {
+        failedAfterSend.push({ id: row.id, err: errStr, attemptCount: newAttempt });
+      } else {
+        retryAfterSend.push({ id: row.id, err: errStr });
+      }
     }
   }
+
+  const writes: Array<Promise<unknown>> = [];
+
+  if (skippedSms.length) {
+    writes.push(prisma.pendingNotificationDelivery.updateMany({
+      where: { id: { in: skippedSms } },
+      data: { status: 'skipped', errorMessage: 'sms provider not configured' },
+    }));
+  }
+
+  if (sentIds.length) {
+    writes.push(prisma.pendingNotificationDelivery.updateMany({
+      where: { id: { in: sentIds } },
+      data: { status: 'sent', sentAt: new Date(), attemptCount: { increment: 1 } },
+    }));
+  }
+
+  // failedNoEmail rows can have different `errorMessage` values; fan
+  // out per row but still in parallel. Typically <5 per drain.
+  for (const f of failedNoEmail) {
+    writes.push(prisma.pendingNotificationDelivery.update({
+      where: { id: f.id },
+      data: {
+        status: 'failed',
+        errorMessage: f.reason,
+        attemptCount: { increment: 1 },
+      },
+    }));
+  }
+
+  // Same per-row pattern for SES failures — different error strings.
+  for (const f of failedAfterSend) {
+    writes.push(prisma.pendingNotificationDelivery.update({
+      where: { id: f.id },
+      data: { status: 'failed', errorMessage: f.err, attemptCount: { increment: 1 } },
+    }));
+  }
+  for (const r of retryAfterSend) {
+    writes.push(prisma.pendingNotificationDelivery.update({
+      where: { id: r.id },
+      data: { status: 'pending', errorMessage: r.err, attemptCount: { increment: 1 } },
+    }));
+  }
+
+  await Promise.all(writes);
 }

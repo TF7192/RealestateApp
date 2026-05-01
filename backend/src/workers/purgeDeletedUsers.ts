@@ -25,6 +25,7 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 const THIRTY_DAYS_MS = 30 * 24 * ONE_HOUR_MS;
 
 let timer: NodeJS.Timeout | null = null;
+let bootTimer: NodeJS.Timeout | null = null;
 
 async function purgeOnce(): Promise<void> {
   const cutoff = new Date(Date.now() - THIRTY_DAYS_MS);
@@ -53,8 +54,19 @@ async function purgeOnce(): Promise<void> {
         const m = (v.url || '').replace(/^\/uploads\//, '');
         if (m && m !== v.url) keys.push(m);
       }
+      // P1-4 — track S3 failures. If any blob delete fails we skip
+      // user.delete so the cascade doesn't strip the rows that point
+      // at the surviving keys (which would orphan them on S3 forever).
+      // The next hourly tick retries the whole user.
+      let s3Failures = 0;
       for (const key of keys) {
-        try { await deleteUpload(key); } catch { /* best-effort */ }
+        try { await deleteUpload(key); } catch { s3Failures += 1; }
+      }
+      if (s3Failures > 0) {
+        console.error(
+          `[purge-deleted-users] skipping user.delete for ${u.id} — ${s3Failures}/${keys.length} S3 deletes failed; will retry next tick`,
+        );
+        continue;
       }
       await prisma.user.delete({ where: { id: u.id } });
 
@@ -67,11 +79,19 @@ async function purgeOnce(): Promise<void> {
 }
 
 export function startPurgeDeletedUsersWorker(): void {
-  if (timer) return;
+  if (timer || bootTimer) return;
   // Stagger by 90s on boot so this doesn't pile on top of the other
   // start-up DB queries; then run hourly.
-  setTimeout(() => {
+  bootTimer = setTimeout(() => {
+    bootTimer = null;
     purgeOnce().catch(() => {});
     timer = setInterval(() => { purgeOnce().catch(() => {}); }, ONE_HOUR_MS);
   }, 90_000);
+}
+
+export function stopPurgeDeletedUsersWorker(): void {
+  if (bootTimer) clearTimeout(bootTimer);
+  if (timer) clearInterval(timer);
+  bootTimer = null;
+  timer = null;
 }

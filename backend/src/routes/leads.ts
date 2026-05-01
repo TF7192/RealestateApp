@@ -257,25 +257,12 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       where.AND = [...(where.AND || []), { id: { in: leadIds.length ? leadIds : ['__none__'] } }];
     }
 
-    // PERF-002 — overfetch by 1 to detect a next page. When post-filter
-    // search-profile criteria are active we still apply them in JS (see
-    // hasProfileFilters block below); pagination is best-effort in that
-    // path — the cursor is still based on createdAt order so the
-    // worst-case is the FE asking for one extra page. The legacy FE
-    // doesn't pass `take`/`cursor` so this is purely additive today.
-    const items = await prisma.lead.findMany({
-      where,
-      include: { viewings: true, agreements: true, searchProfiles: true },
-      orderBy: { createdAt: 'desc' },
-      take: take + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    });
-
-    // Post-filter on search-profile fields (rooms / floor / types / hoods)
-    // — doing this in Prisma requires either a raw join or a nested
-    // `some: { ... }` per field, and mixing them in one where-clause gets
-    // hairy. The result set is already owner-scoped (bounded) so an
-    // in-memory filter is safe and keeps the query readable.
+    // P2-7 — push the search-profile filter into SQL via a nested
+    // `some: { ... }` clause. The previous implementation fetched
+    // every (agentId-scoped) lead and post-filtered in JS; that's
+    // safe at small scale but blows up once an agent has 1k+ leads.
+    // Now Postgres does the join via the (leadId) index on
+    // LeadSearchProfile.
     const hoods    = toList(q.neighborhoods);
     const minRoom  = q.minRoom  != null ? Number(q.minRoom)  : null;
     const maxRoom  = q.maxRoom  != null ? Number(q.maxRoom)  : null;
@@ -286,28 +273,45 @@ export const registerLeadRoutes: FastifyPluginAsync = async (app) => {
       minRoom != null || maxRoom != null ||
       minFloor != null || maxFloor != null;
 
-    const filtered = !hasProfileFilters ? items : items.filter((l: any) => {
-      const profiles = l.searchProfiles || [];
-      // A lead passes if ANY of its profiles matches every constraint.
-      // Leads with no profiles fall back to flat `rooms`/`city` fields.
-      const candidates = profiles.length ? profiles : [{
-        neighborhoods: [], propertyTypes: [],
-        minRoom:  null, maxRoom:  null,
-        minFloor: null, maxFloor: null,
+    if (hasProfileFilters) {
+      // Per-constraint expression for the `some` branch. Each room/floor
+      // bound is "the profile has no upper/lower limit OR the limit
+      // overlaps the user's range" — matches the JS logic verbatim.
+      const profileConstraints: any[] = [];
+      if (hoods.length)        profileConstraints.push({ neighborhoods: { hasSome: hoods } });
+      if (types.length)        profileConstraints.push({ propertyTypes: { hasSome: types } });
+      if (minRoom  != null)    profileConstraints.push({ OR: [{ maxRoom:  null }, { maxRoom:  { gte: minRoom  } }] });
+      if (maxRoom  != null)    profileConstraints.push({ OR: [{ minRoom:  null }, { minRoom:  { lte: maxRoom  } }] });
+      if (minFloor != null)    profileConstraints.push({ OR: [{ maxFloor: null }, { maxFloor: { gte: minFloor } }] });
+      if (maxFloor != null)    profileConstraints.push({ OR: [{ minFloor: null }, { minFloor: { lte: maxFloor } }] });
+
+      // No-profile leads pass only when the user isn't filtering by
+      // neighborhoods or property types (an empty profile array can't
+      // overlap a non-empty filter). Room/floor constraints alone don't
+      // disqualify them — the empty profile's null bounds always pass.
+      const noProfileBranch = (hoods.length === 0 && types.length === 0)
+        ? [{ searchProfiles: { none: {} } }]
+        : [];
+
+      where.AND = [...(where.AND || []), {
+        OR: [
+          ...noProfileBranch,
+          { searchProfiles: { some: { AND: profileConstraints } } },
+        ],
       }];
-      return candidates.some((p: any) => {
-        if (hoods.length && !(p.neighborhoods || []).some((h: string) => hoods.includes(h))) return false;
-        if (types.length && !(p.propertyTypes || []).some((t: string) => types.includes(t))) return false;
-        if (minRoom != null && (p.maxRoom != null && p.maxRoom < minRoom)) return false;
-        if (maxRoom != null && (p.minRoom != null && p.minRoom > maxRoom)) return false;
-        if (minFloor != null && (p.maxFloor != null && p.maxFloor < minFloor)) return false;
-        if (maxFloor != null && (p.minFloor != null && p.minFloor > maxFloor)) return false;
-        return true;
-      });
+    }
+
+    // PERF-002 — overfetch by 1 to detect a next page.
+    const items = await prisma.lead.findMany({
+      where,
+      include: { viewings: true, agreements: true, searchProfiles: true },
+      orderBy: { createdAt: 'desc' },
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    // PERF-002 — slice off the +1 overfetch and emit a nextCursor.
-    const hasMore = filtered.length > take;
-    const page = hasMore ? filtered.slice(0, take) : filtered;
+
+    const hasMore = items.length > take;
+    const page = hasMore ? items.slice(0, take) : items;
     const nextCursor = hasMore ? page[page.length - 1].id : null;
     // PERF-024 — list responses no longer carry `suggestedStatus` /
     // `statusExplanation`; the heuristic + Hebrew prose is recomputed

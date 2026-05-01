@@ -10,6 +10,60 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// P1-7 — String columns converted to enums (DB-audit binary-sleeping-mist).
+// Lowercase / snake_case members preserve the existing on-disk values
+// so the migration is data-preserving (USING "col"::"<EnumType>").
+enum AgreementStatus {
+  SENT
+  SIGNED
+  EXPIRED
+  CANCELLED
+}
+
+enum OwnerPhoneKind {
+  primary
+  secondary
+  spouse
+  work
+  fax
+  other
+}
+
+enum UploadedFileKind {
+  property_image
+  signed_agreement
+  document
+  other
+}
+
+enum MarketListingStatus {
+  active
+  removed
+  unknown
+}
+
+enum MarketListingKind {
+  forsale
+  rent
+}
+
+enum MarketListingPosterType {
+  private
+  agency
+}
+
+enum MarketWatcherRunStatus {
+  running
+  success
+  failed
+  skipped
+}
+
+enum MarketContextKind {
+  buy
+  rent
+}
+
 enum UserRole {
   AGENT
   CUSTOMER
@@ -221,8 +275,8 @@ model Conversation {
   userId        String             @unique
   user          User               @relation("UserConversations", fields: [userId], references: [id], onDelete: Cascade)
   status        ConversationStatus @default(OPEN)
-  createdAt     DateTime           @default(now())
-  lastMessageAt DateTime           @default(now())
+  createdAt     DateTime           @default(now()) @db.Timestamptz(6)
+  lastMessageAt DateTime           @default(now()) @db.Timestamptz(6)
   messages      Message[]
 
   @@index([status, lastMessageAt])
@@ -239,10 +293,13 @@ model Message {
   sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   senderRole     String // 'user' | 'admin'
   body           String
-  createdAt      DateTime     @default(now())
-  readAt         DateTime?
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  readAt         DateTime?    @db.Timestamptz(6)
 
   @@index([conversationId, createdAt])
+  // P1-1 — sender lookup. "All messages I sent" / cascading delete by
+  // sender both walk this column.
+  @@index([senderId])
 }
 
 enum MarketingReminderFrequency {
@@ -260,11 +317,12 @@ enum MarketingReminderFrequency {
 model Office {
   id        String   @id @default(cuid())
   name      String
-  phone     String?
+  // P2-4 — VarChar caps on contact PII.
+  phone     String?  @db.VarChar(32)
   address   String?
   logoUrl   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   members User[]
   // Sprint 1 / MLS parity — Task A1 fill-in. Email-based invites for
@@ -281,18 +339,21 @@ model OfficeInvite {
   id           String    @id @default(cuid())
   officeId     String
   office       Office    @relation(fields: [officeId], references: [id], onDelete: Cascade)
-  email        String
+  email        String    @db.VarChar(255)
   invitedById  String
   invitedBy    User      @relation("OfficeInvitesSent", fields: [invitedById], references: [id], onDelete: Cascade)
-  acceptedAt   DateTime?
+  acceptedAt   DateTime? @db.Timestamptz(6)
   acceptedById String?
   acceptedBy   User?     @relation("OfficeInvitesAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
-  revokedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  revokedAt    DateTime? @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
 
   @@unique([officeId, email])
   @@index([email])
+  // P1-1 — FK lookups + cascade walks.
+  @@index([invitedById])
+  @@index([acceptedById])
 }
 
 // ─── Users ─────────────────────────────────────────────────────────────────
@@ -304,7 +365,10 @@ model OfficeInvite {
 // deferred from the SEC hardening pass.
 model User {
   id                    String       @id @default(cuid())
-  email                 String       @unique
+  // P2-4 — VarChar caps. RFC 5321 caps email at 254; we use 255 to
+  // match the historic ORM convention. Phones cover any plausible
+  // international format including extensions.
+  email                 String       @unique @db.VarChar(255)
   passwordHash          String?
   role                  UserRole
   provider              AuthProvider @default(EMAIL)
@@ -313,7 +377,7 @@ model User {
   displayName           String
   // Public, SEO-friendly identifier — used in /agents/<slug> URLs.
   slug                  String?      @unique
-  phone                 String?
+  phone                 String?      @db.VarChar(32)
   avatarUrl             String?
   // ── Onboarding tutorial ────────────────────────────────────────
   // Tracks whether the agent has completed (or skipped) the first-run
@@ -326,27 +390,35 @@ model User {
   // first-login onboarding form (license number + optional title /
   // agency / phone). If null, the SPA route guard bounces the user
   // to /onboarding from every other authed route until they submit.
-  profileCompletedAt    DateTime?
+  profileCompletedAt    DateTime?    @db.Timestamptz(6)
   // A-1 — soft delete. When set, /api/me rejects the request and the
   // SPA logs the user out. UI lies gracefully about "permanence" —
   // rows stay intact so a follow-up support request can restore them
   // and shared properties remain visible to co-owner agents.
-  deletedAt             DateTime?
+  //
+  // P2-3 (DB audit binary-sleeping-mist) — soft-delete is INTENTIONALLY
+  // limited to User. Tenant data (Property, Lead, Owner, Deal, …) is
+  // hard-deleted and relies on `onDelete: Cascade` to clean up. The
+  // privacy-policy purge worker (purgeDeletedUsers.ts) finalises a
+  // soft-deleted User by hard-deleting the row 30 days later, which
+  // cascades to every owned tenant row. Every read of User MUST add
+  // `deletedAt: null`; auth.ts already does this in middleware.
+  deletedAt             DateTime?    @db.Timestamptz(6)
   // 2026-04-27 — Compliance/PPL §11. When the user accepted the
   // current Terms + Privacy Policy. Required at signup; updated when
   // a new policy version forces re-consent.
-  termsAcceptedAt       DateTime?
+  termsAcceptedAt       DateTime?    @db.Timestamptz(6)
   // 2026-04-27 — Cookie/analytics opt-in. NULL = no decision yet
   // (essential cookies only); true = consented to PostHog product
   // analytics; false = explicitly declined. Frontend reads this so
   // it can re-prompt only when null.
   analyticsConsent      Boolean?
-  analyticsConsentAt    DateTime?
+  analyticsConsentAt    DateTime?    @db.Timestamptz(6)
   // 2026-04-27 — JWT revocation anchor. Reject any JWT whose `iat`
   // is older than this timestamp. Bumped on password change and on
   // explicit "log out everywhere" so a leaked 30-day token is dead
   // on the next request after the user remediates.
-  passwordChangedAt     DateTime?
+  passwordChangedAt     DateTime?    @db.Timestamptz(6)
   // 7.1 — Google Calendar OAuth tokens. Populated by a consent flow
   // that's separate from (but layered on top of) the existing Google
   // login — agents who logged in with email can still connect their
@@ -354,7 +426,7 @@ model User {
   // mint new ones server-side without user re-consent.
   googleAccessToken     String?
   googleRefreshToken    String?
-  googleTokenExpiresAt  DateTime?
+  googleTokenExpiresAt  DateTime?    @db.Timestamptz(6)
   googleCalendarEnabled Boolean      @default(false)
 
   // Sprint 1 / MLS parity — Task A1. Office membership. Null for the
@@ -379,8 +451,8 @@ model User {
   // PATCH /api/me/specialty-cities validator.
   specialtyCities String[] @default([])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   // Agent-specific profile
   agentProfile AgentProfile?
@@ -389,55 +461,55 @@ model User {
   customerProfile CustomerProfile?
 
   // Audit trail
-  sessions             Session[]
-  properties           Property[]         @relation("AgentProperties")
-  owners               Owner[]            @relation("AgentOwners")
-  leads                Lead[]             @relation("AgentLeads")
-  deals                Deal[]             @relation("AgentDeals")
-  files                UploadedFile[]
-  transfersSent        PropertyTransfer[] @relation("TransferFrom")
-  transfersReceived    PropertyTransfer[] @relation("TransferTo")
-  templates            MessageTemplate[]
-  conversations        Conversation[]     @relation("UserConversations")
-  sentMessages         Message[]          @relation("SentMessages")
-  prospects            Prospect[]
-  leadMeetings         LeadMeeting[]      @relation("AgentMeetings")
-  tags                 Tag[]              @relation("AgentTags")
+  sessions               Session[]
+  properties             Property[]                    @relation("AgentProperties")
+  owners                 Owner[]                       @relation("AgentOwners")
+  leads                  Lead[]                        @relation("AgentLeads")
+  deals                  Deal[]                        @relation("AgentDeals")
+  files                  UploadedFile[]
+  transfersSent          PropertyTransfer[]            @relation("TransferFrom")
+  transfersReceived      PropertyTransfer[]            @relation("TransferTo")
+  templates              MessageTemplate[]
+  conversations          Conversation[]                @relation("UserConversations")
+  sentMessages           Message[]                     @relation("SentMessages")
+  prospects              Prospect[]
+  leadMeetings           LeadMeeting[]                 @relation("AgentMeetings")
+  tags                   Tag[]                         @relation("AgentTags")
   // Sprint 1 / MLS parity — Task J9. Properties for which this user is
   // the primary assignee. Separate from `AgentProperties` because a row
   // can be owned by one agent and assigned to another inside the office.
-  primaryForProperties Property[]         @relation("PrimaryAgent")
+  primaryForProperties   Property[]                    @relation("PrimaryAgent")
   // Sprint 1 / MLS parity — Task D1.
-  reminders            Reminder[]         @relation("AgentReminders")
+  reminders              Reminder[]                    @relation("AgentReminders")
   // Excel import — saved column mappings keyed by header signature so
   // repeat imports from the same vendor format auto-apply last choice.
-  importMappings       ImportMapping[]
+  importMappings         ImportMapping[]
   // Password-reset tokens issued to this user. Rows persist after
   // `usedAt` for auditability; a cron purges >30 day rows.
-  passwordResetTokens  PasswordResetToken[]
-  reminderAnchors      Reminder[]         @relation("ReminderCustomer")
+  passwordResetTokens    PasswordResetToken[]
+  reminderAnchors        Reminder[]                    @relation("ReminderCustomer")
   // Sprint 1 / MLS parity — Task K2.
-  leadAssignments      LeadAgent[]        @relation("LeadAssignments")
+  leadAssignments        LeadAgent[]                   @relation("LeadAssignments")
   // Sprint 5 / MLS parity — Task J10.
-  propertyAssignments  PropertyAssignee[] @relation("PropertyAssigneeUser")
+  propertyAssignments    PropertyAssignee[]            @relation("PropertyAssigneeUser")
   // Sprint 6 / MLS parity — Task F1.
-  adverts              Advert[]           @relation("AgentAdverts")
+  adverts                Advert[]                      @relation("AgentAdverts")
   // Sprint 7 / MLS parity — Tasks B3, B4.
-  savedSearches        SavedSearch[]      @relation("AgentSavedSearches")
-  favorites            Favorite[]         @relation("AgentFavorites")
+  savedSearches          SavedSearch[]                 @relation("AgentSavedSearches")
+  favorites              Favorite[]                    @relation("AgentFavorites")
   // Sprint 1 / MLS parity — Task A1 fill-in. Office invites sent by
   // this user (as OWNER) and accepted by this user (on signup/login).
-  officeInvitesSent     OfficeInvite[]    @relation("OfficeInvitesSent")
-  officeInvitesAccepted OfficeInvite[]    @relation("OfficeInvitesAccepted")
+  officeInvitesSent      OfficeInvite[]                @relation("OfficeInvitesSent")
+  officeInvitesAccepted  OfficeInvite[]                @relation("OfficeInvitesAccepted")
   // Sprint 4 — in-app notifications targeted at this user.
-  notifications         Notification[]
+  notifications          Notification[]
   // Market Discovery (2026-04-27) — back-relation for matches the
   // hourly watcher creates against this agent's active LeadSearchProfiles.
-  marketListingMatches  MarketListingLeadMatch[]
+  marketListingMatches   MarketListingLeadMatch[]
   // Phase 3 — opt-in notification preferences (email/SMS).
   notificationPreference UserNotificationPreference?
   // Phase 3 — pending email/SMS deliveries the worker drains.
-  pendingDeliveries     PendingNotificationDelivery[]
+  pendingDeliveries      PendingNotificationDelivery[]
   // 2026-05-06 — per-(lead, marketListing) match dispatch ledger.
   // Each row represents one match the digest scheduler may include
   // in its next 30-min email. `dispatchedAt` flips when the row is
@@ -446,14 +518,14 @@ model User {
   notificationDispatches NotificationDispatch[]
   // Sprint 6 — in-house digital contracts (exclusivity / brokerage /
   // offer) authored by this agent.
-  contracts             Contract[]        @relation("AgentContracts")
+  contracts              Contract[]                    @relation("AgentContracts")
 
   // Sprint 10 — AI usage ledger. Observability only; no quotas yet.
-  aiUsage               AiUsage[]
+  aiUsage AiUsage[]
 
   // Sprint 10 — pool rows this viewer has marked "seen" so they no
   // longer count toward the התאמות פומביות badge. Reversible.
-  publicMatchSeen       PublicMatchSeen[]
+  publicMatchSeen PublicMatchSeen[]
 
   @@index([role])
   @@index([officeId])
@@ -477,20 +549,23 @@ model AiUsage {
   cacheReadTokens   Int      @default(0)
   cacheCreateTokens Int      @default(0)
   audioSeconds      Int      @default(0)
-  costUsd           Float    @default(0)
-  createdAt         DateTime @default(now())
+  // P0-4 — Decimal not Float. Float aggregates lose precision over
+  // millions of rows; billing math needs exact arithmetic. (12,4) gives
+  // up to 99,999,999.9999 USD with 0.0001¢ resolution.
+  costUsd           Decimal  @default(0) @db.Decimal(12, 4)
+  createdAt         DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
 }
 
 model AgentProfile {
-  userId  String  @id
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agency  String?
-  title   String?
-  license String?
-  bio     String?
+  userId             String  @id
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agency             String?
+  title              String?
+  license            String?
+  bio                String?
   // Formal intake-form header fields.
   personalId         String? // ת.ז. of the agent, printed on the order header
   businessAddress    String? // e.g. "אלון 18א', נס ציונה"
@@ -516,8 +591,8 @@ model Session {
   token     String   @unique
   userAgent String?
   ip        String?
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  expiresAt DateTime @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([userId])
   @@index([expiresAt])
@@ -531,7 +606,7 @@ model Session {
 model Yad2ImportAttempt {
   id          String   @id @default(cuid())
   agentId     String
-  attemptedAt DateTime @default(now())
+  attemptedAt DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([agentId, attemptedAt])
 }
@@ -567,8 +642,8 @@ model Property {
   owner                      String
   ownerPhone                 String
   ownerEmail                 String?
-  exclusiveStart             DateTime?
-  exclusiveEnd               DateTime?
+  exclusiveStart             DateTime?                  @db.Timestamptz(6)
+  exclusiveEnd               DateTime?                  @db.Timestamptz(6)
   marketingPrice             Int
   closingPrice               Int?
   offer                      Int?
@@ -633,12 +708,12 @@ model Property {
   // re-listings and import backfills can show the right "days on market".
   // NULL means the property was never marketed (draft). Falls back to
   // createdAt in the UI for legacy rows.
-  marketingStartDate         DateTime?
+  marketingStartDate         DateTime?                  @db.Timestamptz(6)
   // 3.2 — commercial-only zone tag (e.g. "איזור תעשיה"). Residential
   // rows keep NULL. Free-form string to avoid another migration when
   // product adds more zones.
   commercialZone             String?
-  lastContact                DateTime?
+  lastContact                DateTime?                  @db.Timestamptz(6)
   lastContactNotes           String?
   marketingReminderFrequency MarketingReminderFrequency @default(WEEKLY)
 
@@ -666,13 +741,14 @@ model Property {
   // seller-side seriousness. `status` stays the life-cycle flag; the
   // two axes are orthogonal.
   stage              PropertyStage? @default(IN_PROGRESS)
-  agentCommissionPct Float?
+  // P0-4 — Decimal not Float. Float % values drift on aggregation.
+  agentCommissionPct Decimal?       @db.Decimal(5, 2)
   // Primary assignee ("סוכן מטפל"). Defaults to the row's `agentId`;
   // set explicitly when the office owner reassigns without transferring
   // ownership. Nullable so legacy rows stay clean.
   primaryAgentId     String?
   primaryAgent       User?          @relation("PrimaryAgent", fields: [primaryAgentId], references: [id], onDelete: SetNull)
-  exclusivityExpire  DateTime?
+  exclusivityExpire  DateTime?      @db.Timestamptz(6)
   sellerSeriousness  Seriousness?
   brokerNotes        String?
 
@@ -681,12 +757,12 @@ model Property {
   // own list; the clone's `publicMatchSourceId` points back for
   // attribution (SetNull on delete so attribution survives opt-outs
   // but breaks cleanly if the source is hard-deleted).
-  isPublicMatch       Boolean   @default(false)
-  publicMatchAt       DateTime?
+  isPublicMatch       Boolean           @default(false)
+  publicMatchAt       DateTime?         @db.Timestamptz(6)
   publicMatchNote     String?
   publicMatchSourceId String?
-  publicMatchSource   Property? @relation("PublicMatchSource", fields: [publicMatchSourceId], references: [id], onDelete: SetNull)
-  publicMatchCopies   Property[] @relation("PublicMatchSource")
+  publicMatchSource   Property?         @relation("PublicMatchSource", fields: [publicMatchSourceId], references: [id], onDelete: SetNull)
+  publicMatchCopies   Property[]        @relation("PublicMatchSource")
   publicMatchSeen     PublicMatchSeen[]
 
   // 2026-04-26 — PR2 form additions. Unit/apartment number (display
@@ -694,13 +770,13 @@ model Property {
   // amenities (residents' room, bicycle room, management company),
   // commercial extras (en-suite toilet), and rental-brokerage commission
   // shapes (tenant-side-only flag and free-form terms like "חודש + מע״מ").
-  unitNumber        String?
-  enSuiteToilet     Boolean @default(false)
-  residentsRoom     Boolean @default(false)
-  bicycleRoom       Boolean @default(false)
-  managementCompany String?
-  tenantSideOnly    Boolean @default(false)
-  commissionTerms   String?
+  unitNumber         String?
+  enSuiteToilet      Boolean @default(false)
+  residentsRoom      Boolean @default(false)
+  bicycleRoom        Boolean @default(false)
+  managementCompany  String?
+  tenantSideOnly     Boolean @default(false)
+  commissionTerms    String?
   // 2026-04-26 — when the landlord side does pay commission, what does
   // the agent get from them. Free-form so an agent can write "חודש +
   // מע״מ", "2%", "5000 ש״ח", or anything else.
@@ -723,8 +799,8 @@ model Property {
   // pushing. Default 0 = no boost.
   priority Int @default(0)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   images           PropertyImage[]
   marketingActions MarketingAction[]
@@ -745,17 +821,16 @@ model Property {
   views            PropertyView[]
 
   // Excel-import tag. Same purpose as Lead.importBatchId.
-  importBatchId    String?
-
-  @@unique([agentId, slug])
+  importBatchId   String?
   // Market Discovery (2026-04-27) — when an agent duplicates a
   // discovered listing into their own properties, this column points
   // back to the source MarketListing so the CRM can keep "פתח במקור"
   // available after duplication. Nullable: properties created the
   // normal way have no source.
-  marketListingId            String?
-  marketListing              MarketListing? @relation(fields: [marketListingId], references: [id], onDelete: SetNull)
+  marketListingId String?
+  marketListing   MarketListing? @relation(fields: [marketListingId], references: [id], onDelete: SetNull)
 
+  @@unique([agentId, slug])
   @@index([agentId])
   // PERF-015 — covers `findMany({ where: { agentId }, orderBy:
   // { createdAt: 'desc' } })` which is the dominant Property query
@@ -781,19 +856,20 @@ model Owner {
   agentId      String
   agent        User     @relation("AgentOwners", fields: [agentId], references: [id], onDelete: Cascade)
   name         String
-  phone        String
-  email        String?
+  // P2-4 — VarChar caps on contact PII.
+  phone        String   @db.VarChar(32)
+  email        String?  @db.VarChar(255)
   notes        String?
   // Relationship hint, e.g. "בעל יחיד", "ירושה", "חברה". Optional copy.
   relationship String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
 
-  properties Property[]
-  phones     OwnerPhone[]
+  properties    Property[]
+  phones        OwnerPhone[]
   // E-1 — reverse of Deal.seller. One owner can be the seller on many
   // deals (multi-asset portfolios).
-  dealsAsSeller Deal[]    @relation("DealSeller")
+  dealsAsSeller Deal[]       @relation("DealSeller")
 
   @@index([agentId])
   @@index([phone])
@@ -802,17 +878,21 @@ model Owner {
 /// J8 multi-phone. One row per phone number; the legacy `Owner.phone`
 /// column above is kept as the denormalized "primary" for back-compat.
 model OwnerPhone {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   ownerId   String
-  owner     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  phone     String
-  kind      String   @default("primary") // primary|secondary|spouse|work|fax|other
+  owner     Owner          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  // P2-4 — VarChar cap.
+  phone     String         @db.VarChar(32)
+  kind      OwnerPhoneKind @default(primary)
   label     String?
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime       @updatedAt @db.Timestamptz(6)
 
   @@index([ownerId])
+  // P1-1 — "primary phone" lookup hits (ownerId, kind='primary') on
+  // every owner detail render.
+  @@index([ownerId, kind])
 }
 
 enum TransferStatus {
@@ -828,14 +908,19 @@ model PropertyTransfer {
   propertyId   String
   property     Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   fromAgentId  String
-  fromAgent    User           @relation("TransferFrom", fields: [fromAgentId], references: [id])
+  // P0-5 — Cascade on agent delete. PropertyTransfer is a per-agent
+  // workflow record; if the originating agent is hard-deleted there's
+  // nobody to act on the transfer anyway.
+  fromAgent    User           @relation("TransferFrom", fields: [fromAgentId], references: [id], onDelete: Cascade)
   toAgentId    String?
-  toAgent      User?          @relation("TransferTo", fields: [toAgentId], references: [id])
+  // SetNull on the destination — the transfer history stays for the
+  // sender's audit trail even if the recipient was deleted.
+  toAgent      User?          @relation("TransferTo", fields: [toAgentId], references: [id], onDelete: SetNull)
   toAgentEmail String? // kept in case the target isn't registered yet
   status       TransferStatus @default(PENDING)
   message      String?
-  createdAt    DateTime       @default(now())
-  respondedAt  DateTime?
+  createdAt    DateTime       @default(now()) @db.Timestamptz(6)
+  respondedAt  DateTime?      @db.Timestamptz(6)
 
   @@index([fromAgentId])
   @@index([toAgentId])
@@ -855,7 +940,7 @@ model PropertyImage {
   urlCard    String?
   urlThumb   String?
   sortOrder  Int      @default(0)
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([propertyId])
 }
@@ -868,25 +953,25 @@ model PropertyImage {
 // intact. Optionally links back to a Lead if the buyer is already in
 // the agent's CRM.
 model PropertyOffer {
-  id          String              @id @default(cuid())
-  propertyId  String
-  property    Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  id         String              @id @default(cuid())
+  propertyId String
+  property   Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   // Optional CRM link — when null, the offer captures only the
   // free-form name + phone fields below.
-  leadId      String?
-  lead        Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  buyerName   String
-  buyerPhone  String?
-  amount      Int
-  status      PropertyOfferStatus @default(NEW)
+  leadId     String?
+  lead       Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  buyerName  String
+  buyerPhone String?
+  amount     Int
+  status     PropertyOfferStatus @default(NEW)
   // Free-form notes — financing terms, contingencies, "מציע מותנה
   // בקבלת משכנתא", etc. Hebrew-friendly.
-  notes       String?
+  notes      String?
   // When the offer was received. Defaults to row creation but can be
   // overridden when the agent is recording past offers.
-  receivedAt  DateTime            @default(now())
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  receivedAt DateTime            @default(now()) @db.Timestamptz(6)
+  createdAt  DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime            @updatedAt @db.Timestamptz(6)
 
   @@index([propertyId])
   @@index([leadId])
@@ -913,7 +998,7 @@ model PropertyVideo {
   sizeBytes  Int?
   mimeType   String?
   sortOrder  Int      @default(0)
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([propertyId])
 }
@@ -924,7 +1009,7 @@ model MarketingAction {
   property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   actionKey  String // e.g. "tabuExtract", "photography"…
   done       Boolean   @default(false)
-  doneAt     DateTime?
+  doneAt     DateTime? @db.Timestamptz(6)
   notes      String?
   link       String? // Listing URL (yad2/madlan/facebook) or any reference URL
 
@@ -938,7 +1023,7 @@ model PropertyViewing {
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   leadId     String?
   lead       Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  viewedAt   DateTime @default(now())
+  viewedAt   DateTime @default(now()) @db.Timestamptz(6)
   source     String?
   notes      String?
 
@@ -954,40 +1039,41 @@ model PropertyInquiry {
   contactPhone String?
   contactEmail String?
   message      String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([propertyId])
 }
 
 model Lead {
-  id                 String           @id @default(cuid())
-  agentId            String
-  agent              User             @relation("AgentLeads", fields: [agentId], references: [id])
-  name               String
-  phone              String
-  email              String?
-  interestType       LeadInterestType @default(PRIVATE)
-  lookingFor         LeadLookingFor   @default(BUY)
+  id                      String           @id @default(cuid())
+  agentId                 String
+  agent                   User             @relation("AgentLeads", fields: [agentId], references: [id])
+  name                    String
+  // P2-4 — VarChar caps on contact PII.
+  phone                   String           @db.VarChar(32)
+  email                   String?          @db.VarChar(255)
+  interestType            LeadInterestType @default(PRIVATE)
+  lookingFor              LeadLookingFor   @default(BUY)
   // 2026-04-30 — distinguishes ליד מתעניין (BUYER) from ליד גיוס
   // (SELLER). For SELLER rows the city/neighborhood/street/rooms/budget
   // describe the property the agent wants to recruit, not the lead's
   // criteria — same columns, opposite reading. Default BUYER keeps
   // the legacy semantics for every existing row.
-  kind               LeadKind         @default(BUYER)
-  city               String?
-  neighborhood       String?
-  street             String?
-  rooms              String?
-  priceRangeLabel    String?
-  budget             Int?
-  preApproval        Boolean          @default(false)
-  sector             String?
-  balconyRequired    Boolean          @default(false)
-  parkingRequired    Boolean          @default(false)
-  elevatorRequired   Boolean          @default(false)
-  safeRoomRequired   Boolean          @default(false)
-  acRequired         Boolean          @default(false)
-  storageRequired    Boolean          @default(false)
+  kind                    LeadKind         @default(BUYER)
+  city                    String?
+  neighborhood            String?
+  street                  String?
+  rooms                   String?
+  priceRangeLabel         String?
+  budget                  Int?
+  preApproval             Boolean          @default(false)
+  sector                  String?
+  balconyRequired         Boolean          @default(false)
+  parkingRequired         Boolean          @default(false)
+  elevatorRequired        Boolean          @default(false)
+  safeRoomRequired        Boolean          @default(false)
+  acRequired              Boolean          @default(false)
+  storageRequired         Boolean          @default(false)
   // Commercial-lead requirement block — mirrors the commercial half
   // of the Property schema. Agents capture these when a business
   // client briefs a brokerage for office / shop / workspace space
@@ -996,28 +1082,29 @@ model Lead {
   // them empty.
   sqmGrossMin             Int?
   sqmNetMin               Int?
-  accessibilityRequired   Boolean  @default(false)
-  buildStateRequired      String?  // "מעטפת" / "גמר" / specific finish
-  workstationsMin         Int?     // מספר עמדות עבודה
-  kitchenetteRequired     Boolean  @default(false)
-  floorShelterRequired    Boolean  @default(false) // ממ"ק
-  inOfficeToiletsRequired Boolean  @default(false) // שירותים בתוך המשרד
-  onFloorToiletsRequired  Boolean  @default(false) // שירותים משותפים בקומה
-  openSpaceRequired       Boolean  @default(false) // חלל פתוח
-  schoolProximity    String?
-  source             String?
+  accessibilityRequired   Boolean          @default(false)
+  buildStateRequired      String? // "מעטפת" / "גמר" / specific finish
+  workstationsMin         Int? // מספר עמדות עבודה
+  kitchenetteRequired     Boolean          @default(false)
+  floorShelterRequired    Boolean          @default(false) // ממ"ק
+  inOfficeToiletsRequired Boolean          @default(false) // שירותים בתוך המשרד
+  onFloorToiletsRequired  Boolean          @default(false) // שירותים משותפים בקומה
+  openSpaceRequired       Boolean          @default(false) // חלל פתוח
+  schoolProximity         String?
+  source                  String?
   // `status` is the thermal temperature rating (HOT/WARM/COLD). New in
   // Sprint 1 / MLS parity Task K2: `customerStatus` is the separate
   // life-cycle flag (אקטואלי / לא אקטואלי / etc.). Kept orthogonal.
-  status             LeadStatus       @default(WARM)
-  notes              String?
-  brokerageSignedAt  DateTime?
-  brokerageExpiresAt DateTime?
-  lastContact        DateTime?
+  status                  LeadStatus       @default(WARM)
+  notes                   String?
+  brokerageSignedAt       DateTime?        @db.Timestamptz(6)
+  brokerageExpiresAt      DateTime?        @db.Timestamptz(6)
+  lastContact             DateTime?        @db.Timestamptz(6)
 
   // Sprint 1 / MLS parity — Task K2. Customer admin block.
   customerStatus      CustomerStatus?
-  commissionPct       Float?
+  // P0-4 — Decimal not Float (see AiUsage.costUsd / Property.agentCommissionPct).
+  commissionPct       Decimal?          @db.Decimal(5, 2)
   isPrivate           Boolean           @default(false)
   purposes            CustomerPurpose[] @default([])
   seriousnessOverride Seriousness?
@@ -1032,9 +1119,10 @@ model Lead {
   address      String?
   cityText     String?
   zip          String?
-  primaryPhone String?
-  phone1       String?
-  phone2       String?
+  // P2-4 — VarChar caps on phone fields.
+  primaryPhone String?          @db.VarChar(32)
+  phone1       String?          @db.VarChar(32)
+  phone2       String?          @db.VarChar(32)
   fax          String?
   personalId   String?
   // Sprint 2 / MLS parity — Task L3 placeholder. Quick-lead UI uses
@@ -1043,8 +1131,8 @@ model Lead {
   // Sprint 2 / MLS parity — Task L1. Quick-lead lifecycle status.
   leadStatus   QuickLeadStatus? @default(NEW)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   viewings        PropertyViewing[]
   customerProfile CustomerProfile?
@@ -1072,20 +1160,24 @@ model Lead {
   // Excel-import tag. Set on every Lead row created via the wizard so
   // an agent who realises the mapping was wrong can bulk-delete the
   // batch from the list page.
-  importBatchId   String?
-
-  @@index([agentId])
+  importBatchId        String?
   // PERF-015 — same rationale as Property: the leads list /
   // Customers page sorts by createdAt desc inside an agent scope.
   // Market Discovery (2026-04-27) — back-relation for hourly-watcher
   // matches against this lead's LeadSearchProfile rows.
   marketListingMatches MarketListingLeadMatch[]
 
+  @@index([agentId])
   @@index([agentId, createdAt(sort: Desc)])
   @@index([status])
   @@index([customerStatus])
   @@index([city])
   @@index([importBatchId])
+  // P1-2 — agent-scoped status filters. The leads list filters by
+  // status/customerStatus inside an agent scope on every render; a
+  // single-column status index forces a bitmap merge with agentId.
+  @@index([agentId, status])
+  @@index([agentId, customerStatus])
 }
 
 // Sprint 1 / MLS parity — Task K2. Composite-PK join table for
@@ -1095,7 +1187,7 @@ model LeadAgent {
   lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   agentId    String
   agent      User     @relation("LeadAssignments", fields: [agentId], references: [id], onDelete: Cascade)
-  assignedAt DateTime @default(now())
+  assignedAt DateTime @default(now()) @db.Timestamptz(6)
 
   @@id([leadId, agentId])
   @@index([agentId])
@@ -1104,7 +1196,10 @@ model LeadAgent {
 model Deal {
   id             String           @id @default(cuid())
   agentId        String
-  agent          User             @relation("AgentDeals", fields: [agentId], references: [id])
+  // P0-5 — Cascade on agent delete. Deal rows are agent-owned business
+  // records; the privacy-policy purge already removes the User after
+  // 30 days, and we want their deals to follow.
+  agent          User             @relation("AgentDeals", fields: [agentId], references: [id], onDelete: Cascade)
   propertyId     String?          @unique
   property       Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   propertyStreet String
@@ -1119,8 +1214,8 @@ model Deal {
   buyerAgent     String?
   sellerAgent    String?
   lawyer         String?
-  updateDate     DateTime         @default(now())
-  signedAt       DateTime?
+  updateDate     DateTime         @default(now()) @db.Timestamptz(6)
+  signedAt       DateTime?        @db.Timestamptz(6)
   // E-1 — structured parties. `buyerId` references a Lead (the
   // prospective buyer in the CRM), `sellerId` references an Owner
   // (the canonical seller record). Both nullable — legacy rows and
@@ -1132,9 +1227,9 @@ model Deal {
   buyer          Lead?            @relation("DealBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
   sellerId       String?
   seller         Owner?           @relation("DealSeller", fields: [sellerId], references: [id], onDelete: SetNull)
-  closeDate      DateTime?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  closeDate      DateTime?        @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(6)
 
   @@index([agentId])
   @@index([status])
@@ -1143,19 +1238,22 @@ model Deal {
 }
 
 model Agreement {
-  id          String        @id @default(cuid())
+  id          String          @id @default(cuid())
   leadId      String?
-  lead        Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  lead        Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
   propertyId  String?
-  property    Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  property    Property?       @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   signerName  String
   signerPhone String?
   signerEmail String?
   fileId      String?
-  file        UploadedFile? @relation(fields: [fileId], references: [id])
-  sentAt      DateTime      @default(now())
-  signedAt    DateTime?
-  status      String        @default("SENT") // SENT | SIGNED | EXPIRED | CANCELLED
+  // P0-5 — SetNull on file delete. The Agreement row holds the audit
+  // trail (signer, sentAt, signedAt); losing the PDF doesn't invalidate
+  // the record, but a dangling FK to a vanished UploadedFile would.
+  file        UploadedFile?   @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  sentAt      DateTime        @default(now()) @db.Timestamptz(6)
+  signedAt    DateTime?       @db.Timestamptz(6)
+  status      AgreementStatus @default(SENT)
   note        String?
 
   @@index([leadId])
@@ -1163,10 +1261,10 @@ model Agreement {
 }
 
 model UploadedFile {
-  id           String   @id @default(cuid())
+  id           String           @id @default(cuid())
   ownerId      String
-  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  kind         String // "property_image" | "signed_agreement" | "document" | "other"
+  owner        User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  kind         UploadedFileKind
   originalName String
   mimeType     String
   sizeBytes    Int
@@ -1175,18 +1273,20 @@ model UploadedFile {
   // "סקרים") for the /documents page filter pill row. Empty array by
   // default; legacy rows (property images / signed agreements) never
   // populate it.
-  tags         String[] @default([])
+  tags         String[]         @default([])
   // 2026-04-27 — optional scoping to a specific property so the agent
   // can attach a PDF (e.g. exclusivity agreement, building plan,
   // arnona statement) directly to a listing. Nullable so existing
   // rows + the global /documents page keep working unchanged.
   propertyId   String?
-  property     Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  createdAt    DateTime @default(now())
+  property     Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
 
   agreements Agreement[]
 
-  @@index([ownerId])
+  // P2-5 — single-column @@index([ownerId]) was redundant; the
+  // compound (ownerId, kind) below already serves any query that
+  // filters by ownerId alone (left-prefix rule).
   @@index([kind])
   @@index([ownerId, kind])
   @@index([propertyId])
@@ -1206,7 +1306,7 @@ model MessageTemplate {
   agent     User                @relation(fields: [agentId], references: [id], onDelete: Cascade)
   kind      MessageTemplateKind
   body      String
-  updatedAt DateTime            @updatedAt
+  updatedAt DateTime            @updatedAt @db.Timestamptz(6)
 
   @@unique([agentId, kind])
   @@index([agentId])
@@ -1253,15 +1353,15 @@ model Prospect {
   // and self-contained — no extra storage backend required. Nullable
   // for the digital flow where the prospect signs later.
   signatureDataUrl String?
-  signedAt         DateTime?
+  signedAt         DateTime? @db.Timestamptz(6)
   // Identity fields captured on the public sign form (industry-standard
   // interested-party intake). Nullable because legacy rows pre-date these.
-  idType           String?   // 'ID' (Israeli ת.ז.) | 'PASSPORT'
+  idType           String? // 'ID' (Israeli ת.ז.) | 'PASSPORT'
   idNumber         String?
   address          String?
   // Public sign-from-phone flow tokens.
   publicToken      String?   @unique
-  tokenExpiresAt   DateTime?
+  tokenExpiresAt   DateTime? @db.Timestamptz(6)
   // Optional link to an existing Lead in the agent's CRM. Set either
   // by the auto-link heuristic on signing (exact-one phone/email
   // match under the same agent) or manually from PropertyDetail.
@@ -1270,7 +1370,7 @@ model Prospect {
   // Per-agent sequential order number printed on the brokerage-services
   // agreement PDF. Back-filled for legacy rows by the migration.
   orderNumber      Int?
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
 
   @@unique([agentId, orderNumber])
   @@index([propertyId])
@@ -1295,8 +1395,8 @@ model LeadMeeting {
   notes         String?
   location      String?
   meetLink      String?
-  startsAt      DateTime
-  endsAt        DateTime
+  startsAt      DateTime @db.Timestamptz(6)
+  endsAt        DateTime @db.Timestamptz(6)
   googleEventId String?
   // Sprint 5 / AI — voice summariser. `audioKey` is the storage key of
   // the uploaded voice note (S3 path in prod; `local://tmp/<uuid>.webm`
@@ -1306,12 +1406,14 @@ model LeadMeeting {
   audioKey      String?
   summary       String?
   summaryJson   Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([leadId])
   @@index([agentId])
   @@index([startsAt])
+  // P1-2 — agent calendar view scans (agentId, startsAt) on a date range.
+  @@index([agentId, startsAt])
 }
 
 // ─── Tags ──────────────────────────────────────────────────────────────────
@@ -1342,8 +1444,8 @@ model Tag {
   // pick from the design-system palette client-side.
   color     String   @default("#C9A14B")
   scope     TagScope @default(ALL)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   assignments TagAssignment[]
 
@@ -1357,7 +1459,7 @@ model TagAssignment {
   tag        Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
   entityType TagEntity
   entityId   String
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
 
   @@unique([tagId, entityType, entityId])
   @@index([entityType, entityId])
@@ -1371,10 +1473,10 @@ model Reminder {
   agent       User           @relation("AgentReminders", fields: [agentId], references: [id], onDelete: Cascade)
   title       String
   notes       String?
-  dueAt       DateTime
+  dueAt       DateTime       @db.Timestamptz(6)
   status      ReminderStatus @default(PENDING)
-  completedAt DateTime?
-  cancelledAt DateTime?
+  completedAt DateTime?      @db.Timestamptz(6)
+  cancelledAt DateTime?      @db.Timestamptz(6)
 
   leadId     String?
   lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
@@ -1386,8 +1488,8 @@ model Reminder {
   customerId String?
   customer   User?     @relation("ReminderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([agentId, status, dueAt])
   @@index([leadId])
@@ -1401,17 +1503,17 @@ model Reminder {
 // autocomplete and hygiene. Aliases capture historical spellings
 // (e.g. רמת-אביב vs רמת אביב) without a migration per variant.
 model Neighborhood {
-  id        String   @id @default(cuid())
-  city      String
-  name      String
-  aliases   String[] @default([])
+  id          String   @id @default(cuid())
+  city        String
+  name        String
+  aliases     String[] @default([])
   // 2026-04-30 — registry street codes that fall inside this
   // neighborhood (per OSM polygons + nearest-neighbor fallback). Built
   // offline via `scripts/build-neighborhood-streets.ts`. Used by the
   // street-autocomplete endpoint to narrow results when the agent
   // has picked a neighborhood for a lead.
-  streetCodes Int[]  @default([])
-  createdAt DateTime @default(now())
+  streetCodes Int[]    @default([])
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
 
   // Sprint 7 / MLS parity — Task G2. Reverse relation so cascading
   // deletes on a Neighborhood clean up the join rows automatically.
@@ -1433,8 +1535,8 @@ model NeighborhoodGroup {
   description String?
   aliases     String[]                  @default([])
   members     NeighborhoodGroupMember[]
-  createdAt   DateTime                  @default(now())
-  updatedAt   DateTime                  @updatedAt
+  createdAt   DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime                  @updatedAt @db.Timestamptz(6)
 
   @@unique([city, name])
   @@index([city])
@@ -1464,8 +1566,8 @@ model SavedSearch {
   entityType SavedSearchEntity
   name       String
   filters    Json
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  createdAt  DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime          @updatedAt @db.Timestamptz(6)
 
   @@index([agentId])
 }
@@ -1483,7 +1585,7 @@ model Favorite {
   agent      User           @relation("AgentFavorites", fields: [agentId], references: [id], onDelete: Cascade)
   entityType FavoriteEntity
   entityId   String
-  createdAt  DateTime       @default(now())
+  createdAt  DateTime       @default(now()) @db.Timestamptz(6)
 
   @@unique([agentId, entityType, entityId])
 }
@@ -1525,14 +1627,16 @@ model Advert {
   publishedPrice Int?
   externalUrl    String?
   externalId     String?
-  publishedAt    DateTime?
-  expiresAt      DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  publishedAt    DateTime?     @db.Timestamptz(6)
+  expiresAt      DateTime?     @db.Timestamptz(6)
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(6)
 
   @@index([agentId])
   @@index([propertyId])
   @@index([channel, status])
+  // P1-2 — Yad2 dashboard filters by (agentId, channel, status).
+  @@index([agentId, channel, status])
 }
 
 // Sprint 5 / MLS parity — Task J10. Secondary assignees on a
@@ -1544,7 +1648,7 @@ model PropertyAssignee {
   userId     String
   user       User     @relation("PropertyAssigneeUser", fields: [userId], references: [id], onDelete: Cascade)
   role       String   @default("CO_AGENT")
-  assignedAt DateTime @default(now())
+  assignedAt DateTime @default(now()) @db.Timestamptz(6)
 
   @@id([propertyId, userId])
   @@index([userId])
@@ -1564,7 +1668,7 @@ model ActivityLog {
   entityId   String?
   summary    String?
   metadata   Json?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([agentId, createdAt])
   @@index([entityType, entityId])
@@ -1608,8 +1712,8 @@ model LeadSearchProfile {
   furnitureReq   Boolean           @default(false)
   mamadReq       Boolean           @default(false)
   storeroomReq   Boolean           @default(false)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
 
   @@index([leadId])
 }
@@ -1619,14 +1723,14 @@ model LeadSearchProfile {
 // the same street share one cache row. 24h TTL is enforced in the
 // service layer, not the DB.
 model MarketContext {
-  id         String   @id @default(cuid())
-  cityKey    String
-  streetKey  String
-  kind       String   // 'buy' | 'rent'
-  fetchedAt  DateTime @default(now())
-  dealCount  Int      @default(0)
-  payload    Json
-  error      String?
+  id        String            @id @default(cuid())
+  cityKey   String
+  streetKey String
+  kind      MarketContextKind
+  fetchedAt DateTime          @default(now()) @db.Timestamptz(6)
+  dealCount Int               @default(0)
+  payload   Json
+  error     String?
 
   @@unique([cityKey, streetKey, kind])
   @@index([fetchedAt])
@@ -1645,11 +1749,11 @@ model ImportMapping {
   id         String   @id @default(cuid())
   agentId    String
   agent      User     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  entityType String   // "LEAD" | "PROPERTY"
+  entityType String // "LEAD" | "PROPERTY"
   headerSig  String
   mapping    Json
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
 
   @@unique([agentId, entityType, headerSig])
   @@index([agentId])
@@ -1666,9 +1770,9 @@ model PasswordResetToken {
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   token     String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
+  expiresAt DateTime  @db.Timestamptz(6)
+  usedAt    DateTime? @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([userId])
   @@index([expiresAt])
@@ -1692,8 +1796,8 @@ model Notification {
   title     String
   body      String?
   link      String?
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
+  readAt    DateTime? @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, readAt])
@@ -1718,27 +1822,27 @@ model Notification {
 // drawing can be layered later without a migration.
 // ────────────────────────────────────────────────────────────────────
 model Contract {
-  id             String    @id @default(cuid())
-  agentId        String
-  agent          User      @relation("AgentContracts", fields: [agentId], references: [id], onDelete: Cascade)
-  propertyId     String?
-  property       Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  leadId         String?
-  lead           Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  type           String // 'EXCLUSIVITY' | 'BROKERAGE' | 'OFFER'
-  title          String
-  body           String // the contract text rendered into the PDF
-  signerName     String
-  signerPhone    String?
-  signerEmail    String?
+  id            String    @id @default(cuid())
+  agentId       String
+  agent         User      @relation("AgentContracts", fields: [agentId], references: [id], onDelete: Cascade)
+  propertyId    String?
+  property      Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  leadId        String?
+  lead          Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  type          String // 'EXCLUSIVITY' | 'BROKERAGE' | 'OFFER'
+  title         String
+  body          String // the contract text rendered into the PDF
+  signerName    String
+  signerPhone   String?
+  signerEmail   String?
   // Sign-time fields: populated when the signer submits. `signatureHash`
   // is a SHA-256 of (contractId + signerName + signedAt.toISOString())
   // — printed on the signed-lock badge as tamper-evidence.
-  signedAt       DateTime?
-  signatureName  String? // the typed-to-sign text
-  signatureHash  String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  signedAt      DateTime? @db.Timestamptz(6)
+  signatureName String? // the typed-to-sign text
+  signatureHash String?
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
 
   @@index([agentId])
   @@index([propertyId])
@@ -1770,7 +1874,7 @@ model PropertyView {
   visitorHash String
   referrer    String?
   userAgent   String?
-  viewedAt    DateTime @default(now())
+  viewedAt    DateTime @default(now()) @db.Timestamptz(6)
 
   @@unique([propertyId, visitorHash, viewedAt])
   @@index([propertyId, viewedAt])
@@ -1792,7 +1896,7 @@ model PublicMatchSeen {
   viewer     User     @relation(fields: [viewerId], references: [id], onDelete: Cascade)
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  seenAt     DateTime @default(now())
+  seenAt     DateTime @default(now()) @db.Timestamptz(6)
 
   @@id([viewerId, propertyId])
   @@index([viewerId])
@@ -1811,44 +1915,44 @@ model PublicMatchSeen {
 // ────────────────────────────────────────────────────────────────────
 
 model MarketListingSource {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  baseUrl     String
-  isEnabled   Boolean  @default(true)
+  id         String   @id @default(cuid())
+  name       String   @unique
+  baseUrl    String
+  isEnabled  Boolean  @default(true)
   // Safety cap — listings ingested per hourly run for this source.
   // Existing yad2-crawler.ts has its own MAX_LISTINGS_TOTAL = 100
   // baked in; this is the watcher-side belt.
-  maxPerHour  Int      @default(200)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  maxPerHour Int      @default(200)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
 }
 
 model MarketListing {
-  id                 String   @id @default(cuid())
-  source             String                                   // matches MarketListingSource.name
-  externalListingId  String                                   // yad2 listing token
-  originalUrl        String                                   // canonical "פתח במקור" link
-  city               String?
-  neighborhood       String?
-  street             String?
-  propertyType       String?
-  rooms              Float?
-  sizeSqm            Int?
-  floor              Int?
-  price              Int?
-  pricePerSqm        Int?
-  // "forsale" | "rent" — Yad2 splits its catalogue into these two
-  // top-level kinds. Madlan/Komo will follow the same dichotomy.
-  kind               String?
-  // "private" | "agency" — Yad2 splits its feed into private + agency
-  // buckets. Useful to filter out agency listings (the agent already
-  // works with most local agencies and wants raw deal flow).
-  posterType         String?
-  firstSeenAt        DateTime  @default(now())
-  lastSeenAt         DateTime  @default(now())
-  status             String    @default("active")             // "active" | "removed" | "unknown"
+  id                String                   @id @default(cuid())
+  source            String // matches MarketListingSource.name
+  externalListingId String // yad2 listing token
+  originalUrl       String // canonical "פתח במקור" link
+  city              String?
+  neighborhood      String?
+  street            String?
+  propertyType      String?
+  rooms             Float?
+  sizeSqm           Int?
+  floor             Int?
+  price             Int?
+  pricePerSqm       Int?
+  // Yad2 splits its catalogue into these two top-level kinds.
+  // Madlan/Komo will follow the same dichotomy.
+  kind              MarketListingKind?
+  // Yad2 splits its feed into private + agency buckets. Useful to
+  // filter out agency listings (the agent already works with most
+  // local agencies and wants raw deal flow).
+  posterType        MarketListingPosterType?
+  firstSeenAt       DateTime                 @default(now()) @db.Timestamptz(6)
+  lastSeenAt        DateTime                 @default(now()) @db.Timestamptz(6)
+  status            MarketListingStatus      @default(active)
   // sha256 of canonicalized metadata; new snapshots only when this changes.
-  metadataHash       String
+  metadataHash      String
   // Reactor cursor (Phase 3 refactor). NULL = the backend
   // marketDiscoveryReactor hasn't processed this row yet (= run
   // matching against active LeadSearchProfiles + create Notifications
@@ -1856,17 +1960,17 @@ model MarketListing {
   // to NULL forces a re-evaluation (e.g. when matching weights
   // change). Watcher service NEVER touches this column — it's the
   // CRM/reactor's bookkeeping.
-  reactedAt          DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  reactedAt         DateTime?                @db.Timestamptz(6)
+  createdAt         DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                 @updatedAt @db.Timestamptz(6)
 
-  snapshots          MarketListingSnapshot[]
-  leadMatches        MarketListingLeadMatch[]
+  snapshots     MarketListingSnapshot[]
+  leadMatches   MarketListingLeadMatch[]
   // Back-relation for Property.marketListing (additive column on
   // Property). When an agent duplicates a listing into their own CRM
   // properties, the Property row points back here so "Open Original"
   // remains available after duplication.
-  crmDuplicates      Property[]
+  crmDuplicates Property[]
 
   @@unique([source, externalListingId])
   @@index([source])
@@ -1889,15 +1993,15 @@ model MarketListing {
 }
 
 model MarketListingSnapshot {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   marketListingId String
   marketListing   MarketListing @relation(fields: [marketListingId], references: [id], onDelete: Cascade)
-  capturedAt      DateTime @default(now())
+  capturedAt      DateTime      @default(now()) @db.Timestamptz(6)
   price           Int?
   pricePerSqm     Int?
   status          String
   metadataHash    String
-  createdAt       DateTime @default(now())
+  createdAt       DateTime      @default(now()) @db.Timestamptz(6)
 
   @@index([marketListingId])
   @@index([capturedAt])
@@ -1906,20 +2010,20 @@ model MarketListingSnapshot {
 }
 
 model MarketWatcherRun {
-  id                    String    @id @default(cuid())
-  startedAt             DateTime  @default(now())
-  finishedAt            DateTime?
-  status                String    @default("running")          // "running" | "success" | "failed" | "skipped"
-  source                String
-  listingsSeen          Int       @default(0)
-  listingsCreated       Int       @default(0)
-  listingsUpdated       Int       @default(0)
-  snapshotsCreated      Int       @default(0)
-  matchesCreated        Int       @default(0)
-  notificationsCreated  Int       @default(0)
-  errorMessage          String?
-  metadataJson          Json?
-  createdAt             DateTime  @default(now())
+  id                   String                 @id @default(cuid())
+  startedAt            DateTime               @default(now()) @db.Timestamptz(6)
+  finishedAt           DateTime?              @db.Timestamptz(6)
+  status               MarketWatcherRunStatus @default(running)
+  source               String
+  listingsSeen         Int                    @default(0)
+  listingsCreated      Int                    @default(0)
+  listingsUpdated      Int                    @default(0)
+  snapshotsCreated     Int                    @default(0)
+  matchesCreated       Int                    @default(0)
+  notificationsCreated Int                    @default(0)
+  errorMessage         String?
+  metadataJson         Json?
+  createdAt            DateTime               @default(now()) @db.Timestamptz(6)
 
   @@index([startedAt])
   @@index([status])
@@ -1930,23 +2034,23 @@ model MarketWatcherRun {
 // internal CRM notifications stay on by default. The watcher reads
 // these before queueing an external delivery.
 model UserNotificationPreference {
-  id                                  String   @id @default(cuid())
-  userId                              String   @unique
-  user                                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  marketMatchInAppEnabled             Boolean  @default(true)
-  marketMatchEmailEnabled             Boolean  @default(false)
-  marketMatchSmsEnabled               Boolean  @default(false)
+  id                               String   @id @default(cuid())
+  userId                           String   @unique
+  user                             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketMatchInAppEnabled          Boolean  @default(true)
+  marketMatchEmailEnabled          Boolean  @default(false)
+  marketMatchSmsEnabled            Boolean  @default(false)
   // Optional override for delivery — if NULL we send to user.email.
   // Lets the agent route market-match alerts to a personal address
   // without changing their login email.
-  customDeliveryEmail                 String?
+  customDeliveryEmail              String?
   // Match score (0..100) below which we never deliver via email/SMS,
   // even if the channel is enabled. Default 40 matches the reactor's
   // MIN_SCORE so toggling email-on actually delivers; agents who want
   // higher-confidence-only can raise it via /settings/notifications.
-  minMatchScoreForExternalDelivery    Int      @default(40)
-  createdAt                           DateTime @default(now())
-  updatedAt                           DateTime @updatedAt
+  minMatchScoreForExternalDelivery Int      @default(40)
+  createdAt                        DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt                        DateTime @updatedAt @db.Timestamptz(6)
 }
 
 // Phase 3 — pending external delivery queue. The watcher (separate
@@ -1958,23 +2062,23 @@ model UserNotificationPreference {
 // Decouples the watcher from the SES dependency and gives us
 // auditability + retry semantics for free.
 model PendingNotificationDelivery {
-  id              String    @id @default(cuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  channel         String                                              // 'email' | 'sms'
-  type            String                                              // 'market_listing_match'
-  title           String
-  body            String?
-  link            String?
-  recipientEmail  String?                                             // captured at queue time so a later email change doesn't redirect a pending mail
-  recipientPhone  String?
-  status          String    @default("pending")                       // 'pending' | 'sent' | 'failed' | 'skipped'
-  errorMessage    String?
-  sentAt          DateTime?
-  attemptCount    Int       @default(0)
-  idempotencyKey  String?                                             // optional dedup hint for the worker
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel        String // 'email' | 'sms'
+  type           String // 'market_listing_match'
+  title          String
+  body           String?
+  link           String?
+  recipientEmail String? // captured at queue time so a later email change doesn't redirect a pending mail
+  recipientPhone String?
+  status         String    @default("pending") // 'pending' | 'sent' | 'failed' | 'skipped'
+  errorMessage   String?
+  sentAt         DateTime? @db.Timestamptz(6)
+  attemptCount   Int       @default(0)
+  idempotencyKey String? // optional dedup hint for the worker
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
 
   @@index([status, createdAt])
   @@index([userId, status])
@@ -2005,8 +2109,8 @@ model NotificationDispatch {
   matchScore      Int       @default(0)
   // Null until the row is included in a sent digest email; once set
   // the row is "spent" and never appears in another digest.
-  dispatchedAt    DateTime?
-  createdAt       DateTime  @default(now())
+  dispatchedAt    DateTime? @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
 
   @@unique([agentId, leadId, marketListingId])
   @@index([agentId, dispatchedAt])
@@ -2014,24 +2118,29 @@ model NotificationDispatch {
 }
 
 model MarketListingLeadMatch {
-  id                String        @id @default(cuid())
-  marketListingId   String
-  marketListing     MarketListing @relation(fields: [marketListingId], references: [id], onDelete: Cascade)
-  leadId            String
-  lead              Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  id              String        @id @default(cuid())
+  marketListingId String
+  marketListing   MarketListing @relation(fields: [marketListingId], references: [id], onDelete: Cascade)
+  leadId          String
+  lead            Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
   // Nullable so legacy "flat-fields" lead matches (no LeadSearchProfile)
   // still get a row. The unique constraint includes searchProfileId so
   // the same listing × lead × profile triple can only fire once.
-  searchProfileId   String?
+  searchProfileId String?
   // Denormalized for query speed — equals lead.agentId at insert time.
   // Routes filter on this column directly when serving an agent's matches.
-  agentUserId       String
-  agent             User          @relation(fields: [agentUserId], references: [id], onDelete: Cascade)
-  score             Int                                          // 0..100
-  reasonsJson       Json
-  status            String        @default("new")               // "new" | "viewed" | "dismissed" | "duplicated"
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  // P1-6 caveat — if a Lead is ever reassigned to a different agent
+  // (no such code path today), every row in this table for that lead
+  // must be updated in the same transaction. There is no SQL-level
+  // sync; treat this column as derived state that needs explicit
+  // maintenance.
+  agentUserId     String
+  agent           User          @relation(fields: [agentUserId], references: [id], onDelete: Cascade)
+  score           Int // 0..100
+  reasonsJson     Json
+  status          String        @default("new") // "new" | "viewed" | "dismissed" | "duplicated"
+  createdAt       DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(6)
 
   @@unique([marketListingId, leadId, searchProfileId])
   @@index([marketListingId])

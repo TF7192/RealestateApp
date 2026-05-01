@@ -87,23 +87,22 @@ export const registerDealRoutes: FastifyPluginAsync = async (app) => {
     // E-1 — agent-scoped FK validation: a buyer must be one of my
     // leads, a seller must be one of my owners, a property must be
     // one of mine. Prevents cross-agent data binding.
-    if (body.buyerId) {
-      const l = await prisma.lead.findUnique({ where: { id: body.buyerId } });
-      if (!l || l.agentId !== uid) {
-        return reply.code(400).send({ error: { message: 'ליד לא נמצא' } });
-      }
+    //
+    // P2-6 — fan the three validation reads out in parallel rather
+    // than serially (3 round-trips → 1).
+    const [buyer, seller, property] = await Promise.all([
+      body.buyerId    ? prisma.lead.findUnique({ where: { id: body.buyerId },    select: { agentId: true } }) : null,
+      body.sellerId   ? prisma.owner.findUnique({ where: { id: body.sellerId },  select: { agentId: true } }) : null,
+      body.propertyId ? prisma.property.findUnique({ where: { id: body.propertyId }, select: { agentId: true } }) : null,
+    ]);
+    if (body.buyerId && (!buyer || buyer.agentId !== uid)) {
+      return reply.code(400).send({ error: { message: 'ליד לא נמצא' } });
     }
-    if (body.sellerId) {
-      const o = await prisma.owner.findUnique({ where: { id: body.sellerId } });
-      if (!o || o.agentId !== uid) {
-        return reply.code(400).send({ error: { message: 'בעלים לא נמצא' } });
-      }
+    if (body.sellerId && (!seller || seller.agentId !== uid)) {
+      return reply.code(400).send({ error: { message: 'בעלים לא נמצא' } });
     }
-    if (body.propertyId) {
-      const p = await prisma.property.findUnique({ where: { id: body.propertyId } });
-      if (!p || p.agentId !== uid) {
-        return reply.code(400).send({ error: { message: 'נכס לא נמצא' } });
-      }
+    if (body.propertyId && (!property || property.agentId !== uid)) {
+      return reply.code(400).send({ error: { message: 'נכס לא נמצא' } });
     }
     const deal = await prisma.deal.create({
       data: { agentId: uid, ...normalize(body) },
