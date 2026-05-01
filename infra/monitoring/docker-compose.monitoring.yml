@@ -1,0 +1,103 @@
+# Monitoring stack — Prometheus + postgres_exporter + Grafana.
+#
+# Bound to 127.0.0.1 only; not publicly exposed. Access on EC2:
+#   ssh -L 3000:127.0.0.1:3000 ec2-user@<host>   # then http://localhost:3000
+#
+# Brought up with:
+#   sudo docker compose -f docker-compose.monitoring.yml up -d
+#
+# Joins the same network as the main estia-new stack so that
+# postgres_exporter can talk to RDS via the host (RDS is reachable
+# from any VPC peer; we use the same DATABASE_URL the backend uses).
+#
+# Storage: Prometheus + Grafana data live on named volumes; safe to
+# `down` and `up -d` without losing dashboards/history. Wipe history
+# with `docker volume rm monitoring_prometheus_data monitoring_grafana_data`.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    # Linux Docker doesn't auto-resolve host.docker.internal — map it
+    # to the gateway IP so prometheus can scrape node_exporter (which
+    # runs in network_mode: host).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    restart: unless-stopped
+    # DATA_SOURCE_NAME comes from monitoring/.env (operator-provided),
+    # NOT from /home/ec2-user/estia-new/.env directly — the backend's
+    # DATABASE_URL contains Prisma-specific query params like
+    # connection_limit / pool_timeout that confuse libpq. The setup
+    # script (see infra/monitoring/README.md) strips those at install
+    # time and writes a libpq-clean DSN here.
+    env_file: ./.env
+    environment:
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+      PG_EXPORTER_EXTEND_QUERY_PATH: ""
+    ports:
+      - "127.0.0.1:9187:9187"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  node_exporter:
+    # Host-level CPU / memory / disk / network metrics. Useful for
+    # correlating "the backend is slow" with "EC2 box is at 100% CPU".
+    image: prom/node-exporter:v1.8.2
+    restart: unless-stopped
+    pid: host
+    network_mode: host
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      # First-run admin password — can be reset later via the UI.
+      # Comes from monitoring.env (a small companion file the operator
+      # writes when bringing the stack up). If unset, Grafana defaults
+      # to admin/admin.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards-provisioned:ro
+    depends_on:
+      - prometheus
+      - postgres_exporter
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  prometheus_data:
+  grafana_data:

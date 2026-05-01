@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres_exporter:9187']
+        labels:
+          db: 'estia-prod'
+
+  - job_name: 'node'
+    # node_exporter runs in network_mode: host so we hit it on the
+    # EC2's loopback as observed from another container. The
+    # `extra_hosts` in the compose maps `host.docker.internal` to the
+    # host's gateway IP on Linux.
+    static_configs:
+      - targets: ['host.docker.internal:9100']
+        labels:
+          host: 'estia-prod-ec2'
