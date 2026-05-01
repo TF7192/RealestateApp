@@ -33,17 +33,18 @@ const THIRTY_ONE_DAYS_AGO = () =>
   new Date(Date.now() - (31 * 24 * 60 * 60 * 1000));
 
 describe('purgeDeletedUsers — purgeOnce', () => {
-  it('hard-deletes a user whose deletedAt is past the 30d threshold + cleans S3 blobs', async () => {
-    // KNOWN BUG (filed as follow-up task): purgeDeletedUsers.ts:67
-    // claims "Cascade FKs handle the rest of the schema", but
-    // Property.agent + Lead.agent + Deal.agent + Owner.agent have no
-    // onDelete:Cascade in schema.prisma — only Property defaults to
-    // Restrict. So in production, any user who ever owned a Property
-    // / Lead / Owner / Deal silently never gets hard-deleted. We seed
-    // an UploadedFile here (its FK does cascade) so the happy path
-    // can be exercised. The fix needs a schema migration; this test
-    // documents the current behaviour rather than the desired one.
+  it('hard-deletes a user with owned Property + Lead + UploadedFile and cleans S3 blobs', async () => {
+    // Migration 20260512000000_purge_user_cascade_property_lead added
+    // ON DELETE CASCADE to Property.agent + Lead.agent (the two FKs
+    // that previously blocked the worker's user.delete call). With
+    // the cascade in place, every agent-owned model — Property, Lead,
+    // Owner, Deal, Reminder, Tag, SavedSearch, Favorite, LeadMeeting,
+    // UploadedFile — disappears together with the user.
     const u = await createUser(prisma, { email: 'purge-stale@example.com' });
+
+    // Seed a Property + Lead owned by the user — these are the rows
+    // that used to break the cascade pre-migration.
+    const prop = await createProperty(prisma, { agentId: u.id });
 
     await prisma.uploadedFile.create({
       data: {
@@ -55,6 +56,13 @@ describe('purgeDeletedUsers — purgeOnce', () => {
         path: 'documents/u1/report.pdf',
       },
     });
+    await prisma.propertyImage.create({
+      data: {
+        propertyId: prop.id,
+        url: '/uploads/properties/p1/cover.jpg',
+        sortOrder: 0,
+      },
+    });
 
     await prisma.user.update({
       where: { id: u.id },
@@ -63,11 +71,17 @@ describe('purgeDeletedUsers — purgeOnce', () => {
 
     await purgeOnce();
 
-    // User row gone via UploadedFile-cascading delete.
-    const after = await prisma.user.findUnique({ where: { id: u.id } });
-    expect(after).toBeNull();
+    // User row gone — and the Property is gone too (cascade).
+    const afterUser = await prisma.user.findUnique({ where: { id: u.id } });
+    expect(afterUser).toBeNull();
+    const afterProp = await prisma.property.findUnique({ where: { id: prop.id } });
+    expect(afterProp).toBeNull();
 
-    expect(deleteUpload).toHaveBeenCalledWith('documents/u1/report.pdf');
+    // S3 helper invoked for both the document path and the property
+    // image url (with the /uploads/ prefix stripped by the worker).
+    const allKeys = deleteUpload.mock.calls.map((c) => c[0]);
+    expect(allKeys).toContain('documents/u1/report.pdf');
+    expect(allKeys).toContain('properties/p1/cover.jpg');
   });
 
   it('leaves users alone when deletedAt is within the 30d window', async () => {

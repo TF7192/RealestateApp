@@ -615,7 +615,12 @@ model Yad2ImportAttempt {
 model Property {
   id                         String                     @id @default(cuid())
   agentId                    String
-  agent                      User                       @relation("AgentProperties", fields: [agentId], references: [id])
+  // onDelete: Cascade — when a User is hard-deleted (purgeDeletedUsers
+  // worker after the 30d retention window), every Property they owned
+  // must go with them. Without the cascade the FK Restrict default
+  // blocks the worker's user.delete() call and the privacy promise at
+  // /privacy is silently broken (rows live forever).
+  agent                      User                       @relation("AgentProperties", fields: [agentId], references: [id], onDelete: Cascade)
   // Per-agent SEO slug — used in /agents/<agent>/<property> URLs.
   slug                       String?
   assetClass                 AssetClass
@@ -1056,7 +1061,10 @@ model PropertyInquiry {
 model Lead {
   id                      String           @id @default(cuid())
   agentId                 String
-  agent                   User             @relation("AgentLeads", fields: [agentId], references: [id])
+  // onDelete: Cascade — same rationale as Property.agent above.
+  // The 30d-retention purge worker depends on every owned-by-agent
+  // model cascading on User.delete().
+  agent                   User             @relation("AgentLeads", fields: [agentId], references: [id], onDelete: Cascade)
   name                    String
   // P2-4 — VarChar caps on contact PII.
   phone                   String           @db.VarChar(32)
