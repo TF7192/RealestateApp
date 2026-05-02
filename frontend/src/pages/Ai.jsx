@@ -12,6 +12,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Sparkles, Send, Loader2, AlertCircle, Bot, User } from 'lucide-react';
 import api from '../lib/api';
 import AiQuotaChips from '../components/AiQuotaChips';
+import { useAuth } from '../lib/auth';
+import { buildAiGreeting } from '../lib/aiGreeting';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -69,8 +71,20 @@ function persistMessages(messages) {
 }
 
 export default function Ai() {
+  const { user } = useAuth();
   // messages: [{ role: 'user'|'assistant', content: string }]
-  const [messages, setMessages] = useState(() => loadPersistedMessages());
+  // Fresh login wipes localStorage (lib/auth.jsx purgeClientSessionState),
+  // so an empty load means "this is a clean session" and we seed an
+  // opening greeting from the assistant. A pure refresh keeps whatever
+  // was there.
+  const [messages, setMessages] = useState(() => {
+    const persisted = loadPersistedMessages();
+    if (persisted.length > 0) return persisted;
+    return [buildAiGreeting({
+      isPremium: !!user?.isPremium,
+      userName: user?.firstName || user?.name || '',
+    })];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
@@ -180,7 +194,12 @@ export default function Ai() {
     }
   };
 
-  const empty = messages.length === 0 && !loading;
+  // Suggested-prompt chips render as long as the user hasn't typed
+  // anything yet — i.e. the transcript is greeting-only. Once the
+  // user sends their first message, the chips disappear so the
+  // composer feels like a real conversation.
+  const userTurnCount = messages.reduce((n, m) => n + (m.role === 'user' ? 1 : 0), 0);
+  const showSuggestions = userTurnCount === 0 && !loading;
 
   return (
     <div dir="rtl" style={{
@@ -242,24 +261,21 @@ export default function Ai() {
             display: 'flex', flexDirection: 'column', gap: 12,
           }}
         >
-          {empty ? (
-            <EmptyState onPick={(p) => handleSend(p)} />
-          ) : (
-            <>
-              {messages.map((m, i) => (
-                // PERF-012 — when the assistant bubble is mid-stream
-                // and no text has landed yet, render the "thinking…"
-                // affordance instead of an empty bubble. As soon as
-                // the first delta arrives, the rendered content
-                // takes over without a layout jump.
-                <Bubble
-                  key={`m-${i}`}
-                  role={m.role}
-                  content={m.content}
-                  loading={m.__streaming && !m.content}
-                />
-              ))}
-            </>
+          {messages.map((m, i) => (
+            // PERF-012 — when the assistant bubble is mid-stream
+            // and no text has landed yet, render the "thinking…"
+            // affordance instead of an empty bubble. As soon as
+            // the first delta arrives, the rendered content
+            // takes over without a layout jump.
+            <Bubble
+              key={`m-${i}`}
+              role={m.role}
+              content={m.content}
+              loading={m.__streaming && !m.content}
+            />
+          ))}
+          {showSuggestions && (
+            <SuggestionChips onPick={(p) => handleSend(p)} />
           )}
         </div>
 
@@ -640,42 +656,30 @@ function Bubble({ role, content, loading }) {
   );
 }
 
-function EmptyState({ onPick }) {
+function SuggestionChips({ onPick }) {
+  // Inline "what should I ask?" affordance, rendered under the seeded
+  // greeting bubble. Disappears as soon as the user sends a turn.
   return (
     <div style={{
-      margin: 'auto', textAlign: 'center', padding: 16,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-      maxWidth: 520,
+      display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end',
+      marginTop: 4,
     }}>
-      <Sparkles size={32} style={{ color: DT.goldDark }} aria-hidden="true" />
-      <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: DT.ink }}>
-        איך אפשר לעזור?
-      </h2>
-      <p style={{ fontSize: 13, color: DT.muted, lineHeight: 1.7, margin: 0 }}>
-        שאל/י על ניסוח הודעות, טיפול בהתנגדויות, הכנה לפגישה,
-        או כל דבר אחר שיעזור לך היום.
-      </p>
-      <div style={{
-        display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center',
-        marginTop: 6,
-      }}>
-        {SUGGESTED_PROMPTS.map((p, i) => (
-          <button
-            key={`s-${i}`}
-            type="button"
-            onClick={() => onPick(p)}
-            style={{
-              ...FONT,
-              padding: '12px 16px', borderRadius: 99,
-              border: `1px solid ${DT.border}`,
-              background: DT.cream4, color: DT.ink,
-              fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              textAlign: 'right',
-              minHeight: 44,
-            }}
-          >{p}</button>
-        ))}
-      </div>
+      {SUGGESTED_PROMPTS.map((p, i) => (
+        <button
+          key={`s-${i}`}
+          type="button"
+          onClick={() => onPick(p)}
+          style={{
+            ...FONT,
+            padding: '10px 14px', borderRadius: 99,
+            border: `1px solid ${DT.border}`,
+            background: DT.cream4, color: DT.ink,
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            textAlign: 'right',
+            minHeight: 36,
+          }}
+        >{p}</button>
+      ))}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { Sparkles, Send, X, Loader2, AlertCircle, Bot, User } from 'lucide-react
 import Portal from './Portal';
 import useFocusTrap from '../hooks/useFocusTrap';
 import { useAuth } from '../lib/auth';
+import { buildAiGreeting } from '../lib/aiGreeting';
 import api from '../lib/api';
 
 const DT = {
@@ -91,15 +92,24 @@ export default function AiChatWidget() {
 
   if (!user) return null;
 
-  return open ? <AiChatPanel onClose={() => setOpen(false)} /> : null;
+  return open ? <AiChatPanel user={user} onClose={() => setOpen(false)} /> : null;
 }
 
-function AiChatPanel({ onClose }) {
+function AiChatPanel({ user, onClose }) {
   const panelRef = useRef(null);
   useFocusTrap(panelRef, { onEscape: onClose });
 
   // Mirror the /ai page's state shape so transcripts roundtrip cleanly.
-  const [messages, setMessages] = useState(() => loadPersistedMessages());
+  // Empty load = fresh login (auth purge wiped the key) → seed an
+  // opening greeting from the assistant. Refresh keeps existing turns.
+  const [messages, setMessages] = useState(() => {
+    const persisted = loadPersistedMessages();
+    if (persisted.length > 0) return persisted;
+    return [buildAiGreeting({
+      isPremium: !!user?.isPremium,
+      userName: user?.firstName || user?.name || '',
+    })];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
@@ -187,7 +197,10 @@ function AiChatPanel({ onClose }) {
     }
   };
 
-  const empty = messages.length === 0 && !loading;
+  // Suggestion chips render until the user types their first turn —
+  // greeting-only transcript still counts as "show suggestions".
+  const userTurnCount = messages.reduce((n, m) => n + (m.role === 'user' ? 1 : 0), 0);
+  const showSuggestions = userTurnCount === 0 && !loading;
 
   return (
     <Portal>
@@ -261,20 +274,17 @@ function AiChatPanel({ onClose }) {
             background: DT.cream4,
           }}
         >
-          {empty ? (
-            <EmptyState onPick={(p) => handleSend(p)} />
-          ) : (
-            <>
-              {messages.map((m, i) => (
-                // PERF-012 — see Ai.jsx; same render contract.
-                <Bubble
-                  key={`m-${i}`}
-                  role={m.role}
-                  content={m.content}
-                  loading={m.__streaming && !m.content}
-                />
-              ))}
-            </>
+          {messages.map((m, i) => (
+            // PERF-012 — see Ai.jsx; same render contract.
+            <Bubble
+              key={`m-${i}`}
+              role={m.role}
+              content={m.content}
+              loading={m.__streaming && !m.content}
+            />
+          ))}
+          {showSuggestions && (
+            <SuggestionChips onPick={(p) => handleSend(p)} />
           )}
         </div>
 
@@ -608,46 +618,35 @@ function Bubble({ role, content, loading }) {
   );
 }
 
-function EmptyState({ onPick }) {
-  // A few starter prompts — abridged from /ai because the panel is
-  // narrower; keep the brokerage-flavor though.
+function SuggestionChips({ onPick }) {
+  // Inline chips under the seeded greeting. Abridged compared to /ai
+  // because the panel is narrower; keep the brokerage flavor though.
   const starters = [
     'תכתוב תזכורת לליד שמחפש דירת 4 חדרים בראשון לציון',
     'איזה ליד לא קיבל מענה בשבוע האחרון?',
     'סכם את העסקאות שנסגרו החודש',
+    'איך מוסיפים נכס חדש?',
   ];
   return (
     <div style={{
-      margin: 'auto', textAlign: 'center', padding: 8,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+      display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end',
+      marginTop: 2,
     }}>
-      <Sparkles size={26} style={{ color: DT.goldDark }} aria-hidden="true" />
-      <h2 style={{ fontSize: 14, fontWeight: 800, margin: 0, color: DT.ink }}>
-        איך אפשר לעזור?
-      </h2>
-      <p style={{ fontSize: 12, color: DT.muted, lineHeight: 1.6, margin: 0 }}>
-        שאל/י על ניסוח הודעות, סטטוס לידים, או כל דבר אחר.
-      </p>
-      <div style={{
-        display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center',
-        marginTop: 4,
-      }}>
-        {starters.map((p, i) => (
-          <button
-            key={`s-${i}`}
-            type="button"
-            onClick={() => onPick(p)}
-            style={{
-              ...FONT,
-              padding: '6px 10px', borderRadius: 99,
-              border: `1px solid ${DT.border}`,
-              background: DT.white, color: DT.ink,
-              fontSize: 11, fontWeight: 600, cursor: 'pointer',
-              textAlign: 'right',
-            }}
-          >{p}</button>
-        ))}
-      </div>
+      {starters.map((p, i) => (
+        <button
+          key={`s-${i}`}
+          type="button"
+          onClick={() => onPick(p)}
+          style={{
+            ...FONT,
+            padding: '6px 10px', borderRadius: 99,
+            border: `1px solid ${DT.border}`,
+            background: DT.white, color: DT.ink,
+            fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            textAlign: 'right',
+          }}
+        >{p}</button>
+      ))}
     </div>
   );
 }

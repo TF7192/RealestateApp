@@ -13,6 +13,13 @@ function purgeClientSessionState() {
   clearPageCache();
   try { resetYad2ScanStore(); } catch { /* ignore */ }
   try { resetMarketScanStore(); } catch { /* ignore */ }
+  // AI chat transcript is keyed in localStorage and survives logout
+  // unless we wipe it explicitly — fresh login should not inherit the
+  // previous user's conversation, and a re-login should start with a
+  // clean abilities-greeting (seeded by Ai.jsx / AiChatWidget.jsx on
+  // empty mount). A pure refresh does NOT call this purge, so it
+  // preserves an in-progress conversation.
+  try { localStorage.removeItem('estia-ai-chat-v1'); } catch { /* quota / SSR — ignore */ }
 }
 
 const AuthContext = createContext(null);

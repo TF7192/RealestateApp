@@ -38,6 +38,7 @@ async function importScanStore() {
 describe('SEC-1 — AuthProvider purges cross-user scan state on login', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    localStorage.clear();
     vi.resetModules();
   });
 
@@ -80,6 +81,47 @@ describe('SEC-1 — AuthProvider purges cross-user scan state on login', () => {
     expect(afterStore.getScanState().status).toBe('idle');
     expect(afterStore.getScanState().result).toBeNull();
     expect(sessionStorage.getItem('estia-yad2-last-scan')).toBeNull();
+  });
+
+  it('login() clears the AI chat transcript left by a previous user', async () => {
+    // Seed "User A had an AI chat conversation".
+    localStorage.setItem('estia-ai-chat-v1', JSON.stringify([
+      { role: 'user', content: 'מה הלידים שלי?' },
+      { role: 'assistant', content: 'יש לך 4 לידים חמים…' },
+    ]));
+
+    const { AuthProvider, useAuth } = await importAuth();
+    let authHandle;
+    function Probe() { authHandle = useAuth(); return null; }
+    await act(async () => {
+      render(<AuthProvider><Probe /></AuthProvider>);
+    });
+
+    await act(async () => {
+      await authHandle.login({ email: 'b@example.com', password: 'x' });
+    });
+
+    expect(localStorage.getItem('estia-ai-chat-v1')).toBeNull();
+  });
+
+  it('logout() clears the AI chat transcript before the next user signs in', async () => {
+    localStorage.setItem('estia-ai-chat-v1', JSON.stringify([
+      { role: 'user', content: 'תכין הודעת תזכורת' },
+      { role: 'assistant', content: 'בטח! …' },
+    ]));
+
+    const { AuthProvider, useAuth } = await importAuth();
+    let authHandle;
+    function Probe() { authHandle = useAuth(); return null; }
+    await act(async () => {
+      render(<AuthProvider><Probe /></AuthProvider>);
+    });
+
+    await act(async () => {
+      await authHandle.logout();
+    });
+
+    expect(localStorage.getItem('estia-ai-chat-v1')).toBeNull();
   });
 
   it('logout() clears scan state before the next user signs in', async () => {
