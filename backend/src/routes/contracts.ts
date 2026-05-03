@@ -166,6 +166,14 @@ async function renderContractPdf(contract: {
   signedAt: Date | null;
   signatureName: string | null;
   signatureHash: string | null;
+  // 2026-05-03 — chain-of-custody fields rendered in the audit-trail
+  // block on signed PDFs. All optional/nullable: legacy contracts
+  // signed before these were captured render with the existing block.
+  documentHash?: string | null;
+  signedIp?: string | null;
+  signedUserAgent?: string | null;
+  consentText?: string | null;
+  consentAcceptedAt?: Date | null;
   createdAt: Date;
 }, agent: {
   displayName: string | null;
@@ -347,6 +355,60 @@ async function renderContractPdf(contract: {
       doc.text(`Hash: ${contract.signatureHash.slice(0, 32)}…`, M, doc.y + 1, {
         width: innerW, align: 'center',
       });
+    }
+    // 2026-05-03 — chain-of-custody audit block. Rendered only when at
+    // least one tier-2 evidence field is populated (legacy signed rows
+    // have all five = null and the existing layout above is preserved).
+    // Hebrew labels per Israeli court convention; values stay LTR for
+    // technical fields (IP, hash, UA) so RTL shaping doesn't mangle them.
+    const hasAudit =
+      contract.documentHash ||
+      contract.signedIp ||
+      contract.signedUserAgent ||
+      contract.consentAcceptedAt;
+    if (hasAudit) {
+      const auditY = doc.y + 14;
+      doc.strokeColor(RULE_LIGHT).lineWidth(0.5)
+         .moveTo(M, auditY).lineTo(PAGE_W - M, auditY).stroke();
+      doc.y = auditY + 8;
+      doc.font('He-Bold').fontSize(9).fillColor(GOLD_DEEP);
+      doc.text(rtl('שרשרת ראיות (חוק חתימה אלקטרונית, תשס"א-2001)'), M, doc.y, {
+        width: innerW, align: 'right', features: ['rtla', 'rtlm'],
+      });
+      doc.font('He').fontSize(8).fillColor(INK_MUTED);
+      const auditRow = (label: string, value: string, ltr = false) => {
+        const text = ltr ? `${label}: ${value}` : rtl(`${label}: ${value}`);
+        doc.text(text, M, doc.y + 2, {
+          width: innerW, align: 'right',
+          features: ltr ? [] : ['rtla', 'rtlm'],
+        });
+      };
+      if (contract.documentHash) {
+        auditRow('Document SHA-256', contract.documentHash, true);
+      }
+      if (contract.signedIp) {
+        auditRow('IP בעת חתימה', contract.signedIp, true);
+      }
+      if (contract.signedUserAgent) {
+        // Truncate UA to a single line — full string is in the DB row
+        // for forensic purposes; PDF shows the recognisable prefix.
+        const uaShort = contract.signedUserAgent.length > 80
+          ? contract.signedUserAgent.slice(0, 80) + '…'
+          : contract.signedUserAgent;
+        auditRow('דפדפן/מכשיר', uaShort, true);
+      }
+      if (contract.consentAcceptedAt) {
+        auditRow('הסכמה נתקבלה', formatIlDateTime(contract.consentAcceptedAt));
+      }
+      if (contract.consentText) {
+        doc.fontSize(7.5).fillColor(INK_MUTED);
+        const cText = contract.consentText.length > 220
+          ? contract.consentText.slice(0, 220) + '…'
+          : contract.consentText;
+        doc.text(rtl(`נוסח ההסכמה שהוצג: "${cText}"`), M, doc.y + 4, {
+          width: innerW, align: 'right', features: ['rtla', 'rtlm'],
+        });
+      }
     }
   } else {
     // Unsigned watermark.
