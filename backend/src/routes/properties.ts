@@ -540,14 +540,22 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       const x = await prisma.property.findFirst({ where: { agentId, slug: cand } });
       return !!x;
     });
+    // Prisma 5 strictly distinguishes "checked" (relation form, e.g.
+    // `agent: { connect: ... }`) from "unchecked" (FK scalar, e.g.
+    // `agentId: "..."`) create inputs and rejects mixing the two on a
+    // single create. The duplicate payload spreads `agentId` from the
+    // source row, which forces Prisma into the unchecked branch — in
+    // that branch `propertyOwner: { connect: ... }` is rejected as an
+    // "Unknown argument". Prior code mixed the forms and 500'd in prod
+    // (2026-05-03) any time a source row had a linked Owner. Re-passing
+    // `propertyOwnerId` directly keeps the whole create on the unchecked
+    // branch the rest of the data is already in.
     const created = await prisma.property.create({
       data: {
         ...payload,
         slug: newSlug,
         status: 'ACTIVE',
-        // Inherit the seller/landlord row when present — relation form is
-        // mandatory; the FK scalar was stripped above.
-        ...(srcOwnerId ? { propertyOwner: { connect: { id: srcOwnerId } } } : {}),
+        ...(srcOwnerId ? { propertyOwnerId: srcOwnerId } : {}),
         // Mark the copy so agents eyeballing the list see it instantly.
         notes: payload.notes ? `${payload.notes}\n\n(עותק)` : '(עותק)',
         marketingStartDate: new Date(),
