@@ -41,6 +41,13 @@ services:
                                  # the newest image for the tag, so a
                                  # re-push of `:main` without a SHA
                                  # change still lands.
+    # Memory cap so a runaway request / Playwright leak gets the
+    # container OOM-killed (and restarted by `restart: unless-stopped`)
+    # instead of locking up the host. Sized for a Playwright burst on
+    # the 2 GB t3.small. Soft reservation under the cap to keep the
+    # scheduler happy when 3 replicas run.
+    mem_limit: 800m
+    mem_reservation: 500m
 
   frontend:
     image: ghcr.io/tf7192/estia-frontend:${ESTIA_TAG:-main}
@@ -52,6 +59,8 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
     pull_policy: always
+    mem_limit: 128m
+    mem_reservation: 64m
 
   # Market Discovery (2026-04-27) — hourly Yad2 metadata watcher.
   # Separate container by design (per spec): the CRM keeps working
@@ -91,6 +100,11 @@ services:
       options: { max-size: "20m", max-file: "5" }
     pull_policy: always
     stop_grace_period: 30s
+    # Cap memory so a Chromium leak in the watcher gets killed instead
+    # of taking down the host. Watcher runs hourly so a kill+restart
+    # is harmless — next tick picks up where this one left off.
+    mem_limit: 700m
+    mem_reservation: 350m
     # Chromium needs proper /dev/shm headroom in containers. Default
     # Docker /dev/shm is 64MB which causes hangs on JS-heavy pages
     # (Reblaze JS challenge stalls). 1GB matches Playwright's
