@@ -379,7 +379,7 @@ export default function ProspectDialog({ property, onClose, onCreated }) {
           {digital && (
             <footer className="pdg-foot">
               <button className="btn btn-secondary" onClick={onClose}>סיימתי</button>
-              <button className="btn btn-primary" onClick={shareViaWA}>
+              <button className="btn btn-whatsapp" onClick={shareViaWA}>
                 <Send size={14} /> שלח ב-WhatsApp
               </button>
             </footer>

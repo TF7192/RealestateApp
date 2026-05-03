@@ -448,7 +448,7 @@ export default function ShareDialog({ kind = 'property', entity, onClose }) {
               type="button"
               data-channel="whatsapp"
               onClick={handleWhatsApp}
-              style={primaryBtn()}
+              style={whatsappBtn()}
             >
               <MessageCircle size={14} />
               שלח בוואטסאפ
@@ -556,6 +556,18 @@ function primaryBtn() {
     cursor: 'pointer', fontSize: 13, fontWeight: 800,
     display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
     boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+  };
+}
+
+function whatsappBtn() {
+  return {
+    ...FONT,
+    background: 'linear-gradient(135deg, #25d366 0%, #128c7e 100%)',
+    border: 'none', color: '#fff',
+    padding: '10px 14px', borderRadius: 10,
+    cursor: 'pointer', fontSize: 13, fontWeight: 800,
+    display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 4px 10px rgba(37, 211, 102, 0.32)',
   };
 }
 

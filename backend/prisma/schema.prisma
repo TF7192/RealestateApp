@@ -492,6 +492,8 @@ model User {
   leadAssignments        LeadAgent[]                   @relation("LeadAssignments")
   // Sprint 5 / MLS parity — Task J10.
   propertyAssignments    PropertyAssignee[]            @relation("PropertyAssigneeUser")
+  // 2026-05-03 — per-property external broker contacts owned by this agent.
+  propertyBrokers        PropertyBroker[]              @relation("AgentPropertyBrokers")
   // Sprint 6 / MLS parity — Task F1.
   adverts                Advert[]                      @relation("AgentAdverts")
   // Sprint 7 / MLS parity — Tasks B3, B4.
@@ -647,6 +649,11 @@ model Property {
   owner                      String
   ownerPhone                 String
   ownerEmail                 String?
+  // 2026-05-03 — optional Israeli national-ID number for the property owner.
+  // Optional because most listings are captured before the agent has it; can
+  // be filled in later for contracts / due diligence. Stored as plain string
+  // (no validation here) to allow non-Israeli IDs (passports) when needed.
+  ownerNationalId            String?
   exclusiveStart             DateTime?                  @db.Timestamptz(6)
   exclusiveEnd               DateTime?                  @db.Timestamptz(6)
   marketingPrice             Int
@@ -678,10 +685,15 @@ model Property {
   parkingTandem              Boolean                    @default(false) // עוקבות
   parkingEvCharger           Boolean                    @default(false)
   nearbyParking              Boolean                    @default(false) // Commercial: public parking nearby
+  // 2026-05-03 — Commercial extras pricing. Total = marketingPrice +
+  // (parkingPricePerSpot × parkingCount) + storagePrice. Computed in
+  // the FE display rather than stored so legacy rows stay untouched.
+  parkingPricePerSpot        Int?
   // ── Storage ─────────────────────────────────────────────────
   storage                    Boolean                    @default(false)
   storageLocation            String? // "attached" | "basement"
   storageSize                Int?
+  storagePrice               Int?
   // ────────────────────────────────────────────────────────────
   balconySize                Int                        @default(0)
   // 1.1 — sub-option surfaced in the form only when balconySize > 0.
@@ -819,6 +831,8 @@ model Property {
   prospects        Prospect[]
   reminders        Reminder[]
   assignees        PropertyAssignee[]
+  // 2026-05-03 — external broker contacts the agent is coordinating with on this listing.
+  brokers          PropertyBroker[]
   adverts          Advert[]
   // Sprint 6 — in-house digital contracts attached to this property.
   contracts        Contract[]
@@ -1671,6 +1685,31 @@ model PropertyAssignee {
   @@index([userId])
 }
 
+// 2026-05-03 — per-property broker/colleague contacts. Independent of the
+// `User`-based PropertyAssignee table (which links Estia agents who share
+// the listing). PropertyBroker is for *external* brokers / colleagues —
+// people the agent is coordinating with on this specific property who do
+// not have an Estia account. Cascade on property delete: if the asset is
+// gone, its private broker list goes with it.
+model PropertyBroker {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  agentId    String
+  agent      User     @relation("AgentPropertyBrokers", fields: [agentId], references: [id], onDelete: Cascade)
+  name       String
+  phone      String?
+  email      String?
+  agency     String?
+  expertise  String?
+  notes      String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([propertyId])
+  @@index([agentId])
+}
+
 // Sprint 5 / MLS parity — Task H3. Agent-scoped activity log. Records
 // who did what to which entity so the UI can render a recent-activity
 // timeline and office owners can audit their agents' moves. FKs are
@@ -1858,6 +1897,20 @@ model Contract {
   signedAt      DateTime? @db.Timestamptz(6)
   signatureName String? // the typed-to-sign text
   signatureHash String?
+  // 2026-05-03 — chain-of-custody fields for tier-2 admissibility under
+  // חוק חתימה אלקטרונית, התשס"א-2001. All nullable: legacy rows stay valid.
+  // `documentHash` is SHA-256 of body+title at sign time and is the
+  // canonical tamper-evidence — a post-signing edit to `body` no longer
+  // matches this hash. `signedIp` / `signedUserAgent` capture the device
+  // fingerprint at the moment of signing. `consentText` snapshots the
+  // exact consent paragraph the signer was shown (so we can prove what
+  // they accepted, even if the wording changes later); `consentAcceptedAt`
+  // is set when the signer checks the consent box.
+  documentHash       String?
+  signedIp           String?
+  signedUserAgent    String?
+  consentText        String?
+  consentAcceptedAt  DateTime? @db.Timestamptz(6)
   createdAt     DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
 

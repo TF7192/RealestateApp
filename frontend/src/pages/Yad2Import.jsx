@@ -187,9 +187,14 @@ export default function Yad2Import() {
             to="/properties"
             aria-label="חזרה לנכסים"
             style={{
-              ...FONT, display: 'inline-flex', alignItems: 'center', gap: 6,
-              color: DT.muted, textDecoration: 'none', fontSize: 12, fontWeight: 600,
-              marginBottom: 8,
+              ...FONT, display: 'inline-flex', alignItems: 'center', gap: 8,
+              color: DT.ink, textDecoration: 'none', fontSize: 13, fontWeight: 800,
+              background: DT.white,
+              border: `1px solid ${DT.border}`,
+              borderRadius: 999,
+              padding: '8px 16px',
+              boxShadow: '0 1px 3px rgba(30,26,20,0.06)',
+              marginBottom: 12,
             }}
           >
             <ArrowRight size={14} />

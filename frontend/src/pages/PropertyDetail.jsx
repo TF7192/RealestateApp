@@ -73,6 +73,7 @@ import MatchingList from '../components/MatchingList';
 import AiMatchesDrawer from '../components/AiMatchesDrawer';
 import ActivityPanel from '../components/ActivityPanel';
 import PropertyAgreementsSection from '../components/PropertyAgreementsSection';
+import PropertyBrokersCard from '../components/PropertyBrokersCard';
 import { useCopyFeedback, useViewportMobile } from '../hooks/mobile';
 import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/share';
 import { isNative } from '../native/platform';
@@ -111,8 +112,15 @@ const PD_DT = {
   },
   backLink: {
     ..._FONT,
-    display: 'inline-flex', alignItems: 'center', gap: 6,
-    color: _DT.muted, textDecoration: 'none', fontSize: 13, fontWeight: 700,
+    display: 'inline-flex', alignItems: 'center', gap: 8,
+    color: _DT.ink, textDecoration: 'none',
+    fontSize: 13, fontWeight: 800,
+    background: _DT.white,
+    border: `1px solid ${_DT.border}`,
+    borderRadius: 999,
+    padding: '8px 16px',
+    boxShadow: '0 1px 3px rgba(30,26,20,0.06)',
+    transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
   },
   actionsRow: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   primaryBtn: {
@@ -1061,6 +1069,12 @@ export default function PropertyDetail() {
         />
       )}
 
+      {/* 2026-05-03 — Per-property external broker contacts. Card on the
+          asset page so the agent can see (and quickly call/WhatsApp) the
+          colleagues they're coordinating with on this specific listing.
+          The "+ הוסף קולגה" button opens a popup form to add a new one. */}
+      <PropertyBrokersCard propertyId={property.id} />
+
       {/* P-3 — Signed brokerage agreements for this asset. Hides
           itself when there are no signed prospects so the card doesn't
           clutter fresh listings. */}
@@ -1690,7 +1704,7 @@ export default function PropertyDetail() {
                     <button
                       type="button"
                       onClick={() => openWhatsApp({ phone: ownerPhone, text: `שלום ${ownerName}` })}
-                      className="btn btn-primary"
+                      className="btn btn-whatsapp"
                     >
                       <WhatsAppIcon size={14} />וואטסאפ
                     </button>
@@ -1775,13 +1789,18 @@ export default function PropertyDetail() {
                 ))}
               </div>
             )}
-            {property.notes ? (
-              <div className="pd-panel-notes-body">
-                <h5>טקסט חופשי</h5>
-                <p>{property.notes}</p>
-              </div>
-            ) : (
-              <p className="dc-empty">לא הוזנו הערות.</p>
+            {/* 2026-05-03 — inline free-text editor for the marketing description.
+                Was: agents had to leave this page and go to /edit to add a
+                description. Now they can type directly and save without a
+                round-trip. AI generation still lives below. */}
+            <NotesInlineEditor
+              propertyId={property.id}
+              initial={property.notes || ''}
+              onSaved={() => load()}
+              toast={toast}
+            />
+            {property.notes ? null : (
+              <p className="dc-empty" style={{ marginTop: 8 }}>טרם נוסף תיאור — הזן טקסט חופשי למעלה או הפק תיאור ב-AI מתחת.</p>
             )}
             {/* Sprint 5 — AI description generator. Draft preview block
                 appears only after a successful generate; the agent can
@@ -2133,7 +2152,7 @@ export default function PropertyDetail() {
         </a>
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn btn-whatsapp"
           onClick={handleWhatsApp}
           aria-label={`WhatsApp ${property.street}`}
         >
@@ -2528,6 +2547,62 @@ export function VideoTile({ video }) {
       <span>▶ צפה בסרטון</span>
       <small>{video.title || video.url}</small>
     </a>
+  );
+}
+
+// Inline free-text description editor for the property page. Lets the agent
+// type a Yad2-style description directly without leaving the page; saves
+// via PATCH /properties/:id with `notes`.
+function NotesInlineEditor({ propertyId, initial, onSaved, toast }) {
+  const [value, setValue] = useState(initial || '');
+  const [saving, setSaving] = useState(false);
+  const dirty = value !== (initial || '');
+  useEffect(() => { setValue(initial || ''); }, [initial]);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.updateProperty(propertyId, { notes: value.trim() || null });
+      toast?.success?.(value.trim() ? 'התיאור נשמר' : 'התיאור נמחק');
+      onSaved?.();
+    } catch (e) {
+      toast?.error?.(e?.message || 'שמירת התיאור נכשלה');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="pd-panel-notes-editor" style={{ marginBottom: 12 }}>
+      <h5 style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 800 }}>תיאור הנכס (טקסט חופשי)</h5>
+      <textarea
+        className="form-textarea"
+        rows={5}
+        dir="auto"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="כתוב תיאור שיווקי כמו ביד 2 — מיקום, אופי הדירה, מה מיוחד בה, סביבת המגורים, וכו׳"
+        style={{ width: '100%', resize: 'vertical' }}
+      />
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={save}
+          disabled={!dirty || saving}
+        >
+          {saving ? 'שומר…' : 'שמור תיאור'}
+        </button>
+        {dirty && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setValue(initial || '')}
+            disabled={saving}
+          >
+            בטל שינויים
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -876,6 +876,19 @@ tbody tr:last-child td {
 .wa-bg      { background: #25d366 !important; color: #fff !important; }
 .wa-border  { border-color: #25d366 !important; }
 
+/* Canonical WhatsApp button — pair with .btn (and optionally .btn-sm/.btn-lg).
+ * Use everywhere a button's primary action is "send/open WhatsApp" so the
+ * brand-green color signals the channel. */
+.btn.btn-whatsapp {
+  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  color: #fff;
+  border-color: #128c7e;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.32);
+}
+.btn.btn-whatsapp:hover { filter: brightness(1.05); }
+.btn.btn-whatsapp:active { filter: brightness(0.95); }
+.btn.btn-whatsapp:disabled { opacity: 0.55; cursor: not-allowed; filter: none; }
+
 /* P5-M4: safe-area helpers for pages that float CTAs */
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 .safe-top    { padding-top: env(safe-area-inset-top); }

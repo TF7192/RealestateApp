@@ -351,6 +351,29 @@
   gap: 6px;
 }
 
+/* Negative-style badges over the property cover image — solid dark fill
+ * with bright text so they read clearly against any photo background.
+ * The default `.badge-success/.badge-warning/.badge-gold/.badge-info`
+ * pastel-on-tint look from index.css blends into bright photos; the
+ * overrides below apply only inside `.property-badges` (cover image).
+ * Matching color accents are kept by tinting the text per category. */
+.property-badges .badge {
+  background: rgba(13, 15, 20, 0.82);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.property-badges .badge-warning { color: #ffd17a; } /* מסחרי */
+.property-badges .badge-success { color: #6fe0a3; } /* מגורים */
+.property-badges .badge-gold    { color: #f0c97a; } /* מכירה */
+.property-badges .badge-info    { color: #7dd3fc; } /* השכרה */
+
 .property-price-overlay {
   position: absolute;
   bottom: 0;

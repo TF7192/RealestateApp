@@ -237,7 +237,7 @@ export default function Leads() {
                   {lead.phone}
                 </a>
                 <button
-                  className="btn btn-sm btn-primary"
+                  className="btn btn-sm btn-whatsapp"
                   onClick={() => handleWhatsApp(lead)}
                 >
                   <MessageCircle size={14} />

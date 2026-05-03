@@ -42,6 +42,11 @@ export default function PropertyPipelineBlock({
   property,
   onSaved,
   toast,
+  // When true, hide the agent-commission % input — commercial intake
+  // captures commission via the dedicated tenant/landlord commission
+  // controls in NewProperty's "צנרת תיווך" block, so showing the
+  // simple % here is duplicative.
+  hideCommission = false,
 }) {
   const controlled = !!form;
   const [local, setLocal] = useState(() => ({
@@ -155,19 +160,21 @@ export default function PropertyPipelineBlock({
             aria-label="שלב הנכס"
           />
         </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="ppb-commission">עמלת סוכן (%)</label>
-          <NumberField
-            id="ppb-commission"
-            value={v.agentCommissionPct}
-            onChange={(val) => set('agentCommissionPct', val)}
-            unit="%"
-            min={0}
-            max={100}
-            placeholder="2"
-            aria-label="עמלת סוכן באחוזים"
-          />
-        </div>
+        {!hideCommission && (
+          <div className="form-group">
+            <label className="form-label" htmlFor="ppb-commission">עמלת סוכן (%)</label>
+            <NumberField
+              id="ppb-commission"
+              value={v.agentCommissionPct}
+              onChange={(val) => set('agentCommissionPct', val)}
+              unit="%"
+              min={0}
+              max={100}
+              placeholder="2"
+              aria-label="עמלת סוכן באחוזים"
+            />
+          </div>
+        )}
         {/* P-12 — "תאריך סיום בלעדיות" lived in two places: here, AND in
             the "בלעדיות והערות" section of NewProperty where it pairs
             with the start-date and the relative "+3m / +6m / +12m" chips.

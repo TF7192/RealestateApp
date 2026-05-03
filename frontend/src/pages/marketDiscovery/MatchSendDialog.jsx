@@ -113,7 +113,7 @@ export default function MatchSendDialog({ open, match, listing, onClose }) {
           </button>
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-whatsapp"
             onClick={open_wa}
             disabled={!phone || !text.trim()}
           >

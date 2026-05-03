@@ -176,10 +176,17 @@
   outline-offset: 2px;
 }
 
+.ap-contact-chip.whatsapp {
+  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  border-color: #128c7e;
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(37, 211, 102, 0.3);
+}
 .ap-contact-chip.whatsapp:hover {
-  border-color: rgba(37, 211, 102, 0.4);
-  background: rgba(37, 211, 102, 0.1);
-  color: #25d366;
+  border-color: #128c7e;
+  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  color: #fff;
+  filter: brightness(1.05);
 }
 
 /* Filters */

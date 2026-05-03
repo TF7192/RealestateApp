@@ -92,10 +92,29 @@ export default function PropertyHero({
     fn?.();
   };
 
+  // Compact key-fact list shown next to the price so the agent can read
+  // the property's headline numbers without scrolling. Order: rooms,
+  // sqm (with net/gross variant when present), floor, parking count.
+  // Each entry is opt-in (skipped when the field is null) so listings
+  // with sparse data don't show empty separators.
   const summaryParts = [];
   if (property.rooms != null) summaryParts.push(`${property.rooms} חד׳`);
-  if (property.sqm) summaryParts.push(`${property.sqm} מ״ר`);
+  if (property.sqm) {
+    if (property.sqmNet && property.sqmGross && property.sqmNet !== property.sqmGross) {
+      summaryParts.push(`${property.sqmNet}/${property.sqmGross} מ״ר נטו/ברוטו`);
+    } else if (property.sqmNet) {
+      summaryParts.push(`${property.sqmNet} מ״ר נטו`);
+    } else {
+      summaryParts.push(`${property.sqm} מ״ר`);
+    }
+  }
   if (property.floor != null) summaryParts.push(`קומה ${formatFloor(property.floor, property.totalFloors)}`);
+  if (property.parking) {
+    summaryParts.push(property.parkingCount ? `${property.parkingCount} חניות` : 'חניה');
+  }
+  if (property.balconySize) summaryParts.push(`מרפסת ${property.balconySize} מ״ר`);
+  if (property.elevator) summaryParts.push('מעלית');
+  if (property.safeRoom) summaryParts.push('ממ״ד');
 
   return (
     <section className="ph-hero animate-in animate-in-delay-1">
@@ -211,6 +230,31 @@ export default function PropertyHero({
             {property.category === 'SALE' ? 'למכירה' : 'להשכרה'}
           </span>
         </div>
+        {/* 2026-05-03 — Commercial extras: per-spot parking + storage prices
+            roll up into an "all-in" total displayed below the marketing
+            price so agents and customers see the real headline number.
+            Skipped when there are no extras to add. */}
+        {property.assetClass === 'COMMERCIAL' && (() => {
+          const parkingTotal = (property.parkingPricePerSpot || 0) * (property.parkingCount || 0);
+          const storageTotal = property.storagePrice || 0;
+          const extrasTotal = parkingTotal + storageTotal;
+          if (!extrasTotal) return null;
+          const allIn = (property.marketingPrice || 0) + extrasTotal;
+          const breakdown = [];
+          if (parkingTotal) breakdown.push(`חניה ${formatPrice(parkingTotal)}`);
+          if (storageTotal) breakdown.push(`מחסן ${formatPrice(storageTotal)}`);
+          return (
+            <div className="ph-all-in" style={{
+              marginTop: 6, fontSize: 13, color: 'var(--text-secondary)',
+              fontWeight: 600,
+            }}>
+              <span>סה״כ כולל תוספות: <strong style={{ color: 'var(--text-primary)' }}>{formatPrice(allIn)}</strong></span>
+              {breakdown.length > 0 && (
+                <span style={{ marginInlineStart: 6, opacity: 0.75 }}>· {breakdown.join(' + ')}</span>
+              )}
+            </div>
+          );
+        })()}
         {summaryParts.length > 0 && (
           <div className="ph-summary">
             {summaryParts.join(' · ')}

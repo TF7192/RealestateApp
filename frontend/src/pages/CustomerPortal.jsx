@@ -533,7 +533,7 @@ export default function CustomerPortal({ onLogout, isPublic }) {
               <Phone size={20} />
               {agentProfile.phone}
             </a>
-            <button className="btn btn-primary btn-lg cp-contact-btn" onClick={handleContactWhatsApp}>
+            <button className="btn btn-whatsapp btn-lg cp-contact-btn" onClick={handleContactWhatsApp}>
               <MessageCircle size={20} />
               שלח הודעה בוואטסאפ
             </button>

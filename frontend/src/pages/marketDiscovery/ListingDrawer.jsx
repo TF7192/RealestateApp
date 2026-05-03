@@ -98,7 +98,7 @@ export default function ListingDrawer({ listing, onClose, onDuplicate, onOpenMin
                     {m.leadPhone && (
                       <button
                         type="button"
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-whatsapp btn-sm"
                         onClick={() => onSendToLead?.(m, listing)}
                       >
                         <MessageCircle size={14} /> שלח ב-WhatsApp

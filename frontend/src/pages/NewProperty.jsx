@@ -31,6 +31,7 @@ import { useDraftAutosave, readDraft } from '../hooks/mobile';
 import { relLabel } from '../lib/relativeDate';
 import {
   inputPropsForName,
+  inputPropsForContactName,
   inputPropsForCity,
   inputPropsForEmail,
 } from '../lib/inputProps';
@@ -167,6 +168,7 @@ const INITIAL_FORM = {
   owner: '',
   ownerPhone: '',
   ownerEmail: '',
+  ownerNationalId: '',
   propertyOwnerId: null,
   pickedOwner: null,
   marketingPrice: null,
@@ -214,10 +216,12 @@ const INITIAL_FORM = {
   parkingTandem: false,
   parkingEvCharger: false,
   nearbyParking: false,
+  parkingPricePerSpot: null,  // commercial — added to total price
   // Storage details
   storage: false,
   storageLocation: '',
   storageSize: null,
+  storagePrice: null,         // commercial — added to total price
   // Amenities + shelters
   ac: false,
   safeRoom: false,
@@ -289,10 +293,16 @@ const NP_STY = {
   pageShell: { ...FONT, padding: 28, color: NP_DT.ink, minHeight: '100%' },
   backLink: {
     ...FONT,
-    display: 'inline-flex', alignItems: 'center', gap: 6,
-    color: NP_DT.muted, textDecoration: 'none',
-    fontSize: 13, fontWeight: 700,
+    display: 'inline-flex', alignItems: 'center', gap: 8,
+    color: NP_DT.ink, textDecoration: 'none',
+    fontSize: 13, fontWeight: 800,
+    background: NP_DT.white,
+    border: `1px solid ${NP_DT.border}`,
+    borderRadius: 999,
+    padding: '8px 16px',
+    boxShadow: '0 1px 3px rgba(30,26,20,0.06)',
     marginBottom: 14,
+    transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
   },
   headerCard: {
     ...FONT,
@@ -558,6 +568,7 @@ export default function NewProperty() {
           owner: p.owner || '',
           ownerPhone: p.ownerPhone || '',
           ownerEmail: p.ownerEmail || '',
+          ownerNationalId: p.ownerNationalId || '',
           propertyOwnerId: p.propertyOwnerId || null,
           pickedOwner: null,
           marketingPrice: p.marketingPrice ?? null,
@@ -595,6 +606,7 @@ export default function NewProperty() {
           parking: !!p.parking,
           parkingType: p.parkingType || '',
           parkingCount: p.parkingCount ?? null,
+          parkingPricePerSpot: p.parkingPricePerSpot ?? null,
           parkingCovered: !!p.parkingCovered,
           parkingCoupled: !!p.parkingCoupled,
           parkingTandem: !!p.parkingTandem,
@@ -603,6 +615,7 @@ export default function NewProperty() {
           storage: !!p.storage,
           storageLocation: p.storageLocation || '',
           storageSize: p.storageSize ?? null,
+          storagePrice: p.storagePrice ?? null,
           ac: !!p.ac,
           safeRoom: !!p.safeRoom,
           floorShelter: !!p.floorShelter,
@@ -815,6 +828,9 @@ export default function NewProperty() {
       body.ownerPhone = phoneRaw ? (toE164(phoneRaw) ?? phoneRaw) : '';
       if (form.ownerEmail) body.ownerEmail = form.ownerEmail;
     }
+    // National ID is independent of the owner-link path: it lives on the
+    // Property row itself so existing-Owner picks can still attach a fresh ID.
+    body.ownerNationalId = form.ownerNationalId ? String(form.ownerNationalId).trim() : null;
     return body;
   };
   const buildStep2Body = () => ({
@@ -854,6 +870,7 @@ export default function NewProperty() {
     parking: !!form.parking,
     parkingType: form.parkingType || null,
     parkingCount: numOrNull(form.parkingCount),
+    parkingPricePerSpot: numOrNull(form.parkingPricePerSpot),
     parkingCovered: !!form.parkingCovered,
     parkingCoupled: !!form.parkingCoupled,
     parkingTandem: !!form.parkingTandem,
@@ -863,6 +880,7 @@ export default function NewProperty() {
     storage: !!form.storage,
     storageLocation: form.storageLocation || null,
     storageSize: numOrNull(form.storageSize),
+    storagePrice: numOrNull(form.storagePrice),
     // Shelters + amenities
     ac: !!form.ac,
     safeRoom: !!form.safeRoom,
@@ -1173,7 +1191,7 @@ export default function NewProperty() {
       )}
 
       {step === 1 ? (
-        <form id="np-form-step1" onSubmit={saveStep1} className="intake-form animate-in animate-in-delay-2" style={NP_STY.stepBody}>
+        <form id="np-form-step1" onSubmit={saveStep1} autoComplete="off" className="intake-form animate-in animate-in-delay-2" style={NP_STY.stepBody}>
           <div className="form-section">
             <h3 className="form-section-title">סיווג ומחיר</h3>
             <div className="form-row form-row-3">
@@ -1423,7 +1441,7 @@ export default function NewProperty() {
               <div className="form-group">
                 <label className="form-label">שם מלא של בעל הנכס</label>
                 <input
-                  {...inputPropsForName()}
+                  {...inputPropsForContactName()}
                   className="form-input"
                   value={form.owner}
                   onChange={(e) => {
@@ -1450,7 +1468,7 @@ export default function NewProperty() {
                 />
               </div>
             </div>
-            <div className="form-row">
+            <div className="form-row form-row-2">
               <div className="form-group">
                 <label className="form-label">אימייל (אופציונלי)</label>
                 <input
@@ -1459,6 +1477,22 @@ export default function NewProperty() {
                   value={form.ownerEmail || ''}
                   onChange={(e) => update('ownerEmail', e.target.value)}
                   placeholder="owner@example.com"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">תעודת זהות (אופציונלי)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  name="estia-owner-national-id"
+                  className="form-input"
+                  value={form.ownerNationalId || ''}
+                  onChange={(e) => update('ownerNationalId', e.target.value)}
+                  placeholder="123456789"
+                  dir="ltr"
+                  style={{ textAlign: 'right' }}
+                  maxLength={20}
                 />
               </div>
             </div>
@@ -1473,7 +1507,7 @@ export default function NewProperty() {
           </div>
         </form>
       ) : (
-        <form id="np-form-step2" onSubmit={saveStep2} className="intake-form animate-in animate-in-delay-2" style={NP_STY.stepBody}>
+        <form id="np-form-step2" onSubmit={saveStep2} autoComplete="off" className="intake-form animate-in animate-in-delay-2" style={NP_STY.stepBody}>
           {isEdit && (
             <AiEditPanel
               propertyId={propertyId}
@@ -1631,14 +1665,13 @@ export default function NewProperty() {
                     />
                   </div>
                 </div>
-                <div className="form-row form-row-3">
-                  <div className="form-group">
-                    <label className="form-label">שטח ארנונה (מ״ר)</label>
-                    <NumberField unit="מ״ר" placeholder="115" value={form.sqmArnona} onChange={(v) => update('sqmArnona', v)} />
-                  </div>
-                  {/* 3.3 — טאבו was removed from commercial per brief; the
-                      legacy sqmTabu column stays in the DB so existing rows
-                      don't lose data, but the field no longer renders here. */}
+                {/* 3.3 — טאבו was removed from commercial per brief; the
+                    legacy sqmTabu column stays in the DB so existing rows
+                    don't lose data, but the field no longer renders here.
+                    "שטח ארנונה" was also removed (2026-05-03 sprint) — the
+                    monthly arnona price field below covers this need; the
+                    sqmArnona column stays in the DB for legacy data. */}
+                <div className="form-row form-row-2">
                   <div className="form-group">
                     <label className="form-label">מספר עמדות ישיבה</label>
                     <NumberField placeholder="12" value={form.workstations} onChange={(v) => update('workstations', v)} />
@@ -1658,15 +1691,14 @@ export default function NewProperty() {
                 </div>
               </>
             ) : (
-              <div className="form-row form-row-2">
+              <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">מ״ר טאבו</label>
                   <NumberField unit="מ״ר" placeholder="120" value={form.sqmTabu} onChange={(v) => update('sqmTabu', v)} />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">מ״ר ארנונה</label>
-                  <NumberField unit="מ״ר" placeholder="115" value={form.sqmArnona} onChange={(v) => update('sqmArnona', v)} />
-                </div>
+                {/* "מ״ר ארנונה" removed 2026-05-03 — the monthly arnona price
+                    field elsewhere on this form covers this need; sqmArnona
+                    column stays in the DB for legacy data. */}
               </div>
             )}
             <div className="checkbox-grid">
@@ -1755,6 +1787,17 @@ export default function NewProperty() {
                   </label>
                 ))}
               </div>
+              {/* 2026-05-03 — commercial-only: per-spot parking price.
+                  Multiplied by parkingCount on display to add to the
+                  property's total all-in price. Hidden for residential. */}
+              {isCommercial && (
+                <div className="form-row form-row-2">
+                  <div className="form-group">
+                    <label className="form-label">מחיר חניה (לכל חניה, ₪)</label>
+                    <NumberField unit="₪" placeholder="80000" min={0} value={form.parkingPricePerSpot} onChange={(v) => update('parkingPricePerSpot', v)} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1779,6 +1822,16 @@ export default function NewProperty() {
                   <NumberField unit="מ״ר" placeholder="4" min={0} max={200} value={form.storageSize} onChange={(v) => update('storageSize', v)} />
                 </div>
               </div>
+              {/* 2026-05-03 — commercial-only: storage price.
+                  Added to the property's total all-in price on display. */}
+              {isCommercial && (
+                <div className="form-row form-row-2">
+                  <div className="form-group">
+                    <label className="form-label">מחיר מחסן (₪)</label>
+                    <NumberField unit="₪" placeholder="50000" min={0} value={form.storagePrice} onChange={(v) => update('storagePrice', v)} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2000,6 +2053,7 @@ export default function NewProperty() {
               }}
               onChange={update}
               toast={toast}
+              hideCommission={isCommercial}
             />
             {/* 2026-04-26 — Rental-brokerage commission shape. The
                 pct field above stays for sale + percentage flows;

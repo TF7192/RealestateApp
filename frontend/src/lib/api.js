@@ -289,6 +289,15 @@ export const api = {
   // 2026-04-26 — Free-form Hebrew instruction → AI-extracted partial patch.
   aiEditProperty: (id, instruction) =>
     request(`/properties/${id}/ai-edit`, { method: 'POST', body: { instruction } }),
+  // 2026-05-03 — per-property external broker contacts.
+  listPropertyBrokers: (id) =>
+    request(`/properties/${id}/brokers`),
+  createPropertyBroker: (id, body) =>
+    request(`/properties/${id}/brokers`, { method: 'POST', body }),
+  updatePropertyBroker: (id, brokerId, body) =>
+    request(`/properties/${id}/brokers/${brokerId}`, { method: 'PATCH', body }),
+  deletePropertyBroker: (id, brokerId) =>
+    request(`/properties/${id}/brokers/${brokerId}`, { method: 'DELETE' }),
   // 2026-04-27 — Price offers received on a property.
   listPropertyOffers: (id) =>
     request(`/properties/${id}/offers`),

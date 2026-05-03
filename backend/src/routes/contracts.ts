@@ -106,6 +106,30 @@ function computeSignatureHash(
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 
+// SHA-256 of the contract body — the canonical tamper-evidence anchor
+// for tier-2 admissibility under חוק חתימה אלקטרונית, התשס"א-2001.
+// Computed at create time so the signed PDF can render the hash, and
+// any post-signing edit to `body` will fail to round-trip against this
+// stored value (we re-compute on demand and compare).
+function computeDocumentHash(title: string, body: string): string {
+  return crypto.createHash('sha256').update(`${title}\n${body}`).digest('hex');
+}
+
+// Best-effort client-IP extractor that respects upstream proxy chain.
+// EC2 fronts via nginx → Cloudflare so X-Forwarded-For is the source of
+// truth; we keep only the first hop (the actual client).
+function extractClientIp(req: { ip?: string; headers: Record<string, unknown> }): string | null {
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.length) {
+    return xff.split(',')[0]!.trim().slice(0, 64);
+  }
+  if (Array.isArray(xff) && xff.length) {
+    const first = xff[0];
+    return typeof first === 'string' ? first.trim().slice(0, 64) : null;
+  }
+  return req.ip ? String(req.ip).slice(0, 64) : null;
+}
+
 // Validation schemas. Bodies are bounded so a rogue payload can't blow
 // up the PDF buffer size.
 const CreateInput = z.object({
@@ -121,6 +145,11 @@ const CreateInput = z.object({
 
 const SignInput = z.object({
   signatureName: z.string().min(2).max(120),
+  // Consent text the signer was shown (snapshot at sign time so we can
+  // prove what they accepted, even if the wording changes later). Optional
+  // for back-compat with the old client; new sign UI always sends it.
+  consentText: z.string().max(2000).optional(),
+  consentAccepted: z.boolean().optional(),
 });
 
 // Render the contract to a PDF Buffer. Shared between the signed and
@@ -389,12 +418,16 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    const finalTitle = input.title ?? contractTypeLabel(input.type);
+    const finalBody  = input.body ?? DEFAULT_BODIES[input.type] ?? '';
+    const documentHash = computeDocumentHash(finalTitle, finalBody);
     const contract = await prisma.contract.create({
       data: {
         agentId:     u.id,
         type:        input.type,
-        title:       input.title ?? contractTypeLabel(input.type),
-        body:        input.body ?? DEFAULT_BODIES[input.type] ?? '',
+        title:       finalTitle,
+        body:        finalBody,
+        documentHash,
         signerName:  input.signerName,
         signerPhone: input.signerPhone ?? null,
         signerEmail: input.signerEmail && input.signerEmail !== '' ? input.signerEmail : null,
@@ -476,9 +509,30 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
     const signedAt = new Date();
     const signatureName = parsed.data.signatureName.trim();
     const signatureHash = computeSignatureHash(contract.id, signatureName, signedAt);
+    // Tier-2 evidence capture (חוק חתימה אלקטרונית, התשס"א-2001):
+    //   - signedIp / signedUserAgent: device fingerprint at moment of sign
+    //   - consentText: snapshot of the consent paragraph the signer was
+    //     shown (so we can prove what they accepted, even if our wording
+    //     changes later)
+    //   - consentAcceptedAt: only set when the signer ticked the box
+    // documentHash was already captured at create time — kept on the row
+    // so any post-signing edit to body fails to round-trip.
+    const signedIp = extractClientIp(req);
+    const ua = req.headers['user-agent'];
+    const signedUserAgent = typeof ua === 'string' ? ua.slice(0, 512) : null;
+    const consentText = parsed.data.consentText?.trim() || null;
+    const consentAcceptedAt = parsed.data.consentAccepted ? signedAt : null;
     const updated = await prisma.contract.update({
       where: { id },
-      data: { signedAt, signatureName, signatureHash },
+      data: {
+        signedAt,
+        signatureName,
+        signatureHash,
+        signedIp,
+        signedUserAgent,
+        consentText,
+        consentAcceptedAt,
+      },
     });
     return { contract: updated };
   });

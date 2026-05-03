@@ -23,6 +23,7 @@ import TagPicker from '../components/TagPicker';
 import RemindersPanel from '../components/RemindersPanel';
 import MatchingList from '../components/MatchingList';
 import AiMatchesDrawer from '../components/AiMatchesDrawer';
+import MultiPropertySendDialog from '../components/MultiPropertySendDialog';
 import CustomerEditDialog from '../components/CustomerEditDialog';
 import ActivityPanel from '../components/ActivityPanel';
 import MeetingSummarizerCard from '../components/MeetingSummarizerCard';
@@ -68,6 +69,9 @@ export default function CustomerDetail() {
   const [editOpen, setEditOpen] = useState(false);
   // Sprint 5 — "✨ התאמות חכמות" drawer open-state
   const [aiMatchesOpen, setAiMatchesOpen] = useState(false);
+  // 2026-05-03 — multi-property send: pick N properties and send all in
+  // a single WhatsApp message to this customer.
+  const [multiSendOpen, setMultiSendOpen] = useState(false);
   // Sprint 5 / AI — summariser card hangs off the most-recent meeting
   // for this lead. Reload with `loadLatestMeeting` after a summarize
   // roundtrip so the UI reflects the persisted row.
@@ -244,6 +248,18 @@ export default function CustomerDetail() {
             <Sparkles size={14} />
             <span>✨ התאמות חכמות</span>
           </button>
+          {/* 2026-05-03 — Send multiple matching properties in one WhatsApp
+              message. Distinct from "התאמות חכמות" (AI scoring) — this is
+              the agent's own pick from their listings. */}
+          <button
+            type="button"
+            onClick={() => { haptics.tap(); setMultiSendOpen(true); }}
+            className="btn btn-whatsapp btn-sm"
+            title="שלח מספר נכסים בוואטסאפ"
+          >
+            <MessageCircle size={14} />
+            <span>שלח נכסים</span>
+          </button>
           <button type="button" onClick={() => { haptics.tap(); setEditOpen(true); }} style={secondaryBtn()} title="ערוך פרטי לקוח">
             <Edit3 size={14} /> ערוך
           </button>
@@ -367,6 +383,12 @@ export default function CustomerDetail() {
         <AiMatchesDrawer
           leadId={lead.id}
           onClose={() => setAiMatchesOpen(false)}
+        />
+      )}
+      {multiSendOpen && (
+        <MultiPropertySendDialog
+          lead={lead}
+          onClose={() => setMultiSendOpen(false)}
         />
       )}
     </div>

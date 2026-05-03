@@ -154,7 +154,7 @@ export default function OwnerDetail() {
               <a
                 href={`https://wa.me/${owner.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`שלום ${owner.name}`)}`}
                 target="_blank" rel="noopener noreferrer"
-                style={secondaryBtn()} title="שלח בוואטסאפ"
+                style={whatsappBtn()} title="שלח בוואטסאפ"
               >
                 <MessageCircle size={14} /> וואטסאפ
               </a>
@@ -446,6 +446,18 @@ function secondaryBtn() {
     fontSize: 12, fontWeight: 700,
     display: 'inline-flex', gap: 5, alignItems: 'center', color: DT.ink,
     textDecoration: 'none',
+  };
+}
+function whatsappBtn() {
+  return {
+    ...FONT,
+    background: 'linear-gradient(135deg, #25d366 0%, #128c7e 100%)',
+    border: '1px solid #128c7e',
+    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 800,
+    display: 'inline-flex', gap: 5, alignItems: 'center', color: '#fff',
+    textDecoration: 'none',
+    boxShadow: '0 3px 8px rgba(37, 211, 102, 0.28)',
   };
 }
 function ghostBtn() {

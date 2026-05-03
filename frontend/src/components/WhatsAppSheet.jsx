@@ -79,7 +79,7 @@ export default function WhatsAppSheet({
               {copied ? <Check size={14} /> : <Copy size={14} />}
               {copied ? 'הועתק' : 'העתק'}
             </button>
-            <button className="btn btn-primary" onClick={openWhatsApp}>
+            <button className="btn btn-whatsapp" onClick={openWhatsApp}>
               <Send size={14} />
               פתח בוואטסאפ
             </button>

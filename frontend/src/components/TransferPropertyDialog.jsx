@@ -227,7 +227,7 @@ export default function TransferPropertyDialog({ property, onClose, onDone }) {
                 שלח בקשת העברה
               </button>
             ) : (
-              <button className="btn btn-primary" onClick={sendWhatsApp}>
+              <button className="btn btn-whatsapp" onClick={sendWhatsApp}>
                 <MessageCircle size={14} />
                 פתח בוואטסאפ
               </button>

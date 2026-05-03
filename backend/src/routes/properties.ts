@@ -95,6 +95,9 @@ const propertyInput = z.object({
   // Allow `''` defensively — current FE guards via `if (form.ownerEmail)`
   // but AI-edit / import paths can emit empty strings.
   ownerEmail: z.string().email().or(z.literal('')).nullable().optional(),
+  // 2026-05-03 — optional national ID (תעודת זהות) for the property owner.
+  // Free-form to allow passports / non-Israeli IDs.
+  ownerNationalId: z.string().max(40).nullable().optional(),
   // New: link this property to an existing Owner record (the canonical
   // persona table). When omitted, an Owner row is created/looked up from
   // the inline `owner` + `ownerPhone` fields.
@@ -134,10 +137,13 @@ const propertyInput = z.object({
   parkingTandem: z.boolean().optional(),
   parkingEvCharger: z.boolean().optional(),
   nearbyParking: z.boolean().optional(),
+  // 2026-05-03 — commercial extras pricing.
+  parkingPricePerSpot: z.number().int().nonnegative().nullable().optional(),
   // Storage
   storage: z.boolean().optional(),
   storageLocation: z.string().max(40).nullable().optional(),
   storageSize: z.number().int().nonnegative().nullable().optional(),
+  storagePrice: z.number().int().nonnegative().nullable().optional(),
   // Shelters & amenities
   balconySize: z.number().int().nonnegative().optional(),
   // 1.1 Balcony type sub-option — "SUNNY" (שמש) / "COVERED" (מקורה).
@@ -541,15 +547,14 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       return !!x;
     });
     // Prisma 5 strictly distinguishes "checked" (relation form, e.g.
-    // `agent: { connect: ... }`) from "unchecked" (FK scalar, e.g.
-    // `agentId: "..."`) create inputs and rejects mixing the two on a
-    // single create. The duplicate payload spreads `agentId` from the
-    // source row, which forces Prisma into the unchecked branch — in
-    // that branch `propertyOwner: { connect: ... }` is rejected as an
-    // "Unknown argument". Prior code mixed the forms and 500'd in prod
-    // (2026-05-03) any time a source row had a linked Owner. Re-passing
-    // `propertyOwnerId` directly keeps the whole create on the unchecked
-    // branch the rest of the data is already in.
+     // `agent: { connect: ... }`) from "unchecked" (FK scalar, e.g.
+     // `agentId: "..."`) create inputs and rejects the mix. The duplicate
+     // payload carries `agentId` from `...payload`, so we must use FK
+     // scalars for ALL relations on this create — no `propertyOwner:
+     // { connect }` form. Prior code mixed the two and 500'd in prod
+     // (2026-05-03: "Unknown argument `propertyOwner`. Did you mean
+     // `propertyOwnerId`?"). Re-passing `propertyOwnerId` directly keeps
+     // us in the unchecked branch the rest of the data is already in.
     const created = await prisma.property.create({
       data: {
         ...payload,
@@ -834,6 +839,95 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       agentId: prop.agentId, actorId: uid,
       verb: 'unassigned', entityType: 'Property', entityId: id,
       metadata: { userId },
+    });
+    return { ok: true };
+  });
+
+  // 2026-05-03 — per-property external broker contacts. Distinct from
+  // /assignees (Estia agents who share the listing): /brokers is for
+  // *outside* colleagues the agent is coordinating with on this listing.
+  // Owned by the agent — cross-agent reads return 404 via the ownership
+  // filter on the parent property.
+  const brokerInput = z.object({
+    name:      z.string().min(1).max(120),
+    phone:     z.string().max(40).nullable().optional(),
+    email:     z.string().email().max(200).nullable().optional().or(z.literal('')),
+    agency:    z.string().max(120).nullable().optional(),
+    expertise: z.string().max(120).nullable().optional(),
+    notes:     z.string().max(2000).nullable().optional(),
+  });
+  app.get('/:id/brokers', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const prop = await prisma.property.findFirst({ where: propertyOwnershipFilter(req, id) });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    const items = await prisma.propertyBroker.findMany({
+      where: { propertyId: id },
+      orderBy: { createdAt: 'asc' },
+    });
+    return { items };
+  });
+  app.post('/:id/brokers', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const uid = requireUser(req).id;
+    const prop = await prisma.property.findFirst({ where: propertyOwnershipFilter(req, id) });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    const body = brokerInput.parse(req.body);
+    const broker = await prisma.propertyBroker.create({
+      data: {
+        propertyId: id,
+        agentId:    prop.agentId,
+        name:       body.name.trim(),
+        phone:      body.phone?.trim() || null,
+        email:      body.email?.trim() || null,
+        agency:     body.agency?.trim() || null,
+        expertise:  body.expertise?.trim() || null,
+        notes:      body.notes?.trim() || null,
+      },
+    });
+    await logActivity({
+      agentId: prop.agentId, actorId: uid,
+      verb: 'added_broker', entityType: 'Property', entityId: id,
+      summary: `נוסף מתווך שותף: ${broker.name}`,
+      metadata: { brokerId: broker.id },
+    });
+    return { broker };
+  });
+  app.patch('/:id/brokers/:brokerId', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id, brokerId } = req.params as { id: string; brokerId: string };
+    const prop = await prisma.property.findFirst({ where: propertyOwnershipFilter(req, id) });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    const body = brokerInput.partial().parse(req.body);
+    const existing = await prisma.propertyBroker.findUnique({ where: { id: brokerId } });
+    if (!existing || existing.propertyId !== id) {
+      return reply.code(404).send({ error: { message: 'Broker not found' } });
+    }
+    const broker = await prisma.propertyBroker.update({
+      where: { id: brokerId },
+      data: {
+        ...(body.name      !== undefined ? { name:      body.name.trim() } : {}),
+        ...(body.phone     !== undefined ? { phone:     body.phone?.trim() || null } : {}),
+        ...(body.email     !== undefined ? { email:     body.email?.trim() || null } : {}),
+        ...(body.agency    !== undefined ? { agency:    body.agency?.trim() || null } : {}),
+        ...(body.expertise !== undefined ? { expertise: body.expertise?.trim() || null } : {}),
+        ...(body.notes     !== undefined ? { notes:     body.notes?.trim() || null } : {}),
+      },
+    });
+    return { broker };
+  });
+  app.delete('/:id/brokers/:brokerId', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id, brokerId } = req.params as { id: string; brokerId: string };
+    const uid = requireUser(req).id;
+    const prop = await prisma.property.findFirst({ where: propertyOwnershipFilter(req, id) });
+    if (!prop) return reply.code(404).send({ error: { message: 'Not found' } });
+    const existing = await prisma.propertyBroker.findUnique({ where: { id: brokerId } });
+    if (!existing || existing.propertyId !== id) {
+      return reply.code(404).send({ error: { message: 'Broker not found' } });
+    }
+    await prisma.propertyBroker.delete({ where: { id: brokerId } });
+    await logActivity({
+      agentId: prop.agentId, actorId: uid,
+      verb: 'removed_broker', entityType: 'Property', entityId: id,
+      metadata: { brokerId, name: existing.name },
     });
     return { ok: true };
   });

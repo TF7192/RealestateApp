@@ -45,39 +45,82 @@
   grid-template-columns: repeat(4, 1fr);
 }
 
-/* Toggle group */
+/* Toggle group — modernized 2026-05-03. Was: a hard-edged 4-cell row with
+ * a faint gold tint on the active state. Now: pill-shaped segmented
+ * control with a soft inner background, rounded inner buttons, and a
+ * lifted "active" pill that reads as a real selection rather than a
+ * subtle highlight. */
 .toggle-group {
-  display: flex;
-  gap: 0;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-input, rgba(180,139,76,0.06));
+  border: 1px solid var(--border-light, rgba(30,26,20,0.08));
+  border-radius: 999px;
+  width: 100%;
 }
 
 .toggle-btn {
   flex: 1;
-  padding: 10px 16px;
-  border: none;
-  background: var(--bg-input);
-  color: var(--text-secondary);
+  min-width: 0;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary, rgba(30,26,20,0.62));
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 999px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s, border-color 0.18s, transform 0.12s;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .toggle-btn + .toggle-btn {
-  border-right: 1px solid var(--border-light);
+  border-right: none; /* legacy divider no longer needed in pill layout */
 }
 
 .toggle-btn.active {
-  background: var(--gold-glow);
-  color: var(--gold);
-  font-weight: 600;
+  background: #fff;
+  color: var(--text-primary, #1e1a14);
+  border-color: var(--border-light, rgba(30,26,20,0.10));
+  box-shadow: 0 1px 3px rgba(30,26,20,0.08), 0 0 0 1px rgba(180,139,76,0.18) inset;
 }
 
 .toggle-btn:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255,255,255,0.5);
+  color: var(--text-primary, #1e1a14);
+}
+
+.toggle-btn:active:not(.active) {
+  transform: scale(0.97);
+}
+
+/* Priority-tone variants — color-code the active pill per priority level
+ * so the form reads at a glance: red = critical, amber = high, neutral
+ * = medium, muted = low. Inactive buttons stay neutral so the row is
+ * not a confetti of color when nothing is picked. */
+.toggle-group-priority .toggle-btn:nth-child(1).active {
+  background: linear-gradient(180deg, #fde6e6, #f9d3d3);
+  color: #b91c1c;
+  box-shadow: 0 1px 3px rgba(185,28,28,0.18), 0 0 0 1px rgba(185,28,28,0.22) inset;
+}
+.toggle-group-priority .toggle-btn:nth-child(2).active {
+  background: linear-gradient(180deg, #fdf0d8, #f8e2bb);
+  color: #b45309;
+  box-shadow: 0 1px 3px rgba(180,83,9,0.18), 0 0 0 1px rgba(180,83,9,0.22) inset;
+}
+.toggle-group-priority .toggle-btn:nth-child(3).active {
+  background: linear-gradient(180deg, #fff, #f7f3ec);
+  color: #1e1a14;
+  box-shadow: 0 1px 3px rgba(30,26,20,0.10), 0 0 0 1px rgba(180,139,76,0.30) inset;
+}
+.toggle-group-priority .toggle-btn:nth-child(4).active {
+  background: linear-gradient(180deg, #f0f3f6, #e6ebf0);
+  color: #475569;
+  box-shadow: 0 1px 3px rgba(71,85,105,0.14), 0 0 0 1px rgba(71,85,105,0.18) inset;
 }
 
 /* Checkbox */

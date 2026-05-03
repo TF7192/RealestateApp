@@ -103,6 +103,26 @@ export function inputPropsForName() {
   };
 }
 
+// For names of *third parties* in the CRM (property owner, contact, etc.) —
+// NOT the logged-in user. Chrome aggressively autofills any input whose
+// autoComplete is "name" with the user's saved address-book name, which
+// causes the form to start with a stale name pre-filled. The unique token
+// below is non-standard so Chrome (and Safari) won't match it against any
+// saved profile. `name` attribute is also randomized per render to defeat
+// Chrome's heuristic that ignores autoComplete on fields it has matched
+// before.
+export function inputPropsForContactName() {
+  return {
+    type: 'text',
+    autoComplete: 'off',
+    autoCapitalize: 'words',
+    autoCorrect: 'off',
+    spellCheck: false,
+    enterKeyHint: 'next',
+    name: 'estia-contact-name',
+  };
+}
+
 export function inputPropsForAddress() {
   return {
     type: 'text',

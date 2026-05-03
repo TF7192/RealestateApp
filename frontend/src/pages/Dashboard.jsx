@@ -108,6 +108,10 @@ export default function Dashboard() {
   const [deals, setDeals] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [premiumOpen, setPremiumOpen] = useState(false);
+  // Today vs. this-week toggle on the right-side meetings panel.
+  // Default 'today' so each morning the agent sees what's planned now;
+  // they can flip to 'week' to see the rest of the week ahead.
+  const [meetingsView, setMeetingsView] = useState('today');
 
   // PERF — 2026-05-01 v2: progressive load.
   // First effect: fetch the THIN /api/dashboard/full (counts + 4 top-N
@@ -174,6 +178,19 @@ export default function Dashboard() {
       })
       .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
   }, [meetings]);
+  // Same filter, expanded to "next 7 days from now" for the week view.
+  const weekReminders = useMemo(() => {
+    const now = Date.now();
+    const weekEnd = now + 7 * 24 * 60 * 60 * 1000;
+    return (meetings || [])
+      .filter((m) => {
+        if (!m.dueAt) return false;
+        if (m.status && m.status !== 'PENDING') return false;
+        const t = new Date(m.dueAt).getTime();
+        return t >= now && t < weekEnd;
+      })
+      .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+  }, [meetings]);
   const aiPriorities = useMemo(
     () => computeAiPriorities({ leads, properties, deals, meetings }),
     [leads, properties, deals, meetings],
@@ -184,11 +201,14 @@ export default function Dashboard() {
   // `<list>.length` for the legacy fan-out path.
   const kpis = useMemo(() => {
     const c = summary?.counts;
+    // 2026-05-03 — `to` makes each KPI card a single click-target into
+    // the relevant page (request: "make the meetings icon clickable
+    // to see all scheduled meetings").
     return [
-      { l: 'לידים פעילים',   v: c?.leads ?? leads.length,           i: Users },
-      { l: 'פגישות השבוע',   v: c?.todayMeetings ?? meetings.length, i: CalendarIcon },
-      { l: 'עסקאות פתוחות', v: c?.deals ?? deals.length,             i: Banknote },
-      { l: 'נכסים פעילים',   v: c?.properties ?? properties.length,  i: BarChart2 },
+      { l: 'לידים פעילים',   v: c?.leads ?? leads.length,           i: Users,        to: '/leads' },
+      { l: 'פגישות השבוע',   v: c?.todayMeetings ?? meetings.length, i: CalendarIcon, to: '/calendar' },
+      { l: 'עסקאות פתוחות', v: c?.deals ?? deals.length,             i: Banknote,     to: '/deals' },
+      { l: 'נכסים פעילים',   v: c?.properties ?? properties.length,  i: BarChart2,    to: '/properties' },
     ];
   }, [summary, leads.length, meetings.length, deals.length, properties.length]);
 
@@ -288,25 +308,40 @@ export default function Dashboard() {
           ? 'repeat(2, minmax(0, 1fr))'
           : 'repeat(auto-fit, minmax(190px, 1fr))',
       }}>
-        {kpis.map((k, i) => (
-          <DCard key={i} compact={isMobile}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        {kpis.map((k, i) => {
+          const card = (
+            <DCard key={i} compact={isMobile}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{
+                  fontSize: isMobile ? 11 : 12, color: DT.muted, fontWeight: 600,
+                  lineHeight: 1.35, minWidth: 0,
+                }}>{k.l}</div>
+                <span style={{
+                  color: DT.gold, background: DT.goldSoft,
+                  width: isMobile ? 26 : 32, height: isMobile ? 26 : 32, borderRadius: 8,
+                  display: 'grid', placeItems: 'center', flexShrink: 0,
+                }}><k.i size={isMobile ? 13 : 15} /></span>
+              </div>
               <div style={{
-                fontSize: isMobile ? 11 : 12, color: DT.muted, fontWeight: 600,
-                lineHeight: 1.35, minWidth: 0,
-              }}>{k.l}</div>
-              <span style={{
-                color: DT.gold, background: DT.goldSoft,
-                width: isMobile ? 26 : 32, height: isMobile ? 26 : 32, borderRadius: 8,
-                display: 'grid', placeItems: 'center', flexShrink: 0,
-              }}><k.i size={isMobile ? 13 : 15} /></span>
-            </div>
-            <div style={{
-              fontSize: isMobile ? 22 : 30, fontWeight: 800,
-              letterSpacing: isMobile ? -0.5 : -0.8, marginTop: isMobile ? 4 : 8,
-            }}>{k.v}</div>
-          </DCard>
-        ))}
+                fontSize: isMobile ? 22 : 30, fontWeight: 800,
+                letterSpacing: isMobile ? -0.5 : -0.8, marginTop: isMobile ? 4 : 8,
+                color: DT.ink,
+              }}>{k.v}</div>
+            </DCard>
+          );
+          return k.to ? (
+            <Link
+              key={i}
+              to={k.to}
+              style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+              aria-label={`${k.l} — ${k.v}`}
+            >
+              {card}
+            </Link>
+          ) : (
+            <div key={i}>{card}</div>
+          );
+        })}
       </div>
 
       {/* Main grid: AI priorities + today's schedule.
@@ -399,21 +434,53 @@ export default function Dashboard() {
         <DCard>
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            marginBottom: 14,
+            marginBottom: 12, gap: 8, flexWrap: 'wrap',
           }}>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>
-              היום · {todaysReminders.length || 0} תזכורות
+            <div style={{ display: 'inline-flex', gap: 4, background: DT.goldSoft, padding: 3, borderRadius: 999 }}>
+              {[
+                { k: 'today', label: 'היום', count: todaysReminders.length },
+                { k: 'week',  label: 'השבוע', count: weekReminders.length },
+              ].map((t) => {
+                const active = meetingsView === t.k;
+                return (
+                  <button
+                    key={t.k}
+                    type="button"
+                    onClick={() => setMeetingsView(t.k)}
+                    style={{
+                      background: active ? DT.white : 'transparent',
+                      border: 'none',
+                      padding: '5px 12px',
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: active ? DT.ink : DT.muted,
+                      cursor: 'pointer',
+                      boxShadow: active ? '0 1px 3px rgba(30,26,20,0.08)' : 'none',
+                    }}
+                    aria-pressed={active}
+                  >
+                    {t.label} · {t.count}
+                  </button>
+                );
+              })}
             </div>
-            <Link to="/reminders" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+            <Link to="/calendar" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
               יומן מלא
             </Link>
           </div>
-          {todaysReminders.length === 0 && (
+          {(meetingsView === 'today' ? todaysReminders : weekReminders).length === 0 && (
             <div style={{ fontSize: 13, color: DT.muted, padding: '12px 0' }}>
-              אין תזכורות להיום — הוסיפו תזכורת כדי לראות אותה כאן.
+              {meetingsView === 'today'
+                ? 'אין פגישות להיום — הוסיפו פגישה כדי לראות אותה כאן.'
+                : 'אין פגישות בשבוע הקרוב.'}
             </div>
           )}
-          {todaysReminders.slice(0, 4).map((m, i) => {
+          {(() => {
+            const list = meetingsView === 'today' ? todaysReminders : weekReminders;
+            const cap = meetingsView === 'today' ? 4 : 8;
+            const visible = list.slice(0, cap);
+            return visible.map((m, i) => {
             const when = m.dueAt ? new Date(m.dueAt) : null;
             const time = when
               ? when.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
@@ -422,7 +489,7 @@ export default function Dashboard() {
             return (
               <div key={m.id || i} style={{
                 display: 'flex', gap: 10, padding: '10px 0',
-                borderBottom: i === Math.min(3, todaysReminders.length - 1) ? 'none' : `1px solid ${DT.border}`,
+                borderBottom: i === visible.length - 1 ? 'none' : `1px solid ${DT.border}`,
                 position: 'relative',
               }}>
                 {isNext && (
@@ -462,7 +529,8 @@ export default function Dashboard() {
                 </div>
               </div>
             );
-          })}
+          });
+          })()}
         </DCard>
       </div>
 

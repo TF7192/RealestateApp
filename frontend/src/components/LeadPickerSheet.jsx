@@ -179,7 +179,7 @@ export default function LeadPickerSheet({
               <strong>פתח בוואטסאפ</strong>
               <small>בחירת נמען בתוך וואטסאפ</small>
             </div>
-            <span className="lps-cta-wa lps-cta-wa-gold" aria-hidden="true">
+            <span className="lps-cta-wa" aria-hidden="true">
               <WhatsAppIcon size={13} />
             </span>
           </button>
