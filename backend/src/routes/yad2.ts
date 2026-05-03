@@ -213,6 +213,37 @@ async function tryReserveYad2Quota(
   });
 }
 
+// Refund the most recently-reserved quota slot. Called when a crawl
+// fails for reasons that are NOT the agent's fault — bad agency URL
+// (404 from Yad2), WAF challenge we can't pass, network timeout, or
+// any envelope status >= 422 from the crawler. The original reserve
+// is intentionally up-front (so two concurrent imports can't race
+// past the limit) but billing the agent for an outcome they couldn't
+// influence is bad UX. We delete the most recent attempt row for this
+// agent inside the same advisory lock so a concurrent reserve can't
+// see a refund mid-flight.
+async function refundYad2Quota(agentId: string): Promise<void> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(
+        `SELECT pg_advisory_xact_lock(hashtext($1))`,
+        agentId,
+      );
+      const latest = await tx.yad2ImportAttempt.findFirst({
+        where: { agentId },
+        orderBy: { attemptedAt: 'desc' },
+        select: { id: true },
+      });
+      if (latest) {
+        await tx.yad2ImportAttempt.delete({ where: { id: latest.id } });
+      }
+    });
+  } catch {
+    // Best-effort; if refund fails the agent loses a slot but the
+    // window resets in <=1h. Don't let it mask the underlying error.
+  }
+}
+
 function quotaExceededReply(reply: any, quota: QuotaSnapshot) {
   const minutesLeft = Math.ceil(quota.msUntilReset / 60_000);
   return reply.code(429).send({
@@ -369,8 +400,19 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
       if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
       const reservation = await tryReserveYad2Quota(u.id);
       if (!reservation.reserved) return quotaExceededReply(reply, reservation.quota);
-      const report = await crawlAgency(agencyId);
-      return { listings: report.listings, agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone }, sections: report.sections, truncated: report.truncated, quota: reservation.quota };
+      try {
+        const report = await crawlAgency(agencyId);
+        // Empty result = bad URL / agency-doesn't-exist; refund the slot.
+        if (report.listings.length === 0) {
+          await refundYad2Quota(u.id);
+          const quotaAfter = await getYad2Quota(u.id);
+          return reply.code(422).send({ error: { message: 'לא נמצאו נכסים בסוכנות זו — בדוק את הקישור', quota: quotaAfter } });
+        }
+        return { listings: report.listings, agency: { id: report.agencyId, name: report.agencyName, phone: report.agencyPhone }, sections: report.sections, truncated: report.truncated, quota: reservation.quota };
+      } catch (err) {
+        await refundYad2Quota(u.id);
+        throw err;
+      }
     }
     return reply.code(400).send({ error: { message: 'נא להדביק כתובת של דף סוכנות (yad2.co.il/realestate/agency/...)' } });
   });
@@ -425,16 +467,23 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
     // attempt up-front (not on success) so a flaky Yad2 / WAF burst
     // doesn't let the agent retry their way around the limit.
     // The reserve is atomic so two concurrent requests can't both pass.
+    // 2026-05-03 — refund the slot if the crawl fails for reasons that
+    // are NOT the agent's fault (bad agency URL → 422 envelope, WAF
+    // block → 503 envelope, timeout → 504). Original anti-abuse intent
+    // is preserved because successful and rate-limited paths still bill.
     const reservation = await tryReserveYad2Quota(u.id);
     if (!reservation.reserved) return quotaExceededReply(reply, reservation.quota);
     try {
       return await runAgencyPreview(agencyId, u.id, req.log);
     } catch (err: any) {
       if (err?.__yad2Envelope) {
+        await refundYad2Quota(u.id);
         const env = err.__yad2Envelope;
-        return reply.code(env.status || 500).send({ error: env });
+        const refunded = await getYad2Quota(u.id);
+        return reply.code(env.status || 500).send({ error: { ...env, quota: refunded } });
       }
       req.log.warn({ err, agencyId }, 'yad2 agency crawl threw');
+      await refundYad2Quota(u.id);
       const quotaAfter = await getYad2Quota(u.id);
       return reply.code(504).send({ error: { message: 'הסוכנות לא הגיבה — נסה שוב', quota: quotaAfter } });
     }
@@ -466,7 +515,17 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
         report({ pct: 2, stage: 'מכין סריקה' });
         return await runAgencyPreview(agencyId, u.id, log, report);
       } catch (err: any) {
-        if (err?.__yad2Envelope) throw err;
+        // 2026-05-03 — refund the quota slot on any not-our-fault
+        // failure (envelope from upstream OR thrown error). Quota was
+        // reserved up-front to defeat retry-the-limit-away abuse, but
+        // billing the agent for a 422/503/504 they couldn't influence
+        // is bad UX.
+        await refundYad2Quota(u.id);
+        if (err?.__yad2Envelope) {
+          const refunded = await getYad2Quota(u.id);
+          err.__yad2Envelope = { ...err.__yad2Envelope, quota: refunded };
+          throw err;
+        }
         log.warn({ err, agencyId }, 'yad2 agency crawl threw (async)');
         const quotaAfter = await getYad2Quota(u.id);
         throwYad2Envelope({ status: 504, message: 'הסוכנות לא הגיבה — נסה שוב', quota: quotaAfter });
