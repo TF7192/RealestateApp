@@ -70,6 +70,7 @@ const leadInput = z.object({
   // legacy display paths keep working unchanged.
   cities:        z.array(z.string().max(80)).max(20).optional(),
   neighborhoods: z.array(z.string().max(80)).max(40).optional(),
+  streets:       z.array(z.string().max(120)).max(60).optional(),
   propertyTypes: z.array(z.string().max(40)).max(15).optional(),
   floorMin: z.number().int().nullable().optional(),
   floorMax: z.number().int().nullable().optional(),
@@ -622,6 +623,9 @@ function normalize(body: Partial<z.infer<typeof leadInput>>) {
   }
   if (Array.isArray(data.neighborhoods) && data.neighborhoods.length > 0 && !data.neighborhood) {
     data.neighborhood = data.neighborhoods[0];
+  }
+  if (Array.isArray(data.streets) && data.streets.length > 0 && !data.street) {
+    data.street = data.streets[0];
   }
   // Snap city + street to their government-registered canonical form
   // so rows stay comparable across spelling variants (שיינקין / שינקין,

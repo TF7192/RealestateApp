@@ -1135,6 +1135,7 @@ model Lead {
   // on save. UI binds to the arrays.
   cities                     String[]      @default([])
   neighborhoods              String[]      @default([])
+  streets                    String[]      @default([])
   propertyTypes              String[]      @default([])
   floorMin                   Int?
   floorMax                   Int?

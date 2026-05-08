@@ -55,6 +55,7 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
     // 2026-05-08 PR 2 — multi-value brief.
     cities:        Array.isArray(lead.cities)        ? lead.cities        : (lead.city ? [lead.city] : []),
     neighborhoods: Array.isArray(lead.neighborhoods) ? lead.neighborhoods : (lead.neighborhood ? [lead.neighborhood] : []),
+    streets:       Array.isArray(lead.streets)       ? lead.streets       : (lead.street ? [lead.street] : []),
     propertyTypes: Array.isArray(lead.propertyTypes) ? lead.propertyTypes : [],
     floorMin: lead.floorMin ?? null,
     floorMax: lead.floorMax ?? null,
@@ -102,6 +103,54 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
     }).catch(() => { /* keep fallback */ });
     return () => { cancelled = true; };
   }, []);
+  // 2026-05-08 — typeahead options for the שכונות / רחובות multi-chips,
+  // sourced from EVERY city in the form's cities array. Re-fetches when
+  // the cities list changes; results de-duplicated + sorted.
+  const [neighborhoodOptions, setNeighborhoodOptions] = useState([]);
+  const [streetOptions, setStreetOptions] = useState([]);
+  useEffect(() => {
+    const cities = Array.isArray(form.cities) ? form.cities : [];
+    if (cities.length === 0) {
+      setNeighborhoodOptions([]);
+      setStreetOptions([]);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      const seenN = new Set();
+      const seenS = new Set();
+      const settled = await Promise.allSettled(cities.map(async (city) => {
+        const [neighRes, streetRes] = await Promise.allSettled([
+          api.listNeighborhoods?.({ city, limit: 200 }),
+          api.streets?.(city),
+        ]);
+        return {
+          city,
+          hoods: neighRes.status === 'fulfilled' ? (neighRes.value?.items || neighRes.value || []) : [],
+          streets: streetRes.status === 'fulfilled' ? (streetRes.value?.streets || streetRes.value?.items || streetRes.value || []) : [],
+        };
+      }));
+      if (cancelled) return;
+      const hoodNames = [];
+      const streetNames = [];
+      for (const r of settled) {
+        if (r.status !== 'fulfilled') continue;
+        for (const h of r.value.hoods) {
+          const name = typeof h === 'string' ? h : h?.name;
+          if (name && !seenN.has(name)) { seenN.add(name); hoodNames.push(name); }
+        }
+        for (const s of r.value.streets) {
+          const name = typeof s === 'string' ? s : (s?.name || s?.label);
+          if (name && !seenS.has(name)) { seenS.add(name); streetNames.push(name); }
+        }
+      }
+      hoodNames.sort((a, b) => a.localeCompare(b, 'he'));
+      streetNames.sort((a, b) => a.localeCompare(b, 'he'));
+      setNeighborhoodOptions(hoodNames);
+      setStreetOptions(streetNames);
+    })();
+    return () => { cancelled = true; };
+  }, [form.cities]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const panelRef = useRef(null);
@@ -143,6 +192,7 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
         // 2026-05-08 PR 2 — multi-value brief.
         cities:        Array.isArray(form.cities)        ? form.cities        : [],
         neighborhoods: Array.isArray(form.neighborhoods) ? form.neighborhoods : [],
+        streets:       Array.isArray(form.streets)       ? form.streets       : [],
         propertyTypes: Array.isArray(form.propertyTypes) ? form.propertyTypes : [],
         floorMin: form.floorMin != null && form.floorMin !== '' ? Number(form.floorMin) : null,
         floorMax: form.floorMax != null && form.floorMax !== '' ? Number(form.floorMax) : null,
@@ -402,17 +452,23 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                 <MultiChipsInput
                   values={form.neighborhoods}
                   onChange={(arr) => update('neighborhoods', arr)}
-                  placeholder="הוסף שכונה ולחץ Enter"
+                  options={neighborhoodOptions}
+                  placeholder={form.cities?.length
+                    ? 'התחל להקליד שכונה — הצעות יופיעו'
+                    : 'בחר/י עיר תחילה כדי לראות שכונות'}
                   ariaLabel="שכונות מבוקשות"
                 />
               </Field>
               <div style={gridRow2()}>
-                <Field label="רחוב">
-                  <input
-                    {...inputPropsForAddress()}
-                    className="form-input"
-                    value={form.street}
-                    onChange={(e) => update('street', e.target.value)}
+                <Field label="רחובות (אופציונלי)">
+                  <MultiChipsInput
+                    values={form.streets}
+                    onChange={(arr) => update('streets', arr)}
+                    options={streetOptions}
+                    placeholder={form.cities?.length
+                      ? 'התחל להקליד רחוב — הצעות מתעדכנות לפי הערים'
+                      : 'בחר/י עיר תחילה כדי לראות רחובות'}
+                    ariaLabel="רחובות מבוקשים"
                   />
                 </Field>
                 <Field label="סוג הנכס">
@@ -779,6 +835,11 @@ function labelStyle() {
     fontSize: 11, fontWeight: 700, color: DT.muted,
     textTransform: 'uppercase', letterSpacing: 0.3,
     display: 'block',
+    // 2026-05-08 — labels live inside a flex-column Field; with no
+    // textAlign they default to `left`, rendering Hebrew labels on the
+    // LEFT side of the row (looks LTR). Force `right` so they sit on
+    // the inline-start side in RTL.
+    textAlign: 'right',
   };
 }
 function gridRow2() {
