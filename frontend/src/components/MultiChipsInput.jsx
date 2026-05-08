@@ -118,25 +118,30 @@ export default function MultiChipsInput({
       <div
         role="group"
         aria-label={ariaLabel}
+        dir="rtl"
         onClick={() => inputRef.current?.focus()}
         style={{
-          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
-          padding: '8px 10px', minHeight: 42,
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+          padding: '10px 12px', minHeight: 46,
           borderRadius: 10,
           border: `1px solid ${PALETTE.border}`,
           background: disabled ? PALETTE.cream : '#fff',
           cursor: disabled ? 'not-allowed' : 'text',
           boxSizing: 'border-box',
+          direction: 'rtl',
         }}
       >
         {(values || []).map((v, i) => (
           <span
             key={`${v}-${i}`}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
+              // 2026-05-08 — bumped padding + font so chip pills read
+              // as proper "bubbles" instead of cramped tags.
+              display: 'inline-flex', alignItems: 'center', gap: 6,
               background: PALETTE.goldSoft, color: PALETTE.ink,
-              padding: '4px 8px 4px 4px', borderRadius: 999,
-              fontSize: 13, fontWeight: 700,
+              padding: '6px 14px 6px 10px', borderRadius: 999,
+              fontSize: 14, fontWeight: 700,
+              border: `1px solid ${PALETTE.border}`,
             }}
           >
             <button

@@ -1336,6 +1336,10 @@ function sectionCard() {
   return {
     background: DT.white, border: `1px solid ${DT.border}`,
     borderRadius: 14, padding: 20,
+    // 2026-05-08 — explicit RTL on each section card so children
+    // (Segmented controls, inline-flex titles, gridRow2 layouts)
+    // don't accidentally inherit LTR if anything upstream resets it.
+    direction: 'rtl',
   };
 }
 function sectionTitle() {
@@ -1343,6 +1347,8 @@ function sectionTitle() {
     display: 'inline-flex', alignItems: 'center', gap: 6,
     fontSize: 14, fontWeight: 800, margin: '0 0 14px', color: DT.ink,
     letterSpacing: -0.2,
+    // Section header — icon on the right (RTL leading), text left of icon.
+    direction: 'rtl',
   };
 }
 function labelStyle() {
