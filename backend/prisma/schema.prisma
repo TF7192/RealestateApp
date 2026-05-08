@@ -1527,6 +1527,11 @@ model Reminder {
   status      ReminderStatus @default(PENDING)
   completedAt DateTime?      @db.Timestamptz(6)
   cancelledAt DateTime?      @db.Timestamptz(6)
+  // Set by the reminderScheduler worker once the bell + email
+  // have been emitted for this reminder. Prevents double-firing on
+  // every poll. NULL means "not notified yet"; once set, the worker
+  // skips the row regardless of dueAt.
+  notifiedAt  DateTime?      @db.Timestamptz(6)
 
   leadId     String?
   lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)

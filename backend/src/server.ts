@@ -482,6 +482,15 @@ if (runAsMain) {
       );
       startMatchDigestScheduler();
       workerStops.push(stopMatchDigestScheduler);
+      // 2026-05-08 — reminder firing. Polls Reminder rows every 60s,
+      // creates a Notification (kind='reminder_due') when dueAt has
+      // passed and notifiedAt is still null. Was a known gap: agents
+      // would set a reminder and the bell would never light up.
+      const { startReminderScheduler, stopReminderScheduler } = await import(
+        './workers/reminderScheduler.js'
+      );
+      startReminderScheduler();
+      workerStops.push(stopReminderScheduler);
       // 2026-04-27 — soft-delete purge. Hard-deletes users with
       // deletedAt < now - 30d and their S3 blobs. Honours the
       // privacy-policy promise that account-deletion is final after
