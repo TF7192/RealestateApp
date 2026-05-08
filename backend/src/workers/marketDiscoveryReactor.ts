@@ -197,15 +197,11 @@ export async function drainOnce() {
         continue;
       }
 
-      const title = matches.length === 1
-        ? 'נכס חדש מתאים למתעניין שלך'
-        : `נכס חדש מתאים ל-${matches.length} מתעניינים שלך`;
-
       await prisma.notification.create({
         data: {
           userId: agentUserId,
           type: 'market_listing_match',
-          title,
+          title: notificationTitle(listing, matches),
           body: notificationBody(listing, matches),
           link: `/market-discovery?match=${primary.matchId}`,
         },
@@ -274,36 +270,68 @@ export async function drainOnce() {
 }
 
 // In-app notification body — short, fits in the bell dropdown.
-function notificationBody(
-  l: {
-    street: string | null;
-    city: string | null;
-    rooms: number | null;
-    sizeSqm: number | null;
-    price: number | null;
-  },
+// 2026-05-08 — listing kind label in Hebrew. Maps the Prisma enum
+// MarketListingKind (`forsale` / `rent`) onto the natural Hebrew
+// preposition phrase that reads inside a sentence.
+function listingKindLabel(kind: 'forsale' | 'rent' | null | undefined): string {
+  if (kind === 'rent') return 'להשכרה';
+  if (kind === 'forsale') return 'למכירה';
+  return '';
+}
+
+// Format the matched-customer names as a natural Hebrew phrase.
+//   1 match  → "טל"
+//   2 matches → "טל והדר"
+//   3+       → "טל, הדר ועוד {N-2}{ suffix?}"
+// `suffix` (e.g. "מתעניינים") is appended after the count when set.
+// The list is capped to the first two names — agents glance at the
+// notification, so a wall of names hurts more than it helps.
+function formatMatchedNames(
+  matches: { leadName: string }[],
+  opts: { suffix?: string } = {},
+): string {
+  const names = matches.map((m) => m.leadName).filter(Boolean) as string[];
+  if (names.length === 0) return '';
+  if (names.length === 1) return names[0]!;
+  if (names.length === 2) return `${names[0]} ו${names[1]}`;
+  const rest = names.length - 2;
+  const tail = opts.suffix ? `ועוד ${rest} ${opts.suffix}` : `ועוד ${rest}`;
+  return `${names[0]}, ${names[1]} ${tail}`;
+}
+
+// Title ─ the bell-popover headline. Format:
+//   "נכס חדש {למכירה|להשכרה} ב{עיר} מתאים ל{שמות}, ועוד N מתעניינים"
+// Each segment is opt-in so missing fields don't leave dangling words:
+// e.g. "נכס חדש מתאים לטל" if both kind + city are null.
+function notificationTitle(
+  l: { city: string | null; kind: 'forsale' | 'rent' | null | undefined },
   matches: { leadName: string }[],
 ): string {
-  // 2026-05-08 — preview content per agent feedback: surface the
-  // property's address + key specs AND the names of the matched
-  // customers ("מתעניינים") so the agent can decide if the alert is
-  // worth opening without leaving the bell popover.
-  const addressFrag = [l.street, l.city].filter(Boolean).join(', ');
-  const specs = [
-    l.rooms != null ? `${l.rooms} חד׳` : null,
-    l.sizeSqm != null ? `${l.sizeSqm} מ״ר` : null,
-    l.price != null ? `₪${l.price.toLocaleString('he-IL')}` : null,
-  ].filter(Boolean).join(' · ');
-  // Names: show up to 3 inline; the rest collapses into "+N נוספים" so
-  // a 10-lead match doesn't blow up the popover row.
-  const names = matches.map((m) => m.leadName).filter(Boolean) as string[];
-  const shown = names.slice(0, 3).join(', ');
-  const rest = names.length - Math.min(3, names.length);
-  const peopleFrag = rest > 0 ? `${shown} ועוד ${rest} מתעניינים` : shown;
+  const kind = listingKindLabel(l.kind);
+  const cityFrag = l.city ? `ב${l.city}` : '';
+  const namesFrag = formatMatchedNames(matches, { suffix: 'מתעניינים' });
 
-  // Compose: "{address} · {specs} · {names}" with each present part.
-  const parts = [addressFrag, specs, peopleFrag].filter(Boolean);
-  return parts.join(' · ');
+  const head = ['נכס חדש', kind, cityFrag].filter(Boolean).join(' ');
+  return namesFrag ? `${head} מתאים ל${namesFrag}` : head;
+}
+
+// Body ─ the preview line under the title. Format:
+//   "נמצא נכס חדש ב{עיר}, רחוב {רחוב} אשר מתאים ל{שמות} ועוד N"
+// Same opt-in rules as the title; falls back gracefully when city /
+// street are null. Body intentionally omits the trailing "מתעניינים"
+// to keep the line shorter — the title already names the audience.
+function notificationBody(
+  l: { street: string | null; city: string | null },
+  matches: { leadName: string }[],
+): string {
+  const placeBits: string[] = [];
+  if (l.city)   placeBits.push(`ב${l.city}`);
+  if (l.street) placeBits.push(`רחוב ${l.street}`);
+  const placeFrag = placeBits.join(', ');
+  const namesFrag = formatMatchedNames(matches);
+
+  const head = placeFrag ? `נמצא נכס חדש ${placeFrag}` : 'נמצא נכס חדש';
+  return namesFrag ? `${head} אשר מתאים ל${namesFrag}` : head;
 }
 
 // 2026-05-06 — the previous per-match plain-text email body lived
