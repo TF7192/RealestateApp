@@ -26,7 +26,7 @@ import {
   BarChart2, Banknote, Upload, UsersRound, Settings,
   Bell, Search, MessageCircle, LogOut, Menu, X,
   ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
-  Activity as ActivityIcon, Tag, Download as DownloadIcon, Heart,
+  Activity as ActivityIcon, Download as DownloadIcon, Heart,
   Star, FolderOpen, HelpCircle, IdCard, Megaphone, ShieldCheck,
   UserPlus, Plus,
 } from 'lucide-react';

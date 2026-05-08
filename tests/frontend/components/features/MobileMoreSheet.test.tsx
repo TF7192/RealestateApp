@@ -20,7 +20,6 @@ describe('<MobileMoreSheet>', () => {
     expect(screen.getByRole('button', { name: /דוחות/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /פעילות/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /תזכורות/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /ניהול תגיות/ })).toBeInTheDocument();
   });
 
   it('does NOT show the Office row for AGENT role', async () => {

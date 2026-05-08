@@ -53,33 +53,6 @@ describe('<CustomerDetail>', () => {
     expect((await screen.findAllByRole('heading', { name: /תזכורות/ })).length).toBeGreaterThan(0);
     expect((await screen.findAllByRole('heading', { name: /נכסים תואמים/ })).length).toBeGreaterThan(0);
     expect((await screen.findAllByRole('heading', { name: /יומן פעילות/ })).length).toBeGreaterThan(0);
-    // The dedicated "פרופילי חיפוש" panel was retired during the
-    // CustomerDetail redesign — search profiles are now part of the
-    // lead-edit dialog, not a side panel.
-    expect((await screen.findAllByRole('button', { name: 'הוסף תג' }))[0]).toBeInTheDocument();
-  });
-
-  it('attaches a tag via TagPicker', async () => {
-    mountLead(seedLead());
-    let assignedForId = null;
-    server.use(
-      http.get('/api/tags', () =>
-        HttpResponse.json({ items: [{ id: 't1', name: 'חם ביותר', color: '#D4AF37' }] })
-      ),
-      http.get('/api/tags/for', () => HttpResponse.json({ items: [] })),
-      http.post('/api/tags/:id/assign', async ({ params, request }) => {
-        assignedForId = String(params.id);
-        await request.json(); // drain
-        return HttpResponse.json({ ok: true });
-      }),
-    );
-    const user = userEvent.setup();
-    render(<CustomerDetail />, { route: '/customers/lead-1', path: '/customers/:id' });
-    await screen.findByText('דני לוי');
-    await user.click(await screen.findByRole('button', { name: 'הוסף תג' }));
-    const opt = await screen.findByRole('option', { name: /חם ביותר/ });
-    await user.click(opt);
-    await waitFor(() => expect(assignedForId).toBe('t1'));
   });
 
   it('creates a reminder through the embedded RemindersPanel', async () => {

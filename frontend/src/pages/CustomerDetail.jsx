@@ -3,7 +3,7 @@
 //   LEFT:  matching properties, lead summary card, tags
 //   RIGHT: reminders, activity log, derived timeline
 //
-// Sub-panels (MatchingList, TagPicker, RemindersPanel, ActivityPanel,
+// Sub-panels (MatchingList, RemindersPanel, ActivityPanel,
 // CustomerEditDialog, LeadMeetingDialog) stay as-is — they already
 // render in the cream & gold palette in light mode and their
 // internals aren't worth rewriting for this sprint.
@@ -19,7 +19,6 @@ import { popoutCurrentRoute } from '../lib/popout';
 import { printPage } from '../lib/print';
 import api from '../lib/api';
 import LeadMeetingDialog from '../components/LeadMeetingDialog';
-import TagPicker from '../components/TagPicker';
 import RemindersPanel from '../components/RemindersPanel';
 import MatchingList from '../components/MatchingList';
 import AiMatchesDrawer from '../components/AiMatchesDrawer';
@@ -316,10 +315,6 @@ export default function CustomerDetail() {
             <MatchingList leadId={lead.id} title="נכסים תואמים" />
           </section>
           <LeadSummaryPanel lead={lead} onEdit={() => setEditOpen(true)} />
-          <section style={sectionCard()} aria-label="תגי לקוח">
-            <h3 style={sectionTitle()}>תגים</h3>
-            <TagPicker entityType="LEAD" entityId={lead.id} />
-          </section>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <section style={sectionCard()} aria-label="תזכורות">

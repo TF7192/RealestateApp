@@ -13,7 +13,7 @@
 
 import { Link } from 'react-router-dom';
 import {
-  Tag, MapPin, Building2, UserCircle, MessageSquare, ChevronLeft,
+  MapPin, Building2, UserCircle, MessageSquare, ChevronLeft,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 
@@ -28,13 +28,6 @@ const DT = {
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const CARDS = [
-  {
-    key: 'tags',
-    to: '/settings/tags',
-    title: 'תגיות',
-    description: 'נהל את אוסף התגיות של המשרד — צבעים, תחום (נכסים / מתעניינים / כולם).',
-    Icon: Tag,
-  },
   {
     key: 'neighborhoods',
     to: '/settings/neighborhoods',

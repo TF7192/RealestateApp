@@ -187,9 +187,3 @@ describe('P-14 — market-context error banner has a retry', () => {
   });
 });
 
-describe('P-15 — tag chips paint via --tag-color custom property', () => {
-  const src = read('frontend/src/components/TagPicker.jsx');
-  it('chipStyle returns { "--tag-color": color } so the N-5 CSS tints', () => {
-    expect(src).toMatch(/'--tag-color':\s*color/);
-  });
-});

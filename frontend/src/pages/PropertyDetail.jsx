@@ -28,7 +28,6 @@ import {
   UserPlus,
   Users,
   Workflow,
-  Tag,
   Bell,
   Activity,
   Target,
@@ -67,7 +66,6 @@ import PropertyPanelSheet from '../components/PropertyPanelSheet';
 import PropertyPipelineBlock from '../components/PropertyPipelineBlock';
 import PropertyAssigneesPanel from '../components/PropertyAssigneesPanel';
 import AdvertsPanel from '../components/AdvertsPanel';
-import TagPicker from '../components/TagPicker';
 import RemindersPanel from '../components/RemindersPanel';
 import MatchingList from '../components/MatchingList';
 import AiMatchesDrawer from '../components/AiMatchesDrawer';
@@ -1549,15 +1547,6 @@ export default function PropertyDetail() {
             <Sparkles size={14} />
             <span>✨ התאמות חכמות</span>
           </button>
-        </DashCard>
-
-        {/* MLS parity — tags (A2) */}
-        <DashCard
-          delay={7}
-          icon={<Tag size={16} />}
-          title="תגיות"
-        >
-          <TagPicker entityType="PROPERTY" entityId={property.id} />
         </DashCard>
 
         {/* MLS parity — reminders (D1) */}

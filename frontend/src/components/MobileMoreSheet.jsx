@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, UserCircle, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield, Calculator, Download as DownloadIcon, BarChart2, Activity as ActivityIcon, Bell, Tag, Building2 } from 'lucide-react';
+import { User, UserCircle, Share2, LogOut, UserPlus, Plus, Check, Search, ArrowLeftRight, FileText, Shield, Calculator, Download as DownloadIcon, BarChart2, Activity as ActivityIcon, Bell, Building2 } from 'lucide-react';
 
 // SEC-010 — admin status reads off user.role, not the email allowlist.
 const isAdminUser = (u) => !!u && u.role === 'ADMIN';
@@ -128,11 +128,6 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
             <button className="mms-row" onClick={() => go('/reminders')}>
               <span className="mms-row-icon"><Bell size={18} /></span>
               <span className="mms-row-text"><strong>תזכורות</strong><small>מטלות ותזכורות עם מועד</small></span>
-              <span className="mms-arrow">›</span>
-            </button>
-            <button className="mms-row" onClick={() => go('/settings/tags')}>
-              <span className="mms-row-icon"><Tag size={18} /></span>
-              <span className="mms-row-text"><strong>ניהול תגיות</strong><small>תיוג לקוחות, נכסים, עסקאות</small></span>
               <span className="mms-arrow">›</span>
             </button>
             {user?.role === 'OWNER' && (

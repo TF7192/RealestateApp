@@ -129,10 +129,6 @@ describe('L-9 — right-column panels exit loading when their anchor prop is mis
     const src = read('frontend/src/components/MatchingList.jsx');
     expect(src).toMatch(/onClick=\{load\}[\s\S]{0,120}?נסה שוב/);
   });
-  it('TagPicker exits loading when entityId is missing', () => {
-    const src = read('frontend/src/components/TagPicker.jsx');
-    expect(src).toMatch(/if \(!entityId\)\s*\{[\s\S]*setLoading\(false\)/);
-  });
 });
 
 // L-A — the prior test asserted that Customers.jsx imports

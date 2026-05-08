@@ -41,7 +41,7 @@ function renderDetail() {
 }
 
 describe('<PropertyDetail> — MLS parity wiring', () => {
-  it('shows the pipeline / adverts / assignees / matching / tags / activity / reminders cards', async () => {
+  it('shows the pipeline / adverts / assignees / matching / activity / reminders cards', async () => {
     server.use(
       http.get('/api/properties/:id', () =>
         HttpResponse.json({ property: propertyFixture })
@@ -58,9 +58,6 @@ describe('<PropertyDetail> — MLS parity wiring', () => {
     expect(screen.getByText('מודעות פרסום')).toBeInTheDocument();
     expect(screen.getByText('שותפים לנכס')).toBeInTheDocument();
     expect(screen.getByText('לקוחות תואמים')).toBeInTheDocument();
-    // "תגיות" appears as both the card title and the TagPicker stub label;
-    // either is proof the card rendered.
-    expect(screen.getAllByText('תגיות').length).toBeGreaterThan(0);
     expect(screen.getByText('תזכורות')).toBeInTheDocument();
     expect(screen.getByText('פעילות')).toBeInTheDocument();
   });

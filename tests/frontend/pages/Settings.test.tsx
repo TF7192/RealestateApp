@@ -47,7 +47,7 @@ describe('<Settings>', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows all five cards for an OWNER user', async () => {
+  it('shows all four cards for an OWNER user', async () => {
     asOwner();
     render(<Settings />);
     // The auth provider fetches /me asynchronously; wait for the
@@ -55,28 +55,20 @@ describe('<Settings>', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /^משרד/ })).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: /תגיות/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /שכונות/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /הפרופיל שלי/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /תבניות הודעה/ })).toBeInTheDocument();
-    expect(screen.getAllByRole('link')).toHaveLength(5);
+    expect(screen.getAllByRole('link')).toHaveLength(4);
   });
 
   it('hides the "משרד" card for an AGENT (non-owner) user', async () => {
     asAgent();
     render(<Settings />);
     // Wait for non-owner-only cards to render first.
-    await screen.findByRole('link', { name: /תגיות/ });
+    await screen.findByRole('link', { name: /שכונות/ });
     expect(screen.queryByRole('link', { name: /^משרד/ })).not.toBeInTheDocument();
-    // Four links for an agent.
-    expect(screen.getAllByRole('link')).toHaveLength(4);
-  });
-
-  it('tags card links to /settings/tags', async () => {
-    asAgent();
-    render(<Settings />);
-    const link = await screen.findByRole('link', { name: /תגיות/ });
-    expect(link).toHaveAttribute('href', '/settings/tags');
+    // Three links for an agent.
+    expect(screen.getAllByRole('link')).toHaveLength(3);
   });
 
   it('neighborhoods card links to /settings/neighborhoods (even before that route exists)', async () => {
@@ -111,13 +103,10 @@ describe('<Settings>', () => {
     asAgent();
     render(<Settings />);
     // The Settings cards were redesigned in the cream/gold port to be
-    // inline-styled link cards (display:flex column, gold hover ring),
-    // not classic .btn .btn-secondary buttons. The canonical button
-    // system from CLAUDE.md still applies to actual buttons elsewhere
-    // in the app — these are full-tile navigation cards. Assert the
-    // accessible affordance (link role + correct href) instead.
-    const link = await screen.findByRole('link', { name: /תגיות/ });
+    // inline-styled link cards. Assert the accessible affordance
+    // (link role + correct href) instead of the .btn class system.
+    const link = await screen.findByRole('link', { name: /שכונות/ });
     expect(link.tagName).toBe('A');
-    expect(link).toHaveAttribute('href', '/settings/tags');
+    expect(link).toHaveAttribute('href', '/settings/neighborhoods');
   });
 });

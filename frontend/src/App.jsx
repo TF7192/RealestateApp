@@ -110,7 +110,6 @@ const TeamAgentDetail = lazy(() => import('./pages/TeamAgentDetail'));
 // Sprint 7 — full-page results for the global search (?q=foo). Links
 // from CommandPalette's new "ראה את כל התוצאות" footer button.
 const SearchResults = lazy(() => import('./pages/SearchResults'));
-const TagSettings = lazy(() => import('./pages/TagSettings'));
 const Settings = lazy(() => import('./pages/Settings'));
 // Sprint 7 — in-app FAQ + support-channel hub (/help). Lazy so the
 // static JSON registry + DT card styling don't weigh down the main
@@ -462,7 +461,6 @@ function AppRoutes() {
                 and points early-access CTAs at /contact. */}
             <Route path="/inbox" element={<Inbox />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/settings/tags" element={<TagSettings />} />
             <Route path="/settings/neighborhoods" element={<NeighborhoodAdmin />} />
             {/* Sprint 6 / ScreenContract — in-house digital contract
                 e-sign flow. List + detail (preview + type-to-sign). */}
