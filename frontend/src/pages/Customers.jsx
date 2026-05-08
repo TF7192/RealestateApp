@@ -208,12 +208,17 @@ export default function Customers() {
   // PTR gesture. Desktop keeps its static render (PTR hook is a no-op
   // under pointer:fine per PullRefresh.css) so the behaviour is
   // mobile-only without two code paths.
-  const Container = isMobile
-    ? ({ children }) => <PullRefresh onRefresh={load}>{children}</PullRefresh>
-    : ({ children }) => <>{children}</>;
+  //
+  // 2026-05-08 — Container was previously defined as an inline arrow
+  // component inside the function body. React saw a new function
+  // identity on every render and unmounted/remounted the entire
+  // page subtree on each `setState` — including the table — which
+  // looked exactly like a "table refresh" when an agent ticked a
+  // single checkbox. Use a stable conditional render at the JSX
+  // call-site instead so identity is preserved across renders.
 
-  return (
-    <Container>
+  const pageContent = (
+    <>
     <div dir="rtl" style={{
       ...FONT, padding: isMobile ? '16px 14px 40px' : 28,
       color: DT.ink, minHeight: '100%',
@@ -505,8 +510,11 @@ export default function Customers() {
         onClose={() => setBulkOpen(false)}
       />
     )}
-    </Container>
+    </>
   );
+  return isMobile
+    ? <PullRefresh onRefresh={load}>{pageContent}</PullRefresh>
+    : pageContent;
 }
 
 // 2026-05-08 — extracted from the inline map so each row only re-renders
