@@ -198,15 +198,15 @@ export async function drainOnce() {
       }
 
       const title = matches.length === 1
-        ? 'נכס חדש מתאים לליד שלך'
-        : `נכס חדש מתאים ל-${matches.length} לידים שלך`;
+        ? 'נכס חדש מתאים למתעניין שלך'
+        : `נכס חדש מתאים ל-${matches.length} מתעניינים שלך`;
 
       await prisma.notification.create({
         data: {
           userId: agentUserId,
           type: 'market_listing_match',
           title,
-          body: notificationBody(listing, matches.length),
+          body: notificationBody(listing, matches),
           link: `/market-discovery?match=${primary.matchId}`,
         },
       });
@@ -275,17 +275,35 @@ export async function drainOnce() {
 
 // In-app notification body — short, fits in the bell dropdown.
 function notificationBody(
-  l: { city: string | null; rooms: number | null; sizeSqm: number | null; price: number | null },
-  leadCount: number,
+  l: {
+    street: string | null;
+    city: string | null;
+    rooms: number | null;
+    sizeSqm: number | null;
+    price: number | null;
+  },
+  matches: { leadName: string }[],
 ): string {
-  const cityFrag = l.city ? ` ב${l.city}` : '';
-  const parts = [
-    l.rooms != null ? `${l.rooms} חדרים` : null,
+  // 2026-05-08 — preview content per agent feedback: surface the
+  // property's address + key specs AND the names of the matched
+  // customers ("מתעניינים") so the agent can decide if the alert is
+  // worth opening without leaving the bell popover.
+  const addressFrag = [l.street, l.city].filter(Boolean).join(', ');
+  const specs = [
+    l.rooms != null ? `${l.rooms} חד׳` : null,
     l.sizeSqm != null ? `${l.sizeSqm} מ״ר` : null,
     l.price != null ? `₪${l.price.toLocaleString('he-IL')}` : null,
-  ].filter(Boolean);
-  const leadFrag = leadCount === 1 ? 'לליד פעיל' : `ל-${leadCount} לידים פעילים`;
-  return `נמצא נכס חדש${cityFrag} שמתאים ${leadFrag}${parts.length ? `: ${parts.join(', ')}` : ''}.`;
+  ].filter(Boolean).join(' · ');
+  // Names: show up to 3 inline; the rest collapses into "+N נוספים" so
+  // a 10-lead match doesn't blow up the popover row.
+  const names = matches.map((m) => m.leadName).filter(Boolean) as string[];
+  const shown = names.slice(0, 3).join(', ');
+  const rest = names.length - Math.min(3, names.length);
+  const peopleFrag = rest > 0 ? `${shown} ועוד ${rest} מתעניינים` : shown;
+
+  // Compose: "{address} · {specs} · {names}" with each present part.
+  const parts = [addressFrag, specs, peopleFrag].filter(Boolean);
+  return parts.join(' · ');
 }
 
 // 2026-05-06 — the previous per-match plain-text email body lived

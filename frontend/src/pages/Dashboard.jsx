@@ -572,11 +572,16 @@ export default function Dashboard() {
               ? when.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
               : '—';
             const isNext = i === 0;
+            // 2026-05-08 — each meeting row is now a Link into the
+            // meeting card. Was: only "יומן מלא" was clickable; the row
+            // and the "הבא" pill on the next-up meeting weren't, so
+            // there was no way to open the meeting from the dashboard.
             return (
-              <div key={m.id || i} style={{
+              <Link key={m.id || i} to={`/meetings/${m.id}`} style={{
                 display: 'flex', gap: 10, padding: '10px 0',
                 borderBottom: i === visible.length - 1 ? 'none' : `1px solid ${DT.border}`,
                 position: 'relative',
+                textDecoration: 'none', color: 'inherit',
               }}>
                 {isNext && (
                   <div style={{
@@ -613,7 +618,7 @@ export default function Dashboard() {
                     }}>{m.description}</div>
                   )}
                 </div>
-              </div>
+              </Link>
             );
           });
           })()}

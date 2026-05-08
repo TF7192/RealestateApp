@@ -784,6 +784,10 @@ function Topbar({ narrow, onOpenPalette, onOpenChat, user, isAdmin }) {
         key: `n-${n.id}`,
         kind: n.type || 'activity',
         title: n.title || 'התראה',
+        // 2026-05-08 — body carries a preview line (e.g. property
+        // street + matched מתעניינים' names) so the agent can decide
+        // whether to open the link without leaving the bell popover.
+        body: n.body || null,
         when: n.createdAt,
         to: n.link || '/notifications',
         readAt: n.readAt,
@@ -794,10 +798,24 @@ function Topbar({ narrow, onOpenPalette, onOpenChat, user, isAdmin }) {
     finally { setLoadingNotifs(false); }
   };
 
+  // 2026-05-08 — opening the bell counts as "I saw the alerts", so we
+  // mark everything read on open and zero the badge optimistically. The
+  // server call is fire-and-forget; the badge stays at 0 even if the
+  // request fails (next mount's listNotifications fetch will reconcile).
+  const markAllReadOptimistic = useCallback(() => {
+    setUnreadCount(0);
+    setNotifs((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: new Date().toISOString() })));
+    api.markAllNotificationsRead?.().catch(() => {});
+  }, []);
+
   const toggleNotifs = () => {
     setNotifOpen((v) => {
-      if (!v) loadNotifs();
-      return !v;
+      const opening = !v;
+      if (opening) {
+        loadNotifs();
+        markAllReadOptimistic();
+      }
+      return opening;
     });
   };
 
@@ -1113,8 +1131,24 @@ function NotificationsPopover({ items, loading, unreadCount, onClose, onClearAll
               <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {it.title}
               </div>
+              {/* 2026-05-08 — preview line shows which property + which
+                  matched מתעניינים, so the agent gets the gist without
+                  navigating into the link. Two-line clamp keeps each row
+                  compact when the names list is long. */}
+              {it.body && (
+                <div style={{
+                  fontSize: 11, color: DT.muted, marginTop: 2,
+                  lineHeight: 1.4,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}>
+                  {it.body}
+                </div>
+              )}
               {it.when && (
-                <div style={{ fontSize: 10, color: DT.muted }}>
+                <div style={{ fontSize: 10, color: DT.muted, marginTop: 2 }}>
                   {new Date(it.when).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}
                 </div>
               )}
