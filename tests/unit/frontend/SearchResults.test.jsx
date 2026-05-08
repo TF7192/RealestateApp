@@ -70,7 +70,7 @@ describe('<SearchResults />', () => {
     const SearchResults = await importPage();
     const { container } = await mount(SearchResults);
 
-    expect(container.querySelector('[aria-label="לידים"]')).toBeTruthy();
+    expect(container.querySelector('[aria-label="מתעניינים"]')).toBeTruthy();
     expect(container.querySelector('[aria-label="נכסים"]')).toBeTruthy();
     expect(container.querySelector('[aria-label="בעלים"]')).toBeTruthy();
     expect(container.querySelector('[aria-label="עסקאות"]')).toBeTruthy();
@@ -92,7 +92,7 @@ describe('<SearchResults />', () => {
     const SearchResults = await importPage();
     await mount(SearchResults);
 
-    expect(screen.getByText('לא נמצאו לידים')).toBeTruthy();
+    expect(screen.getByText('לא נמצאו מתעניינים')).toBeTruthy();
     expect(screen.getByText('לא נמצאו בעלים')).toBeTruthy();
     expect(screen.getByText('לא נמצאו עסקאות')).toBeTruthy();
     expect(screen.queryByText('לא נמצאו נכסים')).toBeNull();

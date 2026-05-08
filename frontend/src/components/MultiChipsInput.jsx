@@ -121,8 +121,8 @@ export default function MultiChipsInput({
         dir="rtl"
         onClick={() => inputRef.current?.focus()}
         style={{
-          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
-          padding: '10px 12px', minHeight: 46,
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
+          padding: '6px 10px', minHeight: 46,
           borderRadius: 10,
           border: `1px solid ${PALETTE.border}`,
           background: disabled ? PALETTE.cream : '#fff',
@@ -135,13 +135,12 @@ export default function MultiChipsInput({
           <span
             key={`${v}-${i}`}
             style={{
-              // 2026-05-08 — bumped padding + font so chip pills read
-              // as proper "bubbles" instead of cramped tags.
-              display: 'inline-flex', alignItems: 'center', gap: 6,
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               background: PALETTE.goldSoft, color: PALETTE.ink,
-              padding: '6px 14px 6px 10px', borderRadius: 999,
-              fontSize: 14, fontWeight: 700,
+              padding: '2px 10px 2px 6px', borderRadius: 999,
+              fontSize: 13, fontWeight: 700, lineHeight: 1.4,
               border: `1px solid ${PALETTE.border}`,
+              maxHeight: 28,
             }}
           >
             <button
@@ -162,7 +161,7 @@ export default function MultiChipsInput({
         <input
           ref={inputRef}
           type="text"
-          dir="auto"
+          dir="rtl"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
@@ -179,6 +178,7 @@ export default function MultiChipsInput({
             flex: 1, minWidth: 120, border: 'none', outline: 'none',
             padding: '4px 2px', fontSize: 14, background: 'transparent',
             color: PALETTE.ink,
+            direction: 'rtl', textAlign: 'right',
           }}
         />
       </div>

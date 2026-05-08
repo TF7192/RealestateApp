@@ -50,11 +50,11 @@ describe('<LeadFiltersSheet />', () => {
 
   it('renders the header and every section when open=true', () => {
     openSheet();
-    const dialog = screen.getByRole('dialog', { name: 'סינון לידים' });
+    const dialog = screen.getByRole('dialog', { name: 'סינון מתעניינים' });
     expect(dialog).toBeTruthy();
 
     // Header
-    expect(within(dialog).getByRole('heading', { name: 'סינון לידים' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'סינון מתעניינים' })).toBeTruthy();
 
     // Each section heading is an <h4> with the section's label.
     for (const title of ['סטטוס', 'מה מחפש', 'אופי נכס', 'עיר', 'תקציב', 'חדרים']) {
@@ -65,14 +65,14 @@ describe('<LeadFiltersSheet />', () => {
   it('renders the status/lookingFor/interestType radiogroups', () => {
     openSheet();
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByRole('radiogroup', { name: 'סטטוס ליד' })).toBeTruthy();
+    expect(within(dialog).getByRole('radiogroup', { name: 'סטטוס מתעניין' })).toBeTruthy();
     expect(within(dialog).getByRole('radiogroup', { name: 'סוג עסקה' })).toBeTruthy();
     expect(within(dialog).getByRole('radiogroup', { name: 'סוג נכס' })).toBeTruthy();
   });
 
   it('seeds draft from the `values` prop (current pill is aria-checked)', () => {
     openSheet({ values: { status: 'hot', lookingFor: 'BUY', interestType: 'PRIVATE' } });
-    const statusGroup = screen.getByRole('radiogroup', { name: 'סטטוס ליד' });
+    const statusGroup = screen.getByRole('radiogroup', { name: 'סטטוס מתעניין' });
     const hotPill = within(statusGroup).getByRole('radio', { name: 'חמים' });
     expect(hotPill.getAttribute('aria-checked')).toBe('true');
 
@@ -87,7 +87,7 @@ describe('<LeadFiltersSheet />', () => {
 
   it('toggling a segmented pill updates state WITHOUT firing onApply', () => {
     const { onApply } = openSheet();
-    const statusGroup = screen.getByRole('radiogroup', { name: 'סטטוס ליד' });
+    const statusGroup = screen.getByRole('radiogroup', { name: 'סטטוס מתעניין' });
     const warmPill = within(statusGroup).getByRole('radio', { name: 'פושרים' });
 
     // Before click: the "all" pill is the checked one.
@@ -106,7 +106,7 @@ describe('<LeadFiltersSheet />', () => {
     const { onApply, onClose } = openSheet();
 
     // Pick HOT + BUY + a city.
-    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'סטטוס ליד' })).getByRole('radio', { name: 'חמים' }));
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'סטטוס מתעניין' })).getByRole('radio', { name: 'חמים' }));
     fireEvent.click(within(screen.getByRole('radiogroup', { name: 'סוג עסקה' })).getByRole('radio', { name: 'קנייה' }));
     fireEvent.change(screen.getByLabelText('עיר'), { target: { value: 'חיפה' } });
 
@@ -139,7 +139,7 @@ describe('<LeadFiltersSheet />', () => {
     openSheet({ values: { status: 'hot', lookingFor: 'BUY', city: 'חיפה' } });
 
     // Pre-condition — hot is checked, buy is checked.
-    const statusGroup = screen.getByRole('radiogroup', { name: 'סטטוס ליד' });
+    const statusGroup = screen.getByRole('radiogroup', { name: 'סטטוס מתעניין' });
     expect(within(statusGroup).getByRole('radio', { name: 'חמים' }).getAttribute('aria-checked')).toBe('true');
 
     fireEvent.click(screen.getByRole('button', { name: 'נקה' }));

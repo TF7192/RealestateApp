@@ -36,7 +36,7 @@ async function importFaq() {
 const EXPECTED_CATEGORIES = [
   'הכול',
   'כללי',
-  'לידים ולקוחות',
+  'מתעניינים ולקוחות',
   'נכסים',
   'עסקאות',
   'AI וסיכומים',
