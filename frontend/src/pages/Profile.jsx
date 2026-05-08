@@ -454,6 +454,11 @@ export default function Profile() {
             tied to the "שמור שינויים" form save above. */}
         <CalendarSection />
 
+        {/* 2026-05-08 — Outlook / Microsoft Graph Calendar. Parallel
+            to Google so an agent on O365 can two-way-sync without
+            picking one over the other. */}
+        <OutlookCalendarSection />
+
         {/* 2026-05-06 — Per-agent specialty cities. Drives the
             "מודעות חדשות בשוק" feed: when non-empty, the feed only
             returns listings whose city is on this list. Empty list
@@ -798,6 +803,112 @@ function CalendarSection() {
           </div>
           <button type="button" onClick={connect} style={primaryBtn()}>
             <LinkIcon size={13} /> חבר Google Calendar
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// 2026-05-08 — Outlook (Microsoft Graph) Calendar. Mirror of
+// CalendarSection; uses the parallel api.outlookCalendar* methods
+// and routes the redirect to /api/integrations/outlook-calendar/connect.
+function OutlookCalendarSection() {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => {
+    api.outlookCalendarStatus().then(setStatus).catch(() => setStatus({ connected: false, configured: false }));
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('outlook')) {
+      sp.delete('outlook');
+      const next = window.location.pathname + (sp.toString() ? `?${sp.toString()}` : '');
+      window.history.replaceState({}, '', next);
+      refresh();
+    }
+  }, []);
+
+  useEffect(() => {
+    const onVis = () => { if (!document.hidden) refresh(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
+  const connect = () => {
+    window.location.href = '/api/integrations/outlook-calendar/connect';
+  };
+  const disconnect = async () => {
+    setBusy(true);
+    try { await api.outlookCalendarDisconnect(); } catch { /* ignore */ }
+    setBusy(false);
+    refresh();
+  };
+
+  return (
+    <section style={sectionCard()} aria-label="Outlook Calendar">
+      <h3 style={sectionTitle()}>
+        <Calendar size={16} /> Outlook Calendar
+        <span style={sectionSubtitle()}>
+          סנכרון פגישות עם יומן Microsoft 365 שלך
+        </span>
+      </h3>
+      {status?.configured === false ? (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          background: 'rgba(180,83,9,0.08)', color: '#b45309',
+          padding: '8px 12px', borderRadius: 10, fontSize: 13,
+        }}>
+          <AlertCircle size={14} />
+          האינטגרציה לא הוגדרה בצד השרת. נא ליצור קשר עם הצוות הטכני.
+        </div>
+      ) : status?.connected ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          background: 'rgba(21,128,61,0.06)',
+          border: `1px solid rgba(21,128,61,0.15)`,
+          borderRadius: 10, padding: '12px 14px', flexWrap: 'wrap',
+        }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: 99,
+            background: 'rgba(21,128,61,0.15)', color: DT.success,
+            display: 'grid', placeItems: 'center', flexShrink: 0,
+          }}>
+            <Check size={14} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 180 }}>
+            <strong style={{ fontSize: 13, color: DT.ink }}>מחובר</strong>
+            <span style={{ fontSize: 12, color: DT.muted }}>
+              פגישות שתיצור יופיעו אוטומטית ב-Outlook שלך.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={disconnect}
+            disabled={busy}
+            style={{ ...secondaryBtn(), opacity: busy ? 0.6 : 1 }}
+          >
+            <Unlink size={13} /> נתק
+          </button>
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          background: DT.cream4, border: `1px solid ${DT.border}`,
+          borderRadius: 10, padding: '12px 14px', flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 180 }}>
+            <strong style={{ fontSize: 13, color: DT.ink }}>לא מחובר</strong>
+            <span style={{ fontSize: 12, color: DT.muted }}>
+              התחבר כדי שפגישות שתתזמן יוצרו אוטומטית ב-Outlook Calendar.
+            </span>
+          </div>
+          <button type="button" onClick={connect} style={primaryBtn()}>
+            <LinkIcon size={13} /> חבר Outlook Calendar
           </button>
         </div>
       )}

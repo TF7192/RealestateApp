@@ -33,6 +33,7 @@ import { registerSitemapRoute } from './routes/sitemap.js';
 import { registerProspectRoutes } from './routes/prospects.js';
 import { registerProspectPdfRoutes } from './routes/prospect-pdf.js';
 import { registerCalendarRoutes } from './routes/calendar.js';
+import { registerOutlookCalendarRoutes } from './routes/outlook-calendar.js';
 import { registerMeetingRoutes } from './routes/meetings.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { registerAgentRoutes } from './routes/agents.js';
@@ -334,6 +335,7 @@ export async function build(opts: BuildOptions = {}) {
   // so the routes sit next to /api/prospects/* from registerProspectRoutes.
   await app.register(registerProspectPdfRoutes, { prefix: '/api' });
   await app.register(registerCalendarRoutes, { prefix: '/api/integrations/calendar' });
+  await app.register(registerOutlookCalendarRoutes, { prefix: '/api/integrations/outlook-calendar' });
   await app.register(registerMeetingRoutes, { prefix: '/api/meetings' });
   await app.register(registerOfficeRoutes, { prefix: '/api/office' });
   await app.register(registerTeamRoutes, { prefix: '/api/team' });

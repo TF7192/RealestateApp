@@ -428,6 +428,14 @@ model User {
   googleRefreshToken    String?
   googleTokenExpiresAt  DateTime?    @db.Timestamptz(6)
   googleCalendarEnabled Boolean      @default(false)
+  // 2026-05-08 — same shape, but Microsoft Graph (Outlook). Agents
+  // using O365 instead of Google can connect their Outlook calendar
+  // and have meetings two-way-sync. OAuth scope =
+  // Calendars.ReadWrite + offline_access. Tokens refresh server-side.
+  outlookAccessToken     String?
+  outlookRefreshToken    String?
+  outlookTokenExpiresAt  DateTime?    @db.Timestamptz(6)
+  outlookCalendarEnabled Boolean      @default(false)
 
   // Sprint 1 / MLS parity — Task A1. Office membership. Null for the
   // legacy solo-agent flow; populated once an OWNER invites an agent
@@ -1448,6 +1456,10 @@ model LeadMeeting {
   startsAt      DateTime @db.Timestamptz(6)
   endsAt        DateTime @db.Timestamptz(6)
   googleEventId String?
+  // 2026-05-08 — parallel field for Microsoft Graph events when the
+  // agent's Outlook integration is on. Either or both can be populated
+  // depending on which calendars the agent has connected.
+  outlookEventId String?
   // Sprint 5 / AI — voice summariser. `audioKey` is the storage key of
   // the uploaded voice note (S3 path in prod; `local://tmp/<uuid>.webm`
   // when S3 was unreachable during tests). `summary` holds the Hebrew

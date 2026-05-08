@@ -333,6 +333,12 @@ export const api = {
   // connect is a redirect, we navigate directly rather than fetch it.
   calendarConnectUrl: () => `${import.meta.env.VITE_API_URL || '/api'}/integrations/calendar/connect`,
 
+  // 2026-05-08 — Outlook (Microsoft Graph) Calendar. Same shape as
+  // the Google trio so the Profile UI can render two parallel cards.
+  outlookCalendarStatus:     () => request('/integrations/outlook-calendar/status'),
+  outlookCalendarDisconnect: () => request('/integrations/outlook-calendar/disconnect', { method: 'POST' }),
+  outlookCalendarConnectUrl: () => `${import.meta.env.VITE_API_URL || '/api'}/integrations/outlook-calendar/connect`,
+
   // Sprint 4 — flat cross-lead meetings list for the /calendar page.
   // Optional `from` / `to` ISO strings bound the window.
   listMeetings: (params = {}) => {
