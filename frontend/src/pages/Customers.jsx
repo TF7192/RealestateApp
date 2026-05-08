@@ -16,6 +16,7 @@ import { formatPhone } from '../lib/phone';
 import { useViewportMobile, useRefreshOnRefocus } from '../hooks/mobile';
 import LeadFiltersSheet from '../components/LeadFiltersSheet';
 import CustomerEditDialog from '../components/CustomerEditDialog';
+import BulkWhatsAppDialog from '../components/BulkWhatsAppDialog';
 import SwipeRow from '../components/SwipeRow';
 import PullRefresh from '../components/PullRefresh';
 import { telUrl, waUrl } from '../lib/waLink';
@@ -66,6 +67,12 @@ export default function Customers() {
   // budget without leaving the list. Triggered by the negative-style
   // pencil icon next to the row's phone+WhatsApp cluster.
   const [editLead, setEditLead] = useState(null);
+  // 2026-05-08 — bulk WhatsApp send. Set<id> of selected lead rows;
+  // toggle via per-row checkbox + "select all" in the header. The
+  // "שלח WhatsApp לנבחרים" CTA shows up in a sticky toolbar when
+  // selectedIds.size > 0 and opens BulkWhatsAppDialog.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   // Lazy-load the city lookup once the sheet is about to open. Cheap
   // payload (~a few KB), cached by api.js's GET-level HTTP cache.
@@ -400,6 +407,22 @@ export default function Customers() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${DT.border}`, background: DT.cream2 }}>
+                    <th style={{ ...headerCell(), width: 36 }}>
+                      <input
+                        type="checkbox"
+                        aria-label="בחר הכול"
+                        checked={filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(new Set(filtered.map((l) => l.id)));
+                          } else {
+                            setSelectedIds(new Set());
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </th>
                     {['שם', 'טלפון', 'עיר', 'תקציב', 'מה מחפש', 'מקור', 'עודכן', ''].map((h) => (
                       <th key={h} style={headerCell()}>{h}</th>
                     ))}
@@ -416,6 +439,19 @@ export default function Customers() {
                         cursor: 'pointer',
                       }}
                     >
+                      <td style={{ ...bodyCell(), width: 36 }} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`בחר את ${l.name || 'מתעניין'}`}
+                          checked={selectedIds.has(l.id)}
+                          onChange={(e) => {
+                            const next = new Set(selectedIds);
+                            if (e.target.checked) next.add(l.id); else next.delete(l.id);
+                            setSelectedIds(next);
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
                       <td style={bodyCell()}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <Avatar name={l.name} />
@@ -484,11 +520,64 @@ export default function Customers() {
         </div>
       )}
     </div>
+    {selectedIds.size > 0 && (
+      <div
+        role="toolbar"
+        aria-label={`${selectedIds.size} נבחרו`}
+        dir="rtl"
+        style={{
+          position: 'fixed',
+          bottom: 24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: DT.ink,
+          color: DT.cream,
+          borderRadius: 14,
+          padding: '10px 16px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 12,
+          fontSize: 13,
+          fontWeight: 700,
+          boxShadow: '0 12px 28px rgba(0,0,0,0.25)',
+          zIndex: 50,
+          direction: 'rtl',
+        }}
+      >
+        <span>{selectedIds.size} נבחרו</span>
+        <button
+          type="button"
+          className="btn btn-whatsapp btn-sm"
+          onClick={() => setBulkOpen(true)}
+        >
+          <MessageCircle size={14} /> שלח WhatsApp לנבחרים
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedIds(new Set())}
+          style={{
+            background: 'transparent',
+            color: DT.cream,
+            border: `1px solid rgba(251,247,240,0.3)`,
+            padding: '6px 10px',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontSize: 12, fontWeight: 700,
+          }}
+        >בטל בחירה</button>
+      </div>
+    )}
     {editLead && (
       <CustomerEditDialog
         lead={editLead}
         onClose={() => setEditLead(null)}
         onSaved={() => { setEditLead(null); load(); }}
+      />
+    )}
+    {bulkOpen && (
+      <BulkWhatsAppDialog
+        leads={leads.filter((l) => selectedIds.has(l.id))}
+        onClose={() => setBulkOpen(false)}
       />
     )}
     </Container>
