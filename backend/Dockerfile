@@ -39,6 +39,12 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
 COPY tsconfig.json ./
 COPY src ./src
+# 2026-05-08 — bring scripts/ into the build stage too so it lands in
+# the runtime image. One-off ops (neighborhood backfill, notification
+# format backfill) need to run inside the prod container with the
+# right Prisma client / node_modules; shipping the script source is
+# simpler than building a separate image.
+COPY scripts ./scripts
 RUN npx prisma generate
 RUN npx tsc -p tsconfig.json
 
@@ -57,6 +63,12 @@ COPY --from=build /app/src/assets ./dist/assets
 # imported by addressNormalize.ts via resolveJsonModule, but tsc
 # doesn't emit .json files, so it would be missing at runtime.
 COPY --from=build /app/src/data ./dist/data
+# 2026-05-08 — also keep the raw src/ + scripts/ in the runtime image
+# so one-off ops scripts can be exec'd with `npx tsx` inside the prod
+# container. Adds a couple of MB of TS source — worth it for not
+# having to docker-cp every time we run a backfill.
+COPY --from=build /app/src ./src
+COPY --from=build /app/scripts ./scripts
 COPY package.json package-lock.json ./
 # tsx runs the seed script in production without a separate build step.
 # Also re-pin openai + @anthropic-ai/sdk here — the earlier
