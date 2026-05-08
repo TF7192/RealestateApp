@@ -1069,8 +1069,13 @@ html, body {
    `animation:` inline shorthand so each navigation shows a subtle
    lift rather than an instant swap. Respects reduced-motion. */
 @keyframes estia-page-fade {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  /* Opacity-only on purpose — using `transform` here turns <main>
+     into a containing block for any descendant `position:fixed`,
+     which broke modal overlays (they'd land relative to <main>
+     instead of the viewport, leaving the topbar / sidebar visible
+     above the dim layer). Lift is gone; the fade alone is enough. */
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   main { animation: none !important; }

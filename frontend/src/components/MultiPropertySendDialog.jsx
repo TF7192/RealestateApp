@@ -127,7 +127,7 @@ export default function MultiPropertySendDialog({ lead, onClose }) {
       aria-labelledby="mpd-title"
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
       style={{
-        position: 'fixed', inset: 0, zIndex: 80,
+        position: 'fixed', inset: 0, zIndex: 1200,
         background: 'rgba(13,15,20,0.55)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 16,

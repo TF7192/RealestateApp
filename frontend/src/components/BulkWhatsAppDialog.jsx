@@ -56,7 +56,7 @@ export default function BulkWhatsAppDialog({ leads = [], onClose }) {
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, background: 'rgba(30,26,20,0.5)',
-        display: 'grid', placeItems: 'center', zIndex: 100, padding: 16,
+        display: 'grid', placeItems: 'center', zIndex: 1200, padding: 16,
       }}
     >
       <div

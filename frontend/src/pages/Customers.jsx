@@ -5,7 +5,8 @@
 // direct phone + WhatsApp launchers so the agent never has to open
 // the detail page for a one-tap outreach.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Upload, Filter, Phone, MessageCircle, Sparkles, Search,
@@ -73,6 +74,15 @@ export default function Customers() {
   // selectedIds.size > 0 and opens BulkWhatsAppDialog.
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
+  // Stable callback so the memoized DesktopLeadRow doesn't see a new
+  // function on every render (would defeat the React.memo).
+  const toggleSelected = useCallback((id, on) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id); else next.delete(id);
+      return next;
+    });
+  }, []);
 
   // Lazy-load the city lookup once the sheet is about to open. Cheap
   // payload (~a few KB), cached by api.js's GET-level HTTP cache.
@@ -430,88 +440,14 @@ export default function Customers() {
                 </thead>
                 <tbody>
                   {filtered.map((l) => (
-                    <tr
+                    <DesktopLeadRow
                       key={l.id}
-                      className="estia-row-hover"
-                      onClick={() => navigate(`/customers/${l.id}`)}
-                      style={{
-                        borderBottom: `1px solid ${DT.border}`,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <td style={{ ...bodyCell(), width: 36 }} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          aria-label={`בחר את ${l.name || 'מתעניין'}`}
-                          checked={selectedIds.has(l.id)}
-                          onChange={(e) => {
-                            const next = new Set(selectedIds);
-                            if (e.target.checked) next.add(l.id); else next.delete(l.id);
-                            setSelectedIds(next);
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        />
-                      </td>
-                      <td style={bodyCell()}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Avatar name={l.name} />
-                          <div>
-                            <div style={{ fontWeight: 700 }}>{l.name || 'מתעניין'}</div>
-                            <StatusChip status={l.status} />
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ ...bodyCell(), color: DT.muted, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'right' }}>
-                        {l.phone ? formatPhone(l.phone) : '—'}
-                      </td>
-                      <td style={bodyCell()}>{l.city || '—'}</td>
-                      <td style={{ ...bodyCell(), fontWeight: 700 }}>
-                        {l.budget ? `₪${Math.round(l.budget / 1000)}K` : (l.priceRangeLabel || '—')}
-                      </td>
-                      <td style={{
-                        ...bodyCell(), color: DT.muted,
-                        maxWidth: 220, overflow: 'hidden',
-                        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {[l.rooms ? `${l.rooms} חד׳` : null, l.lookingFor === 'BUY' ? 'קנייה' : 'שכירות']
-                          .filter(Boolean).join(' · ') || '—'}
-                      </td>
-                      <td style={{ ...bodyCell(), color: DT.muted, fontSize: 12 }}>{l.source || '—'}</td>
-                      <td style={{ ...bodyCell(), color: DT.muted, fontSize: 12 }}>
-                        {l.updatedAt
-                          ? new Date(l.updatedAt).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })
-                          : '—'}
-                      </td>
-                      <td style={{ ...bodyCell(), textAlign: 'left' }}>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                          {l.phone && (
-                            <a
-                              href={`tel:${l.phone}`}
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label="התקשר"
-                              style={iconBtn(DT.cream2, DT.ink)}
-                            ><Phone size={12} /></a>
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setEditLead(l); }}
-                            aria-label="ערוך מתעניין"
-                            title="ערוך"
-                            style={iconBtn(DT.ink, DT.cream)}
-                          ><Edit3 size={12} /></button>
-                          {l.phone && (
-                            <a
-                              href={`https://wa.me/${l.phone.replace(/\D/g, '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label="WhatsApp"
-                              style={iconBtn('rgba(21,128,61,0.12)', DT.success)}
-                            ><MessageCircle size={12} /></a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                      lead={l}
+                      isSelected={selectedIds.has(l.id)}
+                      onToggle={toggleSelected}
+                      onNavigate={() => navigate(`/customers/${l.id}`)}
+                      onEdit={() => setEditLead(l)}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -520,7 +456,7 @@ export default function Customers() {
         </div>
       )}
     </div>
-    {selectedIds.size > 0 && (
+    {selectedIds.size > 0 && createPortal(
       <div
         role="toolbar"
         aria-label={`${selectedIds.size} נבחרו`}
@@ -530,7 +466,7 @@ export default function Customers() {
           bottom: 24,
           left: '50%',
           transform: 'translateX(-50%)',
-          background: DT.ink,
+          background: '#3a2e1f',
           color: DT.cream,
           borderRadius: 14,
           padding: '10px 16px',
@@ -540,7 +476,10 @@ export default function Customers() {
           fontSize: 13,
           fontWeight: 700,
           boxShadow: '0 12px 28px rgba(0,0,0,0.25)',
-          zIndex: 50,
+          // Above sidebar (200) but below modal dialogs (1200) so when
+          // the BulkWhatsAppDialog opens, its dim overlay covers the
+          // toolbar instead of the toolbar floating on top of the dim.
+          zIndex: 1100,
           direction: 'rtl',
         }}
       >
@@ -565,7 +504,8 @@ export default function Customers() {
             fontSize: 12, fontWeight: 700,
           }}
         >בטל בחירה</button>
-      </div>
+      </div>,
+      document.body,
     )}
     {editLead && (
       <CustomerEditDialog
@@ -583,6 +523,98 @@ export default function Customers() {
     </Container>
   );
 }
+
+// 2026-05-08 — extracted from the inline map so each row only re-renders
+// when its OWN selection state flips, not when any other row's checkbox
+// is clicked. Without this, ticking one checkbox re-rendered all 100+
+// rows and visually felt like "the table refreshed".
+const DesktopLeadRow = memo(function DesktopLeadRow({
+  lead: l,
+  isSelected,
+  onToggle,
+  onNavigate,
+  onEdit,
+}) {
+  return (
+    <tr
+      className="estia-row-hover"
+      onClick={onNavigate}
+      style={{
+        borderBottom: `1px solid ${DT.border}`,
+        cursor: 'pointer',
+      }}
+    >
+      <td style={{ ...bodyCell(), width: 36 }} onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          aria-label={`בחר את ${l.name || 'מתעניין'}`}
+          checked={isSelected}
+          onChange={(e) => onToggle(l.id, e.target.checked)}
+          style={{ cursor: 'pointer' }}
+        />
+      </td>
+      <td style={bodyCell()}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Avatar name={l.name} />
+          <div>
+            <div style={{ fontWeight: 700 }}>{l.name || 'מתעניין'}</div>
+            <StatusChip status={l.status} />
+          </div>
+        </div>
+      </td>
+      <td style={{ ...bodyCell(), color: DT.muted, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'right' }}>
+        {l.phone ? formatPhone(l.phone) : '—'}
+      </td>
+      <td style={bodyCell()}>{l.city || '—'}</td>
+      <td style={{ ...bodyCell(), fontWeight: 700 }}>
+        {l.budget ? `₪${Math.round(l.budget / 1000)}K` : (l.priceRangeLabel || '—')}
+      </td>
+      <td style={{
+        ...bodyCell(), color: DT.muted,
+        maxWidth: 220, overflow: 'hidden',
+        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {[l.rooms ? `${l.rooms} חד׳` : null, l.lookingFor === 'BUY' ? 'קנייה' : 'שכירות']
+          .filter(Boolean).join(' · ') || '—'}
+      </td>
+      <td style={{ ...bodyCell(), color: DT.muted, fontSize: 12 }}>{l.source || '—'}</td>
+      <td style={{ ...bodyCell(), color: DT.muted, fontSize: 12 }}>
+        {l.updatedAt
+          ? new Date(l.updatedAt).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })
+          : '—'}
+      </td>
+      <td style={{ ...bodyCell(), textAlign: 'left' }}>
+        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+          {l.phone && (
+            <a
+              href={`tel:${l.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="התקשר"
+              style={iconBtn(DT.cream2, DT.ink)}
+            ><Phone size={12} /></a>
+          )}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            aria-label="ערוך מתעניין"
+            title="ערוך"
+            style={iconBtn(DT.ink, DT.cream)}
+          ><Edit3 size={12} /></button>
+          {l.phone && (
+            <a
+              href={`https://wa.me/${l.phone.replace(/\D/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="WhatsApp"
+              style={iconBtn('rgba(21,128,61,0.12)', DT.success)}
+            ><MessageCircle size={12} /></a>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+});
 
 // Sprint 8 — MobileLeadRow wraps the lead card in a SwipeRow so RTL
 // swipe-left (trailing reveal) exposes call / WhatsApp / SMS actions.
