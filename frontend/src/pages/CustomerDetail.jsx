@@ -26,7 +26,6 @@ import MultiPropertySendDialog from '../components/MultiPropertySendDialog';
 import CustomerEditDialog from '../components/CustomerEditDialog';
 import ActivityPanel from '../components/ActivityPanel';
 import MeetingSummarizerCard from '../components/MeetingSummarizerCard';
-import { leadMatchesProperty } from './Properties';
 import { primeContactBump } from '../hooks/mobile';
 import { formatPhone } from '../lib/phone';
 import { relativeDate } from '../lib/relativeDate';
@@ -124,14 +123,19 @@ export default function CustomerDetail() {
   useEffect(() => { loadLatestMeeting(); }, [loadLatestMeeting]);
 
   // Count matching properties for the gold pill in the header.
+  // 2026-05-08 — was running the client-side `leadMatchesProperty`
+  // matcher over the agent's full property list, which has different
+  // (looser) criteria than `api.leadMatches`. Result: pill said "1
+  // נכס תואם" while the panel below said "אין התאמות" — same lead,
+  // two different answers. Now both surfaces share the same source.
   useEffect(() => {
     if (!lead) return undefined;
     let cancelled = false;
-    api.listProperties({ mine: '1' })
+    api.leadMatches(lead.id)
       .then((res) => {
         if (cancelled) return;
-        const props = res?.items || [];
-        setMatchCount(props.filter((p) => leadMatchesProperty(lead, p)).length);
+        const items = res?.items || [];
+        setMatchCount(items.length);
       })
       .catch(() => { /* pill stays at 0 */ });
     return () => { cancelled = true; };
