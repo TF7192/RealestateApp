@@ -196,7 +196,7 @@ export default function Customers() {
         marginBottom: 18, gap: 16, flexWrap: 'wrap',
       }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.7, margin: 0 }}>לידים</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.7, margin: 0 }}>מתעניינים</h1>
           <div style={{ fontSize: 13, color: DT.muted, marginTop: 2 }}>
             {leads.length} סך הכול · {counts.hot} חמים · {counts.warm} פושרים · {counts.cold} קרים
           </div>
@@ -216,7 +216,7 @@ export default function Customers() {
             <Upload size={14} /> ייבוא
           </Link>
           <Link to="/customers/new" style={primaryBtn()}>
-            <Plus size={14} /> ליד חדש
+            <Plus size={14} /> מתעניין חדש
           </Link>
         </div>
       </div>
@@ -228,7 +228,7 @@ export default function Customers() {
         flexWrap: 'wrap',
       }}>
         {[
-          { k: 'all',    label: 'כל הלידים', n: leads.length },
+          { k: 'all',    label: 'כל המתעניינים', n: leads.length },
           { k: 'buyer',  label: 'ליד מתעניין', n: kindCounts.buyer },
           { k: 'seller', label: 'ליד גיוס',    n: kindCounts.seller },
         ].map((t) => {
@@ -262,7 +262,7 @@ export default function Customers() {
           <button
             type="button"
             onClick={() => setSheetOpen(true)}
-            aria-label="סינון לידים"
+            aria-label="סינון מתעניינים"
             style={{
               ...FONT,
               background: DT.white, color: DT.ink,
@@ -355,7 +355,7 @@ export default function Customers() {
             <div style={{
               padding: 40, textAlign: 'center', color: DT.muted, fontSize: 13,
               background: DT.white, border: `1px solid ${DT.border}`, borderRadius: 14,
-            }}>טוען לידים…</div>
+            }}>טוען מתעניינים…</div>
           )}
           {!loading && filtered.length === 0 && (
             <div style={{
@@ -384,7 +384,7 @@ export default function Customers() {
         }}>
           {loading && (
             <div style={{ padding: 40, textAlign: 'center', color: DT.muted, fontSize: 13 }}>
-              טוען לידים…
+              טוען מתעניינים…
             </div>
           )}
           {!loading && filtered.length === 0 && (
@@ -415,7 +415,7 @@ export default function Customers() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <Avatar name={l.name} />
                           <div>
-                            <div style={{ fontWeight: 700 }}>{l.name || 'ליד'}</div>
+                            <div style={{ fontWeight: 700 }}>{l.name || 'מתעניין'}</div>
                             <StatusChip status={l.status} />
                           </div>
                         </div>
@@ -522,7 +522,7 @@ function MobileLeadRow({ lead, onOpen }) {
             <div style={{
               fontWeight: 700, fontSize: 15,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>{lead.name || 'ליד'}</div>
+            }}>{lead.name || 'מתעניין'}</div>
             <StatusChip status={lead.status} />
           </div>
           <div style={{
@@ -616,17 +616,17 @@ function EmptyState({ hasAny }) {
     <div style={{ padding: '48px 24px', textAlign: 'center', color: DT.muted }}>
       <Sparkles size={28} style={{ color: DT.gold, marginBottom: 10 }} aria-hidden="true" />
       <div style={{ fontSize: 16, fontWeight: 800, color: DT.ink, marginBottom: 6 }}>
-        {hasAny ? 'אין תוצאות למסנן הזה' : 'עדיין אין לידים'}
+        {hasAny ? 'אין תוצאות למסנן הזה' : 'עדיין אין מתעניינים'}
       </div>
       <p style={{ fontSize: 13, margin: '0 0 16px', lineHeight: 1.7 }}>
         {hasAny
-          ? 'נסו מסנן אחר או נקו את החיפוש כדי לראות את כל הלידים.'
-          : 'התחילו עם ליד ראשון — הקלדה ידנית או ייבוא מ-Excel.'}
+          ? 'נסו מסנן אחר או נקו את החיפוש כדי לראות את כל המתעניינים.'
+          : 'התחילו עם מתעניין ראשון — הקלדה ידנית או ייבוא מ-Excel.'}
       </p>
       {!hasAny && (
         <div style={{ display: 'inline-flex', gap: 8 }}>
           <Link to="/customers/new" style={primaryBtn()}>
-            <Plus size={14} /> ליד חדש
+            <Plus size={14} /> מתעניין חדש
           </Link>
           <Link to="/import/leads" style={actionBtn()}>
             <Upload size={14} /> ייבוא מ-Excel

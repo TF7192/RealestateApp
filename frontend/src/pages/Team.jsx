@@ -51,7 +51,7 @@ const COLS = [
   { key: 'closedDeals',      label: 'עסקאות נסגרו',   numeric: true  },
   { key: 'totalVolume',      label: 'מחזור',           numeric: true  },
   { key: 'avgRating',        label: 'דירוג',           numeric: true  },
-  { key: 'leadsOpen',        label: 'לידים פתוחים',   numeric: true  },
+  { key: 'leadsOpen',        label: 'מתעניינים פתוחים',   numeric: true  },
   { key: 'propertiesActive', label: 'נכסים פעילים',   numeric: true  },
 ];
 

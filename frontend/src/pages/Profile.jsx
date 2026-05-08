@@ -469,7 +469,7 @@ export default function Profile() {
             <span style={sectionSubtitle()}>הורדת כל המידע שלך כקובץ JSON</span>
           </h3>
           <p style={{ margin: '0 0 12px', fontSize: 13, color: DT.muted, lineHeight: 1.6 }}>
-            מורידה את כל הנכסים, הלידים, הפגישות, ההסכמים והתיעוד שלך
+            מורידה את כל הנכסים, המתעניינים, הפגישות, ההסכמים והתיעוד שלך
             בפורמט JSON אחד. בהתאם לסעיף 13 לחוק הגנת הפרטיות (זכות עיון).
           </p>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -740,7 +740,7 @@ function CalendarSection() {
       <h3 style={sectionTitle()}>
         <Calendar size={16} /> Google Calendar
         <span style={sectionSubtitle()}>
-          תזמון פגישות עם לידים — יסתנכרן ליומן שלך
+          תזמון פגישות עם מתעניינים — יסתנכרן ליומן שלך
         </span>
       </h3>
       {status?.configured === false ? (
@@ -769,7 +769,7 @@ function CalendarSection() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 180 }}>
             <strong style={{ fontSize: 13, color: DT.ink }}>מחובר</strong>
             <span style={{ fontSize: 12, color: DT.muted }}>
-              פגישות שתיצור מעמוד הליד יופיעו אוטומטית ביומן שלך.
+              פגישות שתיצור מעמוד המתעניין יופיעו אוטומטית ביומן שלך.
             </span>
           </div>
           <button
@@ -793,7 +793,7 @@ function CalendarSection() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 180 }}>
             <strong style={{ fontSize: 13, color: DT.ink }}>לא מחובר</strong>
             <span style={{ fontSize: 12, color: DT.muted }}>
-              התחבר כדי שפגישות שתתזמן עם לידים יוצרו אוטומטית ב-Google Calendar.
+              התחבר כדי שפגישות שתתזמן עם מתעניינים יוצרו אוטומטית ב-Google Calendar.
             </span>
           </div>
           <button type="button" onClick={connect} style={primaryBtn()}>

@@ -27,7 +27,7 @@ describe('N-16 — VoiceCaptureButton premium gate', () => {
   it('opens the premium-gate dialog on LEAD kind', async () => {
     const user = userEvent.setup({ delay: null });
     render(<VoiceCaptureButton kind="LEAD" onExtracted={() => {}} />);
-    await user.click(screen.getByRole('button', { name: /דבר במקום להקליד — ליד/ }));
+    await user.click(screen.getByRole('button', { name: /דבר במקום להקליד — מתעניין/ }));
     expect(await screen.findByText(/פיצ׳ר פרימיום/)).toBeInTheDocument();
   });
 
@@ -53,7 +53,7 @@ describe('N-16 — VoiceCaptureButton premium gate', () => {
     });
 
     render(<VoiceCaptureButton kind="LEAD" onExtracted={() => {}} />);
-    await user.click(screen.getByRole('button', { name: /דבר במקום להקליד — ליד/ }));
+    await user.click(screen.getByRole('button', { name: /דבר במקום להקליד — מתעניין/ }));
     await user.click(await screen.findByRole('button', { name: /צור קשר עם התמיכה/ }));
 
     await waitFor(() => expect(navigatedTo).toMatch(/^mailto:support@estia\.co\.il/));

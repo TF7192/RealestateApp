@@ -32,12 +32,12 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 // can run against /api/ai/chat with context pulled from the caller's
 // leads / properties / deals.
 const SUGGESTED_PROMPTS = [
-  'תכתוב הודעת תזכורת לכל הלידים שמחפשים דירה בראשון לציון',
-  'תבדוק לי איזה ליד לא קיבל מענה בשבוע האחרון',
+  'תכתוב הודעת תזכורת לכל המתעניינים שמחפשים דירה בראשון לציון',
+  'תבדוק לי איזה מתעניין לא קיבל מענה בשבוע האחרון',
   'סכם לי את העסקאות שנסגרו החודש',
-  'איזה נכסים במלאי שלי מתאימים לליד החם האחרון שהוספתי?',
+  'איזה נכסים במלאי שלי מתאימים למתעניין החם האחרון שהוספתי?',
   'הצע לי טקסט שיווק לפנטהאוז על הים שאני משווק',
-  'הכן לי תזכורות מעקב לכל הלידים שבסטטוס פושר',
+  'הכן לי תזכורות מעקב לכל המתעניינים שבסטטוס פושר',
 ];
 
 const PERSIST_KEY = 'estia-ai-chat-v1';
@@ -303,7 +303,7 @@ export default function Ai() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="שאל/י כל דבר על מכירה, ליד, או ניסוח הודעה…"
+              placeholder="שאל/י כל דבר על מכירה, מתעניין, או ניסוח הודעה…"
               rows={1}
               style={{
                 ...FONT,

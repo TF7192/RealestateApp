@@ -162,11 +162,11 @@ describe('<Customers> page (post-DLeads-port surface)', () => {
   it('renders the empty state when no leads exist', async () => {
     mountLeads([]);
     render(<Customers />, { route: '/customers' });
-    expect(await screen.findByText('עדיין אין לידים')).toBeInTheDocument();
-    // The toolbar at the top also surfaces a "ליד חדש" link, so on an
+    expect(await screen.findByText('עדיין אין מתעניינים')).toBeInTheDocument();
+    // The toolbar at the top also surfaces a "מתעניין חדש" link, so on an
     // empty page there are two — assert both target the right route
     // rather than getting tripped up by the duplicate.
-    const newLeadLinks = screen.getAllByRole('link', { name: /ליד חדש/ });
+    const newLeadLinks = screen.getAllByRole('link', { name: /מתעניין חדש/ });
     expect(newLeadLinks.length).toBeGreaterThanOrEqual(1);
     for (const a of newLeadLinks) expect(a).toHaveAttribute('href', '/customers/new');
     // Empty state's import CTA uses the longer "ייבוא מ-Excel" copy.
@@ -193,11 +193,11 @@ describe('<Customers> page (post-DLeads-port surface)', () => {
     }
   });
 
-  it('the toolbar exposes "ייבוא" and "ליד חדש" entry points', async () => {
+  it('the toolbar exposes "ייבוא" and "מתעניין חדש" entry points', async () => {
     mountLeads();
     render(<Customers />, { route: '/customers' });
     await screen.findByText('דנה אבני');
     expect(screen.getByRole('link', { name: /ייבוא/ })).toHaveAttribute('href', '/import/leads');
-    expect(screen.getByRole('link', { name: /ליד חדש/ })).toHaveAttribute('href', '/customers/new');
+    expect(screen.getByRole('link', { name: /מתעניין חדש/ })).toHaveAttribute('href', '/customers/new');
   });
 });

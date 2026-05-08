@@ -169,7 +169,7 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
                   <span className="mms-row-icon"><Shield size={18} /></span>
                   <span className="mms-row-text">
                     <strong>משתמשים</strong>
-                    <small>פאנל אדמין — כל המשתמשים, נכסים, לידים</small>
+                    <small>פאנל אדמין — כל המשתמשים, נכסים, מתעניינים</small>
                   </span>
                   <span className="mms-arrow">›</span>
                 </button>
@@ -185,7 +185,7 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
             </button>
             <button className="mms-row" onClick={() => go('/customers/new')}>
               <span className="mms-row-icon"><UserPlus size={18} /></span>
-              <span className="mms-row-text"><strong>ליד חדש</strong><small>הוספת לקוח פוטנציאלי</small></span>
+              <span className="mms-row-text"><strong>מתעניין חדש</strong><small>הוספת לקוח פוטנציאלי</small></span>
               <span className="mms-arrow">›</span>
             </button>
             <button className="mms-row" onClick={() => go('/properties/new')}>

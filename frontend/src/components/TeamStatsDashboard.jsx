@@ -185,8 +185,8 @@ export const WIDGETS = [
   },
   {
     kind: 'leadTemp',
-    title: 'טמפרטורת לידים',
-    tooltip: 'חלוקה לפי דירוג חום הליד',
+    title: 'טמפרטורת מתעניינים',
+    tooltip: 'חלוקה לפי דירוג חום המתעניין',
     render: (d) => {
       const t = d.leadTemperature || { HOT: 0, WARM: 0, COLD: 0, unspecified: 0 };
       const total = (t.HOT || 0) + (t.WARM || 0) + (t.COLD || 0) + (t.unspecified || 0);
@@ -234,8 +234,8 @@ export const WIDGETS = [
   },
   {
     kind: 'leadSources',
-    title: 'מקור לידים',
-    tooltip: 'מאיפה הגיעו הלידים האחרונים',
+    title: 'מקור מתעניינים',
+    tooltip: 'מאיפה הגיעו המתעניינים האחרונים',
     render: (d) => {
       const items = (d.leadSources || []).slice(0, 8).map((r) => ({
         label: SOURCE_LABELS[r.source] || r.source, value: r.count,
@@ -302,12 +302,12 @@ export const WIDGETS = [
   },
   {
     kind: 'inquiryConv',
-    title: 'המרת פניות → לידים',
-    tooltip: 'יחס בין פניות למודעות לבין לידים בפועל',
+    title: 'המרת פניות → מתעניינים',
+    tooltip: 'יחס בין פניות למודעות לבין מתעניינים בפועל',
     render: (d) => (
       <KpiBig
         value={fmtPct(d.inquiryToLeadConvRate)}
-        caption="פניות שהפכו ללידים אקטיביים"
+        caption="פניות שהפכו למתעניינים אקטיביים"
       />
     ),
   },
@@ -361,7 +361,7 @@ export const WIDGETS = [
       const lw = d.newLastWeek || { leads: 0, properties: 0 };
       return (
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
-          <KpiBig value={tw.leads} caption="לידים חדשים"
+          <KpiBig value={tw.leads} caption="מתעניינים חדשים"
             delta={tw.leads - lw.leads} deltaLabel="מהשבוע שעבר" />
           <KpiBig value={tw.properties} caption="נכסים חדשים"
             delta={tw.properties - lw.properties} deltaLabel="מהשבוע שעבר" />

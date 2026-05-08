@@ -93,7 +93,7 @@ function applyVoicePrefillLead(setForm, fields) {
 const PURPOSE_OPTIONS = Object.keys(CUSTOMER_PURPOSE_LABELS);
 
 const INITIAL_FORM = {
-  // 2026-04-30 — BUYER = ליד מתעניין (legacy default), SELLER = ליד
+  // 2026-04-30 — BUYER = ליד מתעניין (legacy default), SELLER = מתעניין
   // גיוס. SELLER renders the slim form: name/phone + city/hood/street
   // + price/rooms + notes. Everything else is BUYER-only.
   kind: 'BUYER',
@@ -195,7 +195,7 @@ export default function NewLead() {
 
   const hasContent = !!(form.name || form.phone || form.email || form.city || form.notes);
   const isDirty = hasContent && !savedRef.current;
-  useBeforeUnload(isDirty, 'יש שינויים שלא נשמרו בליד — לעזוב?');
+  useBeforeUnload(isDirty, 'יש שינויים שלא נשמרו במתעניין — לעזוב?');
   const [clipboardSuggestion, setClipboardSuggestion] = useState(null);
   const [clipboardDismissed, setClipboardDismissed] = useState(false);
   const peekedRef = useRef(false);
@@ -376,12 +376,12 @@ export default function NewLead() {
       const res = await api.createLead(body);
       savedRef.current = true;
       clearDraft();
-      toast.success('הליד נשמר');
+      toast.success('המתעניין נשמר');
       const newId = res?.id || res?.lead?.id;
       if (newId) navigate(`/customers/${newId}`);
       else navigate('/customers');
     } catch (err) {
-      toast.error(err?.message || 'שמירת הליד נכשלה');
+      toast.error(err?.message || 'שמירת המתעניין נכשלה');
       submittingRef.current = false;
       setSubmitting(false);
     }
@@ -405,7 +405,7 @@ export default function NewLead() {
         fontSize: 13, fontWeight: 700, marginBottom: 14,
       }}>
         <ArrowRight size={16} />
-        חזרה ללידים
+        חזרה למתעניינים
       </Link>
 
       {/* Page header card */}
@@ -423,7 +423,7 @@ export default function NewLead() {
         </div>
         <div style={{ flex: 1, minWidth: 220 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: 0 }}>
-            ליד חדש
+            מתעניין חדש
           </h1>
           <p style={{ fontSize: 13, color: DT.muted, margin: '4px 0 0' }}>
             הזן פרטי לקוח מתעניין
@@ -538,9 +538,9 @@ export default function NewLead() {
         {/* Section 0 — kind toggle. Drives whether the rest of the
             form renders the full BUYER (interested-party) brief or the
             slim SELLER (listing-recruitment) one. */}
-        <section style={sectionCard()} aria-label="סוג הליד">
+        <section style={sectionCard()} aria-label="סוג המתעניין">
           <h3 style={sectionTitle()}>
-            <Sparkles size={16} /> סוג הליד
+            <Sparkles size={16} /> סוג המתעניין
           </h3>
           <Segmented
             value={form.kind}
@@ -549,14 +549,14 @@ export default function NewLead() {
               { value: 'BUYER',  label: 'ליד מתעניין' },
               { value: 'SELLER', label: 'ליד גיוס' },
             ]}
-            ariaLabel="סוג הליד"
+            ariaLabel="סוג המתעניין"
           />
           <p style={{
             fontSize: 12, color: DT.muted, margin: '8px 0 0', lineHeight: 1.6,
           }}>
             {form.kind === 'SELLER'
-              ? 'ליד של בעל נכס שאתה רוצה לגייס לרשימת המכירה / השכרה.'
-              : 'ליד של לקוח שמחפש נכס לקנייה או שכירות.'}
+              ? 'מתעניין של בעל נכס שאתה רוצה לגייס לרשימת המכירה / השכרה.'
+              : 'מתעניין של לקוח שמחפש נכס לקנייה או שכירות.'}
           </p>
         </section>
 
@@ -584,7 +584,7 @@ export default function NewLead() {
           </div>
           {form.kind === 'BUYER' && (
           <div style={gridRow2()}>
-            <Field label="מקור הליד">
+            <Field label="מקור המתעניין">
               {/* F-5 — grouped sources. Flat 9-option dropdown hurt
                   scanning; "הפניה" vs "הפניה מלקוח" adjacency cost real
                   agent seconds and polluted the funnel report. */}
@@ -1002,12 +1002,12 @@ export default function NewLead() {
                 id="k2-cs"
               />
             </Field>
-            <Field label="סטטוס ליד">
+            <Field label="סטטוס מתעניין">
               <SelectField
                 value={form.leadStatus}
                 onChange={(v) => update('leadStatus', v)}
                 options={labelsToOptions(QUICK_LEAD_STATUS_LABELS)}
-                aria-label="סטטוס ליד"
+                aria-label="סטטוס מתעניין"
                 id="k2-ls"
               />
             </Field>
@@ -1097,7 +1097,7 @@ export default function NewLead() {
         }}>
           <button type="submit" disabled={submitting} style={primaryBtn(submitting)}>
             {submitting ? <Loader2 size={16} className="y2-spin" /> : <Save size={16} />}
-            {submitting ? 'שומר…' : 'שמור ליד'}
+            {submitting ? 'שומר…' : 'שמור מתעניין'}
           </button>
           <Link to="/customers" style={ghostBtn()}>
             ביטול
@@ -1130,7 +1130,7 @@ export default function NewLead() {
       <StickyActionBar visible>
         <button type="submit" form="lead-form" disabled={submitting} style={primaryBtn(submitting)}>
           {submitting ? <Loader2 size={16} className="y2-spin" /> : <Save size={16} />}
-          {submitting ? 'שומר…' : 'שמור ליד'}
+          {submitting ? 'שומר…' : 'שמור מתעניין'}
         </button>
         <Link to="/customers" style={ghostBtn()}>ביטול</Link>
       </StickyActionBar>

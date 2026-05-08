@@ -1,7 +1,7 @@
 // MobileTabBar — bottom nav. The earlier suite expected a "+ add"
-// flyout sheet with שortcuts (נכס חדש / ליד חדש / עסקאות / לוח בקרה).
+// flyout sheet with שortcuts (נכס חדש / מתעניין חדש / עסקאות / לוח בקרה).
 // The current MobileTabBar (frontend/src/components/MobileTabBar.jsx)
-// is a 4-tab bar (בית · לידים · נכסים · Estia AI) plus an "עוד"
+// is a 4-tab bar (בית · מתעניינים · נכסים · Estia AI) plus an "עוד"
 // button that opens a full-screen MoreSheet with the complete nav
 // tree, primary + tools + favorites — the simplified add-shortcut
 // flyout was retired during the claude.ai/design port. This file
@@ -13,11 +13,11 @@ import { render, screen, userEvent } from '../../setup/test-utils';
 import MobileTabBar from '@estia/frontend/components/MobileTabBar.jsx';
 
 describe('<MobileTabBar>', () => {
-  it('renders the four quick tabs (בית / לידים / נכסים / Estia AI) + עוד button', () => {
+  it('renders the four quick tabs (בית / מתעניינים / נכסים / Estia AI) + עוד button', () => {
     render(<MobileTabBar />);
     expect(screen.getByRole('navigation', { name: 'ניווט ראשי' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /בית/ })).toHaveAttribute('href', '/dashboard');
-    expect(screen.getByRole('link', { name: /לידים/ })).toHaveAttribute('href', '/customers');
+    expect(screen.getByRole('link', { name: /מתעניינים/ })).toHaveAttribute('href', '/customers');
     expect(screen.getByRole('link', { name: /נכסים/ })).toHaveAttribute('href', '/properties');
     expect(screen.getByRole('link', { name: /Estia AI/ })).toHaveAttribute('href', '/ai');
     // "עוד" opens the MoreSheet (full nav tree). aria-label is the
@@ -30,7 +30,7 @@ describe('<MobileTabBar>', () => {
     const user = userEvent.setup();
     render(
       <MobileTabBar
-        primary={[{ k: 'leads', to: '/customers', label: 'לידים' }]}
+        primary={[{ k: 'leads', to: '/customers', label: 'מתעניינים' }]}
         tools={[{ k: 'settings', to: '/settings', label: 'הגדרות' }]}
       />,
     );

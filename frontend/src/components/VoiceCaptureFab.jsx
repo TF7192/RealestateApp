@@ -13,7 +13,7 @@ import './VoiceCaptureFab.css';
 const SUPPORT_EMAIL = 'support@estia.co.il';
 const PREMIUM_SUBJECT = 'הפעלת פיצ׳ר הקלטה קולית — Estia';
 const PREMIUM_BODY =
-  'היי, אני רוצה להפעיל את פיצ׳ר הקלטת הליד הקולי בחשבון שלי.';
+  'היי, אני רוצה להפעיל את פיצ׳ר הקלטת המתעניין הקולי בחשבון שלי.';
 
 // H3 — voice-to-lead FAB.
 //
@@ -108,7 +108,7 @@ export default function VoiceCaptureFab() {
 
   const recording = state === 'recording';
   const busy = state === 'requesting' || state === 'stopping';
-  const label = recording ? 'עצור הקלטה' : 'הקלטת ליד';
+  const label = recording ? 'עצור הקלטה' : 'הקלטת מתעניין';
 
   return (
     <>
@@ -117,7 +117,7 @@ export default function VoiceCaptureFab() {
         className={`vc-fab ${recording ? 'is-recording' : ''}`}
         aria-label={label}
         aria-pressed={recording ? 'true' : 'false'}
-        title="הקלטה → ליד"
+        title="הקלטה → מתעניין"
         onClick={onClick}
         disabled={busy && !recording}
       >
@@ -135,7 +135,7 @@ export default function VoiceCaptureFab() {
         <ConfirmDialog
           title="פיצ׳ר פרימיום"
           message={
-            'הקלטת ליד קולית והפקת פרטי הליד באמצעות AI זמינה במסלולי פרימיום בלבד. ' +
+            'הקלטת מתעניין קולית והפקת פרטי המתעניין באמצעות AI זמינה במסלולי פרימיום בלבד. ' +
             'נשמח להפעיל את זה עבורך — צור/י קשר עם התמיכה ונחבר אותך מיד.'
           }
           confirmLabel="צור קשר עם התמיכה"

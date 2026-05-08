@@ -622,8 +622,8 @@ function SuggestionChips({ onPick }) {
   // Inline chips under the seeded greeting. Abridged compared to /ai
   // because the panel is narrower; keep the brokerage flavor though.
   const starters = [
-    'תכתוב תזכורת לליד שמחפש דירת 4 חדרים בראשון לציון',
-    'איזה ליד לא קיבל מענה בשבוע האחרון?',
+    'תכתוב תזכורת למתעניין שמחפש דירת 4 חדרים בראשון לציון',
+    'איזה מתעניין לא קיבל מענה בשבוע האחרון?',
     'סכם את העסקאות שנסגרו החודש',
     'איך מוסיפים נכס חדש?',
   ];

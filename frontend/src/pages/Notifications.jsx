@@ -34,8 +34,8 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 const TYPE_META = {
   reminder_due:       { Icon: BellRing,    label: 'תזכורת' },
   reminder_completed: { Icon: Check,       label: 'תזכורת הושלמה' },
-  lead_assigned:      { Icon: Users,       label: 'ליד חדש' },
-  lead_updated:       { Icon: Users,       label: 'עדכון ליד' },
+  lead_assigned:      { Icon: Users,       label: 'מתעניין חדש' },
+  lead_updated:       { Icon: Users,       label: 'עדכון מתעניין' },
   property_transfer:  { Icon: Building2,   label: 'העברת נכס' },
   property_updated:   { Icon: Building2,   label: 'עדכון נכס' },
   meeting_upcoming:   { Icon: Calendar,    label: 'פגישה מתקרבת' },
@@ -181,7 +181,7 @@ export default function Notifications() {
               <EmptyState
                 icon={<Bell size={44} />}
                 title="אין התראות"
-                description="כשיקרה משהו חדש — תזכורת, ליד, עסקה — תראו אותו כאן"
+                description="כשיקרה משהו חדש — תזכורת, מתעניין, עסקה — תראו אותו כאן"
                 variant="first"
               />
             </div>

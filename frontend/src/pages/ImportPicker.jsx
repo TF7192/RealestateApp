@@ -22,7 +22,7 @@ export default function ImportPicker() {
         </div>
         <p className="imp-pick-sub">
           שלושה מסלולים: סריקה אוטומטית של כל הנכסים שלכם ב-Yad2, ייבוא
-          טבלת לידים מ-Excel/CSV, או ייבוא מלאי נכסים שלם מ-Excel/CSV.
+          טבלת מתעניינים מ-Excel/CSV, או ייבוא מלאי נכסים שלם מ-Excel/CSV.
           עד 2,000 שורות בכל פעם, תצוגה מקדימה לפני ההוספה.
         </p>
       </div>
@@ -43,11 +43,11 @@ export default function ImportPicker() {
 
         <Link to="/import/leads" className="imp-pick-card">
           <Users size={32} aria-hidden="true" />
-          <h2>ייבוא לידים מ-Excel / CSV</h2>
+          <h2>ייבוא מתעניינים מ-Excel / CSV</h2>
           <p>שמות, טלפונים, עיר ותקציב — כל הלקוחות הפוטנציאליים בקובץ.</p>
           <span className="imp-pick-cta">
             <Sparkles size={14} aria-hidden="true" />
-            המשך לייבוא לידים
+            המשך לייבוא מתעניינים
           </span>
         </Link>
 

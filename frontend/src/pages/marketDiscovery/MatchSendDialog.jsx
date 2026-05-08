@@ -83,7 +83,7 @@ export default function MatchSendDialog({ open, match, listing, onClose }) {
 
         {!phone && (
           <div style={{ background: 'var(--warning-bg)', color: 'var(--warning)', padding: 10, borderRadius: 8, fontSize: 13 }}>
-            לליד הזה אין מספר טלפון שמור בכרטיס. פתח את הליד והוסף טלפון לפני השליחה.
+            למתעניין הזה אין מספר טלפון שמור בכרטיס. פתח את המתעניין והוסף טלפון לפני השליחה.
           </div>
         )}
 

@@ -810,7 +810,7 @@
   /* Auto-fit: as many equal columns as can fit at 300px minimum each.
      At narrow widths (mobile, tight desktop) the cards stack; at wide
      widths all three share a row. The minmax floor of 300px gives
-     מצב הלידים enough space for its bar + 3-chip legend + budget row
+     מצב המתעניינים enough space for its bar + 3-chip legend + budget row
      without wrapping into a tall stack. */
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }

@@ -2,7 +2,7 @@
 // (estia-new-project/project/src/desktop/shell.jsx). Espresso
 // sidebar, gold accents, two sections (עבודה יומיומית / כלים),
 // Premium upgrade card, agent row at bottom, cream topbar with
-// search + ליד חדש + bell + WhatsApp.
+// search + מתעניין חדש + bell + WhatsApp.
 //
 // On narrow viewports (≤900 px) the sidebar becomes a slide-in
 // drawer opened by a hamburger in the topbar, and the existing
@@ -28,6 +28,7 @@ import {
   ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
   Activity as ActivityIcon, Tag, Download as DownloadIcon, Heart,
   Star, FolderOpen, HelpCircle, IdCard, Megaphone, ShieldCheck,
+  UserPlus, Plus,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
@@ -37,7 +38,9 @@ import RouteProgressBar from './RouteProgressBar';
 import { preloadOn } from '../lib/routePreload';
 import Yad2ScanBanner from './Yad2ScanBanner';
 import MarketScanBanner from './MarketScanBanner';
-import QuickCreateFab from './QuickCreateFab';
+// QuickCreateFab import removed 2026-05-08 — replaced by the two
+// top-bar buttons (נכס חדש / מתעניין חדש). The component file stays in
+// the tree in case we want to re-mount it on a specific surface.
 import MobileTabBar from './MobileTabBar';
 import LogoMark from './LogoMark';
 import haptics from '../lib/haptics';
@@ -70,8 +73,11 @@ const isAdminUser = (u) => !!u && u.role === 'ADMIN';
 
 const PRIMARY_NAV = [
   { k: 'dashboard',   to: '/dashboard',  label: 'לוח בקרה', Icon: Home },
-  { k: 'leads',       to: '/customers',  label: 'לידים',      Icon: Users },
+  // 2026-05-08 — נכסים moved up to sit between לוח בקרה and מתעניינים per
+  // agent feedback. Properties is the most-touched surface day-to-day,
+  // so it gets second-place in the right-side nav.
   { k: 'properties',  to: '/properties', label: 'נכסים',      Icon: Building2 },
+  { k: 'leads',       to: '/customers',  label: 'מתעניינים',      Icon: Users },
   { k: 'owners',      to: '/owners',     label: 'בעלים',      Icon: Crown },
   { k: 'deals',       to: '/deals',      label: 'עסקאות',     Icon: Banknote },
   // Two related routes with distinct affordances — /reminders is the
@@ -328,7 +334,11 @@ export default function Layout({ onLogout }) {
         <RouteProgressBar />
       </div>
 
-      <QuickCreateFab />
+      {/* 2026-05-08 — QuickCreateFab (the floating + button on the
+          bottom-inline-end corner) replaced by the two top-bar buttons
+          (נכס חדש / מתעניין חדש) above. Mobile keeps creating from the
+          MobileTabBar's QuickActionSheet. The FAB component file stays
+          in the tree for now in case mobile wants to re-mount it. */}
       {narrow && (
         <MobileTabBar
           primary={primary}
@@ -507,7 +517,7 @@ function SidebarInner({
                 color: DT.sidebarMuted, opacity: 0.85,
               }}
             >
-              סמנו ⭐ בלידים, נכסים ובעלים לגישה מהירה.
+              סמנו ⭐ במתעניינים, נכסים ובעלים לגישה מהירה.
             </div>
           )
         )}
@@ -814,11 +824,52 @@ function Topbar({ narrow, onOpenPalette, onOpenChat, user, isAdmin }) {
           right: 14, color: DT.muted, pointerEvents: 'none',
           display: 'inline-flex',
         }}><Search size={15} /></span>
-        {narrow ? 'חיפוש…' : 'חיפוש לידים, נכסים, פגישות…  (⌘K)'}
+        {narrow ? 'חיפוש…' : 'חיפוש מתעניינים, נכסים, פגישות…  (⌘K)'}
       </button>
       <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
         {!narrow && !isAdmin && (
           <>
+            {/* 2026-05-08 — quick-create buttons replace the bottom-corner
+                QuickCreateFab. Sit in the top bar next to "הקלטה חכמה" so
+                "create new property/lead" is one click from anywhere in
+                the app. Cream/white style differentiates them from the
+                gold AI buttons that sit alongside. */}
+            <button
+              type="button"
+              onClick={() => navigate('/properties/new')}
+              {...preloadOn('/properties/new')}
+              aria-label="הוסף נכס חדש"
+              title="הוסף נכס חדש"
+              data-testid="topbar-new-property"
+              style={{
+                ...FONT,
+                background: DT.white,
+                border: `1px solid ${DT.borderStrong || DT.border}`,
+                padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
+                color: DT.ink, display: 'inline-flex', gap: 6, alignItems: 'center',
+                fontSize: 12, fontWeight: 800,
+              }}
+            >
+              <Building2 size={13} /> נכס חדש
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/customers/new')}
+              {...preloadOn('/customers/new')}
+              aria-label="הוסף מתעניין חדש"
+              title="הוסף מתעניין חדש"
+              data-testid="topbar-new-lead"
+              style={{
+                ...FONT,
+                background: DT.white,
+                border: `1px solid ${DT.borderStrong || DT.border}`,
+                padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
+                color: DT.ink, display: 'inline-flex', gap: 6, alignItems: 'center',
+                fontSize: 12, fontWeight: 800,
+              }}
+            >
+              <UserPlus size={13} /> מתעניין חדש
+            </button>
             {/* AI quick-create — opens the voice ingest flow; detected
                 kind (lead vs property) routes to the right form with
                 the extracted fields pre-filled. */}

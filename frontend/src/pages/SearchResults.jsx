@@ -37,10 +37,10 @@ function bucketDefs() {
   return [
     {
       key: 'leads',
-      label: 'לידים',
+      label: 'מתעניינים',
       Icon: Users,
-      empty: 'לא נמצאו לידים',
-      title: (l) => l.name || 'ליד',
+      empty: 'לא נמצאו מתעניינים',
+      title: (l) => l.name || 'מתעניין',
       sub:   (l) => [l.city, l.phone].filter(Boolean).join(' · '),
       to:    (l) => `/customers?selected=${l.id}`,
     },

@@ -35,66 +35,123 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 // is still gated by the Premium modal on click (the AI layer that
 // would auto-draft the action is premium-only); the signals come
 // from the agent's own records.
+// 2026-05-08 — each priority returns a `to` so clicking the action chip
+// actually navigates to the right page. Previously the chip wired to the
+// premium upsell modal regardless of priority type, which felt fake. The
+// data itself was always real (sourced from the agent's own records).
 function computeAiPriorities({ leads, properties, deals, meetings }) {
   const out = [];
   const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
 
-  // Hot leads whose last-contact is stale (>4 h ago or never). Sorted
-  // newest-stale-first so the most recently missed call surfaces.
+  // Upcoming meeting today / very soon → top of the list, premium-grade
+  // urgency. Match anything within the next 12 h so morning prep + same-
+  // afternoon meetings both surface.
+  const nextMeeting = (meetings || [])
+    .filter((m) => m.dueAt && new Date(m.dueAt).getTime() > now)
+    .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())[0];
+  if (nextMeeting && new Date(nextMeeting.dueAt).getTime() - now < 12 * 60 * 60 * 1000) {
+    const meetingTime = new Date(nextMeeting.dueAt).toLocaleTimeString('he-IL', {
+      hour: '2-digit', minute: '2-digit',
+    });
+    out.push({
+      key: `meet-${nextMeeting.id}`,
+      t: `${meetingTime} — ${nextMeeting.title || 'פגישה'}`,
+      sub: nextMeeting.description || 'הכינו: פרטי לקוח, נכסים תואמים, היסטוריית מגע.',
+      tag: 'gold', action: 'פתח פגישה',
+      to: `/meetings/${nextMeeting.id}`,
+    });
+  }
+
+  // Hot leads with stale last-contact (>4 h or never). Most-stale first.
   const hotStale = (leads || [])
     .filter((l) => (l.status || '').toUpperCase() === 'HOT')
     .map((l) => ({ l, gap: l.lastContact ? now - new Date(l.lastContact).getTime() : Infinity }))
     .filter((x) => x.gap > 4 * 60 * 60 * 1000)
-    .sort((a, b) => a.gap - b.gap);
-  for (const { l } of hotStale.slice(0, 2)) {
+    .sort((a, b) => b.gap - a.gap);
+  for (const { l, gap } of hotStale.slice(0, 2)) {
+    const since = gap === Infinity
+      ? 'לא יצרת קשר אף פעם'
+      : gap > DAY
+        ? `${Math.floor(gap / DAY)} ימים בלי מענה`
+        : `${Math.floor(gap / (60 * 60 * 1000))} שעות בלי מענה`;
     out.push({
       key: `hot-${l.id}`,
-      t: `תתקשרו ל-${l.name || 'ליד'} · לא עניתם זמן רב`,
-      sub: [l.city, l.priceRangeLabel].filter(Boolean).join(' · ') || 'ליד חם ממתין למענה',
-      tag: 'hot', action: 'התקשר עכשיו',
+      t: `${l.name || 'מתעניין חם'} — ${since}`,
+      sub: [l.city, l.priceRangeLabel].filter(Boolean).join(' · ') || 'מתעניין חם ממתין למענה',
+      tag: 'hot', action: 'פתח כרטיס',
+      to: `/customers/${l.id}`,
     });
   }
 
-  // Upcoming meeting today → remind the agent to prep.
-  const nextMeeting = (meetings || []).find((m) => m.dueAt && new Date(m.dueAt).getTime() > now);
-  if (nextMeeting) {
+  // Pending price offers on a property — the agent owes a yes/no.
+  // PERF: only inspects properties already loaded for the dashboard, which
+  // are the agent's own. `pendingOffersCount` is included in the property
+  // serialization (PropertyOffer status === 'NEW').
+  const propsWithOffers = (properties || [])
+    .filter((p) => Number(p.pendingOffersCount) > 0)
+    .sort((a, b) => Number(b.pendingOffersCount) - Number(a.pendingOffersCount));
+  for (const p of propsWithOffers.slice(0, 1)) {
     out.push({
-      key: `meet-${nextMeeting.id}`,
-      t: `הכינו את הפגישה: ${nextMeeting.title || 'פגישה'}`,
-      sub: nextMeeting.description || 'סדר עדיפויות · נכסים · היסטוריית לקוח',
-      tag: 'gold', action: 'פתח סיכום',
+      key: `offer-${p.id}`,
+      t: `${p.pendingOffersCount} הצעות חדשות בנכס ${p.street || ''}${p.city ? `, ${p.city}` : ''}`,
+      sub: 'בעל הנכס מצפה למענה — קבלו, דחו או חזרו עם הצעת-נגד.',
+      tag: 'warm', action: 'פתח נכס',
+      to: `/properties/${p.id}`,
     });
   }
 
-  // Deals sitting in NEGOTIATION for more than a week → nudge.
+  // Deals stuck in NEGOTIATION for more than a week.
   const stuckDeals = (deals || []).filter((d) => {
     const stage = (d.stage || d.status || '').toUpperCase();
     if (stage !== 'NEGOTIATION') return false;
     const touched = d.updatedAt ? new Date(d.updatedAt).getTime() : 0;
-    return touched > 0 && now - touched > 7 * 24 * 60 * 60 * 1000;
-  });
+    return touched > 0 && now - touched > 7 * DAY;
+  }).sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
   for (const d of stuckDeals.slice(0, 1)) {
     out.push({
       key: `deal-${d.id}`,
-      t: `עסקה במו״מ ללא זיז שבוע — ${d.propertyStreet || 'עסקה'}`,
-      sub: 'מומלץ להתקשר לשני הצדדים ולסגור מועד חתימה.',
+      t: `עסקה תקועה במו״מ — ${d.propertyStreet || 'עסקה'}`,
+      sub: 'בלי עדכון יותר משבוע — מומלץ ליזום שיחה ולקבוע מועד.',
       tag: 'warm', action: 'פתח עסקה',
+      to: `/deals/${d.id}`,
     });
   }
 
-  // Stale properties (active + no updatedAt touch in 14 days).
-  const staleProps = (properties || []).filter((p) => {
-    const touched = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
-    return (p.status || '').toUpperCase() === 'ACTIVE' && touched > 0
-      && now - touched > 14 * 24 * 60 * 60 * 1000;
-  });
-  for (const p of staleProps.slice(0, 1)) {
+  // Exclusivity expiring in <= 14 days — agent needs to renew or wrap up.
+  const expiringSoon = (properties || []).filter((p) => {
+    if (!p.exclusiveEnd) return false;
+    const endMs = new Date(p.exclusiveEnd).getTime();
+    return endMs > now && endMs - now <= 14 * DAY;
+  }).sort((a, b) => new Date(a.exclusiveEnd) - new Date(b.exclusiveEnd));
+  for (const p of expiringSoon.slice(0, 1)) {
+    const daysLeft = Math.max(0, Math.ceil((new Date(p.exclusiveEnd).getTime() - now) / DAY));
     out.push({
-      key: `prop-${p.id}`,
-      t: `רענן את הנכס ${p.street || ''}${p.street && p.city ? ', ' : ''}${p.city || ''}`,
-      sub: 'לא נגעתם בנכס יותר משבועיים — מומלץ לעדכן מחיר / תמונות.',
-      tag: 'ink', action: 'ערוך נכס',
+      key: `excl-${p.id}`,
+      t: `בלעדיות נגמרת בעוד ${daysLeft} ימים — ${p.street || ''}${p.city ? `, ${p.city}` : ''}`,
+      sub: 'דברו עם בעל הנכס על הארכת בלעדיות לפני שהיא פגה.',
+      tag: 'ink', action: 'פתח נכס',
+      to: `/properties/${p.id}`,
     });
+  }
+
+  // Stale active properties (no edit in 14+ days). Lower priority, slot
+  // last so it only appears when the busier signals are quiet.
+  if (out.length < 5) {
+    const staleProps = (properties || []).filter((p) => {
+      const touched = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
+      return (p.status || '').toUpperCase() === 'ACTIVE' && touched > 0
+        && now - touched > 14 * DAY;
+    });
+    for (const p of staleProps.slice(0, 5 - out.length)) {
+      out.push({
+        key: `prop-${p.id}`,
+        t: `הנכס ב-${p.street || ''}${p.city ? `, ${p.city}` : ''} לא עודכן מעל שבועיים`,
+        sub: 'רענון תמונות / מחיר מחזיר אותו לראש הפיד של הלקוחות.',
+        tag: 'ink', action: 'ערוך נכס',
+        to: `/properties/${p.id}/edit`,
+      });
+    }
   }
 
   return out.slice(0, 5);
@@ -204,11 +261,15 @@ export default function Dashboard() {
     // 2026-05-03 — `to` makes each KPI card a single click-target into
     // the relevant page (request: "make the meetings icon clickable
     // to see all scheduled meetings").
+    // 2026-05-08 — order changed per agent feedback. RTL row, so the
+    // first array item renders rightmost: properties → leads → meetings
+    // → deals (rightmost to leftmost). The leads route stays at /leads
+    // even though the UI label later renames to "מתעניינים פעילים".
     return [
-      { l: 'לידים פעילים',   v: c?.leads ?? leads.length,           i: Users,        to: '/leads' },
+      { l: 'נכסים פעילים',   v: c?.properties ?? properties.length,  i: BarChart2,    to: '/properties' },
+      { l: 'מתעניינים פעילים',   v: c?.leads ?? leads.length,           i: Users,        to: '/leads' },
       { l: 'פגישות השבוע',   v: c?.todayMeetings ?? meetings.length, i: CalendarIcon, to: '/calendar' },
       { l: 'עסקאות פתוחות', v: c?.deals ?? deals.length,             i: Banknote,     to: '/deals' },
-      { l: 'נכסים פעילים',   v: c?.properties ?? properties.length,  i: BarChart2,    to: '/properties' },
     ];
   }, [summary, leads.length, meetings.length, deals.length, properties.length]);
 
@@ -265,7 +326,7 @@ export default function Dashboard() {
           </h1>
           <div style={{ fontSize: isMobile ? 12 : 14, color: DT.muted, marginTop: 4, lineHeight: 1.5 }}>
             יש לכם <strong style={{ color: DT.gold }}>{meetings.length} פגישות</strong> השבוע ·{' '}
-            <strong style={{ color: DT.gold }}>{hotLeads.length} לידים חמים</strong> ממתינים למענה
+            <strong style={{ color: DT.gold }}>{hotLeads.length} מתעניינים חמים</strong> ממתינים למענה
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -313,7 +374,12 @@ export default function Dashboard() {
             <DCard key={i} compact={isMobile}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{
-                  fontSize: isMobile ? 11 : 12, color: DT.muted, fontWeight: 600,
+                  // 2026-05-08 — bumped to match the "צינור עסקאות" / "סדר
+                  // עדיפויות" section-heading weight (15/800). Was 11/12
+                  // muted-grey, which read as a tiny caption next to the
+                  // big number; the title now carries comparable weight to
+                  // adjacent panels.
+                  fontSize: isMobile ? 13 : 15, color: DT.ink, fontWeight: 800,
                   lineHeight: 1.35, minWidth: 0,
                 }}>{k.l}</div>
                 <span style={{
@@ -369,19 +435,17 @@ export default function Dashboard() {
             marginBottom: 14, gap: 8, flexWrap: 'wrap',
           }}>
             <div>
+              {/* 2026-05-08 — heading bumped to match צינור עסקאות (15/800);
+                  PREMIUM badge dropped since the priorities are computed
+                  locally from the agent's own data, no LLM cost. */}
               <div style={{
-                fontSize: 10, color: DT.goldDark, fontWeight: 700, letterSpacing: 1,
-                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 15, color: DT.ink, fontWeight: 800,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
               }}>
-                <Sparkles size={11} /> ESTIA AI · סדר עדיפויות היום
-                <span style={{
-                  marginInlineStart: 6,
-                  background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
-                  color: DT.ink, padding: '1px 6px', borderRadius: 99,
-                  fontSize: 9, letterSpacing: 0.4,
-                }}>PREMIUM</span>
+                <Sparkles size={14} style={{ color: DT.gold }} />
+                סדר עדיפויות היום
               </div>
-              <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: DT.muted, marginTop: 4 }}>
                 {aiPriorities.length > 0
                   ? `${aiPriorities.length} פעולות שיזיזו אתכם קדימה היום`
                   : 'אין פעולות דחופות כרגע'}
@@ -390,7 +454,7 @@ export default function Dashboard() {
           </div>
           {aiPriorities.length === 0 && (
             <div style={{ fontSize: 13, color: DT.muted, padding: '16px 0', lineHeight: 1.7 }}>
-              אין עדיפויות לטיפול עכשיו. מרגע שיופיעו לידים חמים, פגישות או
+              אין עדיפויות לטיפול עכשיו. מרגע שיופיעו מתעניינים חמים, פגישות או
               עסקאות במו״מ — ה-AI יסדר אותם כאן לפי דחיפות.
             </div>
           )}
@@ -409,24 +473,46 @@ export default function Dashboard() {
                 <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                   {r.t}
                   {r.tag === 'hot'  && <Chip tone="hot">דחוף</Chip>}
-                  {r.tag === 'gold' && <Chip tone="gold">AI</Chip>}
+                  {r.tag === 'gold' && <Chip tone="gold">היום</Chip>}
                 </div>
                 <div style={{ fontSize: 11, color: DT.muted, marginTop: 1 }}>{r.sub}</div>
               </div>
-              <button
-                type="button"
-                onClick={openPremium}
-                style={{
-                  ...FONT,
-                  background: i === 0
-                    ? `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`
-                    : DT.white,
-                  border: i === 0 ? 'none' : `1px solid ${DT.borderStrong}`,
-                  padding: '7px 12px', borderRadius: 8,
-                  fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer', color: DT.ink, whiteSpace: 'nowrap',
-                }}
-              >{r.action}</button>
+              {/* 2026-05-08 — was `onClick={openPremium}` (popped the upsell
+                  modal regardless of priority type — felt fake). Now each
+                  priority carries its own `to` route and the chip
+                  navigates straight there. */}
+              {r.to ? (
+                <Link
+                  to={r.to}
+                  style={{
+                    ...FONT,
+                    background: i === 0
+                      ? `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`
+                      : DT.white,
+                    border: i === 0 ? 'none' : `1px solid ${DT.borderStrong}`,
+                    padding: '7px 12px', borderRadius: 8,
+                    fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', color: DT.ink, whiteSpace: 'nowrap',
+                    textDecoration: 'none',
+                    display: 'inline-flex', alignItems: 'center',
+                  }}
+                >{r.action}</Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openPremium}
+                  style={{
+                    ...FONT,
+                    background: i === 0
+                      ? `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`
+                      : DT.white,
+                    border: i === 0 ? 'none' : `1px solid ${DT.borderStrong}`,
+                    padding: '7px 12px', borderRadius: 8,
+                    fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', color: DT.ink, whiteSpace: 'nowrap',
+                  }}
+                >{r.action}</button>
+              )}
             </div>
           ))}
         </DCard>
@@ -563,14 +649,14 @@ export default function Dashboard() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             marginBottom: 12,
           }}>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>לידים חמים</div>
+            <div style={{ fontSize: 15, fontWeight: 800 }}>מתעניינים חמים</div>
             <Link to="/customers" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
               הכול
             </Link>
           </div>
           {hotLeads.length === 0 && (
             <div style={{ fontSize: 13, color: DT.muted, padding: '12px 0' }}>
-              אין לידים חמים כרגע. הוסיפו לידים בעמוד <Link to="/customers" style={{ color: DT.gold }}>לידים</Link>.
+              אין מתעניינים חמים כרגע. הוסיפו מתעניינים בעמוד <Link to="/customers" style={{ color: DT.gold }}>מתעניינים</Link>.
             </div>
           )}
           {hotLeads.map((l) => (
@@ -761,7 +847,7 @@ function PremiumModalInner({ onClose }) {
           זמין במסלול Premium
         </h2>
         <p style={{ fontSize: 14, color: DT.muted, lineHeight: 1.7, margin: '0 0 18px' }}>
-          כל פעולות ה-AI — סדר עדיפויות חכם, תיאורי נכסים, התאמת לידים,
+          כל פעולות ה-AI — סדר עדיפויות חכם, תיאורי נכסים, התאמת מתעניינים,
           וסיכומי פגישות — כלולות במסלול Premium. שדרוג בחצי דקה, ביטול בכל רגע.
         </p>
         <a

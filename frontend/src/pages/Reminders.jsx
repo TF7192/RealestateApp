@@ -509,7 +509,7 @@ function ReminderCard({ r, tab, isMobile, onComplete, onCancel, onDelete }) {
                 }}
               >
                 <Link2 size={12} />
-                <span>ליד</span>
+                <span>מתעניין</span>
               </Link>
             )}
             {r.propertyId && (

@@ -45,7 +45,7 @@ export default function VoiceDemo() {
           {isPremium && <AiQuotaChips kind="voice" />}
         </div>
         <p style={{ color: DT.muted, margin: '0 0 20px', fontSize: 14, lineHeight: 1.6 }}>
-          תארו/י ליד או נכס בקול חופשי (עד 2 דקות). השרת מתמלל (Whisper)
+          תארו/י מתעניין או נכס בקול חופשי (עד 2 דקות). השרת מתמלל (Whisper)
           ושולף שדות (Claude Haiku), ואפשר לערוך הכל לפני שיוצרים את הרשומה.
         </p>
         {isPremium ? (
@@ -89,7 +89,7 @@ function PremiumLockedTeaser() {
         הקלטה חכמה זמינה למנויי Premium
       </h2>
       <p style={{ fontSize: 14, color: DT.muted, lineHeight: 1.7, margin: '0 0 18px' }}>
-        תיאור קולי שמתורגם אוטומטית לטופס מלא של ליד או נכס — מהיר פי 5 מהקלדה ידנית.
+        תיאור קולי שמתורגם אוטומטית לטופס מלא של מתעניין או נכס — מהיר פי 5 מהקלדה ידנית.
         זמין במסלול Premium יחד עם Estia AI, סיכומי פגישות קוליים וניתוח הצעות.
       </p>
       <div style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>

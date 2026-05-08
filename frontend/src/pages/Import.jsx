@@ -38,7 +38,7 @@ const DT = {
 };
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
-const FRIENDLY_TYPE = { LEAD: 'לידים', PROPERTY: 'נכסים' };
+const FRIENDLY_TYPE = { LEAD: 'מתעניינים', PROPERTY: 'נכסים' };
 const LIST_ROUTE    = { LEAD: '/customers', PROPERTY: '/properties' };
 
 const STEPS = [
@@ -898,7 +898,7 @@ export default function Import() {
                   onClick={() => navigate(`${LIST_ROUTE[entityType]}?importBatch=${jobStatus.batchId}`)}
                   style={primaryBtn({ isMobile })}
                 >
-                  {entityType === 'LEAD' ? 'צפה בלידים החדשים' : 'צפה בנכסים החדשים'}
+                  {entityType === 'LEAD' ? 'צפה במתעניינים החדשים' : 'צפה בנכסים החדשים'}
                 </button>
               </div>
             </div>

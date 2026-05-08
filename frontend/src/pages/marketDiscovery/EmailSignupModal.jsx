@@ -67,7 +67,7 @@ export default function EmailSignupModal({
             </button>
           </div>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.55, margin: 0 }}>
-            נשלח לך מייל בכל פעם שנמצאת התאמה חדשה לליד פעיל — מייל אחד בלבד לכל התאמה (ללא ספאם).
+            נשלח לך מייל בכל פעם שנמצאת התאמה חדשה למתעניין פעיל — מייל אחד בלבד לכל התאמה (ללא ספאם).
           </p>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>

@@ -158,7 +158,7 @@ export default function TeamAgentDetail() {
         <Kpi icon={<Banknote size={16} />} label="סה״כ ערך עסקאות" value={formatPrice(totals.volume)} />
         <Kpi icon={<Banknote size={16} />} label="עמלות" value={formatPrice(totals.commissions)} color={DT.success} />
         <Kpi icon={<Building2 size={16} />} label="נכסים פעילים" value={activeProps} />
-        <Kpi icon={<Users size={16} />} label="לידים פעילים" value={activeLeads} />
+        <Kpi icon={<Users size={16} />} label="מתעניינים פעילים" value={activeLeads} />
       </div>
 
       {/* Two-col grid: properties + leads */}
@@ -193,9 +193,9 @@ export default function TeamAgentDetail() {
           )}
         </Section>
 
-        <Section title="לידים פעילים" count={leads.length} icon={<Users size={16} />}>
+        <Section title="מתעניינים פעילים" count={leads.length} icon={<Users size={16} />}>
           {leads.length === 0 ? (
-            <Empty>אין לידים פעילים</Empty>
+            <Empty>אין מתעניינים פעילים</Empty>
           ) : (
             <ul style={listReset}>
               {leads.map((l) => (

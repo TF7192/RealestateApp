@@ -93,7 +93,7 @@ export default function LeadMeetingDialog({ lead, onClose, onCreated }) {
       } else if (e?.status === 404 || /not\s*found/i.test(e?.message || '')) {
         setErr('לא הצלחנו לקבוע את הפגישה — רענן את הדף ונסה שוב. אם זה חוזר, צור קשר עם התמיכה.');
       } else if (e?.status === 401 || e?.status === 403) {
-        setErr('אין הרשאה ליצור פגישה לליד הזה. נסה להתחבר מחדש.');
+        setErr('אין הרשאה ליצור פגישה למתעניין הזה. נסה להתחבר מחדש.');
       } else {
         setErr(e?.message || 'השמירה נכשלה');
       }

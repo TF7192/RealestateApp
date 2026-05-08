@@ -1150,7 +1150,7 @@ function CloseOfficeDialogInner({ members, busy, onCancel, onConfirm }) {
               </span>
               <span style={{ display: 'block', fontSize: 12, color: DT.muted, marginTop: 3 }}>
                 המשרד יימחק לצמיתות. החברים יהפכו לסוכנים עצמאיים בלי משרד.
-                הנכסים והלידים שלהם לא נמחקים.
+                הנכסים והמתעניינים שלהם לא נמחקים.
               </span>
             </span>
           </label>

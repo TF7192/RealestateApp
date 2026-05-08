@@ -66,7 +66,7 @@ export default function ListingRow({ listing, isMatched, isDuplicated, onOpen, o
         {accent === 'matched' && namesShown && (
           <div className="md-row-match" title={`${matched.length} התאמות`}>
             <Sparkles size={12} />
-            התאמה לליד: {namesShown}{namesOverflow ? ` +${namesOverflow}` : ''}
+            התאמה למתעניין: {namesShown}{namesOverflow ? ` +${namesOverflow}` : ''}
           </div>
         )}
       </div>
@@ -176,7 +176,7 @@ function RowOverflow({ onOverflow }) {
 
 function OverflowItem({ action, onPick }) {
   const labels = {
-    'send-to-lead': 'שלח לליד ב-WhatsApp',
+    'send-to-lead': 'שלח למתעניין ב-WhatsApp',
     'mark-viewed':  'סמן כנצפה',
     'copy-link':    'העתק קישור למקור',
     'dismiss':      'דחה (הסתר מהרשימה)',

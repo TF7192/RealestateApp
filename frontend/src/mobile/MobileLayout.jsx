@@ -10,7 +10,7 @@ const TABS = [
   { path: '/', icon: LayoutDashboard, label: 'הבית', end: true },
   { path: '/properties', icon: Building2, label: 'נכסים' },
   { path: '__FAB__' },
-  { path: '/leads', icon: Users, label: 'לידים' },
+  { path: '/leads', icon: Users, label: 'מתעניינים' },
   { path: '/deals', icon: Handshake, label: 'עסקאות' },
 ];
 
@@ -34,7 +34,7 @@ export default function MobileLayout({ onLogout }) {
   const section =
     location.pathname === '/' ? { title: 'שלום, ' + agentProfile.name.split(' ')[0], eyebrow: dateGreeting() }
     : location.pathname.startsWith('/properties') ? { title: 'הנכסים שלי', eyebrow: 'תיק נדל״ן' }
-    : location.pathname.startsWith('/leads') ? { title: 'לידים', eyebrow: 'פייפליין' }
+    : location.pathname.startsWith('/leads') ? { title: 'מתעניינים', eyebrow: 'פייפליין' }
     : location.pathname.startsWith('/deals') ? { title: 'עסקאות', eyebrow: 'צנרת' }
     : location.pathname.startsWith('/buyers') ? { title: 'קונים ושוכרים', eyebrow: 'לקוחות' }
     : { title: 'Estia', eyebrow: 'ניהול' };

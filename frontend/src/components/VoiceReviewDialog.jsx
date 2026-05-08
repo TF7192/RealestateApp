@@ -91,12 +91,12 @@ export default function VoiceReviewDialog({
       if (kind === 'LEAD') {
         // The LEAD create surface accepts `name` as the required field.
         if (!fields.name && !fields.phone) {
-          toast.error('נדרש שם או טלפון כדי לשמור ליד');
+          toast.error('נדרש שם או טלפון כדי לשמור מתעניין');
           setSaving(false);
           return;
         }
         const body = {
-          name: fields.name || fields.phone || 'ליד חדש',
+          name: fields.name || fields.phone || 'מתעניין חדש',
           phone: fields.phone || null,
           email: fields.email || null,
           city: fields.city || null,
@@ -109,7 +109,7 @@ export default function VoiceReviewDialog({
         };
         const res = await api.createLead(body);
         const entity = res?.lead || res;
-        toast.success('הליד נשמר');
+        toast.success('המתעניין נשמר');
         onCreated?.(entity);
       } else {
         // PROPERTY — backend requires city + marketingPrice for full
@@ -167,7 +167,7 @@ export default function VoiceReviewDialog({
               value={kind}
               onChange={(v) => onKindChange?.(v)}
               options={[
-                { value: 'LEAD',     label: 'ליד' },
+                { value: 'LEAD',     label: 'מתעניין' },
                 { value: 'PROPERTY', label: 'נכס' },
               ]}
               ariaLabel="סוג הרשומה"

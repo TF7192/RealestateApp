@@ -313,7 +313,7 @@ export default function Onboarding() {
               </p>
               {[
                 { icon: <Upload size={18} />,    t: 'ייבוא מ-Excel', d: 'נכסים, לקוחות ובעלים במכה אחת', to: '/import' },
-                { icon: <Plus size={18} />,      t: 'הוספה ידנית',   d: 'הקלדת הנכס והליד הראשון בעצמי', to: '/properties/new' },
+                { icon: <Plus size={18} />,      t: 'הוספה ידנית',   d: 'הקלדת הנכס והמתעניין הראשון בעצמי', to: '/properties/new' },
                 { icon: <ArrowLeft size={18} />, t: 'התחלה ריקה',    d: 'פשוט להתחיל, להוסיף בהדרגה',     to: '/dashboard' },
               ].map((o, i) => (
                 <button

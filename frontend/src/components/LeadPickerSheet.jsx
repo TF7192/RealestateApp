@@ -215,13 +215,13 @@ export default function LeadPickerSheet({
 
           {ranked.length === 0 && query && (
             <div className="lps-empty">
-              לא נמצאו לידים בשם "<strong>{query}</strong>"
+              לא נמצאו מתעניינים בשם "<strong>{query}</strong>"
             </div>
           )}
 
           {leads.length === 0 && !query && (
             <div className="lps-empty">
-              אין עדיין לידים — אפשר לפתוח בוואטסאפ ולבחור נמען שם.
+              אין עדיין מתעניינים — אפשר לפתוח בוואטסאפ ולבחור נמען שם.
             </div>
           )}
         </div>

@@ -50,7 +50,7 @@ function shouldHideOn(pathname) {
 // shortcut landed on the list page and was misleading.
 const MENU_ITEMS = [
   { key: 'property', icon: Building2, label: 'נכס חדש', to: '/properties/new' },
-  { key: 'lead',     icon: UserPlus,  label: 'ליד חדש', to: '/customers/new' },
+  { key: 'lead',     icon: UserPlus,  label: 'מתעניין חדש', to: '/customers/new' },
 ];
 
 export default function QuickCreateFab() {

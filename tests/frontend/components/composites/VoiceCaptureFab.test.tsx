@@ -72,7 +72,7 @@ afterEach(() => {
 describe('<VoiceCaptureFab>', () => {
   it('renders a mic trigger on the dashboard', () => {
     render(<VoiceCaptureFab />, { route: '/' });
-    expect(screen.getByRole('button', { name: 'הקלטת ליד' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'הקלטת מתעניין' })).toBeInTheDocument();
   });
 
   it('is hidden on /login', () => {
@@ -88,7 +88,7 @@ describe('<VoiceCaptureFab>', () => {
   it('first click starts recording; aria-pressed flips true', async () => {
     const user = userEvent.setup();
     render(<VoiceCaptureFab />, { route: '/' });
-    const trigger = screen.getByRole('button', { name: 'הקלטת ליד' });
+    const trigger = screen.getByRole('button', { name: 'הקלטת מתעניין' });
     await user.click(trigger);
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'עצור הקלטה' })).toHaveAttribute('aria-pressed', 'true');
@@ -104,13 +104,13 @@ describe('<VoiceCaptureFab>', () => {
     // for premium users; this test covers the free-tier path.
     const user = userEvent.setup();
     render(<VoiceCaptureFab />, { route: '/' });
-    await user.click(screen.getByRole('button', { name: 'הקלטת ליד' }));
+    await user.click(screen.getByRole('button', { name: 'הקלטת מתעניין' }));
     const stopBtn = await screen.findByRole('button', { name: 'עצור הקלטה' });
     await user.click(stopBtn);
     // Premium upsell shows up after the blob arrives.
     expect(await screen.findByText('פיצ׳ר פרימיום')).toBeInTheDocument();
     expect(
-      screen.getByText(/הקלטת ליד קולית.*זמינה במסלולי פרימיום/),
+      screen.getByText(/הקלטת מתעניין קולית.*זמינה במסלולי פרימיום/),
     ).toBeInTheDocument();
     // The "create lead" review surface must NOT have rendered.
     expect(screen.queryByLabelText('שם הלקוח')).not.toBeInTheDocument();
@@ -124,10 +124,10 @@ describe('<VoiceCaptureFab>', () => {
     });
     const user = userEvent.setup();
     render(<VoiceCaptureFab />, { route: '/' });
-    await user.click(screen.getByRole('button', { name: 'הקלטת ליד' }));
+    await user.click(screen.getByRole('button', { name: 'הקלטת מתעניין' }));
     // Toast copy matches useMediaRecorder's Hebrew message.
     expect(await screen.findByText(/אין גישה למיקרופון/)).toBeInTheDocument();
     // Still showing the idle mic label (not "עצור הקלטה").
-    expect(screen.getByRole('button', { name: 'הקלטת ליד' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'הקלטת מתעניין' })).toBeInTheDocument();
   });
 });

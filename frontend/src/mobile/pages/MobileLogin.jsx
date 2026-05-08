@@ -53,7 +53,7 @@ export default function MobileLogin() {
             <span>Estia</span>
           </div>
           <h1 className="m-login-title">ניהול נדל״ן.<br />בגובה היד.</h1>
-          <p className="m-login-sub">פייפליין נכסים ולידים, בלחיצה אחת.</p>
+          <p className="m-login-sub">פייפליין נכסים ומתעניינים, בלחיצה אחת.</p>
 
           <div className="m-login-role">
             <button

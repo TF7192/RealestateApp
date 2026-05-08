@@ -159,7 +159,7 @@ export default function LeadFiltersSheet({
           ref={panelRef}
           role="dialog"
           aria-modal="true"
-          aria-label="סינון לידים"
+          aria-label="סינון מתעניינים"
           dir="rtl"
           onClick={(e) => e.stopPropagation()}
           style={{
@@ -198,7 +198,7 @@ export default function LeadFiltersSheet({
           }}>
             <h3 style={{
               margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: -0.3,
-            }}>סינון לידים</h3>
+            }}>סינון מתעניינים</h3>
             <button
               type="button"
               onClick={onClose}
@@ -224,7 +224,7 @@ export default function LeadFiltersSheet({
                 options={STATUS_OPTS}
                 value={draft.status}
                 onChange={(v) => update('status', v)}
-                ariaLabel="סטטוס ליד"
+                ariaLabel="סטטוס מתעניין"
               />
             </Section>
 

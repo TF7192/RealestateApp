@@ -75,7 +75,7 @@ export default function Inbox() {
           fontSize: 15, lineHeight: 1.7, color: DT.muted,
           margin: '0 0 28px', maxWidth: 560,
         }}>
-          התיבה המאוחדת של כל ההודעות מהלידים, בתוך Estia.
+          התיבה המאוחדת של כל ההודעות מהמתעניינים, בתוך Estia.
         </p>
 
         {/* Feature preview list. Shipped items get a green check +

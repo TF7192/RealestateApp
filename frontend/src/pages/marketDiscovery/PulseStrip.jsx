@@ -4,7 +4,7 @@
 //
 // Tiles:
 //   1) חדש היום         — new listings in the last 24h, with delta vs prior day
-//   2) התאמות ללידים     — open matches for this agent in the last 3d
+//   2) התאמות למתעניינים     — open matches for this agent in the last 3d
 //   3) % פרטי           — share of private posters in the last 7d, with delta
 //   4) שכונות חמות       — top neighborhoods by raw count in last 3d (chip list)
 
@@ -23,7 +23,7 @@ export default function PulseStrip({ pulse, loading, onApply }) {
       />
       <Tile
         loading={loading}
-        label="נכסים תואמי לידים"
+        label="נכסים תואמי מתעניינים"
         icon={<User size={14} />}
         value={pulse?.matchesForMe?.count}
         sub={pulse?.matchesForMe?.count > 0 ? '3 ימים אחרונים' : 'אין התאמות חדשות'}

@@ -518,7 +518,7 @@ function ActivityTimeline({ lead }) {
       items.push({
         kind: 'created', ts: new Date(lead.createdAt).getTime(),
         icon: Building2,
-        title: 'הליד נוצר',
+        title: 'המתעניין נוצר',
         sub: relativeTime(lead.createdAt),
         absolute: absoluteTime(lead.createdAt),
       });

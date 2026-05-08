@@ -139,7 +139,7 @@ describe('<MarketDiscovery> — listing rows', () => {
     server.use(...defaultMarketHandlers({ items: [matched] }));
     render(<MarketDiscovery />, { route: '/market-discovery' });
     await screen.findByText(/בן גוריון/);
-    expect(screen.getByText(/התאמה לליד: טל פוקס/)).toBeInTheDocument();
+    expect(screen.getByText(/התאמה למתעניין: טל פוקס/)).toBeInTheDocument();
   });
 });
 

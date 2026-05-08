@@ -60,7 +60,7 @@ function DashboardMock() {
       <div className="lp-mock-ai-banner">
         <span className="lp-mock-ai-icon"><Sparkles size={12} /></span>
         <div>
-          <strong>AI מציע:</strong> 3 לידים מתאימים לנכס ברמלה
+          <strong>AI מציע:</strong> 3 מתעניינים מתאימים לנכס ברמלה
         </div>
         <ArrowUpRight size={12} />
       </div>
@@ -70,7 +70,7 @@ function DashboardMock() {
           <span className="lp-mock-kpi-icon"><Users size={12} /></span>
           <div>
             <span className="lp-mock-kpi-n">24</span>
-            <span className="lp-mock-kpi-l">לידים פעילים</span>
+            <span className="lp-mock-kpi-l">מתעניינים פעילים</span>
           </div>
           <span className="lp-mock-kpi-delta up">+3</span>
         </div>
@@ -92,7 +92,7 @@ function DashboardMock() {
       </div>
 
       <div className="lp-mock-section-title">
-        <span><Flame size={11} style={{ color: 'var(--danger)', verticalAlign: -1 }} /> לידים חמים היום</span>
+        <span><Flame size={11} style={{ color: 'var(--danger)', verticalAlign: -1 }} /> מתעניינים חמים היום</span>
         <span className="lp-mock-link">הכל ←</span>
       </div>
 
@@ -127,7 +127,7 @@ function DashboardMock() {
 
       <nav className="lp-mock-tabbar" aria-hidden="true">
         <span className="lp-mock-tab is-active"><Home size={14} /> בית</span>
-        <span className="lp-mock-tab"><Users size={14} /> לידים</span>
+        <span className="lp-mock-tab"><Users size={14} /> מתעניינים</span>
         <span className="lp-mock-tab lp-mock-tab-fab" aria-hidden="true">+</span>
         <span className="lp-mock-tab"><Zap size={14} /> פעולות</span>
         <span className="lp-mock-tab"><CalendarDays size={14} /> יומן</span>

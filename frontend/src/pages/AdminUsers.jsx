@@ -158,7 +158,7 @@ export default function AdminUsers() {
               <th>אימייל</th>
               <th>תפקיד</th>
               <th className="au-num"><button onClick={() => onSort('assetsCount')}>נכסים {sortIcon('assetsCount')}</button></th>
-              <th className="au-num"><button onClick={() => onSort('leadsCount')}>לידים {sortIcon('leadsCount')}</button></th>
+              <th className="au-num"><button onClick={() => onSort('leadsCount')}>מתעניינים {sortIcon('leadsCount')}</button></th>
               <th><button onClick={() => onSort('createdAt')}>נוצר {sortIcon('createdAt')}</button></th>
               <th><button onClick={() => onSort('lastActiveAt')}>פעיל לאחרונה {sortIcon('lastActiveAt')}</button></th>
             </tr>

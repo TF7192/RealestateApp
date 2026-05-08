@@ -83,12 +83,12 @@ export default function ListingDrawer({ listing, onClose, onDuplicate, onOpenMin
             <div className="md-drawer-section">
               <h3>
                 <Sparkles size={12} style={{ verticalAlign: 'middle', marginInlineEnd: 4 }} />
-                התאמה ל-{matches.length} {matches.length === 1 ? 'ליד' : 'לידים'}
+                התאמה ל-{matches.length} {matches.length === 1 ? 'מתעניין' : 'מתעניינים'}
               </h3>
               {matches.map((m) => (
                 <div key={m.id} className="md-match-card">
                   <div className="md-match-card-row">
-                    <span className="md-match-card-name">{m.leadName || 'ליד'}</span>
+                    <span className="md-match-card-name">{m.leadName || 'מתעניין'}</span>
                     {m.score != null && <span className="md-match-card-score">{m.score}/100</span>}
                   </div>
                   {Array.isArray(m.reasons) && m.reasons.length > 0 && (
@@ -108,7 +108,7 @@ export default function ListingDrawer({ listing, onClose, onDuplicate, onOpenMin
                       href={`/customers/${m.leadId}`}
                       className="btn btn-secondary btn-sm"
                     >
-                      פתח כרטיס ליד
+                      פתח כרטיס מתעניין
                     </a>
                     <button
                       type="button"

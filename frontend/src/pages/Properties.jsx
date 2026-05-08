@@ -1392,9 +1392,9 @@ export default function Properties() {
                                 ensureSharePrereqs();
                                 setMatchesPickerFor(prop);
                               }}
-                              aria-label={`${matchCount} לידים תואמים — ${prop.street}`}
+                              aria-label={`${matchCount} מתעניינים תואמים — ${prop.street}`}
                             >
-                              {matchCount} לידים תואמים
+                              {matchCount} מתעניינים תואמים
                             </button>
                           )}
                         </div>
@@ -1527,9 +1527,9 @@ export default function Properties() {
                           ensureSharePrereqs();
                           setMatchesPickerFor(prop);
                         }}
-                        aria-label={`${matchCount} לידים תואמים — ${prop.street}`}
+                        aria-label={`${matchCount} מתעניינים תואמים — ${prop.street}`}
                       >
-                        {matchCount} לידים תואמים
+                        {matchCount} מתעניינים תואמים
                       </button>
                     )}
                     <div className="property-price-overlay">

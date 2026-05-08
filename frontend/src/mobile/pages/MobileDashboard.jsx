@@ -21,7 +21,7 @@ export default function MobileDashboard() {
         <span className="m-eyebrow"><Sparkles size={11} /> היום</span>
         <h1 className="m-page-title">לחזור ללקוחות שלך.</h1>
         <p className="m-page-sub">
-          {hotLeads.length} לידים חמים ממתינים לשיחה · {openDeals.length} עסקאות פעילות
+          {hotLeads.length} מתעניינים חמים ממתינים לשיחה · {openDeals.length} עסקאות פעילות
         </p>
       </div>
 
@@ -42,7 +42,7 @@ export default function MobileDashboard() {
           onClick={() => navigate('/properties?assetClass=commercial')}
         />
         <KpiCard
-          label="לידים חמים"
+          label="מתעניינים חמים"
           value={stats.hotLeads}
           icon={<Flame size={14} />}
           meta={`מתוך ${leads.length}`}

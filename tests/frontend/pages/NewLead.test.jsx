@@ -7,7 +7,7 @@ import NewLead from '@estia/frontend/pages/NewLead.jsx';
 describe('<NewLead>', () => {
   it('renders the four sections including the K1/K2/L1 additions', () => {
     render(<NewLead />);
-    expect(screen.getByRole('heading', { name: 'ליד חדש' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'מתעניין חדש' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'פרטים אישיים' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'פרטים מורחבים' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'ניהול ולקוח' })).toBeInTheDocument();
@@ -21,7 +21,7 @@ describe('<NewLead>', () => {
       http.post('/api/leads', () => { created = true; return HttpResponse.json({ id: 'x' }); })
     );
     render(<NewLead />);
-    await user.click(screen.getAllByRole('button', { name: /שמור ליד/ })[0]);
+    await user.click(screen.getAllByRole('button', { name: /שמור מתעניין/ })[0]);
     expect(created).toBe(false);
   });
 
@@ -54,9 +54,9 @@ describe('<NewLead>', () => {
     // K2 — purpose multi-select: pick השקעה (INVESTMENT).
     await user.click(screen.getByRole('checkbox', { name: 'השקעה' }));
     // L1 — leadStatus NOT_INTERESTED.
-    await user.selectOptions(screen.getByLabelText('סטטוס ליד'), 'NOT_INTERESTED');
+    await user.selectOptions(screen.getByLabelText('סטטוס מתעניין'), 'NOT_INTERESTED');
 
-    await user.click(screen.getAllByRole('button', { name: /שמור ליד/ })[0]);
+    await user.click(screen.getAllByRole('button', { name: /שמור מתעניין/ })[0]);
 
     await waitFor(() => {
       expect(body.name).toBe('דני לוי');
@@ -83,7 +83,7 @@ describe('<NewLead>', () => {
     render(<NewLead />);
     await user.type(screen.getByPlaceholderText('שם מלא'), 'שרה');
     await user.click(screen.getByRole('checkbox', { name: /לקוח פרטי/ }));
-    await user.click(screen.getAllByRole('button', { name: /שמור ליד/ })[0]);
+    await user.click(screen.getAllByRole('button', { name: /שמור מתעניין/ })[0]);
     await waitFor(() => expect(body.isPrivate).toBe(true));
   });
 
@@ -102,7 +102,7 @@ describe('<NewLead>', () => {
     await user.click(screen.getByRole('checkbox', { name: 'מסחרי' }));
     // Toggle off the first one.
     await user.click(screen.getByRole('checkbox', { name: 'השקעה' }));
-    await user.click(screen.getAllByRole('button', { name: /שמור ליד/ })[0]);
+    await user.click(screen.getAllByRole('button', { name: /שמור מתעניין/ })[0]);
     await waitFor(() => expect(body.purposes).toEqual(['COMMERCIAL']));
   });
 });

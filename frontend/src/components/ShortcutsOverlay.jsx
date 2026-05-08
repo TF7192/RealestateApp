@@ -19,7 +19,7 @@ const SECTIONS = [
     title: 'יצירה',
     rows: [
       { keys: ['N'],     label: 'נכס חדש' },
-      { keys: ['L'],     label: 'ליד חדש' },
+      { keys: ['L'],     label: 'מתעניין חדש' },
     ],
   },
   {

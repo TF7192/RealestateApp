@@ -150,7 +150,7 @@ export default function Reports() {
       key: 'customers',  label: 'לקוחות חדשים',
       count: data.newCustomers?.count || 0,
       Icon: Users,
-      sub: 'לידים שנרשמו אצלכם',
+      sub: 'מתעניינים שנרשמו אצלכם',
     },
     {
       key: 'deals',      label: 'עסקאות',

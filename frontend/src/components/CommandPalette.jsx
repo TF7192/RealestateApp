@@ -25,7 +25,7 @@ const STATIC_ENTRIES = [
   { kind: 'nav', icon: Handshake,        title: 'עסקאות',     to: '/deals' },
   { kind: 'nav', icon: User,             title: 'הפרופיל שלי', to: '/profile' },
   { kind: 'action', icon: Plus,          title: 'קליטת נכס חדש', to: '/properties/new' },
-  { kind: 'action', icon: UserPlus,      title: 'ליד חדש',      to: '/customers/new' },
+  { kind: 'action', icon: UserPlus,      title: 'מתעניין חדש',      to: '/customers/new' },
 ];
 
 // Format helpers for the server result shapes. The backend (H1) returns
@@ -147,7 +147,7 @@ export default function CommandPalette({ open, onClose }) {
       kind: 'lead',
       icon: Users,
       id: l.id,
-      title: l.name || 'ליד',
+      title: l.name || 'מתעניין',
       subtitle: leadSub(l),
       to: `/customers?selected=${l.id}`,
     }));
@@ -255,7 +255,7 @@ export default function CommandPalette({ open, onClose }) {
                 {results.leads.map((l, i) => (
                   <Item
                     key={`l-${l.id}`}
-                    item={{ icon: Users, title: l.name || 'ליד', subtitle: leadSub(l) }}
+                    item={{ icon: Users, title: l.name || 'מתעניין', subtitle: leadSub(l) }}
                     active={index === leadOffset + i}
                     onPick={() => { navigate(`/customers?selected=${l.id}`); onClose(); }}
                   />

@@ -131,7 +131,7 @@ export default function PublicMatches() {
               <>
                 {' · '}
                 <strong style={{ color: DT.goldDark, fontWeight: 700 }}>
-                  {matchingCount} תואמים ללידים שלך
+                  {matchingCount} תואמים למתעניינים שלך
                 </strong>
               </>
             )}
@@ -145,7 +145,7 @@ export default function PublicMatches() {
         flexWrap: 'wrap',
       }}>
         <Chip active={filter === 'matching'} onClick={() => setFilter('matching')}>
-          תואמים ללידים שלי · {matchingCount}
+          תואמים למתעניינים שלי · {matchingCount}
         </Chip>
         <Chip active={filter === 'all'} onClick={() => setFilter('all')}>
           כל הנכסים · {items.length}
@@ -198,7 +198,7 @@ export default function PublicMatches() {
           title={filter === 'matching' ? 'אין התאמות כרגע' : 'המאגר ריק כעת'}
           description={
             filter === 'matching'
-              ? 'הוסיפו לידים או הוסיפו פרופילי חיפוש — כשיצטבר מלאי מתאים, הוא יופיע כאן.'
+              ? 'הוסיפו מתעניינים או הוסיפו פרופילי חיפוש — כשיצטבר מלאי מתאים, הוא יופיע כאן.'
               : 'עדיין לא שותפו נכסים למאגר. אפשר לשתף נכס משלכם מדף הנכס.'
           }
         />
@@ -301,7 +301,7 @@ function PoolCard({ row, busy, onDuplicate, onToggleSeen }) {
           display: 'inline-flex', gap: 4, alignItems: 'center',
           boxShadow: '0 2px 6px rgba(30,26,20,0.25)',
         }}>
-          <Users size={11} /> {row.matchCount} לידים
+          <Users size={11} /> {row.matchCount} מתעניינים
         </div>
         {/* Copies badge — top end */}
         {row.copies > 0 && (
@@ -482,7 +482,7 @@ function PoolCard({ row, busy, onDuplicate, onToggleSeen }) {
             {row.topMatches.map((m, i) => (
               <span key={m.id}>
                 <Link to={`/customers/${m.id}`} style={{ color: DT.gold, fontWeight: 700, textDecoration: 'none' }}>
-                  {m.name || 'ליד'}
+                  {m.name || 'מתעניין'}
                 </Link>
                 {i < row.topMatches.length - 1 ? ', ' : ''}
               </span>

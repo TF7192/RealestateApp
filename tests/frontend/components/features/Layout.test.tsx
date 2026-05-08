@@ -1,12 +1,10 @@
-// Layout — sidebar shell. The original suite asserted on the previous
-// nav surface: a "כלי ניהול" group, a "לקוחות" link, "תבניות הודעה",
-// "כווץ סרגל" / "יציאה" labels, and a `nav-favorites-empty` testid.
-// The current Layout (frontend/src/components/Layout.jsx) instead
-// renders three section labels — עבודה יומיומית / כלים / מועדפים — a
-// "לידים" link to /customers, a logout button labelled "התנתקות", and
-// a "כווץ תפריט" / "הרחב תפריט" collapse toggle. The empty-favorites
-// hint is plain Hebrew copy with no testid. This file covers the
-// current surface.
+// Layout — sidebar shell. The original suite asserted on an even earlier
+// nav surface; the current one (post-2026-05-08) renders three section
+// labels — עבודה יומיומית / כלים / מועדפים — a "מתעניינים" link to
+// /customers (renamed from "מתעניינים" — terminology decision, see
+// memory/project_terminology_lead_to_interested.md), a logout button
+// labelled "התנתקות", and a "כווץ תפריט" / "הרחב תפריט" collapse toggle.
+// The empty-favorites hint is plain Hebrew copy with no testid.
 
 import { describe, it, expect, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -22,8 +20,8 @@ describe('<Layout>', () => {
     // robust against layout duplication.
     expect(screen.getAllByRole('link', { name: 'לוח בקרה' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'נכסים' }).length).toBeGreaterThan(0);
-    // Customers route is nav-labelled "לידים" (the route stays /customers).
-    expect(screen.getAllByRole('link', { name: 'לידים' }).length).toBeGreaterThan(0);
+    // Customers route is nav-labelled "מתעניינים" (the route stays /customers).
+    expect(screen.getAllByRole('link', { name: 'מתעניינים' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'עסקאות' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'בעלים' }).length).toBeGreaterThan(0);
   });
@@ -85,7 +83,7 @@ describe('<Layout>', () => {
     // a stable substring that survives minor copy tweaks.
     await waitFor(() => {
       expect(
-        screen.getByText(/סמנו .* בלידים, נכסים ובעלים לגישה מהירה/),
+        screen.getByText(/סמנו .* במתעניינים, נכסים ובעלים לגישה מהירה/),
       ).toBeInTheDocument();
     });
   });

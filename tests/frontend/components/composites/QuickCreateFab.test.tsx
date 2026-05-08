@@ -33,7 +33,7 @@ describe('<QuickCreateFab>', () => {
     // F-1 — "עסקה חדשה" shortcut removed. Only property + lead remain.
     expect(items).toHaveLength(2);
     expect(screen.getByRole('menuitem', { name: /נכס חדש/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /ליד חדש/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /מתעניין חדש/ })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /עסקה חדשה/ })).not.toBeInTheDocument();
   });
 

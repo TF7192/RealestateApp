@@ -26,7 +26,7 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 // gold hue pulls the eye to the sprint-5 feature surface.
 const QUICK_TABS = [
   { to: '/dashboard',  label: 'בית',     Icon: Home },
-  { to: '/customers',  label: 'לידים',    Icon: Users },
+  { to: '/customers',  label: 'מתעניינים',    Icon: Users },
   { to: '/properties', label: 'נכסים',    Icon: Building2 },
   { to: '/ai',         label: 'Estia AI', Icon: Sparkles },
 ];

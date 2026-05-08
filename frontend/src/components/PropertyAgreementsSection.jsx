@@ -3,7 +3,7 @@
 // Lists every signed Prospect for the property. Each row shows:
 //   - download/print link to the rendered PDF (GET /api/prospects/:id/agreement.pdf)
 //   - the signedAt date in Hebrew locale
-//   - a linked-Lead chip, or a `קשר לליד` picker when leadId is null
+//   - a linked-Lead chip, or a `קשר למתעניין` picker when leadId is null
 //
 // The linking uses backend POST /api/prospects/:id/link-lead and
 // /api/prospects/:id/unlink-lead (registered alongside the PDF route
@@ -59,11 +59,11 @@ export default function PropertyAgreementsSection({ propertyId, leads = [] }) {
     setBusyId(prospectId);
     try {
       await api.linkProspectLead(prospectId, leadId);
-      toast?.success?.('ההסכם קושר לליד');
+      toast?.success?.('ההסכם קושר למתעניין');
       setPicker((p) => ({ ...p, [prospectId]: false }));
       await load();
     } catch (e) {
-      toast?.error?.(e?.message || 'קישור לליד נכשל');
+      toast?.error?.(e?.message || 'קישור למתעניין נכשל');
     } finally {
       setBusyId(null);
     }
@@ -73,7 +73,7 @@ export default function PropertyAgreementsSection({ propertyId, leads = [] }) {
     setBusyId(prospectId);
     try {
       await api.unlinkProspectLead(prospectId);
-      toast?.info?.('הקישור לליד הוסר');
+      toast?.info?.('הקישור למתעניין הוסר');
       await load();
     } catch (e) {
       toast?.error?.(e?.message || 'הסרת הקישור נכשלה');
@@ -162,7 +162,7 @@ export default function PropertyAgreementsSection({ propertyId, leads = [] }) {
               <div className="pd-agr-lead">
                 {linked ? (
                   <span className="pd-agr-linked">
-                    <span className="pd-agr-linked-label">ליד:</span>
+                    <span className="pd-agr-linked-label">מתעניין:</span>
                     <a href={`/customers/${linked.id}`} className="pd-agr-linked-name">
                       {linked.name}
                     </a>
@@ -171,14 +171,14 @@ export default function PropertyAgreementsSection({ propertyId, leads = [] }) {
                       className="pd-agr-unlink"
                       onClick={() => unlink(p.id)}
                       disabled={busyId === p.id}
-                      aria-label="הסר קישור לליד"
-                      title="הסר קישור לליד"
+                      aria-label="הסר קישור למתעניין"
+                      title="הסר קישור למתעניין"
                     >
                       <XIcon size={12} aria-hidden />
                     </button>
                   </span>
                 ) : p.leadId ? (
-                  <span className="pd-agr-meta">ליד #{p.leadId.slice(0, 6)}</span>
+                  <span className="pd-agr-meta">מתעניין #{p.leadId.slice(0, 6)}</span>
                 ) : (
                   <div className="pd-agr-picker-wrap">
                     <button
@@ -188,12 +188,12 @@ export default function PropertyAgreementsSection({ propertyId, leads = [] }) {
                       aria-expanded={isOpen}
                     >
                       <UserPlus size={13} aria-hidden />
-                      <span>קשר לליד</span>
+                      <span>קשר למתעניין</span>
                     </button>
                     {isOpen && (
-                      <ul className="pd-agr-picker" role="listbox" aria-label="בחר ליד לקישור">
+                      <ul className="pd-agr-picker" role="listbox" aria-label="בחר מתעניין לקישור">
                         {leads.length === 0 && (
-                          <li className="pd-agr-picker-empty">אין לידים זמינים</li>
+                          <li className="pd-agr-picker-empty">אין מתעניינים זמינים</li>
                         )}
                         {leads.map((l) => (
                           <li key={l.id}>

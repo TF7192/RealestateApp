@@ -343,7 +343,7 @@ export default function Calendar() {
           {!loading && focusedMeetings.length === 0 && (
             <EmptyState
               title="אין פגישות ביום זה"
-              body="פגישה שתתוזמן בלידים תופיע כאן"
+              body="פגישה שתתוזמן במתעניינים תופיע כאן"
             />
           )}
 

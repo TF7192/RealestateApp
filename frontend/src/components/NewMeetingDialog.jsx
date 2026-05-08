@@ -218,7 +218,7 @@ export default function NewMeetingDialog({ initialDate, onClose, onCreated }) {
                 פגישה חדשה
               </strong>
               <span style={{ fontSize: 12, color: DT.muted }}>
-                קבע פגישה ביומן — מקושר לליד או חופשי
+                קבע פגישה ביומן — מקושר למתעניין או חופשי
               </span>
             </div>
             <button
@@ -342,7 +342,7 @@ export default function NewMeetingDialog({ initialDate, onClose, onCreated }) {
                 marginBottom: 8,
               }} role="radiogroup" aria-label="סוג משתתף">
                 {[
-                  { value: 'lead', label: 'בחר מליד קיים' },
+                  { value: 'lead', label: 'בחר ממתעניין קיים' },
                   { value: 'free', label: 'טקסט חופשי' },
                 ].map((opt) => {
                   const sel = participantMode === opt.value;
@@ -393,7 +393,7 @@ export default function NewMeetingDialog({ initialDate, onClose, onCreated }) {
                       }}
                       value={leadQuery}
                       onChange={(e) => setLeadQuery(e.target.value)}
-                      placeholder={leadsLoading ? 'טוען לידים…' : 'חפש לפי שם, עיר או טלפון'}
+                      placeholder={leadsLoading ? 'טוען מתעניינים…' : 'חפש לפי שם, עיר או טלפון'}
                       disabled={leadsLoading}
                       autoComplete="off"
                       autoCorrect="off"
@@ -411,7 +411,7 @@ export default function NewMeetingDialog({ initialDate, onClose, onCreated }) {
                       <div style={pickerEmpty()}>טוען…</div>
                     ) : filteredLeads.length === 0 ? (
                       <div style={pickerEmpty()}>
-                        {leadQuery ? 'לא נמצאו לידים מתאימים' : 'אין עדיין לידים — אפשר לעבור לטקסט חופשי'}
+                        {leadQuery ? 'לא נמצאו מתעניינים מתאימים' : 'אין עדיין מתעניינים — אפשר לעבור לטקסט חופשי'}
                       </div>
                     ) : (
                       filteredLeads.slice(0, 50).map((l) => {

@@ -69,7 +69,7 @@ export default function SettingsNotifications() {
           התראות
         </h1>
         <div style={{ fontSize: 13, color: DT.muted, marginTop: 4 }}>
-          בחר/י איך לקבל התראות על נכסים חדשים שתואמים לליד שלך.
+          בחר/י איך לקבל התראות על נכסים חדשים שתואמים למתעניין שלך.
         </div>
       </div>
 

@@ -138,7 +138,7 @@ export default function Admin() {
             לוח בקרה — Admin
           </h1>
           <div style={{ fontSize: 13, color: DT.muted, marginTop: 2 }}>
-            סקירה כוללת של המערכת — משתמשים, נכסים, לידים, וצריכת AI.
+            סקירה כוללת של המערכת — משתמשים, נכסים, מתעניינים, וצריכת AI.
           </div>
         </div>
         <Link
@@ -185,7 +185,7 @@ export default function Admin() {
         />
         <Kpi
           icon={<ActivityIcon size={16} />}
-          label="לידים"
+          label="מתעניינים"
           value={overview?.leads || 0}
           delta={overview?.newThisWeek?.leads}
         />
@@ -269,7 +269,7 @@ export default function Admin() {
                 <th style={th()}>תפקיד</th>
                 <th style={th()}>משרד</th>
                 <th style={thNum()}>נכסים</th>
-                <th style={thNum()}>לידים</th>
+                <th style={thNum()}>מתעניינים</th>
                 <th style={thNum()}>עסקאות</th>
                 <th style={thNum()}>תזכורות</th>
                 <th style={thNum()}>קריאות AI</th>
@@ -437,7 +437,7 @@ function WeeklyGrowthCard({ overview }) {
   const cols = [
     { label: 'משתמשים חדשים', value: u, color: DT.info },
     { label: 'נכסים חדשים',   value: p, color: DT.gold },
-    { label: 'לידים חדשים',   value: l, color: DT.success },
+    { label: 'מתעניינים חדשים',   value: l, color: DT.success },
   ];
   return (
     <section style={card()}>

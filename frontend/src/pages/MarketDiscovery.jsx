@@ -352,7 +352,7 @@ export default function MarketDiscovery() {
     } else if (action === 'send-to-lead' && target) {
       const m = (target.matches || [])[0];
       if (m) setSendDialog({ match: m, listing: target });
-      else toast.error?.('אין ליד מתאים למודעה הזו');
+      else toast.error?.('אין מתעניין מתאים למודעה הזו');
     }
   }, [drawerListing, markViewed, toast]);
 
@@ -410,7 +410,7 @@ export default function MarketDiscovery() {
       });
       setEmailPref({ ...emailPref, enabled: true, deliveryEmail: customDeliveryEmail });
       setEmailModalOpen(false);
-      toast.success?.('נרשמת בהצלחה — נשלח מייל בכל פעם שנמצאת התאמה לליד');
+      toast.success?.('נרשמת בהצלחה — נשלח מייל בכל פעם שנמצאת התאמה למתעניין');
     } catch (err) {
       toast.error?.(err?.message || 'שמירה נכשלה');
     } finally {
@@ -477,7 +477,7 @@ export default function MarketDiscovery() {
               className="btn btn-secondary"
               onClick={openEmailModal}
               disabled={emailPref == null}
-              title="קבל מייל בכל פעם שנמצאת התאמה לליד"
+              title="קבל מייל בכל פעם שנמצאת התאמה למתעניין"
               style={{ minHeight: 40, padding: '8px 14px', fontSize: 13 }}
             >
               <Mail size={14} />
@@ -569,7 +569,7 @@ export default function MarketDiscovery() {
               <Sparkles size={18} style={{ color: 'var(--success)', flexShrink: 0, marginTop: 2 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="md-match-banner-title">
-                  נכס חדש מתאים לליד שלך
+                  נכס חדש מתאים למתעניין שלך
                   {matchContext.lead?.name && (
                     <span style={{ marginInlineStart: 6, color: 'var(--text-muted)', fontWeight: 500 }}>
                       · {matchContext.lead.name}

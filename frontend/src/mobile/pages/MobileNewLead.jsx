@@ -22,7 +22,7 @@ export default function MobileNewLead() {
       return;
     }
     haptics.success();
-    toast({ message: 'הליד נוסף בהצלחה' });
+    toast({ message: 'המתעניין נוסף בהצלחה' });
     navigate('/leads');
   };
 
@@ -32,7 +32,7 @@ export default function MobileNewLead() {
         <button className="m-icon-btn" onClick={() => { haptics.tap(); navigate(-1); }}>
           <ArrowRight size={18} />
         </button>
-        <div className="m-eyebrow" style={{ marginRight: 'auto', marginLeft: 'auto' }}>ליד חדש</div>
+        <div className="m-eyebrow" style={{ marginRight: 'auto', marginLeft: 'auto' }}>מתעניין חדש</div>
       </header>
 
       <h1 className="m-page-title" style={{ padding: '0 var(--m-page-pad)', marginTop: 18 }}>שיחה שהגיעה.</h1>

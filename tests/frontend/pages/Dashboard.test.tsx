@@ -54,7 +54,7 @@ describe('<Dashboard>', () => {
     );
     // Tiles render their Hebrew label in plain text. KPI grid is the
     // post-port replacement for the deprecated DeltaBadge surface.
-    for (const label of ['לידים פעילים', 'פגישות השבוע', 'עסקאות פתוחות', 'נכסים פעילים']) {
+    for (const label of ['מתעניינים פעילים', 'פגישות השבוע', 'עסקאות פתוחות', 'נכסים פעילים']) {
       expect(await screen.findByText(label)).toBeInTheDocument();
     }
   });
@@ -80,7 +80,7 @@ describe('<Dashboard>', () => {
     );
     // Empty-state copy from the hot-leads card.
     await waitFor(() =>
-      expect(screen.getByText(/אין לידים חמים כרגע/)).toBeInTheDocument(),
+      expect(screen.getByText(/אין מתעניינים חמים כרגע/)).toBeInTheDocument(),
     );
   });
 
@@ -123,7 +123,7 @@ describe('<Dashboard>', () => {
     const tileFor = (label: string) =>
       screen.getByText(label).parentElement!.parentElement!;
     await waitFor(() => {
-      expect(tileFor('לידים פעילים').textContent).toMatch(/12/);
+      expect(tileFor('מתעניינים פעילים').textContent).toMatch(/12/);
       expect(tileFor('פגישות השבוע').textContent).toMatch(/5/);
       expect(tileFor('עסקאות פתוחות').textContent).toMatch(/3/);
       expect(tileFor('נכסים פעילים').textContent).toMatch(/7/);

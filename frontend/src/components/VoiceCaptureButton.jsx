@@ -31,7 +31,7 @@ import './VoiceCaptureButton.css';
 const SUPPORT_EMAIL = 'support@estia.co.il';
 const PREMIUM_SUBJECT = 'הפעלת פיצ׳ר הקלטה קולית — Estia';
 const PREMIUM_BODY =
-  'היי, אני רוצה להפעיל את פיצ׳ר הקלטת הליד הקולי בחשבון שלי.';
+  'היי, אני רוצה להפעיל את פיצ׳ר הקלטת המתעניין הקולי בחשבון שלי.';
 
 function formatMMSS(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -144,7 +144,7 @@ export default function VoiceCaptureButton({ kind = 'LEAD', onExtracted }) {
     ? 'עצור הקלטה'
     : kind === 'PROPERTY'
       ? 'דבר במקום להקליד — נכס'
-      : 'דבר במקום להקליד — ליד';
+      : 'דבר במקום להקליד — מתעניין';
 
   return (
     <>
@@ -189,7 +189,7 @@ export default function VoiceCaptureButton({ kind = 'LEAD', onExtracted }) {
         <ConfirmDialog
           title="פיצ׳ר פרימיום"
           message={
-            'הקלטת ליד קולית והפקת פרטי הליד באמצעות AI זמינה במסלולי פרימיום בלבד. ' +
+            'הקלטת מתעניין קולית והפקת פרטי המתעניין באמצעות AI זמינה במסלולי פרימיום בלבד. ' +
             'נשמח להפעיל את זה עבורך — צור/י קשר עם התמיכה ונחבר אותך מיד.'
           }
           confirmLabel="צור קשר עם התמיכה"

@@ -35,7 +35,7 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 const SCOPE_OPTIONS = [
   { value: 'ALL',      label: 'הכל' },
   { value: 'PROPERTY', label: 'נכס' },
-  { value: 'LEAD',     label: 'ליד' },
+  { value: 'LEAD',     label: 'מתעניין' },
   { value: 'CUSTOMER', label: 'לקוח' },
 ];
 
@@ -166,7 +166,7 @@ export default function TagSettings() {
             תגיות
           </h1>
           <div style={{ fontSize: 13, color: DT.muted, marginTop: 4, lineHeight: 1.6 }}>
-            ניהול ספריית התגיות לשיוך נכסים, לקוחות ולידים.
+            ניהול ספריית התגיות לשיוך נכסים, לקוחות ומתעניינים.
             {items.length > 0 && (
               <>
                 {' · '}
@@ -455,7 +455,7 @@ function EmptyTags() {
         fontSize: 13, color: DT.muted, margin: '0 auto',
         maxWidth: 360, lineHeight: 1.7,
       }}>
-        הוסף/י תגית ראשונה בטופס שלמעלה כדי לסווג נכסים, לקוחות ולידים.
+        הוסף/י תגית ראשונה בטופס שלמעלה כדי לסווג נכסים, לקוחות ומתעניינים.
       </p>
     </div>
   );

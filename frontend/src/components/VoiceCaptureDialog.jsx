@@ -310,10 +310,10 @@ export default function VoiceCaptureDialog({
           </h2>
           <p style={{ fontSize: 13, color: DT.muted, margin: 0, lineHeight: 1.55 }}>
             {preferKind === 'lead'
-              ? 'תארו/י את הליד. אנחנו מזהים שם, טלפון, עיר, תקציב, חדרים ועוד.'
+              ? 'תארו/י את המתעניין. אנחנו מזהים שם, טלפון, עיר, תקציב, חדרים ועוד.'
               : preferKind === 'property'
               ? 'תארו/י את הנכס. אנחנו מזהים סוג, כתובת, מ״ר, מחיר, בעלים ועוד.'
-              : 'תארו/י ליד או נכס — אנחנו נזהה מה מדובר ונמלא את הטופס המתאים.'}
+              : 'תארו/י מתעניין או נכס — אנחנו נזהה מה מדובר ונמלא את הטופס המתאים.'}
           </p>
         </div>
         {!inline && (
@@ -470,7 +470,7 @@ export default function VoiceCaptureDialog({
           }}>
             <Sparkles size={14} style={{ color: DT.goldDark }} />
             <strong style={{ fontSize: 13, color: DT.ink }}>
-              {activeKind === 'lead' && 'זוהה ליד'}
+              {activeKind === 'lead' && 'זוהה מתעניין'}
               {activeKind === 'property' && 'זוהה נכס'}
               {activeKind === 'unclear' && 'לא זוהה אוטומטית'}
             </strong>
@@ -484,7 +484,7 @@ export default function VoiceCaptureDialog({
               <OverrideBtn
                 active={activeKind === 'lead'}
                 onClick={() => setOverrideKind('lead')}
-              >ליד</OverrideBtn>
+              >מתעניין</OverrideBtn>
               <OverrideBtn
                 active={activeKind === 'property'}
                 onClick={() => setOverrideKind('property')}
@@ -503,8 +503,8 @@ export default function VoiceCaptureDialog({
             }}>
               <ArrowLeftRight size={14} style={{ marginTop: 2, color: DT.goldDark }} />
               <div>
-                זיהינו <strong>{activeKind === 'lead' ? 'ליד' : 'נכס'}</strong>,
-                אבל אתם/ן בדף {preferKind === 'lead' ? 'יצירת ליד' : 'יצירת נכס'}.
+                זיהינו <strong>{activeKind === 'lead' ? 'מתעניין' : 'נכס'}</strong>,
+                אבל אתם/ן בדף {preferKind === 'lead' ? 'יצירת מתעניין' : 'יצירת נכס'}.
                 לחיצה על «השתמש בערכים» תעביר אתכם/ן לדף המתאים עם השדות מוכנים.
               </div>
             </div>
@@ -658,7 +658,7 @@ export default function VoiceCaptureDialog({
             >
               <Sparkles size={13} />
               {kindMismatch
-                ? (activeKind === 'lead' ? 'פתח טופס ליד עם הערכים' : 'פתח טופס נכס עם הערכים')
+                ? (activeKind === 'lead' ? 'פתח טופס מתעניין עם הערכים' : 'פתח טופס נכס עם הערכים')
                 : 'מלא את הטופס עם הערכים'}
             </button>
           </div>

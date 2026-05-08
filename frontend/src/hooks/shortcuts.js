@@ -14,7 +14,7 @@ const ROUTE_TITLES = {
   '/templates':  'תבניות',
   '/profile':    'פרופיל',
   '/properties/new': 'נכס חדש',
-  '/customers/new':  'ליד חדש',
+  '/customers/new':  'מתעניין חדש',
 };
 
 function pickTitle(pathname) {

@@ -25,7 +25,7 @@ export default function QuickActionSheet({ open, onClose }) {
         <button className="m-action" onClick={() => go('/leads/new')}>
           <div className="m-action-icon"><UserPlus size={20} /></div>
           <div>
-            ליד חדש
+            מתעניין חדש
             <div className="m-action-sub">שיחה שהגיעה עכשיו</div>
           </div>
         </button>
@@ -39,7 +39,7 @@ export default function QuickActionSheet({ open, onClose }) {
         <button className="m-action" onClick={() => go('/leads?filter=hot')}>
           <div className="m-action-icon"><PhoneCall size={20} /></div>
           <div>
-            לידים חמים
+            מתעניינים חמים
             <div className="m-action-sub">לטיפול היום</div>
           </div>
         </button>

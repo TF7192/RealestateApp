@@ -39,7 +39,7 @@ beforeEach(() => {
   server.use(
     http.post('/api/ai/voice-lead', () =>
       HttpResponse.json({
-        transcript: 'ליד חדש',
+        transcript: 'מתעניין חדש',
         extracted: { name: 'רות', phone: '050-9999999', city: 'רמת גן' },
         mode: 'draft',
         traceId: 't-1',
@@ -58,7 +58,7 @@ afterEach(() => {
 describe('<VoiceCaptureButton>', () => {
   it('renders a LEAD-labeled trigger when kind="LEAD"', () => {
     render(<VoiceCaptureButton kind="LEAD" onExtracted={() => {}} />);
-    expect(screen.getByRole('button', { name: /ליד/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /מתעניין/ })).toBeInTheDocument();
   });
 
   it('renders a PROPERTY-labeled trigger when kind="PROPERTY"', () => {
@@ -75,7 +75,7 @@ describe('<VoiceCaptureButton>', () => {
   it('N-16 — first click opens the premium-gate dialog instead of recording', async () => {
     const user = userEvent.setup();
     render(<VoiceCaptureButton kind="LEAD" onExtracted={() => {}} />);
-    const trigger = screen.getByRole('button', { name: /ליד/ });
+    const trigger = screen.getByRole('button', { name: /מתעניין/ });
     await user.click(trigger);
     expect(await screen.findByText(/פיצ׳ר פרימיום/)).toBeInTheDocument();
   });
@@ -91,7 +91,7 @@ describe('<VoiceCaptureButton>', () => {
     const onExtracted = vi.fn();
     const user = userEvent.setup();
     render(<VoiceCaptureButton kind="LEAD" onExtracted={onExtracted} />);
-    await user.click(screen.getByRole('button', { name: /ליד/ }));
+    await user.click(screen.getByRole('button', { name: /מתעניין/ }));
     await screen.findByText(/פיצ׳ר פרימיום/);
     // The AI-extraction path must stay unreachable while the gate is up.
     expect(onExtracted).not.toHaveBeenCalled();

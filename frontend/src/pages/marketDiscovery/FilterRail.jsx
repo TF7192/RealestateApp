@@ -82,7 +82,7 @@ function FilterRailBody({ filters, onUpdate, onClear }) {
             checked={!!filters.matchedOnly}
             onChange={(e) => onUpdate({ matchedOnly: e.target.checked })}
           />
-          רק עם התאמה לליד שלי
+          רק עם התאמה למתעניין שלי
         </label>
         <label>
           <input

@@ -78,13 +78,13 @@ export default function Leads() {
     <div className="leads-page">
       <div className="page-header animate-in">
         <div className="page-header-info">
-          <h2>ניהול לידים</h2>
-          <p>{leads.length} לידים פעילים</p>
+          <h2>ניהול מתעניינים</h2>
+          <p>{leads.length} מתעניינים פעילים</p>
         </div>
         <div className="page-header-actions">
           <Link to="/leads/new" className="btn btn-primary">
             <UserPlus size={18} />
-            ליד חדש
+            מתעניין חדש
           </Link>
         </div>
       </div>

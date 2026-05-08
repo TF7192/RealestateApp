@@ -3,7 +3,7 @@
 //   סקירה         → 3 KPI tiles (views / inquiries / agreements) +
 //                   top-performer cards + per-property table with an
 //                   inline 14-day SVG sparkline and conversion %.
-//   לידים מדפי נחיתה → PropertyInquiry inbox with "הפוך לליד" one-click
+//   מתעניינים מדפי נחיתה → PropertyInquiry inbox with "הפוך למתעניין" one-click
 //                   promotion → links into /customers/:leadId on success.
 //   הסכמי תיווך   → Agreement list (api.listAgreements) filtered by
 //                   status pill row, copy-link action per row.
@@ -39,7 +39,7 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 // Tabs render as a pill row. Order matters — סקירה is the default.
 const TABS = [
   { key: 'overview',   label: 'סקירה',           Icon: TrendingUp },
-  { key: 'inquiries',  label: 'לידים מדפי נחיתה', Icon: Inbox },
+  { key: 'inquiries',  label: 'מתעניינים מדפי נחיתה', Icon: Inbox },
   { key: 'agreements', label: 'הסכמי תיווך',     Icon: FileSignature },
 ];
 
@@ -114,7 +114,7 @@ export default function Marketing() {
           margin: '6px 0 0', fontSize: isMobile ? 12 : 14,
           color: DT.muted, lineHeight: 1.5, maxWidth: 620,
         }}>
-          ביצועי דפי הנחיתה, לידים שהתקבלו ישירות מהפרסום, וסטטוס הסכמי תיווך —
+          ביצועי דפי הנחיתה, מתעניינים שהתקבלו ישירות מהפרסום, וסטטוס הסכמי תיווך —
           הכול במקום אחד.
         </p>
       </header>
@@ -648,7 +648,7 @@ function InquiriesTab({ isMobile, toast }) {
   const [rows, setRows] = useState([]);
   const [error, setError] = useState(null);
   // Maps inquiryId → resulting leadId once promoted. Swapped in so the
-  // "הפוך לליד" button is replaced by a "פתח ליד" link to /customers/:id.
+  // "הפוך למתעניין" button is replaced by a "פתח מתעניין" link to /customers/:id.
   const [promoted, setPromoted] = useState({});
   const [busyId, setBusyId] = useState(null);
 
@@ -673,9 +673,9 @@ function InquiriesTab({ isMobile, toast }) {
       const res = await api.promoteMarketingInquiry(id);
       const leadId = res?.leadId || res?.lead?.id;
       if (leadId) setPromoted((p) => ({ ...p, [id]: leadId }));
-      toast.success('הליד נוצר');
+      toast.success('המתעניין נוצר');
     } catch (e) {
-      toast.error(e?.message || 'יצירת הליד נכשלה');
+      toast.error(e?.message || 'יצירת המתעניין נכשלה');
     } finally {
       setBusyId(null);
     }
@@ -715,7 +715,7 @@ function InquiriesTab({ isMobile, toast }) {
         <EmptyBlock
           icon={<Inbox size={36} aria-hidden="true" />}
           title="אין עדיין פניות"
-          description="כאשר מבקרים ישלחו טופס בדף נחיתה, הפנייה תופיע כאן מוכנה להפוך לליד."
+          description="כאשר מבקרים ישלחו טופס בדף נחיתה, הפנייה תופיע כאן מוכנה להפוך למתעניין."
           padInline={isMobile}
         />
       )}
@@ -815,7 +815,7 @@ function InquiryRow({ r, promotedLeadId, busy, onPromote }) {
       <Td align="center">
         {promotedLeadId ? (
           <Link to={`/customers/${promotedLeadId}`} style={openLeadStyle()}>
-            <ExternalLink size={12} aria-hidden="true" /> פתח ליד
+            <ExternalLink size={12} aria-hidden="true" /> פתח מתעניין
           </Link>
         ) : (
           <button
@@ -824,7 +824,7 @@ function InquiryRow({ r, promotedLeadId, busy, onPromote }) {
             disabled={busy}
             style={goldBtnStyle(busy)}
           >
-            {busy ? '…' : <><Check size={12} aria-hidden="true" /> הפוך לליד</>}
+            {busy ? '…' : <><Check size={12} aria-hidden="true" /> הפוך למתעניין</>}
           </button>
         )}
       </Td>
@@ -868,14 +868,14 @@ function InquiryCard({ r, promotedLeadId, busy, onPromote }) {
       )}
       {promotedLeadId ? (
         <Link to={`/customers/${promotedLeadId}`} style={{ ...openLeadStyle(), width: '100%', justifyContent: 'center' }}>
-          <ExternalLink size={12} aria-hidden="true" /> פתח ליד
+          <ExternalLink size={12} aria-hidden="true" /> פתח מתעניין
         </Link>
       ) : (
         <button
           type="button" onClick={onPromote} disabled={busy}
           style={{ ...goldBtnStyle(busy), width: '100%', justifyContent: 'center' }}
         >
-          {busy ? '…' : <><Check size={12} aria-hidden="true" /> הפוך לליד</>}
+          {busy ? '…' : <><Check size={12} aria-hidden="true" /> הפוך למתעניין</>}
         </button>
       )}
     </div>
@@ -988,7 +988,7 @@ function AgreementsTab({ isMobile, toast }) {
             icon={<FileSignature size={36} aria-hidden="true" />}
             title={statusFilter === 'ALL' ? 'אין עדיין הסכמי תיווך' : 'אין הסכמים בסטטוס הזה'}
             description={statusFilter === 'ALL'
-              ? 'כשתשלח הסכם חתימה ראשון מכרטיס ליד, הוא יופיע כאן יחד עם הסטטוס.'
+              ? 'כשתשלח הסכם חתימה ראשון מכרטיס מתעניין, הוא יופיע כאן יחד עם הסטטוס.'
               : 'שנה את הסינון למעלה כדי לראות הסכמים בסטטוסים אחרים.'}
             padInline={isMobile}
           />

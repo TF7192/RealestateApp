@@ -182,13 +182,13 @@ export default function CustomerFiltersPanel({
           <div className="cfp-body">
             {/* Lead heat (HOT/WARM/COLD) */}
             <section className="cfp-section">
-              <h4>חום ליד</h4>
+              <h4>חום מתעניין</h4>
               <ChipGroup group="heat" values={labelOptions(LEAD_HEAT_LABELS)} />
             </section>
 
             {/* Quick lead status (Nadlan LeadStatusID) */}
             <section className="cfp-section">
-              <h4>סטטוס ליד</h4>
+              <h4>סטטוס מתעניין</h4>
               <ChipGroup
                 group="leadStatus"
                 values={labelOptions(QUICK_LEAD_STATUS_LABELS)}

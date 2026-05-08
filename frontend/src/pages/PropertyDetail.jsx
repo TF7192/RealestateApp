@@ -1093,9 +1093,9 @@ export default function PropertyDetail() {
         const top = matches.slice(0, 3);
         const restCount = matches.length - top.length;
         return (
-          <section className="pd-matches animate-in animate-in-delay-2" aria-label="לידים תואמים">
+          <section className="pd-matches animate-in animate-in-delay-2" aria-label="מתעניינים תואמים">
             <header className="pd-matches-head">
-              <span>מתאים ל-{matches.length} לידים</span>
+              <span>מתאים ל-{matches.length} מתעניינים</span>
             </header>
             <ul className="pd-matches-list">
               {top.map((lead) => (
@@ -1104,7 +1104,7 @@ export default function PropertyDetail() {
                     type="button"
                     className="pd-match-row"
                     onClick={() => openWhatsApp({ phone: lead.phone, text: buildMessage() })}
-                    title={`שלח לליד ${lead.name} בוואטסאפ`}
+                    title={`שלח למתעניין ${lead.name} בוואטסאפ`}
                   >
                     <span className="pd-match-name">{lead.name}</span>
                     <span className="pd-match-meta">
@@ -1123,7 +1123,7 @@ export default function PropertyDetail() {
                     className="pd-match-more"
                     onClick={() => { setPickerLeadsOverride(matches); setPickerOpen(true); }}
                   >
-                    ראה עוד {restCount} לידים תואמים
+                    ראה עוד {restCount} מתעניינים תואמים
                   </button>
                 </li>
               )}

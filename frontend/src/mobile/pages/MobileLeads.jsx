@@ -71,7 +71,7 @@ export default function MobileLeads() {
 
       <Link to="/customers/new" className="m-new-lead-btn" onClick={() => haptics.press()}>
         <UserPlus size={16} />
-        ליד חדש
+        מתעניין חדש
       </Link>
 
       {['hot', 'warm', 'cold'].map((key) => {
@@ -97,11 +97,11 @@ export default function MobileLeads() {
       {Object.values(grouped).every((g) => !g.length) && (
         <div className="m-empty">
           <div className="m-empty-ring"><UserPlus size={28} /></div>
-          <h3>אין לידים תואמים</h3>
-          <p>נסה לשנות את הסינון או להוסיף ליד חדש</p>
+          <h3>אין מתעניינים תואמים</h3>
+          <p>נסה לשנות את הסינון או להוסיף מתעניין חדש</p>
           <Link to="/customers/new" className="m-chip active" style={{ marginTop: 14 }}>
             <UserPlus size={13} />
-            ליד חדש
+            מתעניין חדש
           </Link>
         </div>
       )}
