@@ -9,12 +9,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Upload, Filter, Phone, MessageCircle, Sparkles, Search,
-  MessageSquareText,
+  MessageSquareText, Edit3,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatPhone } from '../lib/phone';
 import { useViewportMobile, useRefreshOnRefocus } from '../hooks/mobile';
 import LeadFiltersSheet from '../components/LeadFiltersSheet';
+import CustomerEditDialog from '../components/CustomerEditDialog';
 import SwipeRow from '../components/SwipeRow';
 import PullRefresh from '../components/PullRefresh';
 import { telUrl, waUrl } from '../lib/waLink';
@@ -61,6 +62,10 @@ export default function Customers() {
   const [q, setQ] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cityList, setCityList] = useState([]);
+  // 2026-05-08 — inline edit dialog so the agent can fix typos /
+  // budget without leaving the list. Triggered by the negative-style
+  // pencil icon next to the row's phone+WhatsApp cluster.
+  const [editLead, setEditLead] = useState(null);
 
   // Lazy-load the city lookup once the sheet is about to open. Cheap
   // payload (~a few KB), cached by api.js's GET-level HTTP cache.
@@ -451,6 +456,13 @@ export default function Customers() {
                               style={iconBtn(DT.cream2, DT.ink)}
                             ><Phone size={12} /></a>
                           )}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setEditLead(l); }}
+                            aria-label="ערוך מתעניין"
+                            title="ערוך"
+                            style={iconBtn(DT.ink, DT.cream)}
+                          ><Edit3 size={12} /></button>
                           {l.phone && (
                             <a
                               href={`https://wa.me/${l.phone.replace(/\D/g, '')}`}
@@ -472,6 +484,13 @@ export default function Customers() {
         </div>
       )}
     </div>
+    {editLead && (
+      <CustomerEditDialog
+        lead={editLead}
+        onClose={() => setEditLead(null)}
+        onSaved={() => { setEditLead(null); load(); }}
+      />
+    )}
     </Container>
   );
 }

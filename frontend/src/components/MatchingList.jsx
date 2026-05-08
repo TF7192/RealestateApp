@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Loader2, AlertCircle, Building2, User } from 'lucide-react';
+import { Loader2, AlertCircle, Building2, User } from 'lucide-react';
 import api from '../lib/api';
 import EmptyState from './EmptyState';
 import { displayPrice, displayText } from '../lib/display';
@@ -60,7 +60,9 @@ export default function MatchingList({
     <section className="matching-list" aria-label={resolvedTitle} dir="rtl">
       <header className="ml-header">
         <h3 className="ml-title">
-          <Sparkles size={16} aria-hidden />
+          {direction === 'lead'
+            ? <Building2 size={16} aria-hidden />
+            : <User size={16} aria-hidden />}
           {resolvedTitle}
           {items.length > 0 && <span className="ml-count">{items.length}</span>}
         </h3>

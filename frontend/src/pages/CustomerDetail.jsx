@@ -288,7 +288,7 @@ export default function CustomerDetail() {
                   fontWeight: 700, fontSize: 11, textDecoration: 'none',
                 }}
               >
-                <Sparkles size={12} />
+                <Building2 size={12} />
                 <strong>{matchCount}</strong>
                 נכסים תואמים
               </Link>
