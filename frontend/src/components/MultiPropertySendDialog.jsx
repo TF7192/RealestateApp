@@ -3,6 +3,7 @@
 // lead's city) and the dialog assembles a Hebrew message with one block
 // per property, each with the public share link, then opens WhatsApp.
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, MessageCircle, X, Building2 } from 'lucide-react';
 import api from '../lib/api';
 import { waUrl } from '../lib/waLink';
@@ -120,7 +121,7 @@ export default function MultiPropertySendDialog({ lead, onClose }) {
     onClose?.();
   };
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -297,6 +298,7 @@ export default function MultiPropertySendDialog({ lead, onClose }) {
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

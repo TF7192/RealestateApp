@@ -14,6 +14,7 @@
 //   props.leads:  Array<{ id, name, phone? }>
 //   props.onClose
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, MessageCircle, Send } from 'lucide-react';
 
 const PALETTE = {
@@ -48,7 +49,7 @@ export default function BulkWhatsAppDialog({ leads = [], onClose }) {
     onClose?.();
   };
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -155,6 +156,7 @@ export default function BulkWhatsAppDialog({ leads = [], onClose }) {
           </details>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

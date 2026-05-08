@@ -468,7 +468,7 @@ export default function Customers() {
         </div>
       )}
     </div>
-    {selectedIds.size > 0 && createPortal(
+    {selectedIds.size > 0 && !bulkOpen && createPortal(
       <div className="bulk-bar" role="region" aria-label="פעולות על מספר מתעניינים" dir="rtl">
         <div className="bulk-bar-inner">
           <span className="bulk-bar-count">
