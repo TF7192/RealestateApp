@@ -1986,3 +1986,80 @@
   background: var(--gold-glow);
   color: var(--text-primary);
 }
+
+/* ── Bulk-select circle (replaces native checkbox).
+   Default: small outline ring tucked at the row's start.
+   Hover (on the row OR on the cell): expands to a full ~32px circle
+   with a soft gold-cream background so the click target is huge and
+   easy to hit. Animation runs on the inner pill, not the button, so
+   the layout doesn't reflow neighbouring cells. */
+.estia-cust-select-cell {
+  /* Bigger hit area than the inner circle so the click region
+     extends to the table cell edges. */
+  cursor: pointer;
+  vertical-align: middle;
+}
+.estia-cust-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.estia-cust-select-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid rgba(30, 26, 20, 0.28);
+  color: var(--text-on-gold, #1e1a14);
+  transition:
+    width 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+  box-sizing: border-box;
+}
+/* Expand the circle when the user hovers anywhere on the row, not
+   just the tiny target. Works on touch via :focus-within fallback. */
+.estia-cust-row:hover .estia-cust-select-circle,
+.estia-cust-select:hover .estia-cust-select-circle,
+.estia-cust-select:focus-visible .estia-cust-select-circle {
+  width: 28px;
+  height: 28px;
+  border-color: var(--gold, #b48b4c);
+  background: var(--gold-soft, rgba(180, 139, 76, 0.12));
+  box-shadow: 0 0 0 6px var(--gold-glow, rgba(180, 139, 76, 0.10));
+}
+.estia-cust-select.is-on .estia-cust-select-circle,
+.estia-cust-row.is-selected .estia-cust-select-circle {
+  width: 28px;
+  height: 28px;
+  background: var(--gold, #b48b4c);
+  border-color: var(--gold, #b48b4c);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(180, 139, 76, 0.32);
+}
+.estia-cust-row.is-selected {
+  background: var(--gold-soft, rgba(180, 139, 76, 0.07));
+}
+
+/* Match Properties' .bulk-bar but with a green WhatsApp action
+   variant so the bulk message CTA reads as "send" not "delete". */
+.bulk-bar-wa {
+  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.32);
+}
+.bulk-bar-wa:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+

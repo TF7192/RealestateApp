@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Upload, Filter, Phone, MessageCircle, Sparkles, Search,
-  MessageSquareText, Edit3,
+  MessageSquareText, Edit3, Check,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatPhone } from '../lib/phone';
@@ -21,6 +21,7 @@ import BulkWhatsAppDialog from '../components/BulkWhatsAppDialog';
 import SwipeRow from '../components/SwipeRow';
 import PullRefresh from '../components/PullRefresh';
 import { telUrl, waUrl } from '../lib/waLink';
+import './Customers.css';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -74,8 +75,11 @@ export default function Customers() {
   // selectedIds.size > 0 and opens BulkWhatsAppDialog.
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
-  // Stable callback so the memoized DesktopLeadRow doesn't see a new
-  // function on every render (would defeat the React.memo).
+  // Stable callbacks — the memoized DesktopLeadRow does shallow prop
+  // equality, so any inline `() => …` we pass it would be a new
+  // identity on every render and force every row to rebuild on a
+  // single checkbox click. With useCallback the row re-renders only
+  // when its `lead` / `isSelected` actually change.
   const toggleSelected = useCallback((id, on) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -83,6 +87,8 @@ export default function Customers() {
       return next;
     });
   }, []);
+  const onRowNavigate = useCallback((id) => navigate(`/customers/${id}`), [navigate]);
+  const onRowEdit = useCallback((lead) => setEditLead(lead), []);
 
   // Lazy-load the city lookup once the sheet is about to open. Cheap
   // payload (~a few KB), cached by api.js's GET-level HTTP cache.
@@ -417,21 +423,27 @@ export default function Customers() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${DT.border}`, background: DT.cream2 }}>
-                    <th style={{ ...headerCell(), width: 36 }}>
-                      <input
-                        type="checkbox"
-                        aria-label="בחר הכול"
-                        checked={filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedIds(new Set(filtered.map((l) => l.id)));
-                          } else {
-                            setSelectedIds(new Set());
-                          }
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ cursor: 'pointer' }}
-                      />
+                    <th style={{ ...headerCell(), padding: 0, width: 44 }}>
+                      {(() => {
+                        const allSelected = filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id));
+                        return (
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={allSelected}
+                            aria-label="בחר הכול"
+                            onClick={() => {
+                              if (allSelected) setSelectedIds(new Set());
+                              else setSelectedIds(new Set(filtered.map((l) => l.id)));
+                            }}
+                            className={`estia-cust-select${allSelected ? ' is-on' : ''}`}
+                          >
+                            <span className="estia-cust-select-circle">
+                              {allSelected ? <Check size={14} strokeWidth={3} /> : null}
+                            </span>
+                          </button>
+                        );
+                      })()}
                     </th>
                     {['שם', 'טלפון', 'עיר', 'תקציב', 'מה מחפש', 'מקור', 'עודכן', ''].map((h) => (
                       <th key={h} style={headerCell()}>{h}</th>
@@ -445,8 +457,8 @@ export default function Customers() {
                       lead={l}
                       isSelected={selectedIds.has(l.id)}
                       onToggle={toggleSelected}
-                      onNavigate={() => navigate(`/customers/${l.id}`)}
-                      onEdit={() => setEditLead(l)}
+                      onNavigate={onRowNavigate}
+                      onEdit={onRowEdit}
                     />
                   ))}
                 </tbody>
@@ -457,53 +469,26 @@ export default function Customers() {
       )}
     </div>
     {selectedIds.size > 0 && createPortal(
-      <div
-        role="toolbar"
-        aria-label={`${selectedIds.size} נבחרו`}
-        dir="rtl"
-        style={{
-          position: 'fixed',
-          bottom: 24,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: '#3a2e1f',
-          color: DT.cream,
-          borderRadius: 14,
-          padding: '10px 16px',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 12,
-          fontSize: 13,
-          fontWeight: 700,
-          boxShadow: '0 12px 28px rgba(0,0,0,0.25)',
-          // Above sidebar (200) but below modal dialogs (1200) so when
-          // the BulkWhatsAppDialog opens, its dim overlay covers the
-          // toolbar instead of the toolbar floating on top of the dim.
-          zIndex: 1100,
-          direction: 'rtl',
-        }}
-      >
-        <span>{selectedIds.size} נבחרו</span>
-        <button
-          type="button"
-          className="btn btn-whatsapp btn-sm"
-          onClick={() => setBulkOpen(true)}
-        >
-          <MessageCircle size={14} /> שלח WhatsApp לנבחרים
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelectedIds(new Set())}
-          style={{
-            background: 'transparent',
-            color: DT.cream,
-            border: `1px solid rgba(251,247,240,0.3)`,
-            padding: '6px 10px',
-            borderRadius: 8,
-            cursor: 'pointer',
-            fontSize: 12, fontWeight: 700,
-          }}
-        >בטל בחירה</button>
+      <div className="bulk-bar" role="region" aria-label="פעולות על מספר מתעניינים" dir="rtl">
+        <div className="bulk-bar-inner">
+          <span className="bulk-bar-count">
+            <strong>{selectedIds.size}</strong> נבחרו
+          </span>
+          <div className="bulk-bar-actions">
+            <button
+              type="button"
+              className="bulk-bar-btn bulk-bar-wa"
+              onClick={() => setBulkOpen(true)}
+            >
+              <MessageCircle size={16} /> שלח WhatsApp
+            </button>
+            <button
+              type="button"
+              className="bulk-bar-btn bulk-bar-ghost"
+              onClick={() => setSelectedIds(new Set())}
+            >ביטול</button>
+          </div>
+        </div>
       </div>,
       document.body,
     )}
@@ -537,21 +522,30 @@ const DesktopLeadRow = memo(function DesktopLeadRow({
 }) {
   return (
     <tr
-      className="estia-row-hover"
-      onClick={onNavigate}
+      className={`estia-row-hover estia-cust-row${isSelected ? ' is-selected' : ''}`}
+      onClick={() => onNavigate(l.id)}
       style={{
         borderBottom: `1px solid ${DT.border}`,
         cursor: 'pointer',
       }}
     >
-      <td style={{ ...bodyCell(), width: 36 }} onClick={(e) => e.stopPropagation()}>
-        <input
-          type="checkbox"
+      <td
+        className="estia-cust-select-cell"
+        style={{ ...bodyCell(), padding: 0, width: 44 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={isSelected}
           aria-label={`בחר את ${l.name || 'מתעניין'}`}
-          checked={isSelected}
-          onChange={(e) => onToggle(l.id, e.target.checked)}
-          style={{ cursor: 'pointer' }}
-        />
+          onClick={(e) => { e.stopPropagation(); onToggle(l.id, !isSelected); }}
+          className={`estia-cust-select${isSelected ? ' is-on' : ''}`}
+        >
+          <span className="estia-cust-select-circle">
+            {isSelected ? <Check size={14} strokeWidth={3} /> : null}
+          </span>
+        </button>
       </td>
       <td style={bodyCell()}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -595,7 +589,7 @@ const DesktopLeadRow = memo(function DesktopLeadRow({
           )}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            onClick={(e) => { e.stopPropagation(); onEdit(l); }}
             aria-label="ערוך מתעניין"
             title="ערוך"
             style={iconBtn(DT.ink, DT.cream)}
