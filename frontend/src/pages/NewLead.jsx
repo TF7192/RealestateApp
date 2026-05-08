@@ -15,6 +15,7 @@ import api from '../lib/api';
 import { cityNames as fallbackCityNames } from '../data/mockData';
 import CityField from '../components/CityField';
 import NeighborhoodField from '../components/NeighborhoodField';
+import MultiChipsInput from '../components/MultiChipsInput';
 import StreetField from '../components/StreetField';
 import { useToast } from '../lib/toast';
 import useBeforeUnload from '../hooks/useBeforeUnload';
@@ -105,6 +106,17 @@ const INITIAL_FORM = {
   city: '',
   neighborhood: '',
   street: '',
+  // 2026-05-08 PR 2 — multi-value brief fields. Single-value city /
+  // neighborhood above stay so legacy code paths (display, mock data,
+  // matching seed) keep working; the route mirrors cities[0]→city on
+  // save. propertyTypes covers "סוג הנכס" preferences.
+  cities: [],
+  neighborhoods: [],
+  propertyTypes: [],
+  floorMin: null,
+  floorMax: null,
+  sqmMin: null,
+  sqmMax: null,
   roomsMin: '',
   roomsMax: '',
   priceMin: null,
@@ -314,9 +326,19 @@ export default function NewLead() {
         phone: canonPhone(form.phone),
         interestType: form.interestType === 'מסחרי' ? 'COMMERCIAL' : 'PRIVATE',
         lookingFor: form.lookingFor === 'rent' ? 'RENT' : 'BUY',
-        city: form.city || null,
-        neighborhood: form.neighborhood || null,
+        city: form.city || (Array.isArray(form.cities) && form.cities[0]) || null,
+        neighborhood: form.neighborhood || (Array.isArray(form.neighborhoods) && form.neighborhoods[0]) || null,
         street: form.street || null,
+        // 2026-05-08 PR 2 — multi-value brief fields. Backend mirrors
+        // cities[0] → city / neighborhoods[0] → neighborhood again on its
+        // side so the matcher + the legacy display paths stay accurate.
+        cities:        Array.isArray(form.cities)        ? form.cities        : [],
+        neighborhoods: Array.isArray(form.neighborhoods) ? form.neighborhoods : [],
+        propertyTypes: Array.isArray(form.propertyTypes) ? form.propertyTypes : [],
+        floorMin: form.floorMin != null && form.floorMin !== '' ? Number(form.floorMin) : null,
+        floorMax: form.floorMax != null && form.floorMax !== '' ? Number(form.floorMax) : null,
+        sqmMin:   form.sqmMin   != null && form.sqmMin   !== '' ? Math.max(0, Math.round(Number(form.sqmMin))) : null,
+        sqmMax:   form.sqmMax   != null && form.sqmMax   !== '' ? Math.max(0, Math.round(Number(form.sqmMax))) : null,
         roomsMin: form.roomsMin ? Number(form.roomsMin) : null,
         roomsMax: form.roomsMax ? Number(form.roomsMax) : null,
         priceMin: form.priceMin ? Number(form.priceMin) : null,
@@ -671,41 +693,51 @@ export default function NewLead() {
               same autocomplete UX as the property form. Clearing the
               city wipes the neighborhood since the dictionary is
               city-scoped. */}
-          <div style={gridRow2()}>
-            <Field label="עיר מבוקשת">
-              <CityField
-                value={form.city}
-                onChange={(v) => {
-                  if (v !== form.city) {
-                    update('city', v);
-                    if (form.neighborhood) update('neighborhood', '');
-                  }
-                }}
-                options={cityOptions}
-                placeholder="תל אביב, ירושלים, חיפה…"
-                inputProps={{ ...inputPropsForCity(), autoComplete: 'off' }}
-              />
-            </Field>
-            <Field label="שכונה (אופציונלי)">
-              <NeighborhoodField
-                city={form.city}
-                value={form.neighborhood}
-                onChange={(v) => update('neighborhood', v)}
-                placeholder="פלורנטין, רמת אביב, נווה צדק…"
-              />
-            </Field>
-          </div>
+          {/* 2026-05-08 PR 2 — multi-value city + neighborhood selectors.
+              Type to add, Enter / comma to commit, × to remove. The
+              first city is mirrored to Lead.city by the backend route
+              for back-compat with the matcher + display paths. */}
+          <Field label="ערים מבוקשות">
+            <MultiChipsInput
+              values={form.cities}
+              onChange={(arr) => update('cities', arr)}
+              options={cityOptions}
+              placeholder="הוסף עיר ולחץ Enter — תל אביב, ירושלים, נס ציונה…"
+              ariaLabel="ערים מבוקשות"
+            />
+          </Field>
+          <Field label="שכונות (אופציונלי)">
+            <MultiChipsInput
+              values={form.neighborhoods}
+              onChange={(arr) => update('neighborhoods', arr)}
+              placeholder="הוסף שכונה ולחץ Enter"
+              ariaLabel="שכונות מבוקשות"
+            />
+          </Field>
           <div style={gridRow2()}>
             <Field label="רחוב (אופציונלי)">
               <StreetField
                 value={form.street}
                 onChange={(v) => update('street', v)}
-                city={form.city}
-                neighborhood={form.neighborhood}
+                city={form.cities?.[0] || form.city}
+                neighborhood={form.neighborhoods?.[0] || form.neighborhood}
                 placeholder="רוטשילד, אלנבי…"
               />
             </Field>
-            <div />
+            <Field label="סוג הנכס">
+              <MultiChipsInput
+                values={form.propertyTypes}
+                onChange={(arr) => update('propertyTypes', arr)}
+                options={[
+                  'דירה', 'פנטהאוז', 'קוטג׳', 'דו-משפחתי',
+                  'בית פרטי', 'דירת גן', 'מגרש', 'משק', 'נחלה',
+                  'משרד', 'חנות', 'מחסן', 'מבנה תעשייתי',
+                  'קליניקה', 'אולם',
+                ]}
+                placeholder="דירה, בית פרטי, מגרש…"
+                ariaLabel="סוג נכס מבוקש"
+              />
+            </Field>
           </div>
           {/* 2026-05-08 — "קירבה לבית ספר" SelectField removed; replaced
               by the boolean "קרבה למוסדות חינוך" checkbox in the
@@ -736,6 +768,48 @@ export default function NewLead() {
                 value={form.roomsMax}
                 onChange={(v) => update('roomsMax', v)}
                 label="עד"
+              />
+            </div>
+          </Field>
+          {/* 2026-05-08 PR 2 — gross-built area range + required floor
+              range. Both opt-in (null pass-through). Used by the
+              matcher to score candidates' floor and size against the
+              brief. */}
+          <Field label="גודל הנכס (מ״ר)">
+            <div style={gridRow2()}>
+              <NumberField
+                value={form.sqmMin}
+                onChange={(v) => update('sqmMin', v)}
+                unit="מ״ר"
+                placeholder="מ"
+                min={0}
+                max={2000}
+              />
+              <NumberField
+                value={form.sqmMax}
+                onChange={(v) => update('sqmMax', v)}
+                unit="מ״ר"
+                placeholder="עד"
+                min={0}
+                max={2000}
+              />
+            </div>
+          </Field>
+          <Field label="קומה נדרשת">
+            <div style={gridRow2()}>
+              <NumberField
+                value={form.floorMin}
+                onChange={(v) => update('floorMin', v)}
+                placeholder="מ"
+                min={-3}
+                max={120}
+              />
+              <NumberField
+                value={form.floorMax}
+                onChange={(v) => update('floorMax', v)}
+                placeholder="עד"
+                min={-3}
+                max={120}
               />
             </div>
           </Field>

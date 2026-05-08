@@ -1128,6 +1128,18 @@ model Lead {
   // existing rows unaffected.
   educationProximityRequired Boolean       @default(false)
   publicTransportRequired    Boolean       @default(false)
+  // 2026-05-08 PR 2 — multi-value brief fields. The single-value
+  // `city` / `neighborhood` columns above stay for back-compat (the
+  // matching pipeline + leadSearchProfileSeed still read them) and the
+  // route writes cities[0] → city / neighborhoods[0] → neighborhood
+  // on save. UI binds to the arrays.
+  cities                     String[]      @default([])
+  neighborhoods              String[]      @default([])
+  propertyTypes              String[]      @default([])
+  floorMin                   Int?
+  floorMax                   Int?
+  sqmMin                     Int?
+  sqmMax                     Int?
   source                  String?
   // `status` is the thermal temperature rating (HOT/WARM/COLD). New in
   // Sprint 1 / MLS parity Task K2: `customerStatus` is the separate

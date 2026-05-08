@@ -64,6 +64,17 @@ const leadInput = z.object({
   // 2026-05-08 — additional brief booleans surfaced on the lead form.
   educationProximityRequired: z.boolean().optional(),
   publicTransportRequired:    z.boolean().optional(),
+  // 2026-05-08 PR 2 — multi-value brief fields. `city` / `neighborhood`
+  // (above) stay for back-compat; route copies cities[0] → city and
+  // neighborhoods[0] → neighborhood on save so the matcher and the
+  // legacy display paths keep working unchanged.
+  cities:        z.array(z.string().max(80)).max(20).optional(),
+  neighborhoods: z.array(z.string().max(80)).max(40).optional(),
+  propertyTypes: z.array(z.string().max(40)).max(15).optional(),
+  floorMin: z.number().int().nullable().optional(),
+  floorMax: z.number().int().nullable().optional(),
+  sqmMin:   z.number().int().nonnegative().nullable().optional(),
+  sqmMax:   z.number().int().nonnegative().nullable().optional(),
   source: z.string().max(60).nullable().optional(),
   status: z.enum(['HOT', 'WARM', 'COLD']).optional(),
   notes: z.string().max(2000).nullable().optional(),
@@ -601,6 +612,16 @@ function normalize(body: Partial<z.infer<typeof leadInput>>) {
     if (data[k] === '') data[k] = null;
     if (data[k]) data[k] = new Date(data[k]);
     if (data[k] === null) data[k] = null;
+  }
+  // 2026-05-08 PR 2 — keep the legacy single-value `city` / `neighborhood`
+  // columns in sync with the new arrays. Matching + leadSearchProfileSeed
+  // still read the singletons; copying the first array element here is
+  // the one place that needs to know about the dual representation.
+  if (Array.isArray(data.cities) && data.cities.length > 0 && !data.city) {
+    data.city = data.cities[0];
+  }
+  if (Array.isArray(data.neighborhoods) && data.neighborhoods.length > 0 && !data.neighborhood) {
+    data.neighborhood = data.neighborhoods[0];
   }
   // Snap city + street to their government-registered canonical form
   // so rows stay comparable across spelling variants (שיינקין / שינקין,

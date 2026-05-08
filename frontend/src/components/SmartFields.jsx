@@ -271,15 +271,27 @@ export function PriceRange({ minVal, maxVal, onChangeMin, onChangeMax, perMonth 
     return `${minVal ? fmt(minVal) : '0'} — ${maxVal ? fmt(maxVal) : '∞'}${perMonth ? '/חודש' : ''}`;
   })();
 
+  // 2026-05-08 — `מ` / `עד` labels were rendered tiny + at the top-left
+  // (the .sf-range-cap CSS class set fontSize 11 with no alignment).
+  // Bumped inline to 14/700 + textAlign right (RTL inline-start) so they
+  // sit at the natural read-position above each input.
+  const capStyle = {
+    display: 'block',
+    fontSize: 14,
+    fontWeight: 700,
+    color: 'var(--text-primary, #1e1a14)',
+    textAlign: 'right',
+    marginBottom: 4,
+  };
   return (
     <div className="sf-range">
       <div className="sf-range-pair">
         <div className="sf-range-cell">
-          <span className="sf-range-cap">מ</span>
+          <span className="sf-range-cap" style={capStyle}>מ</span>
           <NumberField value={minVal} onChange={onChangeMin} unit="₪" placeholder="0" />
         </div>
         <div className="sf-range-cell">
-          <span className="sf-range-cap">עד</span>
+          <span className="sf-range-cap" style={capStyle}>עד</span>
           <NumberField value={maxVal} onChange={onChangeMax} unit="₪" placeholder="ללא הגבלה" />
         </div>
       </div>

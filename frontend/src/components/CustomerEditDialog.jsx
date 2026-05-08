@@ -4,7 +4,7 @@
 // NewLead sectioned-card vocabulary. Preserves every field wire-up and
 // the full api.updateLead POST body shape (validation/normalization
 // untouched).
-import { useId, useRef, useState } from 'react';
+import { useId, useRef, useState, useEffect } from 'react';
 import {
   X, AlertCircle, Save, Sparkles,
   UserCircle, Search, Home, SlidersHorizontal, StickyNote, Shield, Briefcase,
@@ -12,6 +12,7 @@ import {
 import api from '../lib/api';
 import Portal from './Portal';
 import { NumberField, PhoneField, SelectField, Segmented, PriceRange } from './SmartFields';
+import MultiChipsInput from './MultiChipsInput';
 import useFocusTrap from '../hooks/useFocusTrap';
 import {
   inputPropsForName,
@@ -20,6 +21,7 @@ import {
   inputPropsForAddress,
   inputPropsForRooms,
 } from '../lib/inputProps';
+import { cityNames as fallbackCityNames } from '../data/mockData';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -50,6 +52,14 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
     // but the UI now writes priceMin/priceMax which the matcher prefers.
     priceMin: lead.priceMin ?? null,
     priceMax: lead.priceMax ?? null,
+    // 2026-05-08 PR 2 — multi-value brief.
+    cities:        Array.isArray(lead.cities)        ? lead.cities        : (lead.city ? [lead.city] : []),
+    neighborhoods: Array.isArray(lead.neighborhoods) ? lead.neighborhoods : (lead.neighborhood ? [lead.neighborhood] : []),
+    propertyTypes: Array.isArray(lead.propertyTypes) ? lead.propertyTypes : [],
+    floorMin: lead.floorMin ?? null,
+    floorMax: lead.floorMax ?? null,
+    sqmMin:   lead.sqmMin   ?? null,
+    sqmMax:   lead.sqmMax   ?? null,
     sector: lead.sector || 'כללי',
     schoolProximity: lead.schoolProximity || '',
     educationProximityRequired: !!lead.educationProximityRequired,
@@ -76,6 +86,22 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
     source: lead.source || '',
     notes: lead.notes || '',
   });
+  // 2026-05-08 PR 2 — load the full city dictionary for the
+  // multi-chips typeahead. Falls back to the seeded mock list if the
+  // API call fails so the input still works offline.
+  const [cityOptions, setCityOptions] = useState(fallbackCityNames);
+  useEffect(() => {
+    let cancelled = false;
+    api.cities?.().then((res) => {
+      if (cancelled) return;
+      const names = (res?.cities || [])
+        .map((c) => c?.name)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'he'));
+      if (names.length) setCityOptions(names);
+    }).catch(() => { /* keep fallback */ });
+    return () => { cancelled = true; };
+  }, []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const panelRef = useRef(null);
@@ -114,6 +140,14 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
         budget: Number.isFinite(budgetNum) ? budgetNum : null,
         priceMin: form.priceMin != null && form.priceMin !== '' ? Math.max(0, Math.round(Number(form.priceMin))) : null,
         priceMax: form.priceMax != null && form.priceMax !== '' ? Math.max(0, Math.round(Number(form.priceMax))) : null,
+        // 2026-05-08 PR 2 — multi-value brief.
+        cities:        Array.isArray(form.cities)        ? form.cities        : [],
+        neighborhoods: Array.isArray(form.neighborhoods) ? form.neighborhoods : [],
+        propertyTypes: Array.isArray(form.propertyTypes) ? form.propertyTypes : [],
+        floorMin: form.floorMin != null && form.floorMin !== '' ? Number(form.floorMin) : null,
+        floorMax: form.floorMax != null && form.floorMax !== '' ? Number(form.floorMax) : null,
+        sqmMin:   form.sqmMin   != null && form.sqmMin   !== '' ? Math.max(0, Math.round(Number(form.sqmMin))) : null,
+        sqmMax:   form.sqmMax   != null && form.sqmMax   !== '' ? Math.max(0, Math.round(Number(form.sqmMax))) : null,
         sector: form.sector || null,
         schoolProximity: form.schoolProximity || null,
         educationProximityRequired: !!form.educationProximityRequired,
@@ -351,21 +385,48 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                   />
                 </Field>
               </div>
+              {/* 2026-05-08 PR 2 — multi-value city + neighborhood + property
+                  type. The first city/neighborhood is mirrored to the
+                  legacy single-value columns by the backend route so the
+                  matcher + display paths keep working. */}
+              <Field label="ערים מבוקשות">
+                <MultiChipsInput
+                  values={form.cities}
+                  onChange={(arr) => update('cities', arr)}
+                  options={cityOptions}
+                  placeholder="הוסף עיר ולחץ Enter — תל אביב, ירושלים, נס ציונה…"
+                  ariaLabel="ערים מבוקשות"
+                />
+              </Field>
+              <Field label="שכונות (אופציונלי)">
+                <MultiChipsInput
+                  values={form.neighborhoods}
+                  onChange={(arr) => update('neighborhoods', arr)}
+                  placeholder="הוסף שכונה ולחץ Enter"
+                  ariaLabel="שכונות מבוקשות"
+                />
+              </Field>
               <div style={gridRow2()}>
-                <Field label="עיר">
-                  <input
-                    {...inputPropsForCity()}
-                    className="form-input"
-                    value={form.city}
-                    onChange={(e) => update('city', e.target.value)}
-                  />
-                </Field>
                 <Field label="רחוב">
                   <input
                     {...inputPropsForAddress()}
                     className="form-input"
                     value={form.street}
                     onChange={(e) => update('street', e.target.value)}
+                  />
+                </Field>
+                <Field label="סוג הנכס">
+                  <MultiChipsInput
+                    values={form.propertyTypes}
+                    onChange={(arr) => update('propertyTypes', arr)}
+                    options={[
+                      'דירה', 'פנטהאוז', 'קוטג׳', 'דו-משפחתי',
+                      'בית פרטי', 'דירת גן', 'מגרש', 'משק', 'נחלה',
+                      'משרד', 'חנות', 'מחסן', 'מבנה תעשייתי',
+                      'קליניקה', 'אולם',
+                    ]}
+                    placeholder="דירה, בית פרטי, מגרש…"
+                    ariaLabel="סוג נכס מבוקש"
                   />
                 </Field>
               </div>
@@ -394,6 +455,45 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                     2026-05-08 — `priceRangeLabel` column stays for
                     legacy data. */}
               </div>
+              {/* 2026-05-08 PR 2 — gross-built area + required floor ranges. */}
+              <Field label="גודל הנכס (מ״ר)">
+                <div style={gridRow2()}>
+                  <NumberField
+                    value={form.sqmMin}
+                    onChange={(v) => update('sqmMin', v)}
+                    unit="מ״ר"
+                    placeholder="מ"
+                    min={0}
+                    max={2000}
+                  />
+                  <NumberField
+                    value={form.sqmMax}
+                    onChange={(v) => update('sqmMax', v)}
+                    unit="מ״ר"
+                    placeholder="עד"
+                    min={0}
+                    max={2000}
+                  />
+                </div>
+              </Field>
+              <Field label="קומה נדרשת">
+                <div style={gridRow2()}>
+                  <NumberField
+                    value={form.floorMin}
+                    onChange={(v) => update('floorMin', v)}
+                    placeholder="מ"
+                    min={-3}
+                    max={120}
+                  />
+                  <NumberField
+                    value={form.floorMax}
+                    onChange={(v) => update('floorMax', v)}
+                    placeholder="עד"
+                    min={-3}
+                    max={120}
+                  />
+                </div>
+              </Field>
               {/* 2026-05-08 — single "תקציב" replaced by a from-to range
                   (priceMin / priceMax) so this matches NewLead.jsx and
                   the matcher actually has a numeric range to score on.
