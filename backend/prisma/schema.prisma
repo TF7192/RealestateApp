@@ -1122,6 +1122,12 @@ model Lead {
   onFloorToiletsRequired  Boolean          @default(false) // שירותים משותפים בקומה
   openSpaceRequired       Boolean          @default(false) // חלל פתוח
   schoolProximity         String?
+  // 2026-05-08 — additional brief requirements surfaced on the lead form.
+  // Both are agent-side signals (the matching pipeline can prefer
+  // properties walkable to schools / transit). Defaults false keep
+  // existing rows unaffected.
+  educationProximityRequired Boolean       @default(false)
+  publicTransportRequired    Boolean       @default(false)
   source                  String?
   // `status` is the thermal temperature rating (HOT/WARM/COLD). New in
   // Sprint 1 / MLS parity Task K2: `customerStatus` is the separate

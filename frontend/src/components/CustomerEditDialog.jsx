@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import Portal from './Portal';
-import { NumberField, PhoneField, SelectField, Segmented } from './SmartFields';
+import { NumberField, PhoneField, SelectField, Segmented, PriceRange } from './SmartFields';
 import useFocusTrap from '../hooks/useFocusTrap';
 import {
   inputPropsForName,
@@ -45,8 +45,15 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
     rooms: lead.rooms || '',
     priceRangeLabel: lead.priceRangeLabel || '',
     budget: lead.budget ?? null,
+    // 2026-05-08 — תקציב unified into a from-to range. The single
+    // `budget` field is preserved on the row for backwards compat,
+    // but the UI now writes priceMin/priceMax which the matcher prefers.
+    priceMin: lead.priceMin ?? null,
+    priceMax: lead.priceMax ?? null,
     sector: lead.sector || 'כללי',
     schoolProximity: lead.schoolProximity || '',
+    educationProximityRequired: !!lead.educationProximityRequired,
+    publicTransportRequired:    !!lead.publicTransportRequired,
     balconyRequired: !!lead.balconyRequired,
     parkingRequired: !!lead.parkingRequired,
     elevatorRequired: !!lead.elevatorRequired,
@@ -105,8 +112,12 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
         rooms: (form.rooms && String(form.rooms).trim()) || null,
         priceRangeLabel: form.priceRangeLabel || null,
         budget: Number.isFinite(budgetNum) ? budgetNum : null,
+        priceMin: form.priceMin != null && form.priceMin !== '' ? Math.max(0, Math.round(Number(form.priceMin))) : null,
+        priceMax: form.priceMax != null && form.priceMax !== '' ? Math.max(0, Math.round(Number(form.priceMax))) : null,
         sector: form.sector || null,
         schoolProximity: form.schoolProximity || null,
+        educationProximityRequired: !!form.educationProximityRequired,
+        publicTransportRequired:    !!form.publicTransportRequired,
         balconyRequired: form.balconyRequired,
         parkingRequired: form.parkingRequired,
         elevatorRequired: form.elevatorRequired,
@@ -336,7 +347,7 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                   <SelectField
                     value={form.sector}
                     onChange={(v) => update('sector', v)}
-                    options={['כללי', 'דתי', 'חרדי', 'ערבי']}
+                    options={['כללי', 'דתי', 'חרדי', 'נוצרי', 'מוסלמי']}
                   />
                 </Field>
               </div>
@@ -358,14 +369,10 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                   />
                 </Field>
               </div>
-              <Field label="קירבה לבית ספר">
-                <SelectField
-                  value={form.schoolProximity}
-                  onChange={(v) => update('schoolProximity', v)}
-                  placeholder="לא חשוב"
-                  options={['עד 200 מטר', 'עד 500 מטר', 'הליכה', 'עד ק״מ']}
-                />
-              </Field>
+              {/* 2026-05-08 — "קירבה לבית ספר" SelectField removed; the
+                  same intent is now captured by the boolean
+                  "קרבה למוסדות חינוך" checkbox in the requirements
+                  section. The schoolProximity column stays for legacy. */}
             </section>
 
             {/* Section 3 — תקציב וחדרים */}
@@ -382,25 +389,23 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
                     onChange={(e) => update('rooms', e.target.value)}
                   />
                 </Field>
-                <Field label="טווח מחיר (טקסט)">
-                  <input
-                    dir="auto"
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    enterKeyHint="next"
-                    className="form-input"
-                    value={form.priceRangeLabel}
-                    onChange={(e) => update('priceRangeLabel', e.target.value)}
-                  />
-                </Field>
+                {/* "טווח מחיר (טקסט)" was a free-text label that
+                    duplicated the numeric range below. Removed
+                    2026-05-08 — `priceRangeLabel` column stays for
+                    legacy data. */}
               </div>
+              {/* 2026-05-08 — single "תקציב" replaced by a from-to range
+                  (priceMin / priceMax) so this matches NewLead.jsx and
+                  the matcher actually has a numeric range to score on.
+                  The legacy single `budget` is preserved on save for
+                  back-compat but no longer surfaced in the UI. */}
               <Field label="תקציב">
-                <NumberField
-                  unit="₪"
-                  placeholder="2,500,000"
-                  showShort
-                  value={form.budget}
-                  onChange={(v) => update('budget', v)}
+                <PriceRange
+                  minVal={form.priceMin}
+                  maxVal={form.priceMax}
+                  onChangeMin={(n) => update('priceMin', n)}
+                  onChangeMax={(n) => update('priceMax', n)}
+                  perMonth={form.lookingFor === 'RENT'}
                 />
               </Field>
             </section>
@@ -416,12 +421,15 @@ export default function CustomerEditDialog({ lead, onClose, onSaved }) {
               }}>
                 {[
                   { key: 'preApproval', label: 'אישור עקרוני' },
-                  { key: 'balconyRequired', label: 'מרפסת' },
+                  { key: 'balconyRequired', label: 'מרפסת שמש' },
                   { key: 'parkingRequired', label: 'חניה' },
                   { key: 'elevatorRequired', label: 'מעלית' },
                   { key: 'safeRoomRequired', label: 'ממ״ד' },
                   { key: 'acRequired', label: 'מזגנים' },
                   { key: 'storageRequired', label: 'מחסן' },
+                  // 2026-05-08 — new requirement booleans on Lead.
+                  { key: 'educationProximityRequired', label: 'קרבה למוסדות חינוך' },
+                  { key: 'publicTransportRequired',    label: 'תחבורה ציבורית' },
                 ].map(({ key, label }) => (
                   <CheckboxItem
                     key={key}

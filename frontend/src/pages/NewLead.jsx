@@ -114,6 +114,9 @@ const INITIAL_FORM = {
   sector: 'כללי',
   balconyRequired: false,
   schoolProximity: '',
+  // 2026-05-08 — additional brief booleans (קרבה למוסדות חינוך, תחבורה ציבורית)
+  educationProximityRequired: false,
+  publicTransportRequired: false,
   parkingRequired: false,
   elevatorRequired: false,
   safeRoomRequired: false,
@@ -322,6 +325,8 @@ export default function NewLead() {
         source: form.source || null,
         sector: form.sector || 'כללי',
         schoolProximity: form.schoolProximity || null,
+        educationProximityRequired: !!form.educationProximityRequired,
+        publicTransportRequired:    !!form.publicTransportRequired,
         balconyRequired: !!form.balconyRequired,
         parkingRequired: !!form.parkingRequired,
         elevatorRequired: !!form.elevatorRequired,
@@ -639,7 +644,7 @@ export default function NewLead() {
               <SelectField
                 value={form.sector}
                 onChange={(v) => update('sector', v)}
-                options={['כללי', 'דתי', 'חרדי', 'ערבי']}
+                options={['כללי', 'דתי', 'חרדי', 'נוצרי', 'מוסלמי']}
               />
             </Field>
           </div>
@@ -702,16 +707,10 @@ export default function NewLead() {
             </Field>
             <div />
           </div>
-          {form.kind === 'BUYER' && (
-          <Field label="קירבה לבית ספר">
-            <SelectField
-              value={form.schoolProximity}
-              onChange={(v) => update('schoolProximity', v)}
-              placeholder="לא חשוב"
-              options={['עד 200 מטר', 'עד 500 מטר', 'הליכה', 'עד ק״מ']}
-            />
-          </Field>
-          )}
+          {/* 2026-05-08 — "קירבה לבית ספר" SelectField removed; replaced
+              by the boolean "קרבה למוסדות חינוך" checkbox in the
+              requirements section below. The schoolProximity column
+              stays in the DB for legacy data. */}
         </section>
 
         {/* Section 3 — תקציב וחדרים. For SELLER, the same controls
@@ -740,7 +739,7 @@ export default function NewLead() {
               />
             </div>
           </Field>
-          <Field label="טווח מחיר">
+          <Field label="תקציב">
             <PriceRange
               minVal={form.priceMin}
               maxVal={form.priceMax}
@@ -769,7 +768,7 @@ export default function NewLead() {
             <CheckboxItem
               checked={form.balconyRequired}
               onChange={(v) => update('balconyRequired', v)}
-              label="מרפסת"
+              label="מרפסת שמש"
             />
             <CheckboxItem
               checked={form.parkingRequired}
@@ -795,6 +794,17 @@ export default function NewLead() {
               checked={form.storageRequired}
               onChange={(v) => update('storageRequired', v)}
               label="מחסן"
+            />
+            {/* 2026-05-08 — new requirement booleans. */}
+            <CheckboxItem
+              checked={form.educationProximityRequired}
+              onChange={(v) => update('educationProximityRequired', v)}
+              label="קרבה למוסדות חינוך"
+            />
+            <CheckboxItem
+              checked={form.publicTransportRequired}
+              onChange={(v) => update('publicTransportRequired', v)}
+              label="תחבורה ציבורית"
             />
           </div>
         </section>
@@ -1076,15 +1086,27 @@ export default function NewLead() {
           <h3 style={sectionTitle()}>
             <StickyNote size={16} /> הערות
           </h3>
+          {/* 2026-05-08 — notes textarea forced to full-width + min-height
+              + vertical resize. The class-only version inherited a
+              floated/inline style somewhere, leaving the field stranded
+              in the right corner with empty space to its left. */}
           <textarea
             className="form-textarea"
             placeholder="הערות נוספות על הלקוח..."
-            rows={4}
+            rows={5}
             dir="auto"
             autoCapitalize="sentences"
             enterKeyHint="enter"
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
+            style={{
+              display: 'block',
+              width: '100%',
+              minHeight: 120,
+              resize: 'vertical',
+              boxSizing: 'border-box',
+              marginTop: 8,
+            }}
           />
         </section>
 

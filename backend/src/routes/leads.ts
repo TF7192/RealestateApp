@@ -61,6 +61,9 @@ const leadInput = z.object({
   onFloorToiletsRequired: z.boolean().optional(),
   openSpaceRequired: z.boolean().optional(),
   schoolProximity: z.string().max(60).nullable().optional(),
+  // 2026-05-08 — additional brief booleans surfaced on the lead form.
+  educationProximityRequired: z.boolean().optional(),
+  publicTransportRequired:    z.boolean().optional(),
   source: z.string().max(60).nullable().optional(),
   status: z.enum(['HOT', 'WARM', 'COLD']).optional(),
   notes: z.string().max(2000).nullable().optional(),
