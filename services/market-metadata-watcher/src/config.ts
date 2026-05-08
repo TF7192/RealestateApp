@@ -15,10 +15,17 @@ function listEnv(name: string, fallback: string[]): string[] {
 }
 
 export const config = {
-  // 1 hour default. Set to a smaller value (e.g. 60_000) in dev for
-  // quick iteration; production stays at the conservative cadence the
-  // legal-safety section calls for.
+  // 1 hour default — used only by the scheduleHourly back-compat shim
+  // and the boot log line. Production cadence is driven by
+  // kindIntervalMs / kindOffsetMs below; this value is effectively
+  // dead in the prod path but kept for the legacy entrypoint.
   intervalMs:        intEnv('MARKET_WATCHER_INTERVAL_MS', 60 * 60 * 1000),
+  // 2026-05-08 — per-kind cadence. Each kind (rent / forsale) ticks
+  // every kindIntervalMs; the two kinds are staggered by kindOffsetMs
+  // so they alternate across the day instead of running back-to-back.
+  // Defaults give two scans per kind per day (4 total), evenly spaced.
+  kindIntervalMs:    intEnv('MARKET_WATCHER_KIND_INTERVAL_MS', 12 * 60 * 60 * 1000),
+  kindOffsetMs:      intEnv('MARKET_WATCHER_KIND_OFFSET_MS',    6 * 60 * 60 * 1000),
   // ±10 minutes by default — keeps us off the top-of-the-hour and
   // out of cron-clash territory.
   jitterMs:          intEnv('MARKET_WATCHER_JITTER_MS',   10 * 60 * 1000),

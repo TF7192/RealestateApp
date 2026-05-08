@@ -48,20 +48,21 @@ async function main() {
     return;
   }
 
-  // Two independent schedulers — rent and forsale each tick every 2
-  // hours, offset by 1 hour. Cadence:
-  //   t = 0:00  → rent
-  //   t = 1:00  → forsale
-  //   t = 2:00  → rent
-  //   t = 3:00  → forsale
+  // 2026-05-08 — cadence dropped to twice-a-day per kind (was every 2
+  // hours = 12×/day per kind). Two scans cover the daily flow without
+  // burning Reblaze quota or our proxy budget. Cadence:
+  //   t =  0:00  → rent
+  //   t =  6:00  → forsale
+  //   t = 12:00  → rent
+  //   t = 18:00  → forsale
   //   …
-  // Rent boots first (~0-30s) so the under-represented kind gets fresh
-  // deal flow sooner; forsale follows ~1 hour later. Reblaze treats
-  // them as independent visitors instead of a single ramped scraper,
-  // and the wider 2-hour cadence keeps per-IP rate-limit budgets
-  // refreshed between ticks.
-  const KIND_INTERVAL_MS = 2 * 60 * 60 * 1000;   // 2 hours
-  const KIND_OFFSET_MS   = 1 * 60 * 60 * 1000;   // 1 hour stagger
+  // Rent boots first (~0–30s) so the under-represented kind gets fresh
+  // deal flow sooner; forsale follows 6 hours later. The wider stagger
+  // means Reblaze sees rent + forsale as two independent visitors
+  // hitting once-per-cycle each, and per-IP rate-limit budgets fully
+  // refresh between ticks.
+  const KIND_INTERVAL_MS = config.kindIntervalMs;  // env-driven (12 h default → 2 ticks/day per kind)
+  const KIND_OFFSET_MS   = config.kindOffsetMs;    // env-driven (6 h default — kinds alternate across the day)
   const rentBootDelay = Math.floor(Math.random() * 30_000);
   const forsaleBootDelay = rentBootDelay + KIND_OFFSET_MS;
   const stopRent = scheduleLoop({
