@@ -199,15 +199,6 @@ export default function CustomerDetail() {
                 <Phone size={14} /> התקשר
               </a>
               <a
-                href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`שלום ${lead.name}`)}`}
-                target="_blank" rel="noopener noreferrer"
-                onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
-                className="btn btn-whatsapp btn-sm"
-                title="וואטסאפ"
-              >
-                <MessageCircle size={14} /> וואטסאפ
-              </a>
-              <a
                 href={`sms:${lead.phone}`}
                 onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
                 style={secondaryBtn()}
@@ -236,7 +227,18 @@ export default function CustomerDetail() {
             <MessageCircle size={14} />
             <span>שלח נכסים</span>
           </button>
-          <button type="button" onClick={() => { haptics.tap(); setEditOpen(true); }} style={secondaryBtn()} title="ערוך פרטי לקוח">
+          {lead.phone && (
+            <a
+              href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`שלום ${lead.name}`)}`}
+              target="_blank" rel="noopener noreferrer"
+              onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
+              className="btn btn-whatsapp btn-sm"
+              title="וואטסאפ"
+            >
+              <MessageCircle size={14} /> וואטסאפ
+            </a>
+          )}
+          <button type="button" onClick={() => { haptics.tap(); setEditOpen(true); }} style={negativeBtn()} title="ערוך פרטי לקוח">
             <Edit3 size={14} /> ערוך
           </button>
           <button type="button" onClick={() => printPage()} style={ghostBtn()} title="הדפס">
@@ -565,6 +567,15 @@ function secondaryBtn() {
     padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
     fontSize: 12, fontWeight: 700,
     display: 'inline-flex', gap: 5, alignItems: 'center', color: DT.ink,
+    textDecoration: 'none',
+  };
+}
+function negativeBtn() {
+  return {
+    ...FONT, background: DT.ink, border: `1px solid ${DT.ink}`,
+    padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    display: 'inline-flex', gap: 5, alignItems: 'center', color: DT.cream,
     textDecoration: 'none',
   };
 }
