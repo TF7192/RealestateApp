@@ -314,7 +314,7 @@ export default function CustomerDetail() {
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <section style={sectionCard()} aria-label="נכסים תואמים">
-            <MatchingList leadId={lead.id} title="נכסים תואמים" />
+            <MatchingList leadId={lead.id} lead={lead} title="נכסים תואמים" />
           </section>
           <LeadSummaryPanel lead={lead} onEdit={() => setEditOpen(true)} />
         </div>

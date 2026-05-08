@@ -13,18 +13,31 @@ import './MatchingList.css';
 //   - leadId  → listing matching properties (property link per row)
 //   - propertyId → listing matching customers (lead link per row)
 //
+// Lead-direction surfaces a 3-source picker:
+//   - 'system'      → api.leadMatches (internal scoring, default)
+//   - 'yad2'        → api.listMarketListings filtered by lead profile
+//   - 'colleagues'  → api.listPublicMatches (cross-agent pool)
+//
 // Data shape (from the backend matching engine):
 //   { items: [{ id, score, reasons: string[], property?: {...}, lead?: {...} }] }
 // ──────────────────────────────────────────────────────────────────
+const SOURCE_OPTIONS = [
+  { k: 'system', label: 'מהמערכת' },
+  { k: 'yad2', label: 'מיד 2' },
+  { k: 'colleagues', label: 'מקולגות' },
+];
+
 export default function MatchingList({
   leadId,
   propertyId,
+  lead,
   limit = 10,
   title,
 }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [source, setSource] = useState('system');
 
   const direction = leadId ? 'lead' : propertyId ? 'property' : null;
   const resolvedTitle = title || (direction === 'lead' ? 'נכסים תואמים' : 'לקוחות תואמים');
@@ -42,17 +55,58 @@ export default function MatchingList({
     setLoading(true);
     setError(null);
     try {
-      const res = direction === 'lead'
-        ? await api.leadMatches(leadId)
-        : await api.propertyMatchingCustomers(propertyId);
-      const raw = res?.items || [];
+      let raw = [];
+      if (direction === 'property') {
+        const res = await api.propertyMatchingCustomers(propertyId);
+        raw = res?.items || [];
+      } else if (source === 'system') {
+        const res = await api.leadMatches(leadId);
+        raw = res?.items || [];
+      } else if (source === 'yad2') {
+        // Yad 2 / market-discovery feed: filter the prod MarketListing
+        // table by what we know about the lead (budget + first city +
+        // room range). Returns the same item shape but no `score` —
+        // we render a "n/a" tone instead.
+        const params = paramsFromLead(lead);
+        const res = await api.listMarketListings(params);
+        const list = res?.items || [];
+        raw = list.map((l) => ({
+          id: `yad2-${l.id}`,
+          score: 0,
+          reasons: [],
+          property: {
+            id: l.id,
+            street: l.street || l.address || null,
+            city: l.city || null,
+            price: l.price ?? null,
+          },
+          // Yad2 listings link out to /market-discovery/listings/:id
+          // (a snapshot card inside our app), not /properties.
+          _yad2: true,
+        }));
+      } else if (source === 'colleagues') {
+        const res = await api.listPublicMatches();
+        const list = res?.items || res?.matches || [];
+        raw = list.map((m) => ({
+          id: `coll-${m.id}`,
+          score: m.matchCount ?? 0,
+          reasons: [],
+          property: {
+            id: m.id,
+            street: m.street || m.address || null,
+            city: m.city || null,
+            price: m.price ?? null,
+          },
+          _colleague: true,
+        }));
+      }
       setItems(limit ? raw.slice(0, limit) : raw);
     } catch (e) {
       setError(e?.message || 'טעינת התאמות נכשלה');
     } finally {
       setLoading(false);
     }
-  }, [direction, leadId, propertyId, limit]);
+  }, [direction, leadId, propertyId, limit, source, lead]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -66,6 +120,20 @@ export default function MatchingList({
           {resolvedTitle}
           {items.length > 0 && <span className="ml-count">{items.length}</span>}
         </h3>
+        {direction === 'lead' && (
+          <div role="radiogroup" aria-label="מקור ההתאמות" className="ml-sources">
+            {SOURCE_OPTIONS.map((o) => (
+              <button
+                key={o.k}
+                type="button"
+                role="radio"
+                aria-checked={source === o.k}
+                className={`ml-source-pill ${source === o.k ? 'sel' : ''}`}
+                onClick={() => setSource(o.k)}
+              >{o.label}</button>
+            ))}
+          </div>
+        )}
       </header>
 
       {loading ? (
@@ -107,6 +175,23 @@ export default function MatchingList({
   );
 }
 
+// Build /market-discovery/listings query params from a Lead. Used
+// by the "מיד 2" tab so the Yad2 feed is pre-filtered to what
+// this lead actually wants (first city, room range, budget cap).
+function paramsFromLead(lead) {
+  if (!lead) return { limit: 12 };
+  const params = { limit: 12 };
+  const city = (lead.cities && lead.cities[0]) || lead.city;
+  if (city) params.city = city;
+  if (lead.minRoom != null) params.minRooms = lead.minRoom;
+  if (lead.maxRoom != null) params.maxRooms = lead.maxRoom;
+  if (lead.minBudget != null) params.minPrice = lead.minBudget;
+  if (lead.maxBudget != null) params.maxPrice = lead.maxBudget;
+  if (lead.lookingFor === 'BUY') params.kind = 'forsale';
+  if (lead.lookingFor === 'RENT') params.kind = 'rent';
+  return params;
+}
+
 // Hebrew labels for the backend's snake_case reason tokens. The
 // backend used to surface raw keys ("asset_class", "deal_type") —
 // fixed here so the reason list reads as plain Hebrew.
@@ -142,7 +227,11 @@ function MatchRow({ match, direction }) {
     || entity?.address
     || displayText(null);
   const href = direction === 'lead'
-    ? (entity?.id ? `/properties/${entity.id}` : null)
+    ? (match._yad2
+        ? (entity?.id ? `/market-discovery/listings/${encodeURIComponent(entity.id)}` : null)
+        : match._colleague
+          ? '/public-matches'
+          : (entity?.id ? `/properties/${entity.id}` : null))
     : (entity?.id ? `/customers/${entity.id}` : null);
   const Icon = direction === 'lead' ? Building2 : User;
 
