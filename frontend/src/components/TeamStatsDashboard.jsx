@@ -153,7 +153,7 @@ const SOURCE_LABELS = {
   yad2: 'יד2', whatsapp: 'וואטסאפ', facebook: 'פייסבוק',
   manual: 'הזנה ידנית', referral: 'הפניה', site: 'אתר',
 };
-const STATUS_LABELS = { HOT: 'חם', WARM: 'פושר', COLD: 'קר' };
+const STATUS_LABELS = { HOT: 'חם', WARM: 'חמים', COLD: 'קר' };
 
 // ─── Widget catalogue ───────────────────────────────────────────
 // Each entry has `kind` (stable id used in localStorage), `title`
@@ -194,7 +194,7 @@ export const WIDGETS = [
       const segs = [
         { key: 'HOT',  label: 'חם',    value: t.HOT,  color: DT.danger,
           href: '/customers?status=HOT' },
-        { key: 'WARM', label: 'פושר',  value: t.WARM, color: DT.gold,
+        { key: 'WARM', label: 'חמים',  value: t.WARM, color: DT.gold,
           href: '/customers?status=WARM' },
         { key: 'COLD', label: 'קר',    value: t.COLD, color: DT.info,
           href: '/customers?status=COLD' },

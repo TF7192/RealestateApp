@@ -10,9 +10,9 @@ import { haptics, openExternal } from '../../native';
 import { telUrl, whatsappUrl, smsUrl } from '../../native/actions';
 
 const STATUS = {
-  hot:  { label: 'חמים', icon: Flame,      color: 'var(--danger)',  bg: 'rgba(248,113,113,0.12)' },
-  warm: { label: 'חמימים', icon: Thermometer, color: 'var(--warning)', bg: 'rgba(251,191,36,0.12)' },
-  cold: { label: 'קרים',  icon: Snowflake,  color: 'var(--info)',    bg: 'rgba(96,165,250,0.12)' },
+  hot:  { label: 'חם', icon: Flame,      color: 'var(--danger)',  bg: 'rgba(248,113,113,0.12)' },
+  warm: { label: 'חמים', icon: Thermometer, color: 'var(--warning)', bg: 'rgba(251,191,36,0.12)' },
+  cold: { label: 'קר',  icon: Snowflake,  color: 'var(--info)',    bg: 'rgba(96,165,250,0.12)' },
 };
 
 export default function MobileLeads() {

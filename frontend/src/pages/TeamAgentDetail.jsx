@@ -321,7 +321,7 @@ function StatusChip({ status }) {
   const s = (status || '').toUpperCase();
   const map = {
     HOT:  { label: '🔥 חם',  color: DT.hot,  bg: 'rgba(185,28,28,0.12)' },
-    WARM: { label: 'פושר',    color: DT.warm, bg: 'rgba(180,83,9,0.12)' },
+    WARM: { label: 'חמים',    color: DT.warm, bg: 'rgba(180,83,9,0.12)' },
     COLD: { label: 'קר',      color: DT.cold, bg: 'rgba(71,85,105,0.12)' },
   };
   const cfg = map[s];

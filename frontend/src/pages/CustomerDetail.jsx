@@ -50,7 +50,7 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 function statusMeta(status) {
   const s = (status || '').toUpperCase();
   if (s === 'HOT')  return { label: 'חם',    bg: 'rgba(185,28,28,0.12)', fg: DT.hot,  icon: <Flame size={12} /> };
-  if (s === 'WARM') return { label: 'פושר',  bg: 'rgba(180,83,9,0.12)',  fg: DT.warm, icon: <Thermometer size={12} /> };
+  if (s === 'WARM') return { label: 'חמים',  bg: 'rgba(180,83,9,0.12)',  fg: DT.warm, icon: <Thermometer size={12} /> };
   if (s === 'COLD') return { label: 'קר',    bg: 'rgba(71,85,105,0.12)', fg: DT.cold, icon: <Snowflake size={12} /> };
   return null;
 }
@@ -203,7 +203,7 @@ export default function CustomerDetail() {
                 href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`שלום ${lead.name}`)}`}
                 target="_blank" rel="noopener noreferrer"
                 onClick={() => { primeContactBump(lead.id); haptics.tap(); }}
-                style={secondaryBtn()}
+                className="btn btn-whatsapp btn-sm"
                 title="וואטסאפ"
               >
                 <MessageCircle size={14} /> וואטסאפ
@@ -226,31 +226,8 @@ export default function CustomerDetail() {
           >
             <Calendar size={14} /> קבע פגישה
           </button>
-          {/* Sprint 5 — AI-backed smart matcher. Distinct gold-gradient
-              pill so it visually reads as "premium / magic" and doesn't
-              collide with the classic schedule/edit CTAs. */}
-          <button
-            type="button"
-            onClick={() => { haptics.tap(); setAiMatchesOpen(true); }}
-            style={{
-              ...FONT,
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px', borderRadius: 10,
-              border: 'none',
-              background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
-              color: DT.ink,
-              fontSize: 12, fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 3px 8px rgba(180,139,76,0.25)',
-            }}
-            title="התאמות חכמות מ-AI"
-          >
-            <Sparkles size={14} />
-            <span>✨ התאמות חכמות</span>
-          </button>
           {/* 2026-05-03 — Send multiple matching properties in one WhatsApp
-              message. Distinct from "התאמות חכמות" (AI scoring) — this is
-              the agent's own pick from their listings. */}
+              message. The agent's own pick from their listings. */}
           <button
             type="button"
             onClick={() => { haptics.tap(); setMultiSendOpen(true); }}

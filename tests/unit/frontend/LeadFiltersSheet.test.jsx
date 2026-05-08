@@ -73,7 +73,7 @@ describe('<LeadFiltersSheet />', () => {
   it('seeds draft from the `values` prop (current pill is aria-checked)', () => {
     openSheet({ values: { status: 'hot', lookingFor: 'BUY', interestType: 'PRIVATE' } });
     const statusGroup = screen.getByRole('radiogroup', { name: 'סטטוס מתעניין' });
-    const hotPill = within(statusGroup).getByRole('radio', { name: 'חמים' });
+    const hotPill = within(statusGroup).getByRole('radio', { name: 'חם' });
     expect(hotPill.getAttribute('aria-checked')).toBe('true');
 
     const lookingGroup = screen.getByRole('radiogroup', { name: 'סוג עסקה' });
@@ -88,7 +88,7 @@ describe('<LeadFiltersSheet />', () => {
   it('toggling a segmented pill updates state WITHOUT firing onApply', () => {
     const { onApply } = openSheet();
     const statusGroup = screen.getByRole('radiogroup', { name: 'סטטוס מתעניין' });
-    const warmPill = within(statusGroup).getByRole('radio', { name: 'פושרים' });
+    const warmPill = within(statusGroup).getByRole('radio', { name: 'חמים' });
 
     // Before click: the "all" pill is the checked one.
     expect(within(statusGroup).getByRole('radio', { name: 'הכול' }).getAttribute('aria-checked')).toBe('true');
@@ -106,7 +106,7 @@ describe('<LeadFiltersSheet />', () => {
     const { onApply, onClose } = openSheet();
 
     // Pick HOT + BUY + a city.
-    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'סטטוס מתעניין' })).getByRole('radio', { name: 'חמים' }));
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'סטטוס מתעניין' })).getByRole('radio', { name: 'חם' }));
     fireEvent.click(within(screen.getByRole('radiogroup', { name: 'סוג עסקה' })).getByRole('radio', { name: 'קנייה' }));
     fireEvent.change(screen.getByLabelText('עיר'), { target: { value: 'חיפה' } });
 
@@ -140,13 +140,13 @@ describe('<LeadFiltersSheet />', () => {
 
     // Pre-condition — hot is checked, buy is checked.
     const statusGroup = screen.getByRole('radiogroup', { name: 'סטטוס מתעניין' });
-    expect(within(statusGroup).getByRole('radio', { name: 'חמים' }).getAttribute('aria-checked')).toBe('true');
+    expect(within(statusGroup).getByRole('radio', { name: 'חם' }).getAttribute('aria-checked')).toBe('true');
 
     fireEvent.click(screen.getByRole('button', { name: 'נקה' }));
 
     // After clear — all is the checked status pill, city input is empty.
     expect(within(statusGroup).getByRole('radio', { name: 'הכול' }).getAttribute('aria-checked')).toBe('true');
-    expect(within(statusGroup).getByRole('radio', { name: 'חמים' }).getAttribute('aria-checked')).toBe('false');
+    expect(within(statusGroup).getByRole('radio', { name: 'חם' }).getAttribute('aria-checked')).toBe('false');
     expect(screen.getByLabelText('עיר').value).toBe('');
   });
 });

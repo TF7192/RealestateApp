@@ -59,9 +59,9 @@ const EMPTY = {
 
 const STATUS_OPTS = [
   { k: 'all',   label: 'הכול' },
-  { k: 'hot',   label: 'חמים' },
-  { k: 'warm',  label: 'פושרים' },
-  { k: 'cold',  label: 'קרים' },
+  { k: 'hot',   label: 'חם' },
+  { k: 'warm',  label: 'חמים' },
+  { k: 'cold',  label: 'קר' },
   { k: 'stale', label: 'ללא מענה 24ש' },
 ];
 

@@ -34,9 +34,9 @@ const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const FILTERS = [
   { k: 'all',    label: 'הכול' },
-  { k: 'hot',    label: 'חמים' },
-  { k: 'warm',   label: 'פושרים' },
-  { k: 'cold',   label: 'קרים' },
+  { k: 'hot',    label: 'חם' },
+  { k: 'warm',   label: 'חמים' },
+  { k: 'cold',   label: 'קר' },
   { k: 'stale',  label: 'ללא מענה ביום אחרון' },
 ];
 
@@ -198,7 +198,7 @@ export default function Customers() {
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.7, margin: 0 }}>מתעניינים</h1>
           <div style={{ fontSize: 13, color: DT.muted, marginTop: 2 }}>
-            {leads.length} סך הכול · {counts.hot} חמים · {counts.warm} פושרים · {counts.cold} קרים
+            {leads.length} סך הכול · {counts.hot} חם · {counts.warm} חמים · {counts.cold} קר
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -596,7 +596,7 @@ function StatusChip({ status }) {
   const s = (status || '').toUpperCase();
   const map = {
     HOT:  { label: '🔥 חם', color: DT.hot,  bg: 'rgba(185,28,28,0.12)' },
-    WARM: { label: 'פושר',  color: DT.warm, bg: 'rgba(180,83,9,0.12)' },
+    WARM: { label: 'חמים',  color: DT.warm, bg: 'rgba(180,83,9,0.12)' },
     COLD: { label: 'קר',    color: DT.cold, bg: 'rgba(71,85,105,0.12)' },
   };
   const cfg = map[s];

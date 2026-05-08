@@ -69,9 +69,9 @@ describe('<Customers> page (post-DLeads-port surface)', () => {
     // Subtitle is a single text node — assert its contents loosely so
     // copy tweaks (separator, spacing) don't break the test.
     const subtitle = await screen.findByText(/3 סך הכול/);
+    expect(subtitle).toHaveTextContent(/1 חם/);
     expect(subtitle).toHaveTextContent(/1 חמים/);
-    expect(subtitle).toHaveTextContent(/1 פושרים/);
-    expect(subtitle).toHaveTextContent(/1 קרים/);
+    expect(subtitle).toHaveTextContent(/1 קר/);
   });
 
   it('renders the desktop filter pill row with live counts', async () => {
@@ -80,9 +80,9 @@ describe('<Customers> page (post-DLeads-port surface)', () => {
     await screen.findByText('דנה אבני');
     // "הכול · 3" — count appended to the pill label.
     expect(screen.getByRole('button', { name: /הכול · 3/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /חם · 1/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /חמים · 1/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /פושרים · 1/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /קרים · 1/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /קר · 1/ })).toBeInTheDocument();
   });
 
   it('clicking a filter pill narrows the table client-side', async () => {
@@ -90,7 +90,7 @@ describe('<Customers> page (post-DLeads-port surface)', () => {
     mountLeads();
     render(<Customers />, { route: '/customers' });
     await screen.findByText('דנה אבני');
-    await user.click(screen.getByRole('button', { name: /חמים · 1/ }));
+    await user.click(screen.getByRole('button', { name: /חם · 1/ }));
     // HOT lead stays visible; WARM and COLD leads disappear.
     expect(screen.getByText('דנה אבני')).toBeInTheDocument();
     await waitFor(() => {
@@ -179,7 +179,7 @@ describe('<Customers> page (post-DLeads-port surface)', () => {
     mountLeads([sampleLeads[1]]);
     render(<Customers />, { route: '/customers' });
     await screen.findByText('רון כהן');
-    await user.click(screen.getByRole('button', { name: /חמים · 0/ }));
+    await user.click(screen.getByRole('button', { name: /חם · 0/ }));
     expect(await screen.findByText('אין תוצאות למסנן הזה')).toBeInTheDocument();
   });
 
