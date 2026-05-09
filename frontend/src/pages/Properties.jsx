@@ -33,6 +33,16 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import QuickEditDrawer from '../components/QuickEditDrawer';
 import PropertyNotesDialog from '../components/PropertyNotesDialog';
 import EmptyState from '../components/EmptyState';
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor,
+  useSensor, useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext, useSortable, sortableKeyboardCoordinates,
+  rectSortingStrategy, arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
 import { useRouteScrollRestore } from '../hooks/useScrollRestore';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 import WhatsAppSheet from '../components/WhatsAppSheet';
@@ -283,6 +293,14 @@ export default function Properties() {
   const isMobile = useViewportMobile(820);
   // Desktop-only view-mode toggle. Mobile always uses compact cards.
   const [viewMode, setViewMode] = useViewMode('properties', 'cards');
+  // 2026-05-09 — drag-and-drop hybrid pinning. PointerSensor with a
+  // 200 ms hold + 8 px tolerance so a normal click on the card or
+  // the swipe-row on mobile doesn't accidentally start a drag — the
+  // user must deliberately press-and-hold on the grip handle.
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   // F-6.3 — preserve scroll when the agent goes deep into a property
   // card and pops back. Critical for 500-row lists on desktop.
   useRouteScrollRestore();
@@ -573,6 +591,58 @@ export default function Properties() {
       markFetched();
     } catch { /* ignore */ }
     setLoading(false);
+  };
+
+  // 2026-05-09 — onDragEnd recomputes the moved card's `priority` so
+  // it slots above/below its new neighbours. Backend already orders
+  // by [priority desc, createdAt desc] so a single PATCH per drop is
+  // enough to pin the card to its new position. Other cards keep
+  // their existing priority (most are 0 / default) — we only renumber
+  // the moved card, which avoids cascading writes.
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = cardVisible.findIndex((p) => p.id === active.id);
+    const newIndex = cardVisible.findIndex((p) => p.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(cardVisible, oldIndex, newIndex);
+    const moved = next[newIndex];
+    const prev = newIndex > 0 ? next[newIndex - 1] : null;
+    const nextN = newIndex < next.length - 1 ? next[newIndex + 1] : null;
+    const prevP = prev?.priority ?? 0;
+    const nextP = nextN?.priority ?? 0;
+    let newPriority;
+    if (!prev) {
+      newPriority = Math.max(nextP + 1, 1);
+    } else if (prevP > nextP) {
+      const mid = Math.floor((prevP + nextP) / 2);
+      newPriority = mid > nextP ? mid : prevP;
+    } else if (prevP === nextP) {
+      newPriority = prevP > 0 ? prevP + 1 : 1;
+    } else {
+      newPriority = prevP + 1;
+    }
+    // Optimistic local reorder so the card snaps into place
+    // immediately, then sync to backend.
+    setItems((list) => {
+      const updated = list.map((p) =>
+        p.id === moved.id ? { ...p, priority: newPriority } : p,
+      );
+      // Re-sort by [priority desc, createdAt desc] so the optimistic
+      // view mirrors what the backend will return on next refetch.
+      return [...updated].sort((a, b) => {
+        if ((b.priority ?? 0) !== (a.priority ?? 0)) {
+          return (b.priority ?? 0) - (a.priority ?? 0);
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+    });
+    api.updateProperty(moved.id, { priority: newPriority })
+      .catch(() => {
+        toast?.error?.('שמירת הסדר נכשלה — נסה שוב');
+        // Roll back by reloading from server.
+        load();
+      });
   };
 
   // Refresh on tab refocus so the list reflects edits made on a
@@ -1476,9 +1546,24 @@ export default function Properties() {
                 {...longPressBind(prop.id)}
               >
                 {selectMode && (
-                  <span className="pc-pick pc-pick-desktop" aria-hidden="true">
+                  <button
+                    type="button"
+                    className="pc-pick pc-pick-desktop"
+                    role="checkbox"
+                    aria-checked={isPicked}
+                    aria-label={`בחר ${prop.street}, ${prop.city}`}
+                    onClick={(e) => {
+                      // Sibling of the Link, not nested inside — without
+                      // its own handler, clicks on the checkbox glyph
+                      // hit the absolute-positioned span and do nothing.
+                      e.preventDefault();
+                      e.stopPropagation();
+                      haptics.tap();
+                      toggleSelect(prop.id);
+                    }}
+                  >
                     {isPicked ? <CheckSquare size={22} /> : <Square size={22} />}
-                  </span>
+                  </button>
                 )}
                 <Link to={`/properties/${prop.id}`} className="property-card-link" onClick={handleCardTap}>
                   <div className="property-image">
