@@ -8,12 +8,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Users, Calendar as CalendarIcon, Banknote, BarChart2,
-  Sparkles, X, Star, Activity as ActivityIcon,
+  Sparkles, X, Star, Activity as ActivityIcon, Plus,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
 import Portal from '../components/Portal';
+import NewMeetingDialog from '../components/NewMeetingDialog';
 
 // ─── Tokens lifted from the bundle's shell.jsx ──────────────
 const DT = {
@@ -169,6 +170,10 @@ export default function Dashboard() {
   // Default 'today' so each morning the agent sees what's planned now;
   // they can flip to 'week' to see the rest of the week ahead.
   const [meetingsView, setMeetingsView] = useState('today');
+  // 2026-05-09 — quick-create from the right-side meetings panel.
+  // Mounts NewMeetingDialog so the agent can drop a meeting/reminder
+  // straight from /dashboard without bouncing through /calendar.
+  const [newMeetingOpen, setNewMeetingOpen] = useState(false);
 
   // PERF — 2026-05-01 v2: progressive load.
   // First effect: fetch the THIN /api/dashboard/full (counts + 4 top-N
@@ -551,9 +556,26 @@ export default function Dashboard() {
                 );
               })}
             </div>
-            <Link to="/calendar" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-              יומן מלא
-            </Link>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setNewMeetingOpen(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '5px 10px', borderRadius: 999,
+                  background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
+                  color: DT.ink, border: 'none', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 800,
+                  boxShadow: '0 2px 6px rgba(180,139,76,0.28)',
+                }}
+                title="הוסף פגישה / תזכורת"
+              >
+                <Plus size={14} /> חדש
+              </button>
+              <Link to="/calendar" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                יומן מלא
+              </Link>
+            </div>
           </div>
           {(meetingsView === 'today' ? todaysReminders : weekReminders).length === 0 && (
             <div style={{ fontSize: 13, color: DT.muted, padding: '12px 0' }}>
@@ -695,6 +717,18 @@ export default function Dashboard() {
       </div>
 
       {premiumOpen && <PremiumModal onClose={() => setPremiumOpen(false)} />}
+    {newMeetingOpen && (
+      <NewMeetingDialog
+        onClose={() => setNewMeetingOpen(false)}
+        onCreated={() => {
+          setNewMeetingOpen(false);
+          // Refresh the side panel so the new event appears immediately.
+          api.listReminders?.({ upcoming: '1' })
+            .then((r) => setMeetings(r?.items || []))
+            .catch(() => { /* keep stale list rather than blanking */ });
+        }}
+      />
+    )}
     </div>
   );
 }
