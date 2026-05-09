@@ -15,6 +15,13 @@ import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
 import Portal from '../components/Portal';
 import NewMeetingDialog from '../components/NewMeetingDialog';
+import {
+  PipelineDonut,
+  LeadSourceDonut,
+  MatchCoverageGauge,
+  DaysOnMarketBar,
+  SilenceBucketsBar,
+} from '../components/DashboardCharts';
 
 // ─── Tokens lifted from the bundle's shell.jsx ──────────────
 const DT = {
@@ -664,29 +671,36 @@ export default function Dashboard() {
         </DCard>
       </div>
 
-      {/* Bottom grid: pipeline + hot leads.
-          Perf 2026-04-25: matched min-height so the API-arrival fill
-          doesn't shift this row either. */}
+      {/* 2026-05-09 — replaced the static "צינור עסקאות" list +
+          standalone hot-leads card with a dense charts strip.
+          Three donuts/gauges across the top, two bars below, and
+          the hot-leads list keeps its own row. */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: isMobile
-          ? '1fr'
-          : 'minmax(0, 1fr) minmax(0, 1fr)',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))',
         gap: 14,
-        minHeight: isMobile ? 0 : 320,
+        marginBottom: 14,
       }}>
-        <DCard>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            marginBottom: 14,
-          }}>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>צינור עסקאות</div>
-            <Link to="/deals" style={{ color: DT.gold, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-              לכל העסקאות
-            </Link>
-          </div>
-          <Pipeline deals={deals} />
-        </DCard>
+        <PipelineDonut deals={deals} />
+        <LeadSourceDonut leads={leads} />
+        <MatchCoverageGauge leads={leads} properties={properties} />
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+        gap: 14,
+        marginBottom: 14,
+      }}>
+        <DaysOnMarketBar properties={properties} />
+        <SilenceBucketsBar leads={leads} />
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr)',
+        gap: 14,
+        minHeight: isMobile ? 0 : 200,
+      }}>
 
         <DCard>
           <div style={{

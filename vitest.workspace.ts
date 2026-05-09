@@ -38,13 +38,13 @@ export default defineWorkspace([
       // react-router-dom) when a test renders a frontend component.
       // Mirrors the richer alias block the `frontend` project uses.
       alias: [
-        { find: /^react-router-dom$/, replacement: path.join(frontendRoot, 'node_modules/react-router-dom') },
-        { find: /^react-router$/,     replacement: path.join(frontendRoot, 'node_modules/react-router') },
-        { find: /^lucide-react$/,     replacement: path.join(frontendRoot, 'node_modules/lucide-react') },
+        { find: /^react-router-dom$/, replacement: path.join(repoRoot, 'node_modules/react-router-dom') },
+        { find: /^react-router$/,     replacement: path.join(repoRoot, 'node_modules/react-router') },
+        { find: /^lucide-react$/,     replacement: path.join(repoRoot, 'node_modules/lucide-react') },
         // SEC-012 — exceljs replaced xlsx; the lib lives only in
         // frontend/node_modules, so the unit-frontend project (rooted
         // at repo root) needs an explicit alias to resolve it.
-        { find: /^exceljs$/,          replacement: path.join(frontendRoot, 'node_modules/exceljs') },
+        { find: /^exceljs$/,          replacement: path.join(repoRoot, 'node_modules/exceljs') },
       ],
     },
     test: {
@@ -79,10 +79,10 @@ export default defineWorkspace([
         { find: /^react-dom$/,             replacement: path.join(repoRoot, 'node_modules/react-dom/index.js') },
         { find: /^react-dom\/client$/,     replacement: path.join(repoRoot, 'node_modules/react-dom/client.js') },
 
-        { find: /^react-router-dom$/, replacement: path.join(frontendRoot, 'node_modules/react-router-dom') },
-        { find: /^react-router$/,     replacement: path.join(frontendRoot, 'node_modules/react-router') },
-        { find: /^@capacitor\/core$/, replacement: path.join(frontendRoot, 'node_modules/@capacitor/core') },
-        { find: /^lucide-react$/,     replacement: path.join(frontendRoot, 'node_modules/lucide-react') },
+        { find: /^react-router-dom$/, replacement: path.join(repoRoot, 'node_modules/react-router-dom') },
+        { find: /^react-router$/,     replacement: path.join(repoRoot, 'node_modules/react-router') },
+        { find: /^@capacitor\/core$/, replacement: path.join(repoRoot, 'node_modules/@capacitor/core') },
+        { find: /^lucide-react$/,     replacement: path.join(repoRoot, 'node_modules/lucide-react') },
         // Canonical `@estia/frontend/*` path for the frontend app source.
         // Tests import through this alias so Vite doesn't evaluate the
         // same module twice under different relative paths.
