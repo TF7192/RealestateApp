@@ -208,13 +208,30 @@ export default function Dashboard() {
       api.listLeads?.().catch(() => null),
       api.listProperties?.({ mine: '1' }).catch(() => null),
       api.listDeals?.().catch(() => null),
+      // 2026-05-09 — panel was showing reminders only and routing
+      // every click to /meetings/:id which 404'd ("הפגישה לא נמצאה")
+      // because the IDs were Reminder cuids, not LeadMeeting cuids.
+      // Fetch both lists and tag each item with its `_kind` so the
+      // row click can route to the right surface.
       (api.listReminders?.({ upcoming: '1' }) || Promise.resolve(null)).catch(() => null),
-    ]).then(([lRes, pRes, dRes, mRes]) => {
+      (api.listMeetings?.() || Promise.resolve(null)).catch(() => null),
+    ]).then(([lRes, pRes, dRes, rRes, meetRes]) => {
       if (cancelled) return;
       setLeads(lRes?.items || []);
       setProperties(pRes?.items || []);
       setDeals(dRes?.items || []);
-      setMeetings(mRes?.items || []);
+      const reminders = (rRes?.items || []).map((r) => ({
+        ...r,
+        _kind: 'reminder',
+        startsAt: r.dueAt,
+      }));
+      const meetingsList = (meetRes?.items || []).map((m) => ({
+        ...m,
+        _kind: 'meeting',
+      }));
+      setMeetings([...meetingsList, ...reminders].sort((a, b) =>
+        new Date(a.startsAt) - new Date(b.startsAt),
+      ));
     });
     return () => { cancelled = true; };
   }, []);
@@ -599,7 +616,7 @@ export default function Dashboard() {
             // and the "הבא" pill on the next-up meeting weren't, so
             // there was no way to open the meeting from the dashboard.
             return (
-              <Link key={m.id || i} to={`/meetings/${m.id}`} style={{
+              <Link key={m.id || i} to={m._kind === 'reminder' ? '/reminders' : `/meetings/${m.id}`} style={{
                 display: 'flex', gap: 10, padding: '10px 0',
                 borderBottom: i === visible.length - 1 ? 'none' : `1px solid ${DT.border}`,
                 position: 'relative',
@@ -722,10 +739,18 @@ export default function Dashboard() {
         onClose={() => setNewMeetingOpen(false)}
         onCreated={() => {
           setNewMeetingOpen(false);
-          // Refresh the side panel so the new event appears immediately.
-          api.listReminders?.({ upcoming: '1' })
-            .then((r) => setMeetings(r?.items || []))
-            .catch(() => { /* keep stale list rather than blanking */ });
+          // Refresh the side panel — pull both reminders + meetings
+          // so the new event lands no matter which entity it became.
+          Promise.all([
+            api.listReminders?.({ upcoming: '1' }).catch(() => null),
+            api.listMeetings?.().catch(() => null),
+          ]).then(([rRes, meetRes]) => {
+            const reminders = (rRes?.items || []).map((r) => ({ ...r, _kind: 'reminder', startsAt: r.dueAt }));
+            const meetingsList = (meetRes?.items || []).map((m) => ({ ...m, _kind: 'meeting' }));
+            setMeetings([...meetingsList, ...reminders].sort((a, b) =>
+              new Date(a.startsAt) - new Date(b.startsAt),
+            ));
+          });
         }}
       />
     )}
