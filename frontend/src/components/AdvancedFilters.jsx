@@ -108,8 +108,15 @@ export default function AdvancedFilters({
             <SelectField
               value={values.city || ''}
               onChange={(v) => onChange('city', v)}
-              placeholder="כל הערים"
-              options={(config?.cities || []).map((c) => ({ value: c, label: c }))}
+              options={[
+                // 2026-05-09 — "כל הערים" needs to be a selectable
+                // option, not a `disabled` placeholder, so an agent
+                // who picked a city can re-select "all" without
+                // reloading. Previously this row was the placeholder
+                // entry which SelectField renders with `disabled`.
+                { value: '', label: 'כל הערים' },
+                ...(config?.cities || []).map((c) => ({ value: c, label: c })),
+              ]}
             />
           </div>
         )}

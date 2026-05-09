@@ -6,6 +6,7 @@ import {
   Building2,
   MapPin,
   Bed,
+  Home,
   Maximize,
   LinkIcon,
   Check,
@@ -33,16 +34,6 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import QuickEditDrawer from '../components/QuickEditDrawer';
 import PropertyNotesDialog from '../components/PropertyNotesDialog';
 import EmptyState from '../components/EmptyState';
-import {
-  DndContext, closestCenter, PointerSensor, KeyboardSensor,
-  useSensor, useSensors,
-} from '@dnd-kit/core';
-import {
-  SortableContext, useSortable, sortableKeyboardCoordinates,
-  rectSortingStrategy, arrayMove,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
 import { useRouteScrollRestore } from '../hooks/useScrollRestore';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 import WhatsAppSheet from '../components/WhatsAppSheet';
@@ -293,14 +284,6 @@ export default function Properties() {
   const isMobile = useViewportMobile(820);
   // Desktop-only view-mode toggle. Mobile always uses compact cards.
   const [viewMode, setViewMode] = useViewMode('properties', 'cards');
-  // 2026-05-09 — drag-and-drop hybrid pinning. PointerSensor with a
-  // 200 ms hold + 8 px tolerance so a normal click on the card or
-  // the swipe-row on mobile doesn't accidentally start a drag — the
-  // user must deliberately press-and-hold on the grip handle.
-  const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
   // F-6.3 — preserve scroll when the agent goes deep into a property
   // card and pops back. Critical for 500-row lists on desktop.
   useRouteScrollRestore();
@@ -593,57 +576,6 @@ export default function Properties() {
     setLoading(false);
   };
 
-  // 2026-05-09 — onDragEnd recomputes the moved card's `priority` so
-  // it slots above/below its new neighbours. Backend already orders
-  // by [priority desc, createdAt desc] so a single PATCH per drop is
-  // enough to pin the card to its new position. Other cards keep
-  // their existing priority (most are 0 / default) — we only renumber
-  // the moved card, which avoids cascading writes.
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = cardVisible.findIndex((p) => p.id === active.id);
-    const newIndex = cardVisible.findIndex((p) => p.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const next = arrayMove(cardVisible, oldIndex, newIndex);
-    const moved = next[newIndex];
-    const prev = newIndex > 0 ? next[newIndex - 1] : null;
-    const nextN = newIndex < next.length - 1 ? next[newIndex + 1] : null;
-    const prevP = prev?.priority ?? 0;
-    const nextP = nextN?.priority ?? 0;
-    let newPriority;
-    if (!prev) {
-      newPriority = Math.max(nextP + 1, 1);
-    } else if (prevP > nextP) {
-      const mid = Math.floor((prevP + nextP) / 2);
-      newPriority = mid > nextP ? mid : prevP;
-    } else if (prevP === nextP) {
-      newPriority = prevP > 0 ? prevP + 1 : 1;
-    } else {
-      newPriority = prevP + 1;
-    }
-    // Optimistic local reorder so the card snaps into place
-    // immediately, then sync to backend.
-    setItems((list) => {
-      const updated = list.map((p) =>
-        p.id === moved.id ? { ...p, priority: newPriority } : p,
-      );
-      // Re-sort by [priority desc, createdAt desc] so the optimistic
-      // view mirrors what the backend will return on next refetch.
-      return [...updated].sort((a, b) => {
-        if ((b.priority ?? 0) !== (a.priority ?? 0)) {
-          return (b.priority ?? 0) - (a.priority ?? 0);
-        }
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
-    });
-    api.updateProperty(moved.id, { priority: newPriority })
-      .catch(() => {
-        toast?.error?.('שמירת הסדר נכשלה — נסה שוב');
-        // Roll back by reloading from server.
-        load();
-      });
-  };
 
   // Refresh on tab refocus so the list reflects edits made on a
   // detail page or in another tab without a manual reload.
@@ -1111,15 +1043,61 @@ export default function Properties() {
             style={PROPS_DT.searchInput}
           />
         </div>
-        <DtPillRow
-          value={assetClassFilter}
-          onChange={setAssetClassFilter}
-          items={[
-            { k: 'all', label: 'הכל' },
-            { k: 'RESIDENTIAL', label: 'מגורים' },
-            { k: 'COMMERCIAL', label: 'מסחרי' },
-          ]}
-        />
+        {/* 2026-05-09 — מגורים / מסחרי are the agent's primary mental
+            split (almost every search starts with "is this a home or
+            an office?"), so we surface them before "הכל" and give
+            each a distinct gold/teal accent and a bigger pill. The
+            generic "הכל" stays as a smaller ghost reset. */}
+        <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setAssetClassFilter('RESIDENTIAL')}
+            style={assetClassFilter === 'RESIDENTIAL' ? {
+              ...PROPS_DT.pill,
+              background: `linear-gradient(180deg, ${_DT.goldLight}, ${_DT.gold})`,
+              border: `1px solid ${_DT.gold}`,
+              color: _DT.ink,
+              padding: '10px 18px',
+              fontSize: 14, fontWeight: 800,
+              boxShadow: '0 4px 10px rgba(180,139,76,0.32)',
+            } : {
+              ...PROPS_DT.pill,
+              background: _DT.goldSoft,
+              border: `1px solid ${_DT.gold}`,
+              color: _DT.goldDark,
+              padding: '10px 18px',
+              fontSize: 14, fontWeight: 800,
+            }}
+          ><Home size={15} /> מגורים</button>
+          <button
+            type="button"
+            onClick={() => setAssetClassFilter('COMMERCIAL')}
+            style={assetClassFilter === 'COMMERCIAL' ? {
+              ...PROPS_DT.pill,
+              background: 'linear-gradient(180deg, #14b8a6, #0d9488)',
+              border: '1px solid #0d9488',
+              color: '#fff',
+              padding: '10px 18px',
+              fontSize: 14, fontWeight: 800,
+              boxShadow: '0 4px 10px rgba(13,148,136,0.32)',
+            } : {
+              ...PROPS_DT.pill,
+              background: 'rgba(13,148,136,0.10)',
+              border: '1px solid #0d9488',
+              color: '#0d6f68',
+              padding: '10px 18px',
+              fontSize: 14, fontWeight: 800,
+            }}
+          ><Building2 size={15} /> מסחרי</button>
+          <button
+            type="button"
+            onClick={() => setAssetClassFilter('all')}
+            style={assetClassFilter === 'all' ? {
+              ...PROPS_DT.pillActive,
+              padding: '7px 12px',
+            } : PROPS_DT.pill}
+          >הכל</button>
+        </div>
         <DtPillRow
           value={filter}
           onChange={setFilter}
@@ -1565,6 +1543,43 @@ export default function Properties() {
                     {isPicked ? <CheckSquare size={22} /> : <Square size={22} />}
                   </button>
                 )}
+                {/* 2026-05-09 — pin/unpin. Tapping the pin sets the
+                    card's `priority` to 100 (or back to 0). The
+                    backend already orders `[priority desc, createdAt
+                    desc]`, so pinned cards float to the top of the
+                    grid. Same outcome as drag-to-reorder, simpler UX
+                    on touch + smaller blast radius for v1. */}
+                <button
+                  type="button"
+                  className={`pc-pin-btn ${(prop.priority || 0) > 0 ? 'is-pinned' : ''}`}
+                  aria-label={(prop.priority || 0) > 0 ? `בטל הצמדה של ${prop.street}` : `הצמד את ${prop.street} למעלה`}
+                  title={(prop.priority || 0) > 0 ? 'בטל הצמדה' : 'הצמד למעלה'}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    haptics.tap();
+                    const next = (prop.priority || 0) > 0 ? 0 : 100;
+                    // Optimistic UI: re-sort by [priority desc, createdAt desc]
+                    setItems((list) => {
+                      const updated = list.map((p) =>
+                        p.id === prop.id ? { ...p, priority: next } : p,
+                      );
+                      return [...updated].sort((a, b) => {
+                        if ((b.priority ?? 0) !== (a.priority ?? 0)) {
+                          return (b.priority ?? 0) - (a.priority ?? 0);
+                        }
+                        return new Date(b.createdAt) - new Date(a.createdAt);
+                      });
+                    });
+                    api.updateProperty(prop.id, { priority: next })
+                      .catch(() => {
+                        toast?.error?.('שמירת ההצמדה נכשלה');
+                        load();
+                      });
+                  }}
+                >
+                  <Star size={16} fill={(prop.priority || 0) > 0 ? 'currentColor' : 'none'} />
+                </button>
                 <Link to={`/properties/${prop.id}`} className="property-card-link" onClick={handleCardTap}>
                   <div className="property-image">
                     {thumb ? (

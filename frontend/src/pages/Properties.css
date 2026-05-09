@@ -1234,6 +1234,44 @@
   -webkit-backdrop-filter: saturate(180%) blur(12px);
   color: var(--gold);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Pin-to-top button — sits on the trailing edge of the photo so
+   it's always visible regardless of select-mode. Filled gold star
+   when pinned; outlined when unpinned. */
+.pc-pin-btn {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  color: rgba(30, 26, 20, 0.4);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+  transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.pc-pin-btn:hover {
+  color: var(--gold);
+  transform: scale(1.06);
+}
+.pc-pin-btn.is-pinned {
+  background: linear-gradient(135deg, var(--gold-light, #d9b774), var(--gold));
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(180, 139, 76, 0.45);
 }
 
 /* ── Floating bulk action bar ──────────────────────────────────
