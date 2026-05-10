@@ -278,6 +278,27 @@ function buildShareUrl(agent, filters) {
   return qs ? `${base}?${qs}` : base;
 }
 
+// Renders a card thumbnail that swaps to `fallback` when the <img>
+// fires onError. Without this, a failed load (transient network, lazy-
+// load miss, broken signed-URL race) leaves the slot blank because the
+// placeholder branch only runs when `src` is falsy at render time.
+function CardThumb({ src, alt, eager, fallback }) {
+  const [failed, setFailed] = useState(false);
+  // If the user reloads with a fresh `src`, give it a chance.
+  useEffect(() => { setFailed(false); }, [src]);
+  if (!src || failed) return fallback;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading={eager ? 'eager' : 'lazy'}
+      fetchpriority={eager ? 'high' : undefined}
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export default function Properties() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
@@ -1239,9 +1260,14 @@ export default function Properties() {
               // JPEG just to paint a tiny cell.
               render: (p) => {
                 const t = p.imageThumbs?.[0] || p.images?.[0];
-                return t
-                  ? <img src={t} alt="" loading="lazy" decoding="async" />
-                  : <div className="cell-thumb-placeholder" aria-hidden="true" />;
+                return (
+                  <CardThumb
+                    src={t}
+                    alt=""
+                    eager={false}
+                    fallback={<div className="cell-thumb-placeholder" aria-hidden="true" />}
+                  />
+                );
               },
             },
             {
@@ -1376,17 +1402,12 @@ export default function Properties() {
                           </span>
                         )}
                         <div className="pc-compact-thumb">
-                          {thumb ? (
-                            <img
-                              src={thumb}
-                              alt={prop.street}
-                              loading={isLcpCandidate ? 'eager' : 'lazy'}
-                              fetchpriority={isLcpCandidate ? 'high' : undefined}
-                              decoding="async"
-                            />
-                          ) : (
-                            <Building2 size={26} />
-                          )}
+                          <CardThumb
+                            src={thumb}
+                            alt={prop.street}
+                            eager={isLcpCandidate}
+                            fallback={<Building2 size={26} />}
+                          />
                         </div>
                         <div className="pc-compact-meta">
                           <div className="pc-compact-title">
@@ -1582,32 +1603,29 @@ export default function Properties() {
                 </button>
                 <Link to={`/properties/${prop.id}`} className="property-card-link" onClick={handleCardTap}>
                   <div className="property-image">
-                    {thumb ? (
-                      <img
-                        src={thumb}
-                        alt={prop.street}
-                        loading={isLcpCandidate ? 'eager' : 'lazy'}
-                        fetchpriority={isLcpCandidate ? 'high' : undefined}
-                        decoding="async"
-                      />
-                    ) : (
+                    <CardThumb
+                      src={thumb}
+                      alt={prop.street}
+                      eager={isLcpCandidate}
                       // Inline SVG placeholder — replaces the
                       // via.placeholder.com URL that rendered as a
                       // tiny broken-image glyph in the corner. The
                       // gold building icon on a cream gradient reads
                       // as "no photo yet" instead of "broken".
-                      <div
-                        aria-hidden="true"
-                        style={{
-                          position: 'absolute', inset: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'linear-gradient(160deg, #fbf7f0 0%, #efe9df 100%)',
-                          color: 'rgba(180,139,76,0.55)',
-                        }}
-                      >
-                        <Building2 size={56} strokeWidth={1.4} />
-                      </div>
-                    )}
+                      fallback={(
+                        <div
+                          aria-hidden="true"
+                          style={{
+                            position: 'absolute', inset: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: 'linear-gradient(160deg, #fbf7f0 0%, #efe9df 100%)',
+                            color: 'rgba(180,139,76,0.55)',
+                          }}
+                        >
+                          <Building2 size={56} strokeWidth={1.4} />
+                        </div>
+                      )}
+                    />
                     <div className="property-badges">
                       <span className={`badge ${prop.assetClass === 'COMMERCIAL' ? 'badge-warning' : 'badge-success'}`}>
                         {prop.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים'}
