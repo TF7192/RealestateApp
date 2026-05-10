@@ -297,6 +297,117 @@ export const registerInterestRoutes: FastifyPluginAsync = async (app) => {
     return updated;
   });
 
+  // POST /api/interests/:id/actions — single inline-action entry-point.
+  // The panel's "+ סיור / + הצעה / + הסכם / + פגישה" buttons all post
+  // here; this handler dispatches to the right Prisma model with the
+  // interestId / propertyId / leadId wired automatically.
+  app.post('/interests/:id/actions', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const u = requireUser(req);
+    const interest = await prisma.propertyInterest.findFirst({
+      where: { id, agentId: u.id },
+      include: { lead: { select: { name: true, phone: true, email: true } } },
+    });
+    if (!interest) return reply.code(404).send({ error: { message: 'Interest not found' } });
+
+    const bodyBase = z.object({
+      kind: z.enum(['viewing', 'offer', 'agreement', 'meeting']),
+    }).passthrough().parse(req.body);
+
+    let created;
+    if (bodyBase.kind === 'viewing') {
+      const b = z.object({
+        viewedAt: z.string().datetime().optional(),
+        notes: z.string().max(2000).nullable().optional(),
+        source: z.string().max(60).nullable().optional(),
+      }).parse(req.body);
+      created = await prisma.propertyViewing.create({
+        data: {
+          propertyId: interest.propertyId,
+          leadId: interest.leadId,
+          interestId: interest.id,
+          viewedAt: b.viewedAt ? new Date(b.viewedAt) : new Date(),
+          notes: b.notes || null,
+          source: b.source || null,
+        },
+      });
+    } else if (bodyBase.kind === 'offer') {
+      const b = z.object({
+        amount: z.number().int().min(0),
+        relayedAmount: z.number().int().min(0).nullable().optional(),
+        direction: z.enum(['BUYER_TO_SELLER', 'SELLER_TO_BUYER']).optional(),
+        replyToOfferId: z.string().nullable().optional(),
+        paymentTerms: z.string().max(2000).nullable().optional(),
+        handoverNotes: z.string().max(1000).nullable().optional(),
+        status: z.enum(['NEW', 'NEGOTIATING', 'ACCEPTED', 'DECLINED', 'WITHDRAWN']).optional(),
+        notes: z.string().max(2000).nullable().optional(),
+      }).parse(req.body);
+      created = await prisma.propertyOffer.create({
+        data: {
+          propertyId: interest.propertyId,
+          leadId: interest.leadId,
+          interestId: interest.id,
+          buyerName: interest.lead?.name || 'מתעניין',
+          buyerPhone: interest.lead?.phone || null,
+          amount: b.amount,
+          relayedAmount: b.relayedAmount ?? null,
+          direction: b.direction || 'BUYER_TO_SELLER',
+          replyToOfferId: b.replyToOfferId ?? null,
+          paymentTerms: b.paymentTerms ?? null,
+          handoverNotes: b.handoverNotes ?? null,
+          status: b.status || 'NEW',
+          notes: b.notes ?? null,
+        },
+      });
+    } else if (bodyBase.kind === 'agreement') {
+      const b = z.object({
+        signerName: z.string().min(1).max(200).optional(),
+        signerPhone: z.string().nullable().optional(),
+        signerEmail: z.string().nullable().optional(),
+        note: z.string().max(2000).nullable().optional(),
+        status: z.enum(['SENT', 'SIGNED', 'CANCELLED']).optional(),
+      }).parse(req.body);
+      created = await prisma.agreement.create({
+        data: {
+          propertyId: interest.propertyId,
+          leadId: interest.leadId,
+          interestId: interest.id,
+          signerName: b.signerName || interest.lead?.name || 'בעל הסכם',
+          signerPhone: b.signerPhone ?? interest.lead?.phone ?? null,
+          signerEmail: b.signerEmail ?? interest.lead?.email ?? null,
+          note: b.note ?? null,
+          status: b.status || 'SENT',
+        },
+      });
+    } else if (bodyBase.kind === 'meeting') {
+      const b = z.object({
+        title: z.string().min(1).max(200),
+        notes: z.string().max(2000).nullable().optional(),
+        location: z.string().max(200).nullable().optional(),
+        startsAt: z.string().datetime(),
+        endsAt: z.string().datetime(),
+      }).parse(req.body);
+      created = await prisma.leadMeeting.create({
+        data: {
+          agentId: u.id,
+          leadId: interest.leadId,
+          propertyId: interest.propertyId,
+          interestId: interest.id,
+          title: b.title,
+          notes: b.notes ?? null,
+          location: b.location ?? null,
+          startsAt: new Date(b.startsAt),
+          endsAt: new Date(b.endsAt),
+        },
+      });
+    }
+
+    // Bump the interest's lastActionAt so the panel re-sorts to put
+    // this lead at the top.
+    await bumpInterestActivity(interest.id);
+    return reply.code(201).send({ kind: bodyBase.kind, item: created });
+  });
+
   app.delete('/interests/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const u = requireUser(req);

@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 import {
   Plus, Footprints, Banknote, FileText, Calendar as CalendarIcon,
   MessageSquare, Trash2, ChevronDown, ChevronUp, Building2, User as UserIcon,
+  Pencil, Save, X,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
@@ -205,6 +206,10 @@ function InterestRow({
   const counterparty = mode === 'property' ? it.lead : it.property;
   const heat = mode === 'property' ? it.lead?.status : null;
   const stats = it.stats || {};
+  // Currently-open inline form: 'viewing' | 'offer' | 'agreement' |
+  // 'meeting' | 'commission' | 'deal-notes' | null. Mutually exclusive
+  // so the row never becomes a wall of forms.
+  const [activeForm, setActiveForm] = useState(null);
 
   return (
     <li className={`pi-row pi-row-status-${it.status?.toLowerCase()}`}>
@@ -269,15 +274,23 @@ function InterestRow({
         </div>
       )}
 
+      {/* 2026-05-10 — buyer-side commission display. The agent's fee
+          from this buyer, with a live `% × base − discount` calculator
+          so the row always shows the current expected ₪ amount. Click
+          ערוך to edit; the form expands inline. */}
+      <CommissionBox
+        interest={it}
+        isEditing={activeForm === 'commission'}
+        onEdit={() => setActiveForm('commission')}
+        onCancel={() => setActiveForm(null)}
+        onSaved={() => { setActiveForm(null); onActionCreated(); }}
+      />
+
       <div className="pi-row-actions">
-        {/* Placeholder "+ action" buttons — they wire to existing
-            creation dialogs in Phase 1 by emitting a custom event
-            that PropertyDetail / CustomerDetail catches. Phase 2
-            will inline lightweight forms here. */}
-        <ActionTrigger interestId={it.id} kind="viewing"   label="סיור"   onDone={onActionCreated} />
-        <ActionTrigger interestId={it.id} kind="offer"     label="הצעה"   onDone={onActionCreated} />
-        <ActionTrigger interestId={it.id} kind="agreement" label="הסכם"  onDone={onActionCreated} />
-        <ActionTrigger interestId={it.id} kind="meeting"   label="פגישה" onDone={onActionCreated} />
+        <ActionBtn kind="viewing"   active={activeForm === 'viewing'}   label="סיור"   onToggle={() => setActiveForm(activeForm === 'viewing' ? null : 'viewing')} />
+        <ActionBtn kind="offer"     active={activeForm === 'offer'}     label="הצעה"   onToggle={() => setActiveForm(activeForm === 'offer' ? null : 'offer')} />
+        <ActionBtn kind="agreement" active={activeForm === 'agreement'} label="הסכם"  onToggle={() => setActiveForm(activeForm === 'agreement' ? null : 'agreement')} />
+        <ActionBtn kind="meeting"   active={activeForm === 'meeting'}   label="פגישה" onToggle={() => setActiveForm(activeForm === 'meeting' ? null : 'meeting')} />
         <button
           type="button"
           className="pi-action-btn pi-action-detach"
@@ -286,6 +299,11 @@ function InterestRow({
           aria-label="הסר שיוך"
         ><Trash2 size={13} /></button>
       </div>
+
+      {activeForm === 'viewing'   && <ViewingForm   interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
+      {activeForm === 'offer'     && <OfferForm     interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
+      {activeForm === 'agreement' && <AgreementForm interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
+      {activeForm === 'meeting'   && <MeetingForm   interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
 
       <button
         type="button"
@@ -399,30 +417,366 @@ function eventSubtitle(e) {
   return null;
 }
 
-// Tiny dispatcher — emits a window event so the host page (PropertyDetail
-// / CustomerDetail) can open its existing creation dialog wired with
-// interestId. Phase 1 keeps this lightweight; Phase 2 will inline forms.
-function ActionTrigger({ interestId, kind, label, onDone }) {
+// ── Action button (toggles its inline form) ─────────────────
+function ActionBtn({ kind, active, label, onToggle }) {
   const ICONS = {
-    viewing: Footprints,
-    offer: Banknote,
-    agreement: FileText,
-    meeting: CalendarIcon,
+    viewing: Footprints, offer: Banknote, agreement: FileText, meeting: CalendarIcon,
   };
   const Icon = ICONS[kind] || MessageSquare;
   return (
     <button
       type="button"
-      className={`pi-action-btn pi-action-${kind}`}
-      onClick={() => {
-        const ev = new CustomEvent('estia-interest-action', {
-          detail: { interestId, kind, onDone },
-        });
-        window.dispatchEvent(ev);
-      }}
+      className={`pi-action-btn pi-action-${kind} ${active ? 'is-active' : ''}`}
+      onClick={onToggle}
       title={`הוסף ${label}`}
     >
-      <Icon size={13} /> + {label}
+      <Icon size={13} /> {active ? <><X size={11} /> סגור</> : <>+ {label}</>}
     </button>
+  );
+}
+
+// ── Inline forms (one per kind) ─────────────────────────────
+function FormShell({ title, onCancel, onSubmit, busy, children }) {
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+      dir="rtl"
+      className="pi-form"
+    >
+      <div className="pi-form-title">{title}</div>
+      <div className="pi-form-body">{children}</div>
+      <div className="pi-form-actions">
+        <button type="submit" disabled={busy} className="pi-add-btn">
+          <Save size={13} /> שמור
+        </button>
+        <button type="button" onClick={onCancel} className="pi-form-cancel">בטל</button>
+      </div>
+    </form>
+  );
+}
+
+function ViewingForm({ interestId, onCancel, onSaved }) {
+  const toast = useToast();
+  const [notes, setNotes] = useState('');
+  const [viewedAt, setViewedAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await api.createInterestAction(interestId, {
+        kind: 'viewing',
+        viewedAt: new Date(viewedAt).toISOString(),
+        notes: notes.trim() || null,
+      });
+      toast?.success?.('סיור נרשם');
+      onSaved();
+    } catch (e) {
+      toast?.error?.(e?.message || 'שמירה נכשלה');
+    } finally { setBusy(false); }
+  };
+  return (
+    <FormShell title="רישום סיור" busy={busy} onCancel={onCancel} onSubmit={submit}>
+      <label className="pi-field">
+        <span>מועד</span>
+        <input type="datetime-local" value={viewedAt} onChange={(e) => setViewedAt(e.target.value)} />
+      </label>
+      <label className="pi-field pi-field-full">
+        <span>הערות מהסיור</span>
+        <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="מה אהבו, מה לא, רצון לסיור נוסף..." />
+      </label>
+    </FormShell>
+  );
+}
+
+function OfferForm({ interestId, onCancel, onSaved }) {
+  const toast = useToast();
+  const [amount, setAmount] = useState('');
+  const [relayedAmount, setRelayedAmount] = useState('');
+  const [direction, setDirection] = useState('BUYER_TO_SELLER');
+  const [paymentTerms, setPaymentTerms] = useState('');
+  const [handoverNotes, setHandoverNotes] = useState('');
+  const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // Live "spread" display so the agent sees how much room they're
+  // keeping for negotiation as they type the relayed amount.
+  const spread = Number(amount) && Number(relayedAmount)
+    ? Number(amount) - Number(relayedAmount)
+    : 0;
+
+  const submit = async () => {
+    if (!amount) return;
+    setBusy(true);
+    try {
+      await api.createInterestAction(interestId, {
+        kind: 'offer',
+        amount: Number(amount),
+        relayedAmount: relayedAmount ? Number(relayedAmount) : null,
+        direction,
+        paymentTerms: paymentTerms.trim() || null,
+        handoverNotes: handoverNotes.trim() || null,
+        notes: notes.trim() || null,
+      });
+      toast?.success?.('הצעה נרשמה');
+      onSaved();
+    } catch (e) {
+      toast?.error?.(e?.message || 'שמירה נכשלה');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <FormShell title="רישום הצעה" busy={busy} onCancel={onCancel} onSubmit={submit}>
+      <label className="pi-field">
+        <span>כיוון</span>
+        <select value={direction} onChange={(e) => setDirection(e.target.value)}>
+          <option value="BUYER_TO_SELLER">▶ הצעת קונה לבעלים</option>
+          <option value="SELLER_TO_BUYER">◀ הצעה נגדית מבעלים</option>
+        </select>
+      </label>
+      <label className="pi-field">
+        <span>סכום ההצעה האמיתי (₪)</span>
+        <input
+          type="number" inputMode="numeric" required
+          value={amount} onChange={(e) => setAmount(e.target.value)}
+          placeholder="2100000"
+        />
+      </label>
+      <label className="pi-field">
+        <span>סכום שהועבר לצד השני (₪)</span>
+        <input
+          type="number" inputMode="numeric"
+          value={relayedAmount} onChange={(e) => setRelayedAmount(e.target.value)}
+          placeholder="(אופציונלי — אם זהה לסכום ההצעה)"
+        />
+      </label>
+      {spread !== 0 && (
+        <div className="pi-spread-hint">
+          {spread > 0
+            ? <>פער של <strong>{fmtMoney(spread)}</strong> נשמר למשא ומתן</>
+            : <>הצעה גבוהה מהסכום האמיתי — בדוק/י את הסכומים</>}
+        </div>
+      )}
+      <label className="pi-field pi-field-full">
+        <span>תנאי תשלום / פריסה</span>
+        <input
+          type="text" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)}
+          placeholder='לדוגמה: "60% בחתימה, 35% תוך 30 יום, 5% במסירה"'
+        />
+      </label>
+      <label className="pi-field pi-field-full">
+        <span>מועד מסירה</span>
+        <input
+          type="text" value={handoverNotes} onChange={(e) => setHandoverNotes(e.target.value)}
+          placeholder='לדוגמה: "מסירה 1.9.2026", או "תוך 60 יום מהחתימה"'
+        />
+      </label>
+      <label className="pi-field pi-field-full">
+        <span>הערות נוספות</span>
+        <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </label>
+    </FormShell>
+  );
+}
+
+function AgreementForm({ interestId, onCancel, onSaved }) {
+  const toast = useToast();
+  const [signerName, setSignerName] = useState('');
+  const [note, setNote] = useState('');
+  const [status, setStatus] = useState('SENT');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await api.createInterestAction(interestId, {
+        kind: 'agreement',
+        signerName: signerName.trim() || undefined,
+        note: note.trim() || null,
+        status,
+      });
+      toast?.success?.('הסכם נרשם');
+      onSaved();
+    } catch (e) {
+      toast?.error?.(e?.message || 'שמירה נכשלה');
+    } finally { setBusy(false); }
+  };
+  return (
+    <FormShell title="רישום הסכם" busy={busy} onCancel={onCancel} onSubmit={submit}>
+      <label className="pi-field">
+        <span>חותם (אופציונלי)</span>
+        <input type="text" value={signerName} onChange={(e) => setSignerName(e.target.value)} placeholder="שם החותם — ברירת מחדל: שם הלקוח" />
+      </label>
+      <label className="pi-field">
+        <span>סטטוס</span>
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="SENT">נשלח</option>
+          <option value="SIGNED">נחתם</option>
+          <option value="CANCELLED">בוטל</option>
+        </select>
+      </label>
+      <label className="pi-field pi-field-full">
+        <span>הערות</span>
+        <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="סוג ההסכם, תנאים, וכו'" />
+      </label>
+    </FormShell>
+  );
+}
+
+function MeetingForm({ interestId, onCancel, onSaved }) {
+  const toast = useToast();
+  const [title, setTitle] = useState('פגישה');
+  const [startsAt, setStartsAt] = useState(() => new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16));
+  const [endsAt, setEndsAt] = useState(() => new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().slice(0, 16));
+  const [location, setLocation] = useState('');
+  const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await api.createInterestAction(interestId, {
+        kind: 'meeting',
+        title: title.trim(),
+        startsAt: new Date(startsAt).toISOString(),
+        endsAt: new Date(endsAt).toISOString(),
+        location: location.trim() || null,
+        notes: notes.trim() || null,
+      });
+      toast?.success?.('פגישה נקבעה');
+      onSaved();
+    } catch (e) {
+      toast?.error?.(e?.message || 'שמירה נכשלה');
+    } finally { setBusy(false); }
+  };
+  return (
+    <FormShell title="קביעת פגישה" busy={busy} onCancel={onCancel} onSubmit={submit}>
+      <label className="pi-field">
+        <span>נושא</span>
+        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </label>
+      <label className="pi-field">
+        <span>מיקום</span>
+        <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="אופציונלי" />
+      </label>
+      <label className="pi-field">
+        <span>התחלה</span>
+        <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} required />
+      </label>
+      <label className="pi-field">
+        <span>סיום</span>
+        <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} required />
+      </label>
+      <label className="pi-field pi-field-full">
+        <span>הערות</span>
+        <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </label>
+    </FormShell>
+  );
+}
+
+// ── Commission box — buyer-side commission display + editor ─
+function calcCommission(it) {
+  if (it.buyerCommissionFlat) return it.buyerCommissionFlat;
+  if (it.buyerCommissionPct && it.buyerCommissionBase) {
+    return Math.round(
+      (it.buyerCommissionPct / 100) * it.buyerCommissionBase
+      - (it.buyerCommissionDiscount || 0),
+    );
+  }
+  return null;
+}
+function CommissionBox({ interest: it, isEditing, onEdit, onCancel, onSaved }) {
+  const total = calcCommission(it);
+  const hasAny = it.buyerCommissionPct != null
+    || it.buyerCommissionBase != null
+    || it.buyerCommissionFlat != null;
+
+  if (!isEditing) {
+    return (
+      <div className="pi-commission-summary">
+        {hasAny ? (
+          <>
+            <Banknote size={13} />
+            <span>עמלת המתעניין:</span>
+            {it.buyerCommissionFlat ? (
+              <strong>{fmtMoney(it.buyerCommissionFlat)}</strong>
+            ) : (
+              <>
+                <strong>{it.buyerCommissionPct}% × {fmtMoney(it.buyerCommissionBase)}</strong>
+                {it.buyerCommissionDiscount ? <> − {fmtMoney(it.buyerCommissionDiscount)}</> : null}
+                {total != null && <> = <strong>{fmtMoney(total)}</strong></>}
+              </>
+            )}
+            <button type="button" className="pi-commission-edit" onClick={onEdit}>
+              <Pencil size={11} /> ערוך
+            </button>
+          </>
+        ) : (
+          <button type="button" className="pi-commission-add" onClick={onEdit}>
+            <Plus size={12} /> הגדר עמלה למתעניין
+          </button>
+        )}
+      </div>
+    );
+  }
+  return <CommissionEditor interest={it} onCancel={onCancel} onSaved={onSaved} />;
+}
+function CommissionEditor({ interest: it, onCancel, onSaved }) {
+  const toast = useToast();
+  const [pct, setPct] = useState(it.buyerCommissionPct ?? '');
+  const [base, setBase] = useState(it.buyerCommissionBase ?? '');
+  const [flat, setFlat] = useState(it.buyerCommissionFlat ?? '');
+  const [discount, setDiscount] = useState(it.buyerCommissionDiscount ?? '');
+  const [notes, setNotes] = useState(it.buyerCommissionNotes ?? '');
+  const [busy, setBusy] = useState(false);
+
+  // Live preview while typing.
+  const preview = (() => {
+    if (flat) return Number(flat);
+    if (pct && base) return Math.round((Number(pct) / 100) * Number(base) - Number(discount || 0));
+    return null;
+  })();
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await api.updateInterest(it.id, {
+        buyerCommissionPct: pct === '' ? null : Number(pct),
+        buyerCommissionBase: base === '' ? null : Number(base),
+        buyerCommissionFlat: flat === '' ? null : Number(flat),
+        buyerCommissionDiscount: discount === '' ? null : Number(discount),
+        buyerCommissionNotes: notes.trim() || null,
+      });
+      toast?.success?.('עמלה עודכנה');
+      onSaved();
+    } catch (e) {
+      toast?.error?.(e?.message || 'שמירה נכשלה');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <FormShell title="עמלת המתעניין" busy={busy} onCancel={onCancel} onSubmit={submit}>
+      <label className="pi-field">
+        <span>אחוז</span>
+        <input type="number" step="0.1" min="0" max="100" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="2" />
+      </label>
+      <label className="pi-field">
+        <span>על בסיס (₪)</span>
+        <input type="number" min="0" value={base} onChange={(e) => setBase(e.target.value)} placeholder="2100000" />
+      </label>
+      <label className="pi-field">
+        <span>או סכום קבוע (₪)</span>
+        <input type="number" min="0" value={flat} onChange={(e) => setFlat(e.target.value)} placeholder="מחליף את ה-%×בסיס" />
+      </label>
+      <label className="pi-field">
+        <span>הנחה (₪)</span>
+        <input type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="אופציונלי" />
+      </label>
+      <label className="pi-field pi-field-full">
+        <span>הערות</span>
+        <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="תנאים מיוחדים, הנחה במידת הצורך, וכו׳" />
+      </label>
+      {preview != null && (
+        <div className="pi-commission-preview">סכום צפוי: <strong>{fmtMoney(preview)}</strong></div>
+      )}
+    </FormShell>
   );
 }

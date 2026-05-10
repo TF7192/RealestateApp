@@ -300,6 +300,8 @@ export const api = {
     request(`/interests/${id}`, { method: 'PATCH', body }),
   deleteInterest: (id) =>
     request(`/interests/${id}`, { method: 'DELETE' }),
+  createInterestAction: (interestId, body) =>
+    request(`/interests/${interestId}/actions`, { method: 'POST', body }),
 
   // 2026-05-10 — OwnerActivity (per-property seller-side log).
   listOwnerActivity: (propertyId) =>

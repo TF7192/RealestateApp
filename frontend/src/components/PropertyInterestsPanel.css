@@ -307,3 +307,120 @@
   color: rgba(30, 26, 20, 0.45);
   white-space: nowrap;
 }
+
+/* ── Commission box (compact display) ── */
+.pi-commission-summary {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(21, 128, 61, 0.06);
+  border: 1px dashed rgba(21, 128, 61, 0.32);
+  font-size: 13px;
+  color: var(--text-primary, #1e1a14);
+}
+.pi-commission-summary strong {
+  font-weight: 800;
+  color: #15803d;
+}
+.pi-commission-edit,
+.pi-commission-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold-dark, #7a5c2c);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.pi-commission-edit:hover,
+.pi-commission-add:hover {
+  background: rgba(180, 139, 76, 0.10);
+}
+.pi-commission-add { margin-inline-start: 0; }
+.pi-commission-preview {
+  grid-column: 1 / -1;
+  text-align: end;
+  font-size: 13px;
+  color: #15803d;
+  font-weight: 700;
+  padding-top: 4px;
+  border-top: 1px solid rgba(21, 128, 61, 0.18);
+}
+
+/* ── Inline form ── */
+.pi-form {
+  background: rgba(180, 139, 76, 0.05);
+  border: 1px solid rgba(180, 139, 76, 0.22);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pi-form-title {
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--text-primary, #1e1a14);
+}
+.pi-form-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.pi-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary, #6b6356);
+  font-weight: 700;
+}
+.pi-field-full { grid-column: 1 / -1; }
+.pi-field input,
+.pi-field select,
+.pi-field textarea {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, rgba(30, 26, 20, 0.14));
+  background: #fff;
+  color: var(--text-primary, #1e1a14);
+  direction: rtl;
+  text-align: right;
+}
+.pi-field textarea { resize: vertical; min-height: 50px; }
+.pi-form-actions { display: flex; gap: 6px; }
+.pi-form-cancel {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, rgba(30, 26, 20, 0.14));
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pi-spread-hint {
+  grid-column: 1 / -1;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(180, 139, 76, 0.12);
+  font-size: 12px;
+  color: var(--gold-dark, #7a5c2c);
+  font-weight: 700;
+}
+.pi-spread-hint strong { color: var(--gold-dark, #7a5c2c); }
+
+.pi-action-btn.is-active {
+  background: var(--gold-soft, rgba(180, 139, 76, 0.16));
+  border-color: var(--gold, #b48b4c);
+  color: var(--gold-dark, #7a5c2c);
+}
