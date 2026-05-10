@@ -73,6 +73,9 @@ export default function PropertyInterestsPanel({
   pickerDisabled = false,
   // Optional title override.
   title,
+  // 2026-05-10 — fires after any local mutation (action create, status,
+  // attach, detach) so the parent page can re-pull its KPI hero counts.
+  onAfterChange,
 }) {
   const toast = useToast();
   const mode = propertyId ? 'property' : 'lead';
@@ -105,13 +108,20 @@ export default function PropertyInterestsPanel({
     api.listLeads().then((r) => setAllLeads(r?.items || [])).catch(() => {});
   }, [pickerOpen, allLeads.length, mode]);
 
+  // After any mutation, refresh local list AND notify the parent page so
+  // the KPI hero stays in sync.
+  const reloadAll = () => {
+    load();
+    onAfterChange?.();
+  };
+
   const onAttach = async (selectedLeadIds) => {
     setPickerOpen(false);
     if (!selectedLeadIds?.length) return;
     try {
       await api.createPropertyInterests(propertyId, selectedLeadIds);
       toast?.success?.(`${selectedLeadIds.length} מתעניינים שויכו לנכס`);
-      load();
+      reloadAll();
     } catch (e) {
       toast?.error?.(e?.message || 'שיוך נכשל');
     }
@@ -120,7 +130,7 @@ export default function PropertyInterestsPanel({
   const onStatusChange = async (interestId, nextStatus) => {
     try {
       await api.updateInterest(interestId, { status: nextStatus });
-      load();
+      reloadAll();
     } catch (e) {
       toast?.error?.(e?.message || 'עדכון סטטוס נכשל');
     }
@@ -131,7 +141,7 @@ export default function PropertyInterestsPanel({
     try {
       await api.deleteInterest(interestId);
       toast?.success?.('השיוך הוסר');
-      load();
+      reloadAll();
     } catch (e) {
       toast?.error?.(e?.message || 'הסרת השיוך נכשלה');
     }
@@ -174,7 +184,7 @@ export default function PropertyInterestsPanel({
               onToggleExpand={() => setExpandedId(expandedId === it.id ? null : it.id)}
               onStatusChange={onStatusChange}
               onDetach={onDetach}
-              onActionCreated={load}
+              onActionCreated={reloadAll}
             />
           ))}
         </ul>
@@ -207,99 +217,108 @@ function InterestRow({
   const counterparty = mode === 'property' ? it.lead : it.property;
   const heat = mode === 'property' ? it.lead?.status : null;
   const stats = it.stats || {};
-  // Currently-open inline form: 'viewing' | 'offer' | 'agreement' |
-  // 'meeting' | 'commission' | 'deal-notes' | null. Mutually exclusive
-  // so the row never becomes a wall of forms.
+  // Currently-open form (renders inside FormPopup):
+  // 'viewing' | 'offer' | 'agreement' | 'meeting' | null.
   const [activeForm, setActiveForm] = useState(null);
 
   return (
-    <li className={`pi-row pi-row-status-${it.status?.toLowerCase()}`}>
-      <div className="pi-row-head">
-        <div className="pi-row-identity">
-          {mode === 'property' ? (
-            <Link to={`/customers/${counterparty?.id}`} className="pi-row-name">
-              {counterparty?.name || 'מתעניין'}
-            </Link>
-          ) : (
-            <Link to={`/properties/${counterparty?.id}`} className="pi-row-name">
-              {[counterparty?.street, counterparty?.city].filter(Boolean).join(', ') || 'נכס'}
-            </Link>
-          )}
-          {heat && (
-            <span className={`pi-heat ${HEAT_TONES[heat] || ''}`}>{HEAT_LABELS[heat] || heat}</span>
-          )}
-        </div>
-
-        <StatusPill
-          status={it.status}
-          onChange={(next) => onStatusChange(it.id, next)}
-        />
-      </div>
-
-      <div className="pi-row-meta">
-        {mode === 'property' ? (
-          <>
-            {counterparty?.phone && <span dir="ltr">{counterparty.phone}</span>}
-            {counterparty?.lookingFor && <span>· {counterparty.lookingFor === 'BUY' ? 'קנייה' : 'שכירות'}</span>}
-            {counterparty?.budget != null && <span>· תקציב {fmtMoney(counterparty.budget)}</span>}
-            {counterparty?.city && <span>· {counterparty.city}</span>}
-          </>
-        ) : (
-          <>
-            {counterparty?.marketingPrice != null && <span>{fmtMoney(counterparty.marketingPrice)}</span>}
-            {counterparty?.rooms != null && <span>· {counterparty.rooms} חד׳</span>}
-            {counterparty?.sqm != null && <span>· {counterparty.sqm} מ״ר</span>}
-            {counterparty?.category && (
-              <span>· {counterparty.category === 'SALE' ? 'מכירה' : 'השכרה'}</span>
+    <li className={`pi-row pi-row-status-${it.status?.toLowerCase()} ${isExpanded ? 'pi-row-expanded' : 'pi-row-collapsed'}`}>
+      {/* Always-visible compact header — name, heat pill, status pill,
+          quick stats line, last-activity. Clicking the row body toggles
+          the expanded view (full stats grid + actions). */}
+      <button
+        type="button"
+        className="pi-row-summary"
+        onClick={onToggleExpand}
+        aria-expanded={isExpanded}
+      >
+        <div className="pi-row-head">
+          <div className="pi-row-identity">
+            <span className="pi-row-name">
+              {mode === 'property'
+                ? counterparty?.name || 'מתעניין'
+                : [counterparty?.street, counterparty?.city].filter(Boolean).join(', ') || 'נכס'}
+            </span>
+            {heat && (
+              <span className={`pi-heat ${HEAT_TONES[heat] || ''}`}>{HEAT_LABELS[heat] || heat}</span>
             )}
-          </>
+          </div>
+          <span className="pi-row-summary-right">
+            {/* Compact stats inline — agent can scan without expanding */}
+            {stats.offers > 0 && (
+              <span className="pi-stat-compact">
+                <Banknote size={12} /> {stats.topOfferAmount != null ? fmtMoney(stats.topOfferAmount) : `${stats.offers}`}
+              </span>
+            )}
+            {stats.tours > 0 && (
+              <span className="pi-stat-compact"><Footprints size={12} /> {stats.tours}</span>
+            )}
+            <StatusPill
+              status={it.status}
+              onChange={(next) => onStatusChange(it.id, next)}
+            />
+            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </span>
+        </div>
+        {(it.lastActionLabel || it.lastActionAt) && (
+          <div className="pi-row-last">
+            {it.lastActionLabel || 'הוקם'}
+            <span className="pi-row-last-time"> · {relDate(it.lastActionAt || it.createdAt)}</span>
+          </div>
         )}
-      </div>
+      </button>
 
-      <div className="pi-row-stats">
-        <span className="pi-stat"><Footprints size={13} /> {stats.tours || 0} סיורים</span>
-        <span className="pi-stat">
-          <Banknote size={13} /> {stats.offers || 0} {stats.offers === 1 ? 'הצעה' : 'הצעות'}
-          {stats.topOfferAmount != null && (
-            <span className="pi-stat-em"> · {fmtMoney(stats.topOfferAmount)}</span>
-          )}
-        </span>
-        <span className="pi-stat"><FileText size={13} /> {stats.agreements || 0} הסכמים</span>
-        <span className="pi-stat"><CalendarIcon size={13} /> {stats.meetings || 0} פגישות</span>
-      </div>
+      {isExpanded && (
+        <div className="pi-row-expand">
+          <div className="pi-row-meta">
+            {mode === 'property' ? (
+              <>
+                {counterparty?.phone && (
+                  <Link to={`/customers/${counterparty?.id}`} dir="ltr">{counterparty.phone}</Link>
+                )}
+                {counterparty?.lookingFor && <span>· {counterparty.lookingFor === 'BUY' ? 'קנייה' : 'שכירות'}</span>}
+                {counterparty?.budget != null && <span>· תקציב {fmtMoney(counterparty.budget)}</span>}
+                {counterparty?.city && <span>· {counterparty.city}</span>}
+              </>
+            ) : (
+              <>
+                {counterparty?.marketingPrice != null && <span>{fmtMoney(counterparty.marketingPrice)}</span>}
+                {counterparty?.rooms != null && <span>· {counterparty.rooms} חד׳</span>}
+                {counterparty?.sqm != null && <span>· {counterparty.sqm} מ״ר</span>}
+                {counterparty?.category && (
+                  <span>· {counterparty.category === 'SALE' ? 'מכירה' : 'השכרה'}</span>
+                )}
+              </>
+            )}
+          </div>
 
-      {(it.lastActionLabel || it.lastActionAt) && (
-        <div className="pi-row-last">
-          פעילות אחרונה: <strong>{it.lastActionLabel || 'הוקם'}</strong>
-          <span className="pi-row-last-time"> · {relDate(it.lastActionAt || it.createdAt)}</span>
+          <div className="pi-row-stats">
+            <span className="pi-stat"><Footprints size={13} /> {stats.tours || 0} סיורים</span>
+            <span className="pi-stat">
+              <Banknote size={13} /> {stats.offers || 0} {stats.offers === 1 ? 'הצעה' : 'הצעות'}
+              {stats.topOfferAmount != null && (
+                <span className="pi-stat-em"> · {fmtMoney(stats.topOfferAmount)}</span>
+              )}
+            </span>
+            <span className="pi-stat"><FileText size={13} /> {stats.agreements || 0} הסכמים</span>
+            <span className="pi-stat"><CalendarIcon size={13} /> {stats.meetings || 0} פגישות</span>
+          </div>
+
+          <div className="pi-row-actions">
+            <ActionBtn kind="viewing"   active={activeForm === 'viewing'}   label="סיור"   onToggle={() => setActiveForm(activeForm === 'viewing' ? null : 'viewing')} />
+            <ActionBtn kind="offer"     active={activeForm === 'offer'}     label="הצעה"   onToggle={() => setActiveForm(activeForm === 'offer' ? null : 'offer')} />
+            <ActionBtn kind="agreement" active={activeForm === 'agreement'} label="הסכם"  onToggle={() => setActiveForm(activeForm === 'agreement' ? null : 'agreement')} />
+            <ActionBtn kind="meeting"   active={activeForm === 'meeting'}   label="פגישה" onToggle={() => setActiveForm(activeForm === 'meeting' ? null : 'meeting')} />
+            <button
+              type="button"
+              className="pi-action-btn pi-action-detach"
+              onClick={() => onDetach(it.id)}
+              title="הסר שיוך"
+              aria-label="הסר שיוך"
+            ><Trash2 size={13} /></button>
+          </div>
         </div>
       )}
-
-      {/* 2026-05-10 — buyer-side commission display. The agent's fee
-          from this buyer, with a live `% × base − discount` calculator
-          so the row always shows the current expected ₪ amount. Click
-          ערוך to edit; the form expands inline. */}
-      <CommissionBox
-        interest={it}
-        isEditing={activeForm === 'commission'}
-        onEdit={() => setActiveForm('commission')}
-        onCancel={() => setActiveForm(null)}
-        onSaved={() => { setActiveForm(null); onActionCreated(); }}
-      />
-
-      <div className="pi-row-actions">
-        <ActionBtn kind="viewing"   active={activeForm === 'viewing'}   label="סיור"   onToggle={() => setActiveForm(activeForm === 'viewing' ? null : 'viewing')} />
-        <ActionBtn kind="offer"     active={activeForm === 'offer'}     label="הצעה"   onToggle={() => setActiveForm(activeForm === 'offer' ? null : 'offer')} />
-        <ActionBtn kind="agreement" active={activeForm === 'agreement'} label="הסכם"  onToggle={() => setActiveForm(activeForm === 'agreement' ? null : 'agreement')} />
-        <ActionBtn kind="meeting"   active={activeForm === 'meeting'}   label="פגישה" onToggle={() => setActiveForm(activeForm === 'meeting' ? null : 'meeting')} />
-        <button
-          type="button"
-          className="pi-action-btn pi-action-detach"
-          onClick={() => onDetach(it.id)}
-          title="הסר שיוך"
-          aria-label="הסר שיוך"
-        ><Trash2 size={13} /></button>
-      </div>
 
       {/* Action forms render inside a centered popup so the row stays
           compact (was: forms expanded inline). The popup-shell handles

@@ -388,26 +388,20 @@ export default function PropertyDetail() {
   }, []);
 
   // V1 Refined — page-level fetch for KPI hero (interests count + top
-  // active offer). Re-runs whenever the property id changes; tabs that
-  // own these collections (PropertyInterestsPanel) keep their own
-  // fetches so live edits are reflected without prop-threading.
-  useEffect(() => {
+  // active offer + agreements count). Pulled into a callback so child
+  // surfaces (PropertyInterestsPanel.onAfterChange) can re-trigger it
+  // when an action mutates the data — without that the hero went stale
+  // until a full page reload.
+  const reloadAuxiliary = useCallback(() => {
     if (!id) return;
-    let cancelled = false;
-    api.listPropertyInterests(id)
-      .then((r) => { if (!cancelled) setInterests(r.items || []); })
-      .catch(() => {});
-    api.listPropertyOffers(id)
-      .then((r) => { if (!cancelled) setOffers(r.items || []); })
-      .catch(() => {});
-    // Agreements count for the "הסכמים" pill — listAgreements is the
-    // canonical brokerage-agreement endpoint (signed contracts), filtered
-    // by propertyId server-side.
+    api.listPropertyInterests(id).then((r) => setInterests(r.items || [])).catch(() => {});
+    api.listPropertyOffers(id).then((r) => setOffers(r.items || [])).catch(() => {});
     api.listAgreements({ propertyId: id })
-      .then((r) => { if (!cancelled) setAgreementsCount((r.items || []).length); })
+      .then((r) => setAgreementsCount((r.items || []).length))
       .catch(() => {});
-    return () => { cancelled = true; };
   }, [id]);
+
+  useEffect(() => { reloadAuxiliary(); }, [reloadAuxiliary]);
 
   // Close the kebab menu on outside-click / Escape so it behaves like a
   // normal native menu. Keyed off `moreMenuOpen` so the listener only
@@ -1370,6 +1364,15 @@ export default function PropertyDetail() {
                         </div>
                       </>
                     )}
+                    {/* הערות כלליות — internal-only broker memo (uses
+                        Property.brokerNotes, not exposed in client-facing
+                        templates). Inline editor saves on blur. */}
+                    <div className="prd-card-eyebrow" style={{ marginTop: 18 }}>הערות כלליות</div>
+                    <BrokerNotesEditor
+                      propertyId={property.id}
+                      initial={property.brokerNotes || ''}
+                      onSaved={() => load()}
+                    />
                   </div>
                 </div>
 
@@ -1539,6 +1542,17 @@ export default function PropertyDetail() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+                  {/* Offers — every PropertyOffer is a buyer-side amount the
+                      owner is asked to react to. Listed here so the agent can
+                      quickly see the negotiation state from the seller's
+                      vantage point and accept / reject / counter without
+                      leaving the tab. */}
+                  <OwnerOffersCard
+                    propertyId={property.id}
+                    offers={offers}
+                    marketingPrice={property.marketingPrice}
+                    onChange={reloadAuxiliary}
+                  />
                   <OwnerActivityPanel propertyId={property.id} />
                 </div>
               </div>
@@ -1546,7 +1560,10 @@ export default function PropertyDetail() {
 
             {tab === 'buyers' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <PropertyInterestsPanel propertyId={property.id} />
+                <PropertyInterestsPanel
+                  propertyId={property.id}
+                  onAfterChange={reloadAuxiliary}
+                />
                 <div id="prd-agreements-anchor" />
                 <PropertyAgreementsSection propertyId={property.id} leads={leads} />
               </div>
@@ -2119,6 +2136,285 @@ function embedUrl(url) {
 // a delete button per row. Files double as global library entries —
 // the same row appears on /documents — so the agent can drop a PDF
 // once and reach it from either surface.
+/* ──────────────────────────────────────────────────────────────
+ * OwnerOffersCard — seller-facing list of every PropertyOffer on the
+ * asset, with quick accept / reject / counter affordances. Lives
+ * inside the בעל הנכס tab so the agent can drive the negotiation
+ * "ping-pong" between buyer and owner without leaving the page.
+ *
+ * Per offer:
+ *   • Buyer name + amount + when received
+ *   • Status pill (NEW / NEGOTIATING / ACCEPTED / DECLINED / WITHDRAWN)
+ *   • Inline accept / decline buttons → patch status on the offer row
+ *   • "ענה הצעה נגדית" → opens a counter-offer popup (creates a new
+ *     PropertyOffer with direction=SELLER_TO_BUYER + replyToOfferId).
+ *
+ * The data already supports ping-pong threading (PropertyOffer.direction
+ * + replyToOfferId, see backend/prisma/schema.prisma:1040). This card is
+ * the first surface to make it visible end-to-end.
+ * ────────────────────────────────────────────────────────────── */
+function OwnerOffersCard({ propertyId, offers, onChange, marketingPrice }) {
+  const toast = useToast();
+  const [counterOf, setCounterOf] = useState(null); // offer being countered
+  const [busyId, setBusyId] = useState(null);
+
+  if (!offers || offers.length === 0) {
+    return (
+      <section className="pi-panel" aria-label="הצעות מחיר על הנכס" dir="rtl">
+        <header className="pi-header">
+          <h3 className="pi-title">
+            <Banknote size={16} />
+            הצעות מחיר · 0
+          </h3>
+        </header>
+        <div className="pi-empty">
+          טרם התקבלו הצעות. ההצעות שמתעניינים מכניסים יופיעו כאן ותוכל לקבל,
+          לדחות או להציע הצעה נגדית.
+        </div>
+      </section>
+    );
+  }
+
+  const fmtMoney = (n) => '₪' + Number(n || 0).toLocaleString('he-IL');
+  const labelFor = (s) =>
+    s === 'NEW' ? 'חדשה' :
+    s === 'NEGOTIATING' ? 'במו"מ' :
+    s === 'ACCEPTED' ? 'התקבלה' :
+    s === 'DECLINED' ? 'נדחתה' :
+    s === 'WITHDRAWN' ? 'נמשכה' : s;
+
+  const setStatus = async (offerId, status) => {
+    setBusyId(offerId);
+    try {
+      await api.updatePropertyOffer(propertyId, offerId, { status });
+      toast?.success?.(status === 'ACCEPTED' ? 'ההצעה התקבלה' : 'ההצעה נדחתה');
+      onChange?.();
+    } catch (e) {
+      toast?.error?.(e?.message || 'עדכון נכשל');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <section className="pi-panel" aria-label="הצעות מחיר על הנכס" dir="rtl">
+      <header className="pi-header">
+        <h3 className="pi-title">
+          <Banknote size={16} />
+          הצעות מחיר · {offers.length} {offers.length === 1 ? 'הצעה' : 'הצעות'}
+        </h3>
+      </header>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {offers.map((o) => {
+          const sellerSide = o.direction === 'SELLER_TO_BUYER';
+          return (
+            <li
+              key={o.id}
+              style={{
+                background: sellerSide ? 'rgba(180,139,76,0.05)' : '#fff',
+                border: `1px solid ${o.status === 'NEW' ? 'rgba(180,139,76,0.4)' : 'rgba(30,26,20,0.10)'}`,
+                borderRadius: 12,
+                padding: 12,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontWeight: 800, fontSize: 14 }}>
+                    {sellerSide ? '◀ הצעה נגדית' : '▶ הצעת מתעניין'}
+                  </span>
+                  <span style={{ color: '#6b6356', fontSize: 12 }}>·</span>
+                  <span style={{ fontSize: 13.5, color: '#1e1a14' }}>{o.buyerName || '—'}</span>
+                </div>
+                <span
+                  className="prd-pill"
+                  style={{
+                    background: o.status === 'NEW' ? 'rgba(180,139,76,0.18)' :
+                                o.status === 'ACCEPTED' ? 'rgba(21,128,61,0.12)' :
+                                o.status === 'DECLINED' || o.status === 'WITHDRAWN' ? 'rgba(185,28,28,0.10)' :
+                                'rgba(180,139,76,0.10)',
+                    color: o.status === 'NEW' ? '#7a5c2c' :
+                           o.status === 'ACCEPTED' ? '#15803d' :
+                           o.status === 'DECLINED' || o.status === 'WITHDRAWN' ? '#b91c1c' : '#6b6356',
+                  }}
+                >
+                  {labelFor(o.status)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 22, fontWeight: 800, color: '#1e1a14', letterSpacing: -0.4 }}>
+                  {fmtMoney(o.amount)}
+                </span>
+                {o.relayedAmount != null && o.relayedAmount !== o.amount && (
+                  <span style={{ fontSize: 12, color: '#7a5c2c' }}>
+                    הועבר לבעלים: {fmtMoney(o.relayedAmount)}
+                  </span>
+                )}
+                {marketingPrice && (
+                  <span style={{ fontSize: 12, color: '#6b6356' }}>
+                    {Math.round((1 - o.amount / marketingPrice) * 100)}%- מהדרישה
+                  </span>
+                )}
+                {o.receivedAt && (
+                  <span style={{ fontSize: 11.5, color: '#9c9384', marginInlineStart: 'auto' }}>
+                    {new Date(o.receivedAt).toLocaleString('he-IL')}
+                  </span>
+                )}
+              </div>
+              {o.notes && (
+                <div style={{ fontSize: 12.5, color: '#3a3329', lineHeight: 1.5 }}>{o.notes}</div>
+              )}
+              {(o.status === 'NEW' || o.status === 'NEGOTIATING') && !sellerSide && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="prd-btn"
+                    onClick={() => setStatus(o.id, 'ACCEPTED')}
+                    disabled={busyId === o.id}
+                    style={{ borderColor: 'rgba(21,128,61,0.3)', color: '#15803d' }}
+                  >
+                    קבל הצעה
+                  </button>
+                  <button
+                    type="button"
+                    className="prd-btn"
+                    onClick={() => setStatus(o.id, 'DECLINED')}
+                    disabled={busyId === o.id}
+                    style={{ borderColor: 'rgba(185,28,28,0.25)', color: '#b91c1c' }}
+                  >
+                    דחה הצעה
+                  </button>
+                  <button
+                    type="button"
+                    className="prd-btn prd-btn-primary"
+                    onClick={() => setCounterOf(o)}
+                    disabled={busyId === o.id}
+                  >
+                    ענה הצעה נגדית
+                  </button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {counterOf && (
+        <CounterOfferPopup
+          parent={counterOf}
+          propertyId={propertyId}
+          onClose={() => setCounterOf(null)}
+          onCreated={() => { setCounterOf(null); onChange?.(); }}
+        />
+      )}
+    </section>
+  );
+}
+
+function CounterOfferPopup({ parent, propertyId, onClose, onCreated }) {
+  const toast = useToast();
+  const [amount, setAmount] = useState(String(parent.amount || ''));
+  const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const onEsc = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [onClose]);
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast?.error?.('יש להזין סכום תקין');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.createPropertyOffer(propertyId, {
+        buyerName: parent.buyerName,
+        buyerPhone: parent.buyerPhone,
+        leadId: parent.leadId,
+        amount: amt,
+        notes: notes.trim() || null,
+        direction: 'SELLER_TO_BUYER',
+        replyToOfferId: parent.id,
+      });
+      // Mark the parent as in-negotiation so the next round of UI hides
+      // the accept/decline buttons in favour of the new counter row.
+      await api.updatePropertyOffer(propertyId, parent.id, { status: 'NEGOTIATING' });
+      toast?.success?.('הצעה נגדית נשלחה');
+      onCreated?.();
+    } catch (e2) {
+      toast?.error?.(e2?.message || 'יצירת הצעה נגדית נכשלה');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      className="pi-popup-back"
+      role="dialog"
+      aria-modal="true"
+      aria-label="הצעה נגדית"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
+    >
+      <form onSubmit={submit} className="pi-popup-card" dir="rtl">
+        <header className="pi-popup-head">
+          <span className="pi-popup-title">הצעה נגדית ל{parent.buyerName}</span>
+          <button type="button" className="pi-popup-close" onClick={onClose} aria-label="סגור">
+            <X size={18} />
+          </button>
+        </header>
+        <div className="pi-popup-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#6b6356', fontWeight: 700 }}>הצעה מקורית</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#1e1a14' }}>
+              ₪{Number(parent.amount).toLocaleString('he-IL')}
+            </div>
+          </div>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#1e1a14' }}>הצעה נגדית — מחיר חדש</span>
+            <input
+              type="number" min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              dir="ltr" style={{ textAlign: 'right' }}
+              className="form-input"
+              required
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#1e1a14' }}>הערות (אופציונלי)</span>
+            <textarea
+              rows={3} dir="auto"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="form-textarea"
+              placeholder="לדוגמה: בעל הנכס מוכן לרדת ל..., לסגור עד..."
+            />
+          </label>
+        </div>
+        <footer style={{
+          display: 'flex', gap: 8, justifyContent: 'flex-end',
+          padding: '12px 20px', borderTop: '1px solid rgba(30,26,20,0.08)',
+        }}>
+          <button type="button" className="prd-btn" onClick={onClose} disabled={busy}>ביטול</button>
+          <button type="submit" className="prd-btn prd-btn-primary" disabled={busy}>
+            {busy ? 'שולח…' : 'שלח הצעה נגדית'}
+          </button>
+        </footer>
+      </form>
+    </div>
+  );
+}
+
 function PropertyDocuments({ propertyId }) {
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2462,6 +2758,52 @@ export function VideoTile({ video }) {
       <span>▶ צפה בסרטון</span>
       <small>{video.title || video.url}</small>
     </a>
+  );
+}
+
+// Internal "general notes" editor — uses Property.brokerNotes (not the
+// client-facing `notes` description). Save-on-blur so the agent never
+// has to hunt for a Save button.
+function BrokerNotesEditor({ propertyId, initial, onSaved }) {
+  const toast = useToast();
+  const [value, setValue] = useState(initial || '');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setValue(initial || ''); }, [initial]);
+  const save = async () => {
+    if (value === (initial || '')) return;
+    setSaving(true);
+    try {
+      await api.updateProperty(propertyId, { brokerNotes: value.trim() || null });
+      toast?.success?.('הערות נשמרו');
+      onSaved?.();
+    } catch (e) {
+      toast?.error?.(e?.message || 'שמירת ההערות נכשלה');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <textarea
+      rows={3}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      placeholder="הערות פנימיות שיופיעו רק לי — נימוקים על המחיר, הקשר עם הבעלים, מועדים שצריך לזכור..."
+      dir="auto"
+      style={{
+        width: '100%',
+        minHeight: 70,
+        padding: '10px 12px',
+        borderRadius: 10,
+        border: '1px solid rgba(30,26,20,0.12)',
+        background: '#fbf7f0',
+        fontSize: 13.5,
+        color: '#1e1a14',
+        resize: 'vertical',
+        fontFamily: 'inherit',
+        opacity: saving ? 0.7 : 1,
+      }}
+    />
   );
 }
 
