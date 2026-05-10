@@ -86,6 +86,11 @@ async function main() {
         if (!buf) {
           skippedMissing += 1;
           console.warn(`[image-variants] missing object: ${key}`);
+          // Stamp the existing url into the variant slots so the next
+          // batch query (filtered on `urlThumb IS NULL`) skips this
+          // row. Without this the same orphaned rows get re-fetched
+          // every batch and the script never terminates.
+          await markBackfilled(row.id, row.url, null);
           continue;
         }
         try {

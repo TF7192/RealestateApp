@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { getUser } from '../middleware/auth.js';
-import { putUpload } from '../lib/storage.js';
+import { processPropertyImage } from '../lib/imageVariants.js';
 import { crawlAgency, mapSectionToAssetClass, type Yad2Listing } from '../lib/yad2-crawler.js';
 import { normalizeAddress } from '../lib/addressNormalize.js';
 import { assertRehostUrlSafe } from '../lib/rehostGuards.js';
@@ -593,9 +593,9 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
         for (let i = 0; i < sourceUrls.length; i++) {
           const src = sourceUrls[i];
           try {
-            const url = await rehostImage(src, property.id);
+            const { url, urlCard, urlThumb } = await rehostImage(src, property.id);
             await prisma.propertyImage.create({
-              data: { propertyId: property.id, url, sortOrder: i },
+              data: { propertyId: property.id, url, urlCard, urlThumb, sortOrder: i },
             });
           } catch (imgErr: any) {
             log.warn({ err: imgErr, propertyId: property.id, src }, 'yad2 image rehost failed');
@@ -782,11 +782,11 @@ async function findAlreadyImported(agentId: string, sourceIds: string[]): Promis
 }
 
 // ── Image re-host helper ─────────────────────────────────────────
-// Downloads the Yad2 image bytes and persists them via the storage
-// abstraction — putUpload() routes to S3 in production (UPLOADS_BACKEND=s3)
-// and to local disk in dev. The returned URL is the same /uploads/<key>
-// shape regardless, so /uploads/* serving (S3 redirect or fastifyStatic)
-// finds the bytes either way.
+// Downloads the Yad2 image bytes and runs them through the same
+// `processPropertyImage` variant pipeline agent uploads use, so each
+// import lands with thumb (256 px) + card (768 px) + full (2400 px)
+// JPEGs already in S3. List pages then paint from the 256 px thumb
+// instead of the raw 50–100 KB original.
 //
 // Bug history: the first version wrote with fs.writeFile to UPLOADS_DIR
 // directly. On production (S3) that put the bytes on the ephemeral
@@ -802,7 +802,10 @@ async function findAlreadyImported(agentId: string, sourceIds: string[]): Promis
 // to Yad2's CDN, which always sets Content-Length.
 const REHOST_MAX_BYTES = 10 * 1024 * 1024;
 
-async function rehostImage(srcUrl: string, propertyId: string): Promise<string> {
+async function rehostImage(
+  srcUrl: string,
+  propertyId: string,
+): Promise<{ url: string; urlCard: string; urlThumb: string }> {
   // SEC-006 — refuse anything that isn't a Yad2 CDN https URL up-front,
   // before the fetch is even issued. Throws on the SSRF cases (private
   // IP, loopback, AWS metadata endpoint, non-https, off-allowlist host).
@@ -846,19 +849,18 @@ async function rehostImage(srcUrl: string, propertyId: string): Promise<string> 
   }
   const ct = (r.headers.get('content-type') || '').toLowerCase();
   if (!ct.startsWith('image/')) throw new Error(`not an image: ${ct}`);
-  const ext =
-    ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' :
-    ct.includes('png')  ? 'png' :
-    ct.includes('webp') ? 'webp' : 'jpg';
-  const mime =
-    ext === 'png'  ? 'image/png'  :
-    ext === 'webp' ? 'image/webp' : 'image/jpeg';
   const buf = Buffer.from(await r.arrayBuffer());
   // Defence-in-depth: re-check actual byte length in case Content-Length
   // was missing or wrong.
   if (buf.byteLength > REHOST_MAX_BYTES) {
     throw new Error(`image too large: ${buf.byteLength} bytes (max ${REHOST_MAX_BYTES})`);
   }
-  const key = `properties/${propertyId}/yad2-cover-${randomUUID()}.${ext}`;
-  return putUpload(key, buf, mime);
+  // Run the same variant pipeline agent uploads use, so cards land with
+  // a 256 px thumb (~10 KB) and a 768 px gallery instead of the raw
+  // 50–100 KB Yad2 original. Without this, list pages download the
+  // full file just to paint a 360 px slot.
+  const { url, urlCard, urlThumb } = await processPropertyImage(
+    buf, ct, 'yad2-cover.jpg', propertyId,
+  );
+  return { url, urlCard, urlThumb };
 }
