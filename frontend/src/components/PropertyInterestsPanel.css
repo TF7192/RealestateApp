@@ -354,7 +354,54 @@
   border-top: 1px solid rgba(21, 128, 61, 0.18);
 }
 
-/* ── Inline form ── */
+/* ── Modal popup wrapper ── 2026-05-10
+ * Was: forms expanded inline below the row buttons. New behaviour:
+ * each "+ סיור / + הצעה / + הסכם / + פגישה" opens a centered popup so
+ * the row stays compact and the agent's focus locks on the form. */
+.pi-popup-back {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 15, 20, 0.55);
+  z-index: 1200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 16px;
+  overflow: auto;
+}
+.pi-popup-card {
+  background: #fff;
+  border-radius: 14px;
+  width: min(560px, 100%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+}
+.pi-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(30, 26, 20, 0.08);
+  background: linear-gradient(180deg, rgba(180, 139, 76, 0.10), transparent);
+}
+.pi-popup-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary, #1e1a14);
+}
+.pi-popup-close {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-muted, #6b6356);
+}
+.pi-popup-close:hover { background: rgba(30, 26, 20, 0.05); }
+.pi-popup-body { padding: 18px; }
+
+/* ── Inline form (also used inside the popup) ── */
 .pi-form {
   background: rgba(180, 139, 76, 0.05);
   border: 1px solid rgba(180, 139, 76, 0.22);

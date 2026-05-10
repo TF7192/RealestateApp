@@ -1255,6 +1255,15 @@
  * Mirrors /tmp/.../property-redesign/refined.jsx; classnames are
  * prefixed prd- so they don't clash with the legacy .pd- system.
  * ───────────────────────────────────────────────────────────────── */
+/* V1 Refined uses the full viewport width (capped at 1600 px so the
+   KPI tiles + action rail + tabs grid don't stretch past the design
+   target). The legacy 1120 px cap from `.property-detail` above made
+   the page feel cramped — V1's two-column layout needs the room. */
+.property-detail.prd-page {
+  max-width: 1600px;
+  padding: 4px 32px 28px;
+}
+
 .prd-page {
   --prd-cream: #f7f3ec;
   --prd-cream2: #efe9df;

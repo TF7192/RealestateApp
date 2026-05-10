@@ -103,7 +103,14 @@ export default function OwnerActivityPanel({ propertyId }) {
         </button>
       </header>
 
-      {composeOpen && <ComposeRow onSubmit={onCreate} onCancel={() => setComposeOpen(false)} />}
+      {composeOpen && (
+        <ComposePopup
+          title="רשומה חדשה — שיח עם בעל הנכס"
+          onClose={() => setComposeOpen(false)}
+        >
+          <ComposeRow onSubmit={onCreate} onCancel={() => setComposeOpen(false)} />
+        </ComposePopup>
+      )}
 
       {loading ? (
         <div className="pi-empty">טוען…</div>
@@ -120,6 +127,40 @@ export default function OwnerActivityPanel({ propertyId }) {
         </ul>
       )}
     </section>
+  );
+}
+
+// 2026-05-10 — Modal wrapper for the "רשומה חדשה" compose form. Was
+// inline; popup keeps the timeline scrollable while the form is open.
+function ComposePopup({ title, onClose, children }) {
+  useEffect(() => {
+    const onEsc = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [onClose]);
+  return (
+    <div
+      className="pi-popup-back"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
+    >
+      <div className="pi-popup-card" dir="rtl">
+        <header className="pi-popup-head">
+          <span className="pi-popup-title">{title}</span>
+          <button type="button" className="pi-popup-close" onClick={onClose} aria-label="סגור">
+            <X size={18} />
+          </button>
+        </header>
+        <div className="pi-popup-body">{children}</div>
+      </div>
+    </div>
   );
 }
 

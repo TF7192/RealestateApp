@@ -5,6 +5,7 @@ import {
   Search,
   Flame,
   Send,
+  Plus,
   Sparkles,
   ChevronDown,
   Camera,
@@ -29,9 +30,16 @@ export default function LeadPickerSheet({
   property,
   leads = [],
   previewText = '',
+  // 2026-05-10 — `attach` mode: hides the WhatsApp bubble + "פתח
+  // בוואטסאפ" rows and turns the picker into a plain "associate a
+  // lead" card. Used by PropertyInterestsPanel when the agent clicks
+  // "הוסף מתעניין" — no message is being sent, just a row link.
+  mode = 'message',
+  attachTitle,
   onClose,
   onPick,
 }) {
+  const isAttach = mode === 'attach';
   const [query, setQuery] = useState('');
   const [text, setText] = useState(previewText);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -48,7 +56,9 @@ export default function LeadPickerSheet({
   }, []);
 
   const ranked = useMemo(() => {
-    const list = (leads || []).filter((l) => l.phone);
+    // Attach-mode doesn't require a phone (we're linking a row, not
+    // sending a message). Message-mode keeps the phone filter.
+    const list = (leads || []).filter((l) => isAttach ? true : l.phone);
     const scored = list.map((l) => ({ lead: l, score: matchScore(l, property) }));
     scored.sort((a, b) => {
       if (a.score !== b.score) return b.score - a.score;
@@ -61,7 +71,7 @@ export default function LeadPickerSheet({
     return scored.filter(({ lead }) =>
       [lead.name, lead.city, lead.phone].filter(Boolean).some((s) => String(s).includes(q))
     );
-  }, [leads, property, query]);
+  }, [leads, property, query, isAttach]);
 
   const send = (lead, opts) => {
     haptics.tap();
@@ -87,9 +97,12 @@ export default function LeadPickerSheet({
         {/* HEADER */}
         <header className="lps-head">
           <div className="lps-head-text">
-            <h3>שלח את הנכס</h3>
-            {property && (
+            <h3>{isAttach ? (attachTitle || 'שייך מתעניין לנכס') : 'שלח את הנכס'}</h3>
+            {!isAttach && property && (
               <small>{property.street}, {property.city}</small>
+            )}
+            {isAttach && (
+              <small>בחר מתעניין מהמאגר כדי לקשר אותו לנכס הזה</small>
             )}
           </div>
           <button className="lps-close" onClick={onClose} aria-label="סגור">
@@ -97,7 +110,9 @@ export default function LeadPickerSheet({
           </button>
         </header>
 
-        {/* PREVIEW — editable WhatsApp bubble at the top */}
+        {/* PREVIEW — editable WhatsApp bubble at the top. Skipped in
+            attach-mode (no message is being sent, just a row link). */}
+        {!isAttach && (
         <section className={`lps-preview ${editorOpen ? 'open' : ''}`}>
           <button
             type="button"
@@ -132,6 +147,7 @@ export default function LeadPickerSheet({
             ערוך כאן ישירות — מה שתכתוב יגיע ללקוח
           </small>
         </section>
+        )}
 
         {/* SEARCH */}
         <div className="lps-search">
@@ -152,7 +168,7 @@ export default function LeadPickerSheet({
 
         {/* LIST */}
         <div className="lps-list">
-          {showPhotoShare && (
+          {!isAttach && showPhotoShare && (
             <button
               type="button"
               className="lps-row lps-row-noone lps-row-photos"
@@ -169,6 +185,7 @@ export default function LeadPickerSheet({
             </button>
           )}
 
+          {!isAttach && (
           <button
             type="button"
             className="lps-row lps-row-noone"
@@ -183,6 +200,7 @@ export default function LeadPickerSheet({
               <WhatsAppIcon size={13} />
             </span>
           </button>
+          )}
 
           {ranked.map(({ lead, score }) => (
             <button
@@ -208,7 +226,7 @@ export default function LeadPickerSheet({
                 </small>
               </div>
               <span className="lps-cta-wa" aria-hidden="true">
-                <Send size={12} />
+                {isAttach ? <Plus size={12} /> : <Send size={12} />}
               </span>
             </button>
           ))}

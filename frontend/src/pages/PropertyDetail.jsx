@@ -68,6 +68,7 @@ import PropertyAgreementsSection from '../components/PropertyAgreementsSection';
 import PropertyBrokersCard from '../components/PropertyBrokersCard';
 import PropertyInterestsPanel from '../components/PropertyInterestsPanel';
 import OwnerActivityPanel from '../components/OwnerActivityPanel';
+import OwnerAgreementDialog from '../components/OwnerAgreementDialog';
 import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/share';
 import { isNative } from '../native/platform';
 import { track } from '../lib/analytics';
@@ -338,6 +339,8 @@ export default function PropertyDetail() {
   const [offers, setOffers] = useState([]);
   const [agreementsCount, setAgreementsCount] = useState(0);
   const [statusBusy, setStatusBusy] = useState(false);
+  // Owner-side exclusivity-agreement popup (was: routed to /edit)
+  const [exclusivityOpen, setExclusivityOpen] = useState(false);
   // Landing-link copy feedback. Declared up here with the rest of the
   // top-level hooks — putting it below the `if (loading) return …`
   // guard triggers "Rendered more hooks than during the previous
@@ -1211,8 +1214,11 @@ export default function PropertyDetail() {
             </span>
           </button>
 
-          {/* Exclusivity */}
-          <button type="button" className="prd-quick" onClick={() => setPanel('exclusivity')}>
+          {/* Exclusivity — opens the owner-side agreement popup. The
+              old version routed to the property-edit page; per Adam's
+              UX pass we now show a dedicated dialog so the agent can
+              compose an EXCLUSIVITY contract without leaving the page. */}
+          <button type="button" className="prd-quick" onClick={() => setExclusivityOpen(true)}>
             <span className="prd-quick-ico"><FileText size={15} /></span>
             <span className="prd-quick-body">
               <span className="prd-quick-label">הסכם בלעדיות</span>
@@ -1223,28 +1229,24 @@ export default function PropertyDetail() {
                     : exclusivityDaysLeft != null && exclusivityDaysLeft <= 0
                     ? 'פג תוקף'
                     : 'פעיל')
-                  : 'לא הוגדר'}
+                  : 'לא הוגדר — צור הסכם'}
               </span>
             </span>
           </button>
 
-          {/* Pause / resume marketing */}
+          {/* Brokerage agreement — promoted out of the kebab menu so
+              "צור הסכם תיווך" is a single click from the rail (Adam: "the
+              צור הסכם תיווך should be accessible through פעולות מהירות").
+              Wires into the existing ProspectDialog. */}
           <button
             type="button"
             className="prd-quick"
-            onClick={togglePauseMarketing}
-            disabled={statusBusy}
+            onClick={() => setProspectOpen(true)}
           >
-            <span className="prd-quick-ico">
-              {property.status === 'PAUSED' ? <Megaphone size={15} /> : <Clock size={15} />}
-            </span>
+            <span className="prd-quick-ico"><UserPlus size={15} /></span>
             <span className="prd-quick-body">
-              <span className="prd-quick-label">
-                {property.status === 'PAUSED' ? 'הפעל שיווק' : 'השהה שיווק'}
-              </span>
-              <span className="prd-quick-sub">
-                {statusBusy ? 'מעדכן…' : property.status === 'PAUSED' ? 'הנכס מושהה כעת' : 'מסומן כפעיל'}
-              </span>
+              <span className="prd-quick-label">צור הסכם תיווך</span>
+              <span className="prd-quick-sub">לחתימה דיגיטלית של מתעניין</span>
             </span>
           </button>
         </aside>
@@ -1423,6 +1425,7 @@ export default function PropertyDetail() {
                   </div>
 
                   <PropertyBrokersCard propertyId={property.id} />
+                  <PropertyDocuments propertyId={property.id} />
                 </div>
               </div>
             )}
@@ -1472,14 +1475,14 @@ export default function PropertyDetail() {
                         </span>
                       </a>
                     )}
-                    <button type="button" className="prd-quick" onClick={() => setPanel('exclusivity')}>
+                    <button type="button" className="prd-quick" onClick={() => setExclusivityOpen(true)}>
                       <span className="prd-quick-ico"><FileText size={15} /></span>
                       <span className="prd-quick-body">
                         <span className="prd-quick-label">הסכם בלעדיות</span>
                         <span className="prd-quick-sub">
                           {hasExclusivity
                             ? (exclusivityDaysLeft != null && exclusivityDaysLeft > 0 ? `פעיל · ${exclusivityDaysLeft} ימים` : 'פעיל')
-                            : 'לא הוגדר'}
+                            : 'לחיצה ליצירת הסכם'}
                         </span>
                       </span>
                     </button>
@@ -1542,7 +1545,11 @@ export default function PropertyDetail() {
             )}
 
             {tab === 'buyers' && (
-              <PropertyInterestsPanel propertyId={property.id} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <PropertyInterestsPanel propertyId={property.id} />
+                <div id="prd-agreements-anchor" />
+                <PropertyAgreementsSection propertyId={property.id} leads={leads} />
+              </div>
             )}
 
             {tab === 'activity' && (
@@ -1551,12 +1558,6 @@ export default function PropertyDetail() {
           </div>
         </div>
       </div>
-
-      {/* P-3 — Signed brokerage agreements for this asset, kept below the
-          tabbed body so the agent can scan it without leaving the page.
-          The "הסכמים" More-pill scrolls here. */}
-      <div id="prd-agreements-anchor" />
-      <PropertyAgreementsSection propertyId={property.id} leads={leads} />
 
       {/* ── Slide-in panels ── */}
       {panel === 'marketing' && (
@@ -1875,16 +1876,6 @@ export default function PropertyDetail() {
         </PropertyPanelSheet>
       )}
 
-      {/* Per-asset documents — agents attach PDFs (exclusivity
-          agreement, building plan, arnona statement) directly to a
-          listing here. Renders below the marketing grid alongside the
-          videos block. */}
-      <PropertyDocuments propertyId={property.id} />
-
-      {/* 2026-05-10 — הצעות מחיר card removed; offers now live
-          inside PropertyInterestsPanel above (each interest row has
-          a sticky offer chip + inline "+ הצעה" form). */}
-
       {/* Videos preview if there are videos — shown below the grid */}
       {property.videos?.length > 0 && (
         <div className="pd-videos animate-in animate-in-delay-5">
@@ -1933,6 +1924,14 @@ export default function PropertyDetail() {
           property={property}
           onClose={() => setProspectOpen(false)}
           onCreated={() => { load(); }}
+        />
+      )}
+
+      {exclusivityOpen && (
+        <OwnerAgreementDialog
+          property={property}
+          onClose={() => setExclusivityOpen(false)}
+          onCreated={() => { setExclusivityOpen(false); load(); }}
         />
       )}
 

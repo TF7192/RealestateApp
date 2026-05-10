@@ -183,8 +183,9 @@ export default function PropertyInterestsPanel({
       {pickerOpen && (
         <LeadPickerSheet
           property={null}
+          mode="attach"
+          attachTitle="שייך מתעניין לנכס"
           leads={allLeads}
-          previewText="בחר את המתעניינים שברצונך לשייך לנכס"
           onPick={(lead) => onAttach([lead.id])}
           onMulti={(leads) => onAttach(leads.map((l) => l.id))}
           onClose={() => setPickerOpen(false)}
@@ -300,10 +301,27 @@ function InterestRow({
         ><Trash2 size={13} /></button>
       </div>
 
-      {activeForm === 'viewing'   && <ViewingForm   interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
-      {activeForm === 'offer'     && <OfferForm     interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
-      {activeForm === 'agreement' && <AgreementForm interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
-      {activeForm === 'meeting'   && <MeetingForm   interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
+      {/* Action forms render inside a centered popup so the row stays
+          compact (was: forms expanded inline). The popup-shell handles
+          the overlay/escape; the underlying *Form components keep their
+          inline body styling. */}
+      {(activeForm === 'viewing' || activeForm === 'offer' ||
+        activeForm === 'agreement' || activeForm === 'meeting') && (
+        <FormPopup
+          title={
+            activeForm === 'viewing' ? 'תיעוד סיור חדש' :
+            activeForm === 'offer' ? 'הצעת מחיר חדשה' :
+            activeForm === 'agreement' ? 'הסכם חדש' :
+            'פגישה חדשה'
+          }
+          onClose={() => setActiveForm(null)}
+        >
+          {activeForm === 'viewing'   && <ViewingForm   interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
+          {activeForm === 'offer'     && <OfferForm     interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
+          {activeForm === 'agreement' && <AgreementForm interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
+          {activeForm === 'meeting'   && <MeetingForm   interestId={it.id} onCancel={() => setActiveForm(null)} onSaved={() => { setActiveForm(null); onActionCreated(); }} />}
+        </FormPopup>
+      )}
 
       <button
         type="button"
@@ -418,6 +436,40 @@ function eventSubtitle(e) {
 }
 
 // ── Action button (toggles its inline form) ─────────────────
+// 2026-05-10 — Modal wrapper used by interest-row action forms.
+// Esc + backdrop-click close. Locks page scroll while open.
+function FormPopup({ title, onClose, children }) {
+  useEffect(() => {
+    const onEsc = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [onClose]);
+  return (
+    <div
+      className="pi-popup-back"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
+    >
+      <div className="pi-popup-card" dir="rtl">
+        <header className="pi-popup-head">
+          <span className="pi-popup-title">{title}</span>
+          <button type="button" className="pi-popup-close" onClick={onClose} aria-label="סגור">
+            <X size={18} />
+          </button>
+        </header>
+        <div className="pi-popup-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 function ActionBtn({ kind, active, label, onToggle }) {
   const ICONS = {
     viewing: Footprints, offer: Banknote, agreement: FileText, meeting: CalendarIcon,
