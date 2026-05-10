@@ -3,6 +3,7 @@ import { z } from 'zod';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
+import { ensureInterest } from './interests.js';
 import PDFDocument from 'pdfkit';
 import { prisma } from '../lib/prisma.js';
 import { requireUser } from '../middleware/auth.js';
@@ -69,10 +70,15 @@ export const registerAgreementRoutes: FastifyPluginAsync = async (app) => {
       if (!property) return reply.code(404).send({ error: { message: 'Not found' } });
     }
 
+    // 2026-05-10 — auto-attach to PropertyInterest when both ids present.
+    const interestId = (body.leadId && body.propertyId)
+      ? await ensureInterest(u.id, body.propertyId, body.leadId)
+      : null;
     const agreement = await prisma.agreement.create({
       data: {
         leadId: body.leadId ?? null,
         propertyId: body.propertyId ?? null,
+        interestId,
         signerName: body.signerName,
         signerPhone: body.signerPhone ?? null,
         signerEmail: body.signerEmail ?? null,

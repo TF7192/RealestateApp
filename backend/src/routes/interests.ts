@@ -33,6 +33,44 @@ export async function bumpInterestActivity(interestId: string): Promise<void> {
   }
 }
 
+// 2026-05-10 — Phase 3: auto-attach helper. Called from any existing
+// creation route (PropertyOffer / PropertyViewing / Agreement / Contract /
+// LeadMeeting) that already has both leadId + propertyId at hand.
+// Ensures there's an interest row for the pair; returns its id.
+// Idempotent — if a row already exists, returns its id and bumps
+// lastActionAt; otherwise creates the row at IN_PROGRESS.
+export async function ensureInterest(
+  agentId: string,
+  propertyId: string,
+  leadId: string,
+): Promise<string | null> {
+  if (!propertyId || !leadId) return null;
+  try {
+    const existing = await prisma.propertyInterest.findUnique({
+      where: { propertyId_leadId: { propertyId, leadId } },
+      select: { id: true, agentId: true },
+    });
+    if (existing && existing.agentId === agentId) {
+      await prisma.propertyInterest.update({
+        where: { id: existing.id },
+        data: { lastActionAt: new Date() },
+      });
+      return existing.id;
+    }
+    if (existing) return null; // owned by a different agent — don't link
+    const created = await prisma.propertyInterest.create({
+      data: {
+        agentId, propertyId, leadId,
+        lastActionAt: new Date(),
+      },
+      select: { id: true },
+    });
+    return created.id;
+  } catch {
+    return null;
+  }
+}
+
 // ── Stat summary attached to each listed interest ─────────────────
 // Aggregates the counts the panel renders as quick chips. One pair of
 // SELECTs per interest is fine at the current scale (~dozens per agent);

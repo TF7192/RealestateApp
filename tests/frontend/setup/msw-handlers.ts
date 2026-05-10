@@ -361,6 +361,46 @@ export const defaultHandlers = [
   http.get('/api/leads/:id/matches', () => HttpResponse.json({ items: [] })),
   http.get('/api/properties/:id/matching-customers', () => HttpResponse.json({ items: [] })),
 
+  // PropertyInterest (2026-05-14) — per-(lead, property) action log.
+  http.get('/api/properties/:id/interests', () => HttpResponse.json({ items: [] })),
+  http.get('/api/leads/:id/interests', () => HttpResponse.json({ items: [] })),
+  http.post('/api/properties/:id/interests', async ({ params, request }) => {
+    const body = (await request.json().catch(() => ({}))) as { leadId?: string };
+    return HttpResponse.json({
+      interest: {
+        id: 'pi-1',
+        propertyId: params.id,
+        leadId: body?.leadId ?? null,
+        status: 'IN_PROGRESS',
+        stats: { tours: 0, offers: 0, agreements: 0, meetings: 0, topOfferAmount: null },
+      },
+    });
+  }),
+  http.get('/api/interests/:id', ({ params }) =>
+    HttpResponse.json({ interest: { id: params.id, status: 'IN_PROGRESS' } })
+  ),
+  http.get('/api/interests/:id/timeline', () => HttpResponse.json({ items: [] })),
+  http.patch('/api/interests/:id', ({ params }) =>
+    HttpResponse.json({ interest: { id: params.id, status: 'IN_PROGRESS' } })
+  ),
+  http.delete('/api/interests/:id', () => HttpResponse.json({ ok: true })),
+  http.post('/api/interests/:id/actions', ({ params }) =>
+    HttpResponse.json({ ok: true, interestId: params.id })
+  ),
+
+  // Owner-side activity log (2026-05-14) — seller conversation, commission talk, etc.
+  http.get('/api/properties/:id/owner-activity', () => HttpResponse.json({ items: [] })),
+  http.post('/api/properties/:id/owner-activity', () =>
+    HttpResponse.json({ activity: { id: 'oa-1' } })
+  ),
+  http.patch('/api/owner-activity/:id', ({ params }) =>
+    HttpResponse.json({ activity: { id: params.id } })
+  ),
+  http.delete('/api/owner-activity/:id', () => HttpResponse.json({ ok: true })),
+
+  // Property co-brokers (קולגות בנכס card)
+  http.get('/api/properties/:id/brokers', () => HttpResponse.json({ items: [] })),
+
   // Property assignees (J10)
   http.get('/api/properties/:id/assignees', () => HttpResponse.json({ items: [] })),
   http.post('/api/properties/:id/assignees', ({ params }) =>

@@ -10,6 +10,10 @@ import { waUrl, telUrl } from '../lib/waLink';
 import { formatPhone } from '../lib/phone';
 import { useToast } from '../lib/toast';
 import WhatsAppIcon from './WhatsAppIcon';
+// 2026-05-10 — reuse the PropertyInterestsPanel CSS so this card
+// matches the activity-log panels visually (cream card, gold border,
+// pi-title / pi-add-btn / pi-empty classes).
+import './PropertyInterestsPanel.css';
 
 const _DT = {
   ink: '#1e1a14',
@@ -69,59 +73,31 @@ export default function PropertyBrokersCard({ propertyId }) {
 
   return (
     <section
-      className="dashcard animate-in animate-in-delay-2"
-      aria-label="מתווכים שותפים בנכס"
-      style={{
-        ...FONT,
-        background: _DT.white,
-        border: `1px solid ${_DT.border}`,
-        borderRadius: 14,
-        padding: 18,
-        marginBottom: 16,
-      }}
+      className="pi-panel animate-in animate-in-delay-2"
+      aria-label="קולגות בנכס"
+      dir="rtl"
+      style={{ ...FONT, marginBottom: 16 }}
     >
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 10, marginBottom: items.length ? 12 : 4,
-      }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <span style={{
-            color: _DT.gold, background: _DT.goldSoft,
-            width: 28, height: 28, borderRadius: 8,
-            display: 'grid', placeItems: 'center',
-          }}>
-            <Briefcase size={15} />
-          </span>
-          <div>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: _DT.ink }}>
-              קולגות בנכס
-            </h3>
-            <div style={{ fontSize: 11, color: _DT.muted, marginTop: 2 }}>
-              מתווכים חיצוניים שעובדים איתך על הנכס הזה
-            </div>
-          </div>
-        </div>
+      <header className="pi-header">
+        <h3 className="pi-title">
+          <Briefcase size={16} />
+          קולגות בנכס · {items.length} {items.length === 1 ? 'מתווך' : 'מתווכים'}
+        </h3>
         <button
           type="button"
           onClick={() => { setEditing(null); setDialogOpen(true); }}
-          className="btn btn-primary btn-sm"
+          className="pi-add-btn"
           aria-label="הוסף קולגה"
         >
-          <Plus size={14} />
-          הוסף קולגה
+          <Plus size={14} /> הוסף קולגה
         </button>
       </header>
 
       {loading ? (
-        <div style={{ padding: 12, fontSize: 13, color: _DT.muted }}>טוען…</div>
+        <div className="pi-empty">טוען…</div>
       ) : items.length === 0 ? (
-        <div style={{
-          padding: '14px 12px', fontSize: 13, color: _DT.muted, textAlign: 'center',
-          background: 'rgba(180,139,76,0.04)',
-          border: `1px dashed ${_DT.border}`,
-          borderRadius: 10,
-        }}>
-          טרם הוספת קולגות. לחץ "הוסף קולגה" כדי להוסיף את המתווך הראשון.
+        <div className="pi-empty">
+          טרם הוספת קולגות. לחץ/י "הוסף קולגה" כדי להוסיף את המתווך הראשון.
         </div>
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>

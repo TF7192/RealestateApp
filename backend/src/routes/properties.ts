@@ -27,6 +27,7 @@ function canActOnProperty<T extends { agentId: string }>(
   return u.id === prop.agentId || u.role === 'ADMIN';
 }
 import { tryServiceTokenAuth } from '../middleware/service-token.js';
+import { ensureInterest } from './interests.js';
 import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
 import { processPropertyImage } from '../lib/imageVariants.js';
@@ -706,10 +707,17 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       });
       if (!lead) return reply.code(403).send({ error: { message: 'הליד אינו של המשתמש' } });
     }
+    // 2026-05-10 — auto-attach to the (lead, property) interest row
+    // when both ids are present so PropertyInterestsPanel reflects
+    // offers created via this legacy endpoint too.
+    const interestId = body.leadId
+      ? await ensureInterest(owns.agentId, id, body.leadId)
+      : null;
     const created = await prisma.propertyOffer.create({
       data: {
         propertyId: id,
         leadId:     body.leadId || null,
+        interestId,
         buyerName:  body.buyerName,
         buyerPhone: body.buyerPhone || null,
         amount:     body.amount,

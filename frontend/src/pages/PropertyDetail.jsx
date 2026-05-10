@@ -1056,50 +1056,40 @@ export default function PropertyDetail() {
         onDrop={handleGalleryDrop}
       />
 
-      {/* Market context — recent nadlan.gov.il transactions for this
-          street (purchases + rentals). On-demand: agent clicks the
-          refresh button to fire a Playwright crawl. Hidden if the
-          property is missing street/city. */}
-      {property.street && property.city && (
-        <MarketContextCard
-          propertyId={property.id}
-          propertyCategory={property.category}
-          propertyStreet={property.street}
-          propertyCity={property.city}
+      {/* 2026-05-10 — Reordered per Adam's UX pass:
+          KPI strip → matched-leads dispatch → market context →
+          broker / interest / owner panels. The "מתאים למתעניינים"
+          quick-dispatch + KPI tiles are the most actionable items in
+          the page, so they sit at the top. */}
+
+      {/* KPI strip — top */}
+      <div className="pd-kpis animate-in animate-in-delay-2">
+        <PropertyKpiTile
+          value={`${pct}%`}
+          label="שיווק"
+          sublabel={`${done}/${total}`}
+          onClick={() => setPanel('marketing')}
         />
-      )}
+        <PropertyKpiTile
+          value={pageViews}
+          label="צפיות בעמוד"
+          sublabel="כניסות לעמוד הנכס"
+          tone={pageViews > 0 ? 'gold' : 'neutral'}
+        />
+        <PropertyKpiTile
+          value={inquiriesCount}
+          label="פניות"
+          sublabel="קשרו עם הנכס"
+          tone={inquiriesCount > 0 ? 'gold' : 'neutral'}
+        />
+        <PropertyKpiTile
+          value={daysListed != null ? daysListed : '—'}
+          label="ימים בשוק"
+          tone="neutral"
+        />
+      </div>
 
-      {/* 2026-05-03 — Per-property external broker contacts. Card on the
-          asset page so the agent can see (and quickly call/WhatsApp) the
-          colleagues they're coordinating with on this specific listing.
-          The "+ הוסף קולגה" button opens a popup form to add a new one. */}
-      <PropertyBrokersCard propertyId={property.id} />
-
-      {/* 2026-05-10 — לוח פעילות: per-lead activity log for this listing.
-          Replaces the historical "matched leads" surface with an
-          actionable workflow — agent attaches leads, logs tours / offers
-          / agreements / meetings, owns a status (בתהליך / נסגר / נפל /
-          מושהה) per pair. Mirror panel lives on CustomerDetail. */}
-      <PropertyInterestsPanel propertyId={property.id} />
-
-      {/* 2026-05-10 — לוח פעילות: owner-side (commission talks, owner
-          feedback on specific buyers, price discussions, tour permissions,
-          objections, contract talks). Captures the SELLER half of the
-          negotiation triangle the agent mediates. */}
-      <OwnerActivityPanel propertyId={property.id} />
-
-      {/* P-3 — Signed brokerage agreements for this asset. Hides
-          itself when there are no signed prospects so the card doesn't
-          clutter fresh listings. */}
-      <PropertyAgreementsSection propertyId={property.id} leads={leads} />
-
-      {/* KPI strip */}
-      {/* UX review F-1.1 — Matched-leads quick dispatch.
-          Surfaces top 3 leads that match this property as one-tap
-          "Send WhatsApp" rows. The matching function was already used
-          by handleWhatsApp below; this just makes it visible before
-          the user has to click the generic picker. Saves ~13s × ~15
-          handoffs/day = 11min/agent/day on the #1 workflow.  */}
+      {/* Matched-leads quick dispatch — second */}
       {(() => {
         const matches = (leads || []).filter((l) => leadMatchesProperty(l, property));
         if (matches.length === 0) return null;
@@ -1145,31 +1135,27 @@ export default function PropertyDetail() {
         );
       })()}
 
-      <div className="pd-kpis animate-in animate-in-delay-2">
-        <PropertyKpiTile
-          value={`${pct}%`}
-          label="שיווק"
-          sublabel={`${done}/${total}`}
-          onClick={() => setPanel('marketing')}
+      {/* Market context — third */}
+      {property.street && property.city && (
+        <MarketContextCard
+          propertyId={property.id}
+          propertyCategory={property.category}
+          propertyStreet={property.street}
+          propertyCity={property.city}
         />
-        <PropertyKpiTile
-          value={pageViews}
-          label="צפיות בעמוד"
-          sublabel="כניסות לעמוד הנכס"
-          tone={pageViews > 0 ? 'gold' : 'neutral'}
-        />
-        <PropertyKpiTile
-          value={inquiriesCount}
-          label="פניות"
-          sublabel="קשרו עם הנכס"
-          tone={inquiriesCount > 0 ? 'gold' : 'neutral'}
-        />
-        <PropertyKpiTile
-          value={daysListed != null ? daysListed : '—'}
-          label="ימים בשוק"
-          tone="neutral"
-        />
-      </div>
+      )}
+
+      {/* 2026-05-03 — Per-property external broker contacts. */}
+      <PropertyBrokersCard propertyId={property.id} />
+
+      {/* 2026-05-10 — לוח פעילות: per-lead activity log. */}
+      <PropertyInterestsPanel propertyId={property.id} />
+
+      {/* 2026-05-10 — לוח פעילות: owner-side conversation log. */}
+      <OwnerActivityPanel propertyId={property.id} />
+
+      {/* P-3 — Signed brokerage agreements for this asset. */}
+      <PropertyAgreementsSection propertyId={property.id} leads={leads} />
 
       {/* Dashboard cards grid */}
       <div className="pd-grid">
@@ -1445,35 +1431,6 @@ export default function PropertyDetail() {
           <div className="dc-map-addr">{property.street}, {property.city}</div>
         </DashCard>
 
-        {/* MLS parity — pipeline (J9) */}
-        <DashCard
-          delay={6}
-          icon={<Workflow size={16} />}
-          title="צנרת תיווך"
-          action={(
-            <button
-              type="button"
-              className="dc-cta"
-              onClick={() => setPanel('pipeline')}
-              aria-label="ערוך צנרת תיווך"
-            >
-              ערוך
-              <ChevronLeft size={14} />
-            </button>
-          )}
-        >
-          <div className="pd-pipeline-preview">
-            <span className="pd-pipeline-label">שלב: </span>
-            <strong>{PROPERTY_STAGE_LABELS[property.stage || 'WATCHING'] || PROPERTY_STAGE_LABELS.WATCHING}</strong>
-            {property.agentCommissionPct != null && (
-              <span className="pd-pipeline-chip">עמלה {property.agentCommissionPct}%</span>
-            )}
-            {property.sellerSeriousness && property.sellerSeriousness !== 'NONE' && (
-              <span className="pd-pipeline-chip">רצינות {property.sellerSeriousness}</span>
-            )}
-          </div>
-        </DashCard>
-
         {/* MLS parity — adverts (F1) */}
         <DashCard
           delay={6}
@@ -1502,67 +1459,9 @@ export default function PropertyDetail() {
           onChange={(updated) => setProperty(updated)}
         />
 
-        {/* MLS parity — assignees (J10) */}
-        <DashCard
-          delay={7}
-          icon={<Users size={16} />}
-          title="שותפים לנכס"
-          action={(
-            <button
-              type="button"
-              className="dc-cta"
-              onClick={() => setPanel('assignees')}
-              aria-label="נהל שותפים לנכס"
-            >
-              נהל
-              <ChevronLeft size={14} />
-            </button>
-          )}
-        >
-          <p className="dc-empty">הוסף שותפים מהמשרד לצפייה משותפת</p>
-        </DashCard>
-
-        {/* MLS parity — matching customers (C3 reverse) */}
-        <DashCard
-          delay={7}
-          icon={<Target size={16} />}
-          title="לקוחות תואמים"
-          action={(
-            <button
-              type="button"
-              className="dc-cta"
-              onClick={() => setPanel('matching')}
-              aria-label="הצג לקוחות תואמים"
-            >
-              הצג
-              <ChevronLeft size={14} />
-            </button>
-          )}
-        >
-          <p className="dc-empty">גלה לקוחות במאגר שהנכס תואם את הפרופיל שלהם</p>
-          {/* Sprint 5 — AI-backed smart matcher sits alongside the
-              deterministic list. Gold gradient button to distinguish it
-              from the deterministic "הצג" CTA above. */}
-          <button
-            type="button"
-            onClick={() => setAiMatchesOpen(true)}
-            aria-label="התאמות חכמות מ-AI"
-            style={{
-              marginTop: 10,
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', borderRadius: 10,
-              border: 'none',
-              background: `linear-gradient(180deg, ${_DT.goldLight}, ${_DT.gold})`,
-              color: _DT.ink,
-              fontSize: 12, fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 3px 8px rgba(180,139,76,0.25)',
-            }}
-          >
-            <Sparkles size={14} />
-            <span>✨ התאמות חכמות</span>
-          </button>
-        </DashCard>
+        {/* 2026-05-10 — removed: שותפים לנכס, לקוחות תואמים, צנרת
+            תיווך per Adam's UX pass. The buyer-side PropertyInterestsPanel
+            above already covers attached leads + their interactions. */}
 
         {/* MLS parity — reminders (D1) */}
         <DashCard
@@ -1888,22 +1787,6 @@ export default function PropertyDetail() {
         </PropertyPanelSheet>
       )}
 
-      {/* MLS parity — pipeline (J9) */}
-      {panel === 'pipeline' && (
-        <PropertyPanelSheet
-          title="צנרת תיווך"
-          subtitle="שלב, עמלה, סוכן ראשי, בלעדיות, רצינות מוכר, הערות מתווך"
-          width="lg"
-          onClose={() => setPanel(null)}
-        >
-          <PropertyPipelineBlock
-            property={property}
-            onSaved={() => { load(); }}
-            toast={toast}
-          />
-        </PropertyPanelSheet>
-      )}
-
       {/* MLS parity — adverts (F1) */}
       {panel === 'adverts' && (
         <PropertyPanelSheet
@@ -1913,30 +1796,6 @@ export default function PropertyDetail() {
           onClose={() => setPanel(null)}
         >
           <AdvertsPanel propertyId={property.id} toast={toast} />
-        </PropertyPanelSheet>
-      )}
-
-      {/* MLS parity — assignees (J10) */}
-      {panel === 'assignees' && (
-        <PropertyPanelSheet
-          title="שותפים לנכס"
-          subtitle="שיוף סוכנים נוספים מהמשרד"
-          width="lg"
-          onClose={() => setPanel(null)}
-        >
-          <PropertyAssigneesPanel propertyId={property.id} toast={toast} />
-        </PropertyPanelSheet>
-      )}
-
-      {/* MLS parity — matching customers (C3 reverse) */}
-      {panel === 'matching' && (
-        <PropertyPanelSheet
-          title="לקוחות תואמים"
-          subtitle="לקוחות שפרופיל החיפוש שלהם תואם לנכס הזה"
-          width="lg"
-          onClose={() => setPanel(null)}
-        >
-          <MatchingList propertyId={property.id} />
         </PropertyPanelSheet>
       )}
 
@@ -1969,9 +1828,9 @@ export default function PropertyDetail() {
           videos block. */}
       <PropertyDocuments propertyId={property.id} />
 
-      {/* Price offers received — separate timeline of offers from
-          interested buyers, each tagged with status + amount + notes. */}
-      <PropertyOffers propertyId={property.id} />
+      {/* 2026-05-10 — הצעות מחיר card removed; offers now live
+          inside PropertyInterestsPanel above (each interest row has
+          a sticky offer chip + inline "+ הצעה" form). */}
 
       {/* Videos preview if there are videos — shown below the grid */}
       {property.videos?.length > 0 && (

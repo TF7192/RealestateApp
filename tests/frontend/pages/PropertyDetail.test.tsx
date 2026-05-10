@@ -41,7 +41,7 @@ function renderDetail() {
 }
 
 describe('<PropertyDetail> — MLS parity wiring', () => {
-  it('shows the pipeline / adverts / assignees / matching / activity / reminders cards', async () => {
+  it('shows the adverts / activity / reminders cards', async () => {
     server.use(
       http.get('/api/properties/:id', () =>
         HttpResponse.json({ property: propertyFixture })
@@ -54,35 +54,9 @@ describe('<PropertyDetail> — MLS parity wiring', () => {
     await waitFor(() =>
       expect(screen.getAllByRole('heading', { name: /הרצל 15/ }).length).toBeGreaterThan(0),
     );
-    expect(screen.getByText('צנרת תיווך')).toBeInTheDocument();
     expect(screen.getByText('מודעות פרסום')).toBeInTheDocument();
-    expect(screen.getByText('שותפים לנכס')).toBeInTheDocument();
-    expect(screen.getByText('לקוחות תואמים')).toBeInTheDocument();
     expect(screen.getByText('תזכורות')).toBeInTheDocument();
     expect(screen.getByText('פעילות')).toBeInTheDocument();
-  });
-
-  it('opens the pipeline slide-in panel with the inline editor', async () => {
-    server.use(
-      http.get('/api/properties/:id', () =>
-        HttpResponse.json({ property: propertyFixture })
-      )
-    );
-    const user = userEvent.setup();
-    renderDetail();
-    // PropertyDetail renders the address as a heading in two surfaces:
-    // the page header and the PropertyHero card. Both intentionally
-    // duplicate the address — accept either by going through getAllBy.
-    await waitFor(() =>
-      expect(screen.getAllByRole('heading', { name: /הרצל 15/ }).length).toBeGreaterThan(0),
-    );
-    // The card's action has an aria-label "ערוך צנרת תיווך"; panel opens
-    // with the PropertyPipelineBlock.
-    await user.click(screen.getByRole('button', { name: 'ערוך צנרת תיווך' }));
-    // Block heading comes from the section aria-label; its fields render
-    // with the Hebrew label map.
-    await waitFor(() => expect(screen.getByLabelText('שלב הנכס')).toBeInTheDocument());
-    expect(screen.getByLabelText('הערות מתווך')).toBeInTheDocument();
   });
 
   it('opens the adverts panel and submits a draft advert', async () => {
@@ -112,31 +86,5 @@ describe('<PropertyDetail> — MLS parity wiring', () => {
     await user.click(screen.getByRole('button', { name: 'שמור מודעה' }));
     await waitFor(() => expect(postBody).toBeTruthy());
     expect(postBody!.channel).toBe('FACEBOOK');
-  });
-
-  it('opens the assignees panel and lists existing ones from the API', async () => {
-    server.use(
-      http.get('/api/properties/:id', () =>
-        HttpResponse.json({ property: propertyFixture })
-      ),
-      http.get('/api/properties/:id/assignees', () =>
-        HttpResponse.json({
-          items: [{
-            userId: 'u2', role: 'CO_AGENT',
-            user: { id: 'u2', displayName: 'שותפה', email: 'p@estia.app', role: 'AGENT' },
-          }],
-        })
-      )
-    );
-    const user = userEvent.setup();
-    renderDetail();
-    // PropertyDetail renders the address as a heading in two surfaces:
-    // the page header and the PropertyHero card. Both intentionally
-    // duplicate the address — accept either by going through getAllBy.
-    await waitFor(() =>
-      expect(screen.getAllByRole('heading', { name: /הרצל 15/ }).length).toBeGreaterThan(0),
-    );
-    await user.click(screen.getByRole('button', { name: 'נהל שותפים לנכס' }));
-    await waitFor(() => expect(screen.getByText('שותפה')).toBeInTheDocument());
   });
 });
