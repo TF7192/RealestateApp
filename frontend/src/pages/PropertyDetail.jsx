@@ -44,7 +44,6 @@ import { formatFloor } from '../lib/formatFloor';
 import { inputPropsForPrice } from '../lib/inputProps';
 import { displayPrice } from '../lib/display';
 import { PROPERTY_STAGE_LABELS } from '../lib/mlsLabels';
-import PropertyPublicMatchBlock from '../components/PropertyPublicMatchBlock';
 import { useAuth } from '../lib/auth';
 import MarketingActionDialog from '../components/MarketingActionDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -59,22 +58,16 @@ import LeadPickerSheet from '../components/LeadPickerSheet';
 import StickyActionBar from '../components/StickyActionBar';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import PageTour from '../components/PageTour';
-import PropertyHero from '../components/PropertyHero';
 import MarketContextCard from '../components/MarketContextCard';
-import PropertyKpiTile from '../components/PropertyKpiTile';
 import PropertyPanelSheet from '../components/PropertyPanelSheet';
-import PropertyPipelineBlock from '../components/PropertyPipelineBlock';
-import PropertyAssigneesPanel from '../components/PropertyAssigneesPanel';
 import AdvertsPanel from '../components/AdvertsPanel';
 import RemindersPanel from '../components/RemindersPanel';
-import MatchingList from '../components/MatchingList';
 import AiMatchesDrawer from '../components/AiMatchesDrawer';
 import ActivityPanel from '../components/ActivityPanel';
 import PropertyAgreementsSection from '../components/PropertyAgreementsSection';
 import PropertyBrokersCard from '../components/PropertyBrokersCard';
 import PropertyInterestsPanel from '../components/PropertyInterestsPanel';
 import OwnerActivityPanel from '../components/OwnerActivityPanel';
-import { useCopyFeedback, useViewportMobile } from '../hooks/mobile';
 import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/share';
 import { isNative } from '../native/platform';
 import { track } from '../lib/analytics';
@@ -182,17 +175,6 @@ const PD_DT = {
     letterSpacing: -0.3, whiteSpace: 'nowrap',
   },
 };
-
-function pdChip({ bg, fg, border }) {
-  return {
-    ..._FONT,
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    background: bg, color: fg,
-    border: border ? `1px solid ${border}` : '1px solid transparent',
-    padding: '3px 10px', borderRadius: 99,
-    fontWeight: 700, fontSize: 11,
-  };
-}
 
 function statusChipMeta(status) {
   const s = (status || '').toUpperCase();
@@ -325,8 +307,6 @@ export default function PropertyDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
-  const isMobile = useViewportMobile(820);
-  const { copied, copy } = useCopyFeedback();
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -346,7 +326,18 @@ export default function PropertyDetail() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerLeadsOverride, setPickerLeadsOverride] = useState(null);
   const [lightboxIdx, setLightboxIdx] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
+  // 2026-05-10 — V1 Refined layout state.
+  // `tab` drives the right-hand body (הנכס / בעל הנכס / מתעניינים / פעילות).
+  // `moreMenuOpen` toggles the kebab menu in the header for secondary actions.
+  // `interests` / `offers` are fetched at the page level so the KPI hero
+  // can reflect live counts (PropertyInterestsPanel re-fetches them too —
+  // double fetch is harmless, the alternative is hoisting state).
+  const [tab, setTab] = useState('property');
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [interests, setInterests] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [agreementsCount, setAgreementsCount] = useState(0);
+  const [statusBusy, setStatusBusy] = useState(false);
   // Landing-link copy feedback. Declared up here with the rest of the
   // top-level hooks — putting it below the `if (loading) return …`
   // guard triggers "Rendered more hooks than during the previous
@@ -392,6 +383,45 @@ export default function PropertyDetail() {
     api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
     api.listLeads().then((r) => setLeads(r.items || r.leads || [])).catch(() => {});
   }, []);
+
+  // V1 Refined — page-level fetch for KPI hero (interests count + top
+  // active offer). Re-runs whenever the property id changes; tabs that
+  // own these collections (PropertyInterestsPanel) keep their own
+  // fetches so live edits are reflected without prop-threading.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    api.listPropertyInterests(id)
+      .then((r) => { if (!cancelled) setInterests(r.items || []); })
+      .catch(() => {});
+    api.listPropertyOffers(id)
+      .then((r) => { if (!cancelled) setOffers(r.items || []); })
+      .catch(() => {});
+    // Agreements count for the "הסכמים" pill — listAgreements is the
+    // canonical brokerage-agreement endpoint (signed contracts), filtered
+    // by propertyId server-side.
+    api.listAgreements({ propertyId: id })
+      .then((r) => { if (!cancelled) setAgreementsCount((r.items || []).length); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [id]);
+
+  // Close the kebab menu on outside-click / Escape so it behaves like a
+  // normal native menu. Keyed off `moreMenuOpen` so the listener only
+  // attaches while the menu is visible.
+  useEffect(() => {
+    if (!moreMenuOpen) return undefined;
+    const onDoc = (e) => {
+      if (!e.target.closest?.('.prd-more')) setMoreMenuOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setMoreMenuOpen(false); };
+    document.addEventListener('click', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('click', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [moreMenuOpen]);
 
   const load = async () => {
     try {
@@ -761,49 +791,6 @@ export default function PropertyDetail() {
     }
   };
 
-  const nextImage = () => setCurrentImage((i) => (i + 1) % images.length);
-  const prevImage = () => setCurrentImage((i) => (i - 1 + images.length) % images.length);
-
-  const handleGalleryDragOver = (e) => {
-    if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return;
-    e.preventDefault();
-    if (!dragOver) setDragOver(true);
-  };
-  const handleGalleryDragLeave = (e) => {
-    if (e.currentTarget.contains(e.relatedTarget)) return;
-    setDragOver(false);
-  };
-  const handleGalleryDrop = async (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    // Chrome on Windows hands us HEIC / JFIF / WhatsApp images with an
-    // empty or `application/octet-stream` MIME, so a pure type check
-    // silently drops them. Accept by extension fallback and let the
-    // server (`assertAllowedMime`) be the final arbiter.
-    const all = Array.from(e.dataTransfer?.files || []);
-    const isImage = (f) => f.type?.startsWith('image/')
-      || /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(f.name || '');
-    const files = all.filter(isImage);
-    const skipped = all.length - files.length;
-    if (skipped > 0) {
-      toast?.info?.(`${skipped} קבצים שאינם תמונה דולגו`);
-    }
-    if (!files.length) return;
-    let uploaded = 0;
-    for (const file of files) {
-      try {
-        await api.uploadPropertyImage(property.id, file);
-        uploaded += 1;
-      } catch (err) {
-        toast?.error?.(err?.message || 'העלאת התמונה נכשלה');
-      }
-    }
-    if (uploaded > 0) {
-      toast?.success?.(`${uploaded} תמונות הועלו`);
-      await load();
-    }
-  };
-
   // ── Marketing toggle handler (re-used inside the marketing panel) ──
   const toggleMarketingAction = async (key) => {
     const detail = actionsDetail[key] || { done: false };
@@ -905,616 +892,671 @@ export default function PropertyDetail() {
     featureChips.push(`${property.workstations} עמדות ישיבה`);
   }
 
+  // ── V1 Refined — derived KPI values ─────────────────────────────
+  // Top active offer (status = NEW) — drives the "הצעה פעילה" tile in the
+  // KPI hero. Falls back to the highest amount when nothing is NEW.
+  const newOffers = offers.filter((o) => o.status === 'NEW' || o.status === 'NEGOTIATING');
+  const topOfferAmount = newOffers.length
+    ? Math.max(...newOffers.map((o) => Number(o.amount) || 0))
+    : (offers.length ? Math.max(...offers.map((o) => Number(o.amount) || 0)) : null);
+  const interestsCount = interests.length;
+  // Active interests (status = IN_PROGRESS) drive the "מתעניינים פעילים"
+  // sub-line on the KPI tile.
+  const activeInterestsCount = interests.filter((it) => it.status === 'IN_PROGRESS').length;
+  const viewingsCount = Number(property._count?.viewings ?? 0);
+  // Market delta — pulled from MarketContextCard's data when present.
+  // For the KPI sub-line we just show the price-per-sqm for now; the
+  // panel below holds the full insights breakdown.
+  const pricePerSqm = property.marketingPrice && property.sqm
+    ? Math.round(Number(property.marketingPrice) / Number(property.sqm))
+    : null;
+
+  // ── V1 Refined — pause / resume marketing ──────────────────────
+  // Server accepts ACTIVE / PAUSED via PATCH. Optimistic update keeps the
+  // header pill in sync; on failure we revert and toast the error.
+  const togglePauseMarketing = async () => {
+    if (statusBusy) return;
+    const next = property.status === 'PAUSED' ? 'ACTIVE' : 'PAUSED';
+    setStatusBusy(true);
+    const prev = property;
+    setProperty({ ...property, status: next });
+    try {
+      await api.updateProperty(property.id, { status: next });
+      toast.success(next === 'PAUSED' ? 'השיווק הושהה' : 'השיווק חודש');
+      await load();
+    } catch (e) {
+      setProperty(prev);
+      toast.error(e?.message || 'עדכון הסטטוס נכשל');
+    } finally {
+      setStatusBusy(false);
+    }
+  };
+
+  // ── V1 Refined — next-best action heuristic ────────────────────
+  // Picks the most pressing pending interaction so the action rail can
+  // surface a single clear CTA at the top. Order:
+  //   1. A NEW or NEGOTIATING offer waiting for a response
+  //   2. A "hot" lead match that hasn't been contacted yet
+  //   3. Owner exclusivity expiring within 14 days
+  //   4. null (rail just shows the 6 quick actions)
+  const nextAction = (() => {
+    if (newOffers.length > 0) {
+      const top = newOffers[0];
+      return {
+        kind: 'offer',
+        title: `חזור ל${top.buyerName || 'מתעניין'} על ההצעה`,
+        sub: `${formatPrice(top.amount)} · ממתינה למענה`,
+        cta: 'התקשר עכשיו',
+        phone: top.buyerPhone,
+        onClick: () => {
+          if (top.buyerPhone) window.location.href = telUrl(top.buyerPhone);
+          else setTab('buyers');
+        },
+      };
+    }
+    if (exclusivityDaysLeft != null && exclusivityDaysLeft >= 0 && exclusivityDaysLeft <= 14) {
+      return {
+        kind: 'exclusivity',
+        title: 'בלעדיות עומדת להסתיים',
+        sub: `${exclusivityDaysLeft} ימים נותרו · עדכן את הבעלים`,
+        cta: 'פתח כרטיס בעלים',
+        onClick: () => setTab('owner'),
+      };
+    }
+    return null;
+  })();
+
   return (
-    <div className="property-detail pd-dashboard">
+    <div className="property-detail prd-page" data-theme="light">
       <PageTour
         pageKey="property-detail"
         steps={[
           { target: 'body', placement: 'center',
             title: 'כרטיס הנכס',
-            content: 'דשבורד מלא: 22 פעולות שיווק, בעל הנכס, תמונות, בלעדיות והערות. מעל — כפתורי העברה, עריכה, שיתוף לקוח (וסטורי באפליקציה).' },
+            content: 'KPI מהיר למעלה, פעולות מהירות בצד, וטאבים לפי הקשר: הנכס · בעל הנכס · מתעניינים · פעילות.' },
         ]}
       />
-      {/* Top toolbar — DT inline styles (back link + action buttons).
-          UX review F-6.1 + F-6.2 — canonical toolbar order:
-          Edit (highest frequency) · Share · landing · Prospect ·
-          Transfer · Story (native only) · Print · Pop-out · Delete. */}
-      <div style={PD_DT.toolbar}>
-        <Link to="/properties" style={PD_DT.backLink}>
-          <ArrowRight size={16} />
-          <span>חזרה לנכסים</span>
+
+      {/* V1 Refined header — breadcrumb + identity + status pills + Share/Edit
+          + kebab menu for secondary actions. The legacy toolbar (10+ buttons)
+          collapsed into a single overflow menu so the row is scannable. */}
+      <header className="prd-header">
+        <Link to="/properties" className="prd-breadcrumb">
+          <ArrowRight size={13} aria-hidden="true" />
+          <span>נכסים · {property.city || ''}</span>
         </Link>
-        <div style={PD_DT.actionsRow}>
-          <button type="button" style={PD_DT.secondaryBtn} onClick={() => navigate(`/properties/${id}/edit`)}>
-            <Edit3 size={14} />
-            <span>עריכה</span>
-          </button>
-          <button type="button" style={PD_DT.secondaryBtn} onClick={handleDuplicate} disabled={duplicating} title="צור עותק של הנכס">
-            <Copy size={14} />
-            <span>{duplicating ? 'משכפל…' : 'שכפל נכס'}</span>
-          </button>
-          <button type="button" style={PD_DT.secondaryBtn} onClick={handleShare}>
-            <Share2 size={14} />
-            <span>שתף</span>
-          </button>
-          <button
-            type="button"
-            style={PD_DT.secondaryBtn}
-            onClick={copyLandingLink}
-            title="קישור לדף נחיתה פרימיום — תמונות, טופס, ללא פרטים"
-          >
-            {landingCopied ? <Check size={14} aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
-            <span>{landingCopied ? 'הקישור הועתק' : 'דף נחיתה'}</span>
-          </button>
-          <button type="button" style={PD_DT.secondaryBtn} onClick={() => setProspectOpen(true)}>
-            <UserPlus size={14} />
-            <span>צור הסכם תיווך</span>
-          </button>
-          <button type="button" style={PD_DT.secondaryBtn} onClick={() => setTransferOpen(true)} title="העברה לסוכן אחר">
-            <ArrowLeftRight size={14} />
-            <span>העבר</span>
-          </button>
-          {isNative() && (
+        <div className="prd-id-row">
+          <div className="prd-id">
+            <h1>
+              {[property.street, property.city].filter(Boolean).join(', ') || property.type || 'נכס ללא כתובת'}
+            </h1>
+            <div className="prd-id-meta">
+              {[
+                property.neighborhood,
+                property.type,
+                property.rooms != null ? `${property.rooms} חד׳` : null,
+                property.sqm != null ? `${property.sqm} מ״ר` : null,
+                property.floor != null ? `קומה ${formatFloor(property.floor, property.totalFloors)}` : null,
+              ].filter(Boolean).join(' · ')}
+            </div>
+          </div>
+          <div className="prd-id-actions">
+            {(() => {
+              const sc = statusChipMeta(property.status);
+              const cls = property.status === 'SOLD' ? 'prd-pill prd-pill-success'
+                : property.status === 'PAUSED' ? 'prd-pill prd-pill-gold'
+                : property.status === 'OFF_MARKET' || property.status === 'ARCHIVED' ? 'prd-pill prd-pill-muted'
+                : 'prd-pill prd-pill-success';
+              return (
+                <span className={cls}>
+                  <span className="prd-pill-dot" />
+                  {sc.label}{daysListed != null ? ` · יום ${daysListed}` : ''}
+                </span>
+              );
+            })()}
+            {hasExclusivity && exclusivityDaysLeft != null && exclusivityDaysLeft > 0 && (
+              <span className="prd-pill prd-pill-gold">
+                <Sparkles size={11} /> בלעדיות · {exclusivityDaysLeft} ימים
+              </span>
+            )}
+            <button type="button" className="prd-btn" onClick={handleShare}>
+              <Share2 size={13} aria-hidden="true" /> שתף
+            </button>
             <button
               type="button"
-              style={PD_DT.secondaryBtn}
-              onClick={handleInstagramStory}
-              aria-label="שתף בסטורי של אינסטגרם"
+              className="prd-btn prd-btn-primary"
+              onClick={() => navigate(`/properties/${id}/edit`)}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <rect x="2" y="2" width="20" height="20" rx="5" />
-                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-              </svg>
-              <span>סטורי</span>
+              <Edit3 size={13} aria-hidden="true" /> ערוך נכס
             </button>
-          )}
-          <button type="button" style={PD_DT.ghostBtn} onClick={() => printPage()} title="הדפס">
-            <Printer size={14} />
-            <span>הדפס</span>
-          </button>
-          <button type="button" style={PD_DT.ghostBtn} onClick={() => popoutCurrentRoute()} title="פתח בחלון חדש">
-            <Maximize2 size={14} />
-            <span>פתח בחלון חדש</span>
-          </button>
-          <button type="button" style={PD_DT.dangerBtn} onClick={() => setConfirmDelete(true)}>
-            <Trash2 size={14} />
-            <span>מחיקה</span>
-          </button>
+            <div className="prd-more">
+              <button
+                type="button"
+                className="prd-more-btn"
+                aria-haspopup="menu"
+                aria-expanded={moreMenuOpen}
+                aria-label="עוד פעולות"
+                onClick={(e) => { e.stopPropagation(); setMoreMenuOpen((v) => !v); }}
+              >
+                ⋯
+              </button>
+              {moreMenuOpen && (
+                <div className="prd-more-menu" role="menu">
+                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); handleDuplicate(); }} disabled={duplicating}>
+                    <Copy size={14} /> {duplicating ? 'משכפל…' : 'שכפל נכס'}
+                  </button>
+                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); copyLandingLink(); }}>
+                    {landingCopied ? <Check size={14} /> : <Sparkles size={14} />}
+                    {landingCopied ? 'הקישור הועתק' : 'דף נחיתה ללקוחות'}
+                  </button>
+                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); setProspectOpen(true); }}>
+                    <UserPlus size={14} /> צור הסכם תיווך
+                  </button>
+                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); setTransferOpen(true); }}>
+                    <ArrowLeftRight size={14} /> העבר לסוכן אחר
+                  </button>
+                  {isNative() && (
+                    <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); handleInstagramStory(); }}>
+                      <Sparkles size={14} /> שתף בסטורי
+                    </button>
+                  )}
+                  <div className="prd-more-sep" />
+                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); printPage(); }}>
+                    <Printer size={14} /> הדפס
+                  </button>
+                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); popoutCurrentRoute(); }}>
+                    <Maximize2 size={14} /> פתח בחלון חדש
+                  </button>
+                  <div className="prd-more-sep" />
+                  <button type="button" className="prd-more-item prd-more-item-danger" onClick={() => { setMoreMenuOpen(false); setConfirmDelete(true); }}>
+                    <Trash2 size={14} /> מחק נכס
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* KPI hero — 5 tiles. Most actionable summary at the top of the page. */}
+      <div className="prd-kpis">
+        <div className="prd-kpi">
+          <div className="prd-kpi-head">
+            <span className="prd-kpi-icon"><Target size={15} aria-hidden="true" /></span>
+            <span className="prd-kpi-label">מחיר ביקוש</span>
+          </div>
+          <div className="prd-kpi-value">{property.marketingPrice != null ? formatPrice(property.marketingPrice) : '—'}</div>
+          <div className="prd-kpi-sub prd-tone-info">
+            {pricePerSqm != null ? `₪${pricePerSqm.toLocaleString('he-IL')} למ״ר` : (property.category === 'RENT' ? 'להשכרה' : 'למכירה')}
+          </div>
+        </div>
+        <div className="prd-kpi">
+          <div className="prd-kpi-head">
+            <span className="prd-kpi-icon"><Users size={15} aria-hidden="true" /></span>
+            <span className="prd-kpi-label">מתעניינים</span>
+          </div>
+          <div className="prd-kpi-value">{interestsCount}</div>
+          <div className={`prd-kpi-sub ${activeInterestsCount > 0 ? 'prd-tone-info' : 'prd-tone-muted'}`}>
+            {activeInterestsCount > 0 ? `${activeInterestsCount} פעילים` : 'אין פעילים'}
+          </div>
+        </div>
+        <div className="prd-kpi">
+          <div className="prd-kpi-head">
+            <span className="prd-kpi-icon"><Activity size={15} aria-hidden="true" /></span>
+            <span className="prd-kpi-label">צפיות</span>
+          </div>
+          <div className="prd-kpi-value">{pageViews}</div>
+          <div className={`prd-kpi-sub ${pageViews > 0 ? 'prd-tone-info' : 'prd-tone-muted'}`}>
+            {inquiriesCount > 0 ? `${inquiriesCount} פניות` : 'כניסות לעמוד'}
+          </div>
+        </div>
+        <div className="prd-kpi">
+          <div className="prd-kpi-head">
+            <span className="prd-kpi-icon"><MapPin size={15} aria-hidden="true" /></span>
+            <span className="prd-kpi-label">סיורים</span>
+          </div>
+          <div className="prd-kpi-value">{viewingsCount}</div>
+          <div className={`prd-kpi-sub ${viewingsCount > 0 ? 'prd-tone-success' : 'prd-tone-muted'}`}>
+            {daysListed != null ? `${daysListed} ימים בשוק` : '—'}
+          </div>
+        </div>
+        <div className="prd-kpi">
+          <div className="prd-kpi-head">
+            <span className="prd-kpi-icon"><Banknote size={15} aria-hidden="true" /></span>
+            <span className="prd-kpi-label">הצעה פעילה</span>
+          </div>
+          <div className="prd-kpi-value">{topOfferAmount != null ? formatPrice(topOfferAmount) : '—'}</div>
+          <div className={`prd-kpi-sub ${topOfferAmount != null ? 'prd-tone-hot' : 'prd-tone-muted'}`}>
+            {newOffers.length > 0 ? `${newOffers.length} הצעות פתוחות` : 'אין הצעות פתוחות'}
+          </div>
         </div>
       </div>
 
-      {/* Header card — address + asset-class / category / status chips + price.
-          Sub-panels below (PropertyHero, KPI strip, etc.) keep their
-          existing class-based markup. */}
-      {(() => {
-        const statusChip = statusChipMeta(property.status);
-        const assetLabel = property.assetClass === 'COMMERCIAL' ? 'מסחרי' : 'מגורים';
-        const categoryLabel = property.category === 'SALE' ? 'למכירה' : 'להשכרה';
-        const streetLine = [property.street, property.city].filter(Boolean).join(', ');
-        return (
-          <div style={PD_DT.headerCard}>
-            <div style={PD_DT.headerAvatar} aria-hidden="true">
-              <Building2 size={28} />
-            </div>
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <h1 style={PD_DT.headerTitle}>
-                {streetLine || property.type || 'נכס ללא כתובת'}
-              </h1>
-              <div style={PD_DT.headerSub}>
-                {property.type && <span>{property.type}</span>}
-                {property.rooms != null && <span>· {property.rooms} חד׳</span>}
-                {property.sqm != null && <span>· {property.sqm} מ״ר</span>}
-                {property.floor != null && (
-                  <span>· קומה {formatFloor(property.floor, property.totalFloors)}</span>
-                )}
+      {/* Main grid — action rail (left) + tabbed body (right). */}
+      <div className="prd-grid">
+        {/* LEFT — Quick actions rail */}
+        <aside className="prd-rail">
+          <div className="prd-rail-label">פעולות מהירות</div>
+
+          {nextAction && (
+            <div className="prd-next">
+              <div className="prd-next-head">
+                <span className="prd-next-bolt"><Sparkles size={13} aria-hidden="true" /></span>
+                <span className="prd-next-tag">הצעד הבא</span>
               </div>
-              <div style={PD_DT.chipRow}>
-                <span style={pdChip({
-                  bg: property.assetClass === 'COMMERCIAL' ? 'rgba(180,83,9,0.12)' : _DT.goldSoft,
-                  fg: property.assetClass === 'COMMERCIAL' ? '#b45309' : _DT.goldDark,
-                })}>
-                  <Building2 size={12} /> {assetLabel}
-                </span>
-                <span style={pdChip({
-                  bg: property.category === 'SALE' ? _DT.goldSoft : 'rgba(30,26,20,0.06)',
-                  fg: property.category === 'SALE' ? _DT.goldDark : _DT.ink,
-                })}>
-                  {categoryLabel}
-                </span>
-                <span style={pdChip({ bg: statusChip.bg, fg: statusChip.fg })}>
-                  {statusChip.label}
-                </span>
-                {hasExclusivity && exclusivityDaysLeft != null && exclusivityDaysLeft > 0 && (
-                  <span style={pdChip({
-                    bg: _DT.goldSoft, fg: _DT.goldDark,
-                  })}>
-                    <Sparkles size={12} /> בלעדיות · {exclusivityDaysLeft} ימים
-                  </span>
-                )}
-              </div>
+              <div className="prd-next-title">{nextAction.title}</div>
+              <div className="prd-next-sub">{nextAction.sub}</div>
+              <button type="button" className="prd-next-cta" onClick={nextAction.onClick}>
+                {nextAction.kind === 'offer' && nextAction.phone ? <Phone size={12} /> : <ChevronLeft size={12} />}
+                {nextAction.cta}
+              </button>
             </div>
-            {property.marketingPrice != null && (
-              <div style={PD_DT.price} title="מחיר שיווק">
-                {formatPrice(property.marketingPrice)}
+          )}
+
+          {/* Call owner */}
+          <button
+            type="button"
+            className="prd-quick"
+            onClick={() => {
+              if (ownerPhone) window.location.href = telUrl(ownerPhone);
+              else setOwnerPickerOpen(true);
+            }}
+            disabled={!ownerPhone && !linkedOwner}
+          >
+            <span className="prd-quick-ico"><Phone size={15} aria-hidden="true" /></span>
+            <span className="prd-quick-body">
+              <span className="prd-quick-label">{ownerPhone ? 'התקשר לבעלים' : 'הוסף בעל נכס'}</span>
+              <span className="prd-quick-sub">{ownerName || 'עדיין לא מקושר'}</span>
+            </span>
+          </button>
+
+          {/* WhatsApp to buyers */}
+          <button
+            type="button"
+            className="prd-quick prd-quick-wa"
+            onClick={handleWhatsApp}
+          >
+            <span className="prd-quick-ico"><WhatsAppIcon size={15} /></span>
+            <span className="prd-quick-body">
+              <span className="prd-quick-label">WhatsApp לקונים</span>
+              <span className="prd-quick-sub">
+                {(() => {
+                  const matches = (leads || []).filter((l) => leadMatchesProperty(l, property));
+                  return `${matches.length} מתעניינים תואמים`;
+                })()}
+              </span>
+            </span>
+          </button>
+
+          {/* Share landing page */}
+          <button type="button" className="prd-quick" onClick={copyLandingLink}>
+            <span className="prd-quick-ico">{landingCopied ? <Check size={15} /> : <Share2 size={15} />}</span>
+            <span className="prd-quick-body">
+              <span className="prd-quick-label">{landingCopied ? 'הקישור הועתק' : 'שתף דף נחיתה'}</span>
+              <span className="prd-quick-sub" dir="ltr">
+                {landingLink ? landingLink.replace(/^https?:\/\//, '') : 'estia.app/l/...'}
+              </span>
+            </span>
+          </button>
+
+          {/* Manage media */}
+          <button type="button" className="prd-quick" onClick={() => setManagingPhotos(true)}>
+            <span className="prd-quick-ico"><Images size={15} /></span>
+            <span className="prd-quick-body">
+              <span className="prd-quick-label">ניהול תמונות וסרטונים</span>
+              <span className="prd-quick-sub">
+                {(property.images?.length || 0)} תמונות
+                {property.videos?.length ? ` · ${property.videos.length} סרטונים` : ''}
+              </span>
+            </span>
+          </button>
+
+          {/* Exclusivity */}
+          <button type="button" className="prd-quick" onClick={() => setPanel('exclusivity')}>
+            <span className="prd-quick-ico"><FileText size={15} /></span>
+            <span className="prd-quick-body">
+              <span className="prd-quick-label">הסכם בלעדיות</span>
+              <span className="prd-quick-sub">
+                {hasExclusivity
+                  ? (exclusivityDaysLeft != null && exclusivityDaysLeft > 0
+                    ? `${exclusivityDaysLeft} ימים נותרו`
+                    : exclusivityDaysLeft != null && exclusivityDaysLeft <= 0
+                    ? 'פג תוקף'
+                    : 'פעיל')
+                  : 'לא הוגדר'}
+              </span>
+            </span>
+          </button>
+
+          {/* Pause / resume marketing */}
+          <button
+            type="button"
+            className="prd-quick"
+            onClick={togglePauseMarketing}
+            disabled={statusBusy}
+          >
+            <span className="prd-quick-ico">
+              {property.status === 'PAUSED' ? <Megaphone size={15} /> : <Clock size={15} />}
+            </span>
+            <span className="prd-quick-body">
+              <span className="prd-quick-label">
+                {property.status === 'PAUSED' ? 'הפעל שיווק' : 'השהה שיווק'}
+              </span>
+              <span className="prd-quick-sub">
+                {statusBusy ? 'מעדכן…' : property.status === 'PAUSED' ? 'הנכס מושהה כעת' : 'מסומן כפעיל'}
+              </span>
+            </span>
+          </button>
+        </aside>
+
+        {/* RIGHT — Tabs card */}
+        <div className="prd-tabs-card">
+          {/* Tab strip + More pills */}
+          <div className="prd-tabs-strip">
+            <div className="prd-tabs" role="tablist">
+              {[
+                { k: 'property', label: 'הנכס',     icon: <Building2 size={14} /> },
+                { k: 'owner',    label: 'בעל הנכס', icon: <User size={14} /> },
+                { k: 'buyers',   label: 'מתעניינים', icon: <Users size={14} />, count: interestsCount || null },
+                { k: 'activity', label: 'פעילות',   icon: <Activity size={14} /> },
+              ].map((t) => (
+                <button
+                  key={t.k}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.k}
+                  className={`prd-tab ${tab === t.k ? 'is-active' : ''}`}
+                  onClick={() => setTab(t.k)}
+                >
+                  <span className="prd-tab-icon">{t.icon}</span>
+                  <span>{t.label}</span>
+                  {t.count != null && <span className="prd-tab-count">{t.count}</span>}
+                </button>
+              ))}
+            </div>
+            <div className="prd-more-pills">
+              <button type="button" className="prd-more-pill" onClick={() => setPanel('marketing')} aria-label="פתח פאנל פעולות שיווק">
+                <span>שיווק</span>
+                <span className="prd-more-pill-count">{done}/{total}</span>
+              </button>
+              <button type="button" className="prd-more-pill" onClick={() => setManagingPhotos(true)} aria-label="ניהול מדיה (תמונות וסרטונים)">
+                <span>מדיה</span>
+                <span className="prd-more-pill-count">
+                  {(property.images?.length || 0) + (property.videos?.length || 0)}
+                </span>
+              </button>
+              <button type="button" className="prd-more-pill" onClick={() => setTab('buyers')} aria-label="עבור לטאב מתעניינים לצפייה בהצעות">
+                <span>הצעות</span>
+                <span className="prd-more-pill-count">{offers.length}</span>
+              </button>
+              <button
+                type="button"
+                className="prd-more-pill"
+                aria-label="גלול אל הסכמי תיווך"
+                onClick={() => {
+                  document.getElementById('prd-agreements-anchor')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              >
+                <span>הסכמים</span>
+                <span className="prd-more-pill-count">{agreementsCount}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tab body — switches by `tab` */}
+          <div className="prd-tab-body">
+            {tab === 'property' && (
+              <div className="prd-prop-grid">
+                <div className="prd-card prd-card-flush">
+                  <div className="prd-prop-hero">
+                    <img src={images[currentImage] || images[0]} alt={`${property.street}, ${property.city}`} />
+                    {images.length > 1 && (
+                      <div className="prd-prop-thumbs">
+                        {images.slice(0, 5).map((g, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            className={`prd-prop-thumb ${i === currentImage ? 'is-active' : ''}`}
+                            onClick={() => setCurrentImage(i)}
+                            aria-label={`תמונה ${i + 1}`}
+                          >
+                            <img src={g} alt="" />
+                          </button>
+                        ))}
+                        {images.length > 5 && (
+                          <button
+                            type="button"
+                            className="prd-prop-thumb prd-prop-thumb-more"
+                            onClick={() => setLightboxIdx(currentImage)}
+                            aria-label={`עוד ${images.length - 5} תמונות`}
+                          >
+                            +{images.length - 5}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: 20 }}>
+                    <div className="prd-card-eyebrow">מפרט</div>
+                    <div className="prd-spec-grid">
+                      {[
+                        { l: 'חדרים',    v: property.rooms ?? '—' },
+                        { l: 'שטח',      v: property.sqm != null ? `${property.sqm} מ״ר` : '—' },
+                        { l: 'קומה',     v: property.floor != null ? formatFloor(property.floor, property.totalFloors) : '—' },
+                        { l: 'מצב',      v: property.renovated || '—' },
+                        { l: 'חניה',     v: property.parking ? 'יש' : 'אין' },
+                        { l: 'מחסן',     v: property.storage ? 'יש' : 'אין' },
+                        { l: 'ממ״ד',     v: property.safeRoom ? 'יש' : 'אין' },
+                        { l: 'מעלית',    v: property.elevator ? 'יש' : 'אין' },
+                        { l: 'מרפסת',    v: property.balconySize > 0 ? `${property.balconySize} מ״ר` : 'אין' },
+                        { l: 'כיוונים',  v: property.airDirections || '—' },
+                        { l: 'גיל בניין', v: property.buildingAge != null ? `${property.buildingAge} שנים` : '—' },
+                        { l: 'מזגנים',   v: property.ac ? 'יש' : 'אין' },
+                      ].map((s, i) => (
+                        <div key={i}>
+                          <div className="prd-spec-label">{s.l}</div>
+                          <div className="prd-spec-value">{s.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {property.notes && (
+                      <>
+                        <div className="prd-card-eyebrow" style={{ marginTop: 18 }}>תיאור שיווקי</div>
+                        <div style={{ fontSize: 13.5, color: '#3a3329', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                          {property.notes}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="prd-card">
+                    <div className="prd-card-eyebrow">מחיר ושוק</div>
+                    <div className="prd-price">{property.marketingPrice != null ? formatPrice(property.marketingPrice) : '—'}</div>
+                    <div className="prd-price-row">
+                      {pricePerSqm != null && (
+                        <span style={{ fontSize: 12, color: '#6b6356', fontWeight: 600 }}>
+                          ₪{pricePerSqm.toLocaleString('he-IL')} למ״ר
+                        </span>
+                      )}
+                      <span className={property.category === 'RENT' ? 'prd-pill prd-pill-muted' : 'prd-pill prd-pill-gold'}>
+                        {property.category === 'RENT' ? 'להשכרה' : 'למכירה'}
+                      </span>
+                    </div>
+                    {property.street && property.city && (
+                      <MarketContextCard
+                        propertyId={property.id}
+                        propertyCategory={property.category}
+                        propertyStreet={property.street}
+                        propertyCity={property.city}
+                      />
+                    )}
+                  </div>
+
+                  <div className="prd-card">
+                    <div className="prd-card-eyebrow">מיקום</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#1e1a14', letterSpacing: -0.3 }}>
+                      {property.street}, {property.city}
+                    </div>
+                    {property.neighborhood && (
+                      <div style={{ fontSize: 12, color: '#6b6356', marginTop: 2 }}>{property.neighborhood}</div>
+                    )}
+                    <div className="dc-map-mini" style={{ marginTop: 12 }}>
+                      <iframe
+                        title="מיקום הנכס"
+                        src={mapsEmbed}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                    </div>
+                    <a
+                      href={mapsOpen}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="prd-btn"
+                      style={{ marginTop: 10, display: 'inline-flex' }}
+                    >
+                      <ExternalLink size={13} /> פתח במפות
+                    </a>
+                  </div>
+
+                  <PropertyBrokersCard propertyId={property.id} />
+                </div>
               </div>
             )}
-          </div>
-        );
-      })()}
 
-      {/* Hero — gallery + price/title/CTAs */}
-      <PropertyHero
-        property={property}
-        images={images}
-        currentImage={currentImage}
-        onPrev={prevImage}
-        onNext={nextImage}
-        onSelectImage={setCurrentImage}
-        onOpenLightbox={(i) => setLightboxIdx(i)}
-        onManagePhotos={() => setManagingPhotos(true)}
-        onManageVideos={() => setManagingVideos(true)}
-        onWhatsApp={handleWhatsApp}
-        onCopyLink={(link) => copy(link)}
-        copied={copied}
-        wazeHref={wazeUrl(`${property.street} ${property.city}`)}
-        customerLink={customerLink}
-        isMobile={isMobile}
-        formatPrice={formatPrice}
-        dragOver={dragOver}
-        onDragOver={handleGalleryDragOver}
-        onDragLeave={handleGalleryDragLeave}
-        onDrop={handleGalleryDrop}
-      />
-
-      {/* 2026-05-10 — Reordered per Adam's UX pass:
-          KPI strip → matched-leads dispatch → market context →
-          broker / interest / owner panels. The "מתאים למתעניינים"
-          quick-dispatch + KPI tiles are the most actionable items in
-          the page, so they sit at the top. */}
-
-      {/* KPI strip — top */}
-      <div className="pd-kpis animate-in animate-in-delay-2">
-        <PropertyKpiTile
-          value={`${pct}%`}
-          label="שיווק"
-          sublabel={`${done}/${total}`}
-          onClick={() => setPanel('marketing')}
-        />
-        <PropertyKpiTile
-          value={pageViews}
-          label="צפיות בעמוד"
-          sublabel="כניסות לעמוד הנכס"
-          tone={pageViews > 0 ? 'gold' : 'neutral'}
-        />
-        <PropertyKpiTile
-          value={inquiriesCount}
-          label="פניות"
-          sublabel="קשרו עם הנכס"
-          tone={inquiriesCount > 0 ? 'gold' : 'neutral'}
-        />
-        <PropertyKpiTile
-          value={daysListed != null ? daysListed : '—'}
-          label="ימים בשוק"
-          tone="neutral"
-        />
-      </div>
-
-      {/* Matched-leads quick dispatch — second */}
-      {(() => {
-        const matches = (leads || []).filter((l) => leadMatchesProperty(l, property));
-        if (matches.length === 0) return null;
-        const top = matches.slice(0, 3);
-        const restCount = matches.length - top.length;
-        return (
-          <section className="pd-matches animate-in animate-in-delay-2" aria-label="מתעניינים תואמים">
-            <header className="pd-matches-head">
-              <span>מתאים ל-{matches.length} מתעניינים</span>
-            </header>
-            <ul className="pd-matches-list">
-              {top.map((lead) => (
-                <li key={lead.id}>
-                  <button
-                    type="button"
-                    className="pd-match-row"
-                    onClick={() => openWhatsApp({ phone: lead.phone, text: buildMessage() })}
-                    title={`שלח למתעניין ${lead.name} בוואטסאפ`}
-                  >
-                    <span className="pd-match-name">{lead.name}</span>
-                    <span className="pd-match-meta">
-                      {lead.city || '—'}{lead.budget ? ` · תקציב ₪${Number(lead.budget).toLocaleString('he-IL')}` : ''}
-                    </span>
-                    <span className="pd-match-cta">
-                      <WhatsAppIcon size={14} /> שלח בוואטסאפ
-                    </span>
-                  </button>
-                </li>
-              ))}
-              {restCount > 0 && (
-                <li>
-                  <button
-                    type="button"
-                    className="pd-match-more"
-                    onClick={() => { setPickerLeadsOverride(matches); setPickerOpen(true); }}
-                  >
-                    ראה עוד {restCount} מתעניינים תואמים
-                  </button>
-                </li>
-              )}
-            </ul>
-          </section>
-        );
-      })()}
-
-      {/* Market context — third */}
-      {property.street && property.city && (
-        <MarketContextCard
-          propertyId={property.id}
-          propertyCategory={property.category}
-          propertyStreet={property.street}
-          propertyCity={property.city}
-        />
-      )}
-
-      {/* 2026-05-03 — Per-property external broker contacts. */}
-      <PropertyBrokersCard propertyId={property.id} />
-
-      {/* 2026-05-10 — לוח פעילות: per-lead activity log. */}
-      <PropertyInterestsPanel propertyId={property.id} />
-
-      {/* 2026-05-10 — לוח פעילות: owner-side conversation log. */}
-      <OwnerActivityPanel propertyId={property.id} />
-
-      {/* P-3 — Signed brokerage agreements for this asset. */}
-      <PropertyAgreementsSection propertyId={property.id} leads={leads} />
-
-      {/* Dashboard cards grid */}
-      <div className="pd-grid">
-
-        {/* Marketing — primary card with gold trim */}
-        <DashCard
-          variant="primary"
-          delay={1}
-          icon={<Megaphone size={16} />}
-          title="שיווק"
-          action={(
-            <button className="dc-cta" onClick={() => setPanel('marketing')}>
-              נהל כל ה-{total} פעולות
-              <ChevronLeft size={14} />
-            </button>
-          )}
-        >
-          <div className="dc-progress-row">
-            <div className="dc-progress-bar">
-              <div className="dc-progress-fill" style={{ width: `${pct}%` }} />
-            </div>
-            <span className="dc-progress-num">{pct}%</span>
-          </div>
-          <div className="dc-channel-grid">
-            {MARKETING_HIGHLIGHTS.map((k) => {
-              const on = !!actionsMap[k];
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => toggleMarketingAction(k)}
-                  className={`dc-channel ${on ? 'is-on' : ''}`}
-                  title={MARKETING_LABELS[k]}
-                >
-                  {on
-                    ? <CheckCircle2 size={14} className="dc-channel-icon on" />
-                    : <Circle size={14} className="dc-channel-icon" />}
-                  <span>{MARKETING_LABELS[k]}</span>
-                </button>
-              );
-            })}
-          </div>
-        </DashCard>
-
-        {/* Owner */}
-        <DashCard
-          delay={2}
-          icon={<User size={16} />}
-          title="בעל הנכס"
-          action={(
-            <div className="dc-cta-row">
-              <button
-                className="dc-cta dc-cta-ghost"
-                onClick={() => setOwnerPickerOpen(true)}
-                disabled={ownerSaving}
-                title="החלף את בעל הנכס המקושר"
-                type="button"
-              >
-                <Pencil size={12} />
-                {ownerSaving ? 'שומר…' : (linkedOwner?.id ? 'החלף' : 'הוסף')}
-              </button>
-              <button className="dc-cta" onClick={() => setPanel('owner')} type="button">
-                {linkedOwner?.id ? 'פתח כרטיס' : 'פרטים'}
-                <ChevronLeft size={14} />
-              </button>
-            </div>
-          )}
-        >
-          {ownerName ? (
-            <>
-              <div className="dc-owner">
-                <div className="dc-owner-avatar">{ownerInitial}</div>
-                <div className="dc-owner-id">
-                  {linkedOwner?.id ? (
-                    <Link to={`/owners/${linkedOwner.id}`} className="dc-owner-name dc-owner-link">
-                      {ownerName}
-                    </Link>
-                  ) : (
-                    <span className="dc-owner-name">{ownerName}</span>
-                  )}
-                  {ownerPhone && (
-                    <a href={telUrl(ownerPhone)} className="dc-owner-meta">
-                      <Phone size={12} />
-                      {ownerPhone}
-                    </a>
-                  )}
-                </div>
-                {ownerPhone && (
-                  <div className="dc-owner-round-actions" aria-hidden="false">
-                    <a
-                      href={telUrl(ownerPhone)}
-                      className="dc-owner-round dc-owner-round-call"
-                      aria-label={`התקשר ל${ownerName}`}
-                      title={`התקשר ל${ownerName}`}
-                    >
-                      <Phone size={18} />
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => openWhatsApp({ phone: ownerPhone, text: `שלום ${ownerName}` })}
-                      className="dc-owner-round dc-owner-round-wa"
-                      aria-label={`וואטסאפ ל${ownerName}`}
-                      title={`וואטסאפ ל${ownerName}`}
-                    >
-                      <WhatsAppIcon size={20} />
+            {tab === 'owner' && (
+              <div className="prd-owner-grid">
+                <div className="prd-card">
+                  <div className="prd-owner-id">
+                    <div className="prd-owner-avatar">{ownerInitial}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="prd-card-eyebrow">בעל הנכס</div>
+                      <div className="prd-owner-name">{ownerName || 'לא מוגדר'}</div>
+                      <div className="prd-owner-meta">
+                        {ownerPhone || '—'}{ownerEmail ? ` · ${ownerEmail}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="prd-owner-quick">
+                    {ownerPhone && (
+                      <a href={telUrl(ownerPhone)} className="prd-quick">
+                        <span className="prd-quick-ico"><Phone size={15} /></span>
+                        <span className="prd-quick-body">
+                          <span className="prd-quick-label">התקשר</span>
+                          <span className="prd-quick-sub" dir="ltr">{ownerPhone}</span>
+                        </span>
+                      </a>
+                    )}
+                    {ownerPhone && (
+                      <button
+                        type="button"
+                        className="prd-quick prd-quick-wa"
+                        onClick={() => openWhatsApp({ phone: ownerPhone, text: `שלום ${ownerName}` })}
+                      >
+                        <span className="prd-quick-ico"><WhatsAppIcon size={15} /></span>
+                        <span className="prd-quick-body">
+                          <span className="prd-quick-label">WhatsApp</span>
+                          <span className="prd-quick-sub">עדכון שיווק</span>
+                        </span>
+                      </button>
+                    )}
+                    {ownerEmail && (
+                      <a href={`mailto:${ownerEmail}`} className="prd-quick">
+                        <span className="prd-quick-ico"><FileText size={15} /></span>
+                        <span className="prd-quick-body">
+                          <span className="prd-quick-label">אימייל</span>
+                          <span className="prd-quick-sub">דוח שבועי</span>
+                        </span>
+                      </a>
+                    )}
+                    <button type="button" className="prd-quick" onClick={() => setPanel('exclusivity')}>
+                      <span className="prd-quick-ico"><FileText size={15} /></span>
+                      <span className="prd-quick-body">
+                        <span className="prd-quick-label">הסכם בלעדיות</span>
+                        <span className="prd-quick-sub">
+                          {hasExclusivity
+                            ? (exclusivityDaysLeft != null && exclusivityDaysLeft > 0 ? `פעיל · ${exclusivityDaysLeft} ימים` : 'פעיל')
+                            : 'לא הוגדר'}
+                        </span>
+                      </span>
                     </button>
                   </div>
-                )}
-              </div>
-              {ownerPhone && (
-                <div className="dc-owner-actions dc-owner-actions-desktop">
-                  <a
-                    href={telUrl(ownerPhone)}
-                    className="dc-mini dc-mini-secondary"
-                    aria-label={`Call ${ownerName}`}
-                  >
-                    <Phone size={13} />
-                    <span>התקשר</span>
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => openWhatsApp({ phone: ownerPhone, text: `שלום ${ownerName}` })}
-                    className="dc-mini dc-mini-wa"
-                    aria-label={`WhatsApp ${ownerName}`}
-                  >
-                    <WhatsAppIcon size={13} />
-                    <span>שלח בוואטסאפ</span>
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="dc-empty">לא מוגדר בעל נכס</p>
-          )}
-        </DashCard>
 
-        {/* Photos preview */}
-        <DashCard
-          delay={3}
-          icon={<Images size={16} />}
-          title={`תמונות (${property.images?.length || 0})`}
-          action={(
-            <button className="dc-cta" onClick={() => setManagingPhotos(true)}>
-              ניהול
-              <ChevronLeft size={14} />
-            </button>
-          )}
-        >
-          {property.images?.length > 0 ? (
-            <div className="dc-thumbs">
-              {property.images.slice(0, 4).map((img, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="dc-thumb"
-                  onClick={() => setLightboxIdx(i)}
-                  aria-label={`פתח תמונה ${i + 1}`}
-                >
-                  <img
-                    src={img}
-                    alt=""
-                    width="280"
-                    height="210"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  {i === 3 && property.images.length > 4 && (
-                    <span className="dc-thumb-more">+{property.images.length - 4}</span>
+                  {hasExclusivity && (
+                    <div style={{ marginTop: 18 }}>
+                      <div className="prd-owner-progress-row">
+                        <span style={{ letterSpacing: 0.4, textTransform: 'uppercase' }}>בלעדיות</span>
+                        <span style={{ color: '#7a5c2c' }}>
+                          {exclusivityDaysLeft != null && exclusivityDaysLeft > 0
+                            ? `${exclusivityDaysLeft} ימים נותרו`
+                            : exclusivityRel?.label || ''}
+                        </span>
+                      </div>
+                      <div className="prd-owner-progress-track">
+                        <div
+                          className="prd-owner-progress-fill"
+                          style={{
+                            width: (() => {
+                              if (!property.exclusiveStart || !property.exclusiveEnd) return '50%';
+                              const start = new Date(property.exclusiveStart).getTime();
+                              const end = new Date(property.exclusiveEnd).getTime();
+                              const now = Date.now();
+                              if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return '50%';
+                              const pct2 = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
+                              return `${pct2.toFixed(0)}%`;
+                            })(),
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#9c9384', fontWeight: 600, marginTop: 6 }}>
+                        <span>{property.exclusiveStart ? new Date(property.exclusiveStart).toLocaleDateString('he-IL') : '—'}</span>
+                        <span>{property.exclusiveEnd ? new Date(property.exclusiveEnd).toLocaleDateString('he-IL') : '—'}</span>
+                      </div>
+                    </div>
                   )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="dc-empty">אין עדיין תמונות. גרור או הדבק להעלאה מהירה.</p>
-          )}
-          <p className="dc-hint">גרור או הדבק תמונות לעדכון</p>
-        </DashCard>
 
-        {/* Exclusivity */}
-        <DashCard
-          delay={4}
-          icon={<Clock size={16} />}
-          title="בלעדיות"
-          action={(
-            <button className="dc-cta" onClick={() => setPanel('exclusivity')}>
-              {hasExclusivity ? 'פרטים' : 'הגדר'}
-              <ChevronLeft size={14} />
-            </button>
-          )}
-        >
-          {hasExclusivity ? (
-            <div className="dc-excl">
-              {property.exclusiveEnd && (
-                <div className="dc-excl-line">
-                  <span className="dc-excl-label">סיום</span>
-                  <span className="dc-excl-value">
-                    {new Date(property.exclusiveEnd).toLocaleDateString('he-IL')}
-                  </span>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="prd-btn"
+                      onClick={() => setOwnerPickerOpen(true)}
+                      disabled={ownerSaving}
+                    >
+                      <Pencil size={13} /> {linkedOwner?.id ? 'החלף בעל נכס' : 'קשר בעל נכס'}
+                    </button>
+                    {linkedOwner?.id && (
+                      <Link to={`/owners/${linkedOwner.id}`} className="prd-btn">
+                        <User size={13} /> פתח כרטיס מלא
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              )}
-              {exclusivityRel && (
-                <div className={`dc-excl-pill dc-excl-pill-${
-                  exclusivityDaysLeft != null && exclusivityDaysLeft < 0 ? 'expired'
-                  : exclusivityDaysLeft != null && exclusivityDaysLeft <= 14 ? 'soon'
-                  : 'normal'
-                }`}>
-                  {exclusivityRel.label}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+                  <OwnerActivityPanel propertyId={property.id} />
                 </div>
-              )}
-              <div className="dc-excl-status">
-                סטטוס: <strong>{property.status === 'PAUSED' ? 'מושהה' : property.status === 'ARCHIVED' ? 'בארכיון' : 'פעיל'}</strong>
               </div>
-            </div>
-          ) : (
-            <p className="dc-empty">לא הוגדרה תקופת בלעדיות</p>
-          )}
-        </DashCard>
+            )}
 
-        {/* Notes / features */}
-        <DashCard
-          delay={5}
-          icon={<Sparkles size={16} />}
-          title="הערות ומאפיינים"
-          action={(
-            <button className="dc-cta" onClick={() => setPanel('notes')}>
-              <Pencil size={13} />
-              ערוך
-            </button>
-          )}
-        >
-          {featureChips.length > 0 && (
-            <div className="dc-feature-chips">
-              {featureChips.slice(0, 6).map((c) => (
-                <span key={c} className="dc-feature-chip">{c}</span>
-              ))}
-              {featureChips.length > 6 && (
-                <span className="dc-feature-chip dc-feature-chip-more">+{featureChips.length - 6}</span>
-              )}
-            </div>
-          )}
-          {property.notes ? (
-            <p className="dc-notes-preview">{property.notes}</p>
-          ) : featureChips.length === 0 ? (
-            <p className="dc-empty">אין הערות עדיין</p>
-          ) : null}
-        </DashCard>
+            {tab === 'buyers' && (
+              <PropertyInterestsPanel propertyId={property.id} />
+            )}
 
-        {/* Map */}
-        <DashCard
-          delay={5}
-          icon={<MapPin size={16} />}
-          title="מיקום"
-          action={(
-            <a
-              href={mapsOpen}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="dc-cta"
-            >
-              <ExternalLink size={13} />
-              פתח במפות
-            </a>
-          )}
-        >
-          <div className="dc-map-mini">
-            <iframe
-              title="מיקום הנכס"
-              src={mapsEmbed}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
+            {tab === 'activity' && (
+              <ActivityPanel entityType="PROPERTY" entityId={property.id} />
+            )}
           </div>
-          <div className="dc-map-addr">{property.street}, {property.city}</div>
-        </DashCard>
-
-        {/* MLS parity — adverts (F1) */}
-        <DashCard
-          delay={6}
-          icon={<Megaphone size={16} />}
-          title="מודעות פרסום"
-          action={(
-            <button
-              type="button"
-              className="dc-cta"
-              onClick={() => setPanel('adverts')}
-              aria-label="נהל מודעות פרסום"
-            >
-              נהל
-              <ChevronLeft size={14} />
-            </button>
-          )}
-        >
-          <p className="dc-empty">לחץ "נהל" לפתיחה</p>
-        </DashCard>
-
-        {/* Sprint 10 — התאמות פומביות. Owner-only opt-in + attribution
-            widget (non-owners already see the pool on /public-matches). */}
-        <PropertyPublicMatchBlock
-          property={property}
-          isOwner={property.agentId === user?.id}
-          onChange={(updated) => setProperty(updated)}
-        />
-
-        {/* 2026-05-10 — removed: שותפים לנכס, לקוחות תואמים, צנרת
-            תיווך per Adam's UX pass. The buyer-side PropertyInterestsPanel
-            above already covers attached leads + their interactions. */}
-
-        {/* MLS parity — reminders (D1) */}
-        <DashCard
-          delay={8}
-          icon={<Bell size={16} />}
-          title="תזכורות"
-          action={(
-            <button
-              type="button"
-              className="dc-cta"
-              onClick={() => setPanel('reminders')}
-              aria-label="פתח תזכורות"
-            >
-              פתח
-              <ChevronLeft size={14} />
-            </button>
-          )}
-        >
-          <p className="dc-empty">הוסף תזכורת לפעולה עתידית על הנכס</p>
-        </DashCard>
-
-        {/* MLS parity — activity (H3) */}
-        <DashCard
-          delay={8}
-          icon={<Activity size={16} />}
-          title="פעילות"
-          action={(
-            <button
-              type="button"
-              className="dc-cta"
-              onClick={() => setPanel('activity')}
-              aria-label="הצג פעילות"
-            >
-              הצג
-              <ChevronLeft size={14} />
-            </button>
-          )}
-        >
-          <p className="dc-empty">יומן פעולות שבוצעו על הנכס</p>
-        </DashCard>
-
+        </div>
       </div>
+
+      {/* P-3 — Signed brokerage agreements for this asset, kept below the
+          tabbed body so the agent can scan it without leaving the page.
+          The "הסכמים" More-pill scrolls here. */}
+      <div id="prd-agreements-anchor" />
+      <PropertyAgreementsSection propertyId={property.id} leads={leads} />
 
       {/* ── Slide-in panels ── */}
       {panel === 'marketing' && (

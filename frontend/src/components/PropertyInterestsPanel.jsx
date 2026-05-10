@@ -160,7 +160,7 @@ export default function PropertyInterestsPanel({
       ) : items.length === 0 ? (
         <div className="pi-empty">
           {mode === 'property'
-            ? 'אין מתעניינים משויכים. שייך/י לקוחות כדי להתחיל לעקוב אחרי הסיורים, ההצעות וההסכמים.'
+            ? 'אין מתעניינים משויכים. שייך לקוחות כדי להתחיל לעקוב אחרי הסיורים, ההצעות וההסכמים.'
             : 'הליד עדיין לא משויך לאף נכס. ניתן לשייך אותו מתוך עמוד הנכס.'}
         </div>
       ) : (
@@ -184,7 +184,7 @@ export default function PropertyInterestsPanel({
         <LeadPickerSheet
           property={null}
           leads={allLeads}
-          previewText="בחר/י את המתעניינים שברצונך לשייך לנכס"
+          previewText="בחר את המתעניינים שברצונך לשייך לנכס"
           onPick={(lead) => onAttach([lead.id])}
           onMulti={(leads) => onAttach(leads.map((l) => l.id))}
           onClose={() => setPickerOpen(false)}

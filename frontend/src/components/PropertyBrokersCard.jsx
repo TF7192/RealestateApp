@@ -97,7 +97,7 @@ export default function PropertyBrokersCard({ propertyId }) {
         <div className="pi-empty">טוען…</div>
       ) : items.length === 0 ? (
         <div className="pi-empty">
-          טרם הוספת קולגות. לחץ/י "הוסף קולגה" כדי להוסיף את המתווך הראשון.
+          טרם הוספת קולגות. לחץ "הוסף קולגה" כדי להוסיף את המתווך הראשון.
         </div>
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -361,6 +361,10 @@ export const defaultHandlers = [
   http.get('/api/leads/:id/matches', () => HttpResponse.json({ items: [] })),
   http.get('/api/properties/:id/matching-customers', () => HttpResponse.json({ items: [] })),
 
+  // Brokerage agreements list — used by PropertyDetail's "הסכמים" pill
+  // count and the PropertyAgreementsSection card.
+  http.get('/api/agreements', () => HttpResponse.json({ items: [] })),
+
   // PropertyInterest (2026-05-14) — per-(lead, property) action log.
   http.get('/api/properties/:id/interests', () => HttpResponse.json({ items: [] })),
   http.get('/api/leads/:id/interests', () => HttpResponse.json({ items: [] })),

@@ -40,51 +40,47 @@ function renderDetail() {
   });
 }
 
-describe('<PropertyDetail> — MLS parity wiring', () => {
-  it('shows the adverts / activity / reminders cards', async () => {
+describe('<PropertyDetail> — V1 Refined layout', () => {
+  it('renders the KPI hero and the four relationship tabs', async () => {
     server.use(
       http.get('/api/properties/:id', () =>
         HttpResponse.json({ property: propertyFixture })
       )
     );
     renderDetail();
-    // PropertyDetail renders the address as a heading in two surfaces:
-    // the page header and the PropertyHero card. Both intentionally
-    // duplicate the address — accept either by going through getAllBy.
     await waitFor(() =>
       expect(screen.getAllByRole('heading', { name: /הרצל 15/ }).length).toBeGreaterThan(0),
     );
-    expect(screen.getByText('מודעות פרסום')).toBeInTheDocument();
-    expect(screen.getByText('תזכורות')).toBeInTheDocument();
-    expect(screen.getByText('פעילות')).toBeInTheDocument();
+    // KPI hero — 5 tiles labelled by uppercase eyebrow. "מתעניינים"
+    // shows up twice (KPI eyebrow + tab label) so use getAllBy.
+    expect(screen.getByText('מחיר ביקוש')).toBeInTheDocument();
+    expect(screen.getAllByText('מתעניינים').length).toBeGreaterThan(0);
+    expect(screen.getByText('הצעה פעילה')).toBeInTheDocument();
+    // Tabs — relationships. "הנכס" is a substring of "בעל הנכס" so use
+    // exact name matchers via the tab-list role pattern.
+    expect(screen.getByRole('tab', { name: 'הנכס' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'בעל הנכס' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /מתעניינים/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'פעילות' })).toBeInTheDocument();
+    // More pills — secondary surfaces
+    expect(screen.getByRole('button', { name: /פאנל פעולות שיווק/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ניהול מדיה/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /גלול אל הסכמי תיווך/ })).toBeInTheDocument();
   });
 
-  it('opens the adverts panel and submits a draft advert', async () => {
-    let postBody: Record<string, unknown> | null = null;
+  it('switches to the בעל הנכס tab when clicked', async () => {
     server.use(
       http.get('/api/properties/:id', () =>
         HttpResponse.json({ property: propertyFixture })
-      ),
-      http.post('/api/properties/:id/adverts', async ({ request }) => {
-        postBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ advert: { id: 'new-1', ...postBody } });
-      })
+      )
     );
     const user = userEvent.setup();
     renderDetail();
-    // PropertyDetail renders the address as a heading in two surfaces:
-    // the page header and the PropertyHero card. Both intentionally
-    // duplicate the address — accept either by going through getAllBy.
     await waitFor(() =>
       expect(screen.getAllByRole('heading', { name: /הרצל 15/ }).length).toBeGreaterThan(0),
     );
-    await user.click(screen.getByRole('button', { name: 'נהל מודעות פרסום' }));
-    // Panel content: click the primary CTA in the empty state.
-    const newButtons = await screen.findAllByRole('button', { name: /מודעה חדשה/ });
-    await user.click(newButtons[0]);
-    await user.selectOptions(screen.getByLabelText('ערוץ המודעה'), 'FACEBOOK');
-    await user.click(screen.getByRole('button', { name: 'שמור מודעה' }));
-    await waitFor(() => expect(postBody).toBeTruthy());
-    expect(postBody!.channel).toBe('FACEBOOK');
+    const ownerTab = screen.getByRole('tab', { name: 'בעל הנכס' });
+    await user.click(ownerTab);
+    await waitFor(() => expect(ownerTab).toHaveAttribute('aria-selected', 'true'));
   });
 });
