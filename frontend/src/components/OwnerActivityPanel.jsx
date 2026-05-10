@@ -6,6 +6,7 @@
 // general updates. Distinct from PropertyInterestsPanel which is the
 // buyer-side log.
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus, Banknote, MessageSquare, TrendingDown, DoorOpen,
   Megaphone, AlertCircle, FileText, Activity as ActivityIcon,
@@ -143,7 +144,7 @@ function ComposePopup({ title, onClose, children }) {
       document.removeEventListener('keydown', onEsc);
     };
   }, [onClose]);
-  return (
+  return createPortal(
     <div
       className="pi-popup-back"
       role="dialog"
@@ -160,7 +161,8 @@ function ComposePopup({ title, onClose, children }) {
         </header>
         <div className="pi-popup-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

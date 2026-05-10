@@ -17,6 +17,7 @@
 // "deeply incorporated" requirement.
 
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
   Plus, Footprints, Banknote, FileText, Calendar as CalendarIcon,
@@ -313,36 +314,31 @@ function InterestRow({
             )}
           </div>
 
-          {/* Action buttons with their stat counts INSIDE — agent sees
-              "+ סיור · 0" and gets "this is what you have" + "click to add"
-              in one place. Was: stats above + buttons below = 2 rows. */}
+          {/* Action chips — one row of "+ סיור / + הצעה / + הסכם /
+              + פגישה" with no count. */}
           <div className="pi-row-actions">
             <ActionBtn
               kind="viewing"
               active={activeForm === 'viewing'}
-              label={`סיור · ${stats.tours || 0}`}
+              label="סיור"
               onToggle={() => setActiveForm(activeForm === 'viewing' ? null : 'viewing')}
             />
             <ActionBtn
               kind="offer"
               active={activeForm === 'offer'}
-              label={
-                stats.topOfferAmount != null
-                  ? `הצעה · ${stats.offers} · ${fmtMoney(stats.topOfferAmount)}`
-                  : `הצעה · ${stats.offers || 0}`
-              }
+              label="הצעה"
               onToggle={() => setActiveForm(activeForm === 'offer' ? null : 'offer')}
             />
             <ActionBtn
               kind="agreement"
               active={activeForm === 'agreement'}
-              label={`הסכם · ${stats.agreements || 0}`}
+              label="הסכם"
               onToggle={() => setActiveForm(activeForm === 'agreement' ? null : 'agreement')}
             />
             <ActionBtn
               kind="meeting"
               active={activeForm === 'meeting'}
-              label={`פגישה · ${stats.meetings || 0}`}
+              label="פגישה"
               onToggle={() => setActiveForm(activeForm === 'meeting' ? null : 'meeting')}
             />
             <button
@@ -352,6 +348,20 @@ function InterestRow({
               title="הסר שיוך"
               aria-label="הסר שיוך"
             ><Trash2 size={13} /></button>
+          </div>
+
+          {/* Stats summary — UNDER the + buttons (was: inside button
+              labels). One scannable row of `<count> <noun>` chips. */}
+          <div className="pi-row-stats">
+            <span className="pi-stat"><Footprints size={13} /> {stats.tours || 0} סיורים</span>
+            <span className="pi-stat">
+              <Banknote size={13} /> {stats.offers || 0} {stats.offers === 1 ? 'הצעה' : 'הצעות'}
+              {stats.topOfferAmount != null && (
+                <span className="pi-stat-em"> · {fmtMoney(stats.topOfferAmount)}</span>
+              )}
+            </span>
+            <span className="pi-stat"><FileText size={13} /> {stats.agreements || 0} הסכמים</span>
+            <span className="pi-stat"><CalendarIcon size={13} /> {stats.meetings || 0} פגישות</span>
           </div>
         </div>
       )}
@@ -380,7 +390,7 @@ function InterestRow({
 
       {isExpanded && (
         <div style={{ padding: '0 16px 16px' }}>
-          <InterestTimeline interestId={it.id} />
+          <InterestTimeline interestId={it.id} propertyId={it.propertyId} />
         </div>
       )}
     </li>
@@ -422,16 +432,40 @@ function StatusPill({ status, onChange }) {
   );
 }
 
-function InterestTimeline({ interestId }) {
+function InterestTimeline({ interestId, propertyId }) {
+  const toast = useToast();
   const [events, setEvents] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false;
     api.getInterestTimeline(interestId)
       .then((r) => { if (!cancelled) setEvents(r?.items || []); })
       .catch(() => { if (!cancelled) setEvents([]); });
     return () => { cancelled = true; };
   }, [interestId]);
+
+  useEffect(() => load(), [load]);
+
+  // Delete the underlying row by event kind. Each kind has its own
+  // backend route — offers via /properties/:id/offers/:offerId, etc.
+  // Some kinds (contract, agreement, meeting, viewing) don't have a
+  // delete endpoint yet so we silently fall back to a "not supported"
+  // toast.
+  const handleDelete = async (e) => {
+    if (!confirm('למחוק את הרשומה?')) return;
+    try {
+      if (e.kind === 'offer' && propertyId) {
+        await api.deletePropertyOffer(propertyId, e.id);
+      } else {
+        toast?.error?.('המחיקה לסוג זה אינה זמינה כרגע');
+        return;
+      }
+      toast?.success?.('הרשומה נמחקה');
+      load();
+    } catch (err) {
+      toast?.error?.(err?.message || 'מחיקה נכשלה');
+    }
+  };
 
   if (events === null) {
     return <div className="pi-timeline-empty">טוען היסטוריה…</div>;
@@ -455,6 +489,19 @@ function InterestTimeline({ interestId }) {
     contract:  'חוזים',
     meeting:   'פגישות',
   };
+  const OFFER_STATUS_LABEL = {
+    NEW:         'חדשה',
+    NEGOTIATING: 'במו"מ',
+    ACCEPTED:    'התקבלה',
+    DECLINED:    'נדחתה',
+    WITHDRAWN:   'נמשכה',
+  };
+  const offerStatusTone = (s) => (
+    s === 'ACCEPTED' ? { background: 'rgba(21,128,61,0.12)', color: '#15803d' } :
+    s === 'DECLINED' || s === 'WITHDRAWN' ? { background: 'rgba(185,28,28,0.10)', color: '#b91c1c' } :
+    s === 'NEGOTIATING' ? { background: 'rgba(180,139,76,0.16)', color: '#7a5c2c' } :
+    { background: 'rgba(180,139,76,0.10)', color: '#7a5c2c' }
+  );
 
   return (
     <div className="pi-timeline-stack">
@@ -464,22 +511,53 @@ function InterestTimeline({ interestId }) {
             {SECTION_LABEL[k]} <span className="pi-timeline-headline-count">· {byKind[k].length}</span>
           </h4>
           <ul className="pi-timeline" role="list">
-            {byKind[k].map((e) => (
-              <li key={`${e.kind}-${e.id}`} className={`pi-event pi-event-${e.kind}`}>
-                <span className="pi-event-icon">
-                  {e.kind === 'viewing' && <Footprints size={14} />}
-                  {e.kind === 'offer' && <Banknote size={14} />}
-                  {e.kind === 'agreement' && <FileText size={14} />}
-                  {e.kind === 'contract' && <FileText size={14} />}
-                  {e.kind === 'meeting' && <CalendarIcon size={14} />}
-                </span>
-                <div className="pi-event-body">
-                  <div className="pi-event-title">{eventTitle(e)}</div>
-                  {eventSubtitle(e) && <div className="pi-event-sub">{eventSubtitle(e)}</div>}
-                </div>
-                <span className="pi-event-time">{relDate(e.at)}</span>
-              </li>
-            ))}
+            {byKind[k].map((e) => {
+              const p = e.payload || {};
+              return (
+                <li key={`${e.kind}-${e.id}`} className={`pi-event pi-event-${e.kind}`}>
+                  <span className="pi-event-icon">
+                    {e.kind === 'viewing' && <Footprints size={14} />}
+                    {e.kind === 'offer' && <Banknote size={14} />}
+                    {e.kind === 'agreement' && <FileText size={14} />}
+                    {e.kind === 'contract' && <FileText size={14} />}
+                    {e.kind === 'meeting' && <CalendarIcon size={14} />}
+                  </span>
+                  <div className="pi-event-body">
+                    <div className="pi-event-title">
+                      {eventTitle(e)}
+                      {e.kind === 'offer' && p.status && (
+                        <span style={{
+                          marginInlineStart: 8,
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          ...offerStatusTone(p.status),
+                        }}>
+                          {OFFER_STATUS_LABEL[p.status] || p.status}
+                        </span>
+                      )}
+                    </div>
+                    {eventSubtitle(e) && <div className="pi-event-sub">{eventSubtitle(e)}</div>}
+                  </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span className="pi-event-time">{relDate(e.at)}</span>
+                    {e.kind === 'offer' && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(e)}
+                        title="מחק רשומה"
+                        aria-label="מחק רשומה"
+                        style={{
+                          background: 'transparent', border: 'none', padding: 4,
+                          borderRadius: 6, cursor: 'pointer', color: 'rgba(30,26,20,0.4)',
+                        }}
+                      ><Trash2 size={12} /></button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ))}
@@ -508,7 +586,10 @@ function eventSubtitle(e) {
 
 // ── Action button (toggles its inline form) ─────────────────
 // 2026-05-10 — Modal wrapper used by interest-row action forms.
-// Esc + backdrop-click close. Locks page scroll while open.
+// Esc + backdrop-click close. Locks page scroll while open. Portaled
+// to document.body so the dim backdrop covers the topbar / sidebar /
+// any other stacking context the row lives inside (li > section >
+// .prd-tab-body, etc.).
 function FormPopup({ title, onClose, children }) {
   useEffect(() => {
     const onEsc = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -520,7 +601,7 @@ function FormPopup({ title, onClose, children }) {
       document.removeEventListener('keydown', onEsc);
     };
   }, [onClose]);
-  return (
+  return createPortal(
     <div
       className="pi-popup-back"
       role="dialog"
@@ -537,7 +618,8 @@ function FormPopup({ title, onClose, children }) {
         </header>
         <div className="pi-popup-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

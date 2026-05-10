@@ -676,6 +676,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     status:     z.enum(['NEW', 'NEGOTIATING', 'ACCEPTED', 'DECLINED', 'WITHDRAWN']).optional(),
     notes:      z.string().max(2000).nullable().optional(),
     receivedAt: z.string().datetime().or(z.literal('')).nullable().optional(),
+    // Buyer↔seller dialog fields. `direction` flags which side proposed
+    // this round; `replyToOfferId` threads counter-offers to their parent.
+    direction:      z.enum(['BUYER_TO_SELLER', 'SELLER_TO_BUYER']).optional(),
+    replyToOfferId: z.string().nullable().optional(),
+    relayedAmount:  z.number().int().nonnegative().nullable().optional(),
+    paymentTerms:   z.string().max(2000).nullable().optional(),
+    handoverNotes:  z.string().max(1000).nullable().optional(),
   });
 
   app.get('/:id/offers', { onRequest: [app.requireAgent] }, async (req, reply) => {
@@ -724,6 +731,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         status:     body.status || 'NEW',
         notes:      body.notes || null,
         receivedAt: body.receivedAt ? new Date(body.receivedAt) : new Date(),
+        direction:      body.direction || 'BUYER_TO_SELLER',
+        replyToOfferId: body.replyToOfferId ?? null,
+        relayedAmount:  body.relayedAmount ?? null,
+        paymentTerms:   body.paymentTerms ?? null,
+        handoverNotes:  body.handoverNotes ?? null,
       },
     });
     await logActivity({

@@ -2232,7 +2232,7 @@ function OwnerOffersCard({ propertyId, offers, onChange, marketingPrice }) {
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontWeight: 800, fontSize: 14 }}>
-                    {sellerSide ? '◀ הצעה נגדית' : '▶ הצעת מתעניין'}
+                    {sellerSide ? 'הצעה נגדית' : 'הצעת מתעניין'}
                   </span>
                   <span style={{ color: '#6b6356', fontSize: 12 }}>·</span>
                   <span style={{ fontSize: 13.5, color: '#1e1a14' }}>{o.buyerName || '—'}</span>
