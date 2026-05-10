@@ -99,7 +99,13 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
 
   const handleFiles = async (fileList) => {
     const files = Array.from(fileList || []);
-    if (!files.length) return;
+    if (!files.length) {
+      // Surface something even when the picker closed empty — silent
+      // returns here are how the bug at the call site (file-list
+      // cleared before this fn ran) hid itself for so long.
+      setErr('לא נבחרו קבצים. נסי שוב.');
+      return;
+    }
     // Task 4 · seed optimistic thumbs BEFORE the HTTP request fires, so
     // Chrome has visible state-change on return from the file picker —
     // both a reassurance for the agent and a cue that focus returned.
@@ -262,10 +268,18 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
                   // succeeds — browsers allow it when it's the same event
                   // loop as a user gesture.
                   try { window.focus(); } catch { /* ignore */ }
-                  const files = e.target.files;
-                  // Reset the input value BEFORE firing uploads so the
-                  // element isn't holding references while we upload;
-                  // also lets the user re-select the same file later.
+                  // Materialize the FileList into a concrete array
+                  // BEFORE resetting the input. On Chrome/Windows the
+                  // captured `e.target.files` reference is cleared in
+                  // step with `value = ''`, so `Array.from()` later
+                  // sees zero files and `handleFiles` silent-returns.
+                  // Reproduced on prod 2026-05-10 — file picker opened,
+                  // agent picked a file, and nothing happened on screen.
+                  const files = Array.from(e.target.files || []);
+                  // Reset the input value AFTER capture so the user
+                  // can re-select the same file later (without this,
+                  // picking the same filename a second time wouldn't
+                  // fire onChange).
                   e.target.value = '';
                   handleFiles(files);
                 }}
