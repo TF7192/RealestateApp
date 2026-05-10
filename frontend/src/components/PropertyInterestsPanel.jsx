@@ -223,13 +223,21 @@ function InterestRow({
 
   return (
     <li className={`pi-row pi-row-status-${it.status?.toLowerCase()} ${isExpanded ? 'pi-row-expanded' : 'pi-row-collapsed'}`}>
-      {/* Always-visible compact header — name, heat pill, status pill,
-          quick stats line, last-activity. Clicking the row body toggles
-          the expanded view (full stats grid + actions). */}
-      <button
-        type="button"
+      {/* Compact summary — name + heat + offer/tour chips + status pill +
+          chevron. Whole row is clickable; StatusPill stops propagation
+          so its dropdown doesn't toggle the expand. Plain <div> + onClick
+          (not <button>) because StatusPill renders its own button inside. */}
+      <div
         className="pi-row-summary"
+        role="button"
+        tabIndex={0}
         onClick={onToggleExpand}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleExpand();
+          }
+        }}
         aria-expanded={isExpanded}
       >
         <div className="pi-row-head">
@@ -244,20 +252,21 @@ function InterestRow({
             )}
           </div>
           <span className="pi-row-summary-right">
-            {/* Compact stats inline — agent can scan without expanding */}
             {stats.offers > 0 && (
-              <span className="pi-stat-compact">
+              <span className="pi-stat-compact pi-stat-compact-hot">
                 <Banknote size={12} /> {stats.topOfferAmount != null ? fmtMoney(stats.topOfferAmount) : `${stats.offers}`}
               </span>
             )}
             {stats.tours > 0 && (
               <span className="pi-stat-compact"><Footprints size={12} /> {stats.tours}</span>
             )}
-            <StatusPill
-              status={it.status}
-              onChange={(next) => onStatusChange(it.id, next)}
-            />
-            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            <span onClick={(e) => e.stopPropagation()}>
+              <StatusPill
+                status={it.status}
+                onChange={(next) => onStatusChange(it.id, next)}
+              />
+            </span>
+            {isExpanded ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
           </span>
         </div>
         {(it.lastActionLabel || it.lastActionAt) && (
@@ -266,7 +275,7 @@ function InterestRow({
             <span className="pi-row-last-time"> · {relDate(it.lastActionAt || it.createdAt)}</span>
           </div>
         )}
-      </button>
+      </div>
 
       {isExpanded && (
         <div className="pi-row-expand">
@@ -342,20 +351,11 @@ function InterestRow({
         </FormPopup>
       )}
 
-      <button
-        type="button"
-        className="pi-toggle"
-        onClick={onToggleExpand}
-        aria-expanded={isExpanded}
-      >
-        {isExpanded ? (
-          <><ChevronUp size={14} /> צמצם היסטוריה</>
-        ) : (
-          <><ChevronDown size={14} /> הצג היסטוריה מלאה</>
-        )}
-      </button>
-
-      {isExpanded && <InterestTimeline interestId={it.id} />}
+      {isExpanded && (
+        <div style={{ padding: '0 16px 16px' }}>
+          <InterestTimeline interestId={it.id} />
+        </div>
+      )}
     </li>
   );
 }

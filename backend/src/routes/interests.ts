@@ -14,6 +14,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { logActivity } from '../lib/activity.js';
 import { requireUser } from '../middleware/auth.js';
 
 const statusEnum = z.enum(['IN_PROGRESS', 'CLOSED', 'FELL', 'PAUSED']);
@@ -443,6 +444,31 @@ export const registerInterestRoutes: FastifyPluginAsync = async (app) => {
     // Bump the interest's lastActionAt so the panel re-sorts to put
     // this lead at the top.
     await bumpInterestActivity(interest.id);
+
+    // 2026-05-10 — write to the property's ActivityLog so the פעילות
+    // tab on PropertyDetail reflects every interest action. Was: only
+    // top-level CRUD on the property updated the log; interest actions
+    // (offers, viewings, agreements, meetings) were silent.
+    const leadName = interest.lead?.name || 'מתעניין';
+    const summary =
+      bodyBase.kind === 'viewing'   ? `${leadName} סייר בנכס` :
+      bodyBase.kind === 'offer'     ? `${leadName} הציע מחיר` :
+      bodyBase.kind === 'agreement' ? `הסכם עם ${leadName} נשלח לחתימה` :
+      bodyBase.kind === 'meeting'   ? `נקבעה פגישה עם ${leadName}` :
+      `פעילות עם ${leadName}`;
+    await logActivity({
+      agentId:    u.id,
+      actorId:    u.id,
+      verb:       bodyBase.kind === 'viewing' ? 'viewed'
+                : bodyBase.kind === 'offer' ? 'offered'
+                : bodyBase.kind === 'agreement' ? 'agreement_sent'
+                : 'meeting_scheduled',
+      entityType: 'Property',
+      entityId:   interest.propertyId,
+      summary,
+      metadata:   { interestId: interest.id, leadId: interest.leadId, kind: bodyBase.kind },
+    });
+
     return reply.code(201).send({ kind: bodyBase.kind, item: created });
   });
 

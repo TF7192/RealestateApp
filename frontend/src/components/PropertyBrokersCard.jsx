@@ -4,6 +4,7 @@
 // Each entry has a quick call/WhatsApp action; "+ הוסף" opens a popup
 // form to add a new broker.
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Phone, MessageCircle, Mail, Trash2, X, Briefcase } from 'lucide-react';
 import api from '../lib/api';
 import { waUrl, telUrl } from '../lib/waLink';
@@ -257,47 +258,35 @@ function BrokerDialog({ propertyId, editing, onClose, onSaved }) {
     }
   };
 
-  return (
+  // 2026-05-10 — reuse the .pi-popup-* shell so the broker dialog gets
+  // the same centered overlay + fade/lift animation as the rest of the
+  // property-page popups. Portaled to body via createPortal so it
+  // escapes the underlying card's stacking context (was bleeding through
+  // PropertyDocuments / StickyActionBar at z-index 90).
+  return createPortal(
     <div
+      className="pi-popup-back"
       role="dialog"
       aria-modal="true"
       aria-labelledby="brk-title"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 90,
-        background: 'rgba(13,15,20,0.55)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
-      }}
     >
       <form
         dir="rtl"
         onSubmit={submit}
         autoComplete="off"
-        style={{
-          ...FONT,
-          width: 'min(520px, 100%)',
-          background: _DT.white, borderRadius: 14,
-          boxShadow: '0 30px 80px rgba(0,0,0,0.35)',
-          display: 'flex', flexDirection: 'column',
-          maxHeight: '90vh', overflow: 'hidden',
-        }}
+        className="pi-popup-card"
+        style={{ ...FONT, width: 'min(560px, 100%)' }}
       >
-        <header style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 18px', borderBottom: `1px solid ${_DT.border}`,
-        }}>
-          <h3 id="brk-title" style={{ margin: 0, fontSize: 16, fontWeight: 800, color: _DT.ink }}>
+        <header className="pi-popup-head">
+          <h3 id="brk-title" className="pi-popup-title" style={{ margin: 0 }}>
             {editing ? 'עריכת קולגה' : 'הוסף קולגה'}
           </h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="סגור"
-            style={{
-              background: 'transparent', border: 'none', padding: 6,
-              borderRadius: 8, cursor: 'pointer', color: _DT.muted,
-            }}
+            className="pi-popup-close"
           ><X size={18} /></button>
         </header>
 
@@ -367,7 +356,8 @@ function BrokerDialog({ propertyId, editing, onClose, onSaved }) {
           </button>
         </footer>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -9,9 +9,11 @@
 // The composed body lands in Contract.body and is hashed at create time
 // (documentHash) so any later tamper is detectable on the signed PDF.
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Save, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
+import './PropertyInterestsPanel.css';
 
 const _DT = {
   ink: '#1e1a14',
@@ -161,41 +163,28 @@ export default function OwnerAgreementDialog({ property, onClose, onCreated }) {
     }
   };
 
-  return (
+  // 2026-05-10 — wrap in the shared .pi-popup-* shell so the dialog
+  // matches the rest of the property-page popups (centered, animated,
+  // sticky header). Portaled to body.
+  return createPortal(
     <div
+      className="pi-popup-back"
       role="dialog"
       aria-modal="true"
       aria-labelledby="oad-title"
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1200,
-        background: 'rgba(13,15,20,0.55)',
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        padding: 16, overflow: 'auto',
-      }}
     >
       <form
         ref={panelRef}
         dir="rtl"
         onSubmit={submit}
         autoComplete="off"
-        style={{
-          ...FONT,
-          width: 'min(640px, 100%)',
-          background: _DT.white, borderRadius: 14,
-          boxShadow: '0 30px 80px rgba(0,0,0,0.35)',
-          display: 'flex', flexDirection: 'column',
-          maxHeight: 'calc(100vh - 32px)', overflow: 'hidden',
-          marginTop: 16, marginBottom: 16,
-        }}
+        className="pi-popup-card"
+        style={{ ...FONT, width: 'min(640px, 100%)' }}
       >
-        <header style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 18px', borderBottom: `1px solid ${_DT.border}`,
-          background: `linear-gradient(180deg, ${_DT.goldSoft}, transparent)`,
-        }}>
+        <header className="pi-popup-head">
           <div>
-            <h3 id="oad-title" style={{ margin: 0, fontSize: 16, fontWeight: 800, color: _DT.ink }}>
+            <h3 id="oad-title" className="pi-popup-title" style={{ margin: 0 }}>
               הסכם בלעדיות לבעל הנכס
             </h3>
             <div style={{ fontSize: 12, color: _DT.muted, marginTop: 2 }}>
@@ -206,10 +195,7 @@ export default function OwnerAgreementDialog({ property, onClose, onCreated }) {
             type="button"
             onClick={onClose}
             aria-label="סגור"
-            style={{
-              background: 'transparent', border: 'none', padding: 6,
-              borderRadius: 8, cursor: 'pointer', color: _DT.muted,
-            }}
+            className="pi-popup-close"
           ><X size={18} /></button>
         </header>
 
@@ -350,7 +336,8 @@ export default function OwnerAgreementDialog({ property, onClose, onCreated }) {
           </button>
         </footer>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 

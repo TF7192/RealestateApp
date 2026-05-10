@@ -62,39 +62,105 @@
   gap: 12px;
 }
 
-/* ── Individual interest row card ── */
+/* ── Individual interest row card — 2026-05-10 redesign
+ * Clean two-state card: collapsed shows name + heat + offer + status
+ * pill on a single line, expanded reveals stats + actions. The whole
+ * collapsed surface is the toggle. */
 .pi-row {
   background: var(--bg-card, #fff);
   border: 1px solid var(--border, rgba(30, 26, 20, 0.10));
   border-radius: 12px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s, background 0.15s;
 }
+.pi-row.pi-row-collapsed:hover { border-color: rgba(30, 26, 20, 0.18); }
 .pi-row-status-closed   { border-color: rgba(21, 128, 61, 0.32); background: rgba(21, 128, 61, 0.03); }
 .pi-row-status-fell     { border-color: rgba(185, 28, 28, 0.32); background: rgba(185, 28, 28, 0.03); }
 .pi-row-status-paused   { border-color: rgba(180, 83, 9, 0.32); background: rgba(180, 83, 9, 0.03); }
 
-/* Row head — name + status pill */
+/* Summary header — entire row is the click target. Vertical padding keeps
+   the resting hit area generous; horizontal alignment puts identity on
+   the right (RTL leading) and stats + status on the left (RTL trailing). */
+.pi-row-summary {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 14px 16px;
+  cursor: pointer;
+  text-align: start;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+}
+.pi-row-summary:hover { background: rgba(30, 26, 20, 0.02); }
+.pi-row-expanded .pi-row-summary { background: rgba(180, 139, 76, 0.04); }
+
+/* Header row: identity (right) | stats + status pill + chevron (left) */
 .pi-row-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 .pi-row-identity {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 .pi-row-name {
   font-size: 15px;
   font-weight: 800;
   color: var(--text-primary, #1e1a14);
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pi-row-name:hover { color: var(--gold-dark, #7a5c2c); }
+
+.pi-row-summary-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: var(--text-secondary, #6b6356);
+}
+
+/* Compact stats — inline pill summary used in the collapsed view. */
+.pi-stat-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--bg-elevated, rgba(30, 26, 20, 0.04));
+  color: var(--text-primary, #1e1a14);
+  font-size: 12px;
+  font-weight: 700;
+}
+.pi-stat-compact.pi-stat-compact-hot {
+  background: rgba(180, 139, 76, 0.14);
+  color: var(--gold-dark, #7a5c2c);
+}
+
+/* Expand body — full stats + actions, only rendered when row is open. */
+.pi-row-expand {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid rgba(30, 26, 20, 0.06);
+  margin-top: 0;
+  padding-top: 12px;
+  animation: pi-row-expand-in 180ms ease-out;
+}
+@keyframes pi-row-expand-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 .pi-heat {
   font-size: 10px;

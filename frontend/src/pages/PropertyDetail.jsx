@@ -395,7 +395,7 @@ export default function PropertyDetail() {
   const reloadAuxiliary = useCallback(() => {
     if (!id) return;
     api.listPropertyInterests(id).then((r) => setInterests(r.items || [])).catch(() => {});
-    api.listPropertyOffers(id).then((r) => setOffers(r.items || [])).catch(() => {});
+    api.listPropertyOffers(id).then((r) => setOffers(r.offers || r.items || [])).catch(() => {});
     api.listAgreements({ propertyId: id })
       .then((r) => setAgreementsCount((r.items || []).length))
       .catch(() => {});
