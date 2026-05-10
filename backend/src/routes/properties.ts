@@ -781,6 +781,165 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
+  // 2026-05-11 — Unified offer-response endpoint.
+  //
+  // Every interaction with an offer (accept / decline / withdraw / counter)
+  // routes through here so the cascading status changes happen in one DB
+  // transaction. Was: the frontend stitched together two requests
+  // (PATCH parent + POST counter), which was racy and left orphan
+  // statuses when one half failed.
+  //
+  // Semantics:
+  //   • ACCEPT   — set this offer ACCEPTED. Walk up the thread and
+  //                set every ancestor to NEGOTIATING (frozen but not
+  //                accepted/declined). Set every OTHER root thread on
+  //                the same property+lead pair to DECLINED ("we picked
+  //                a winner, the rest are out"). Other leads' threads
+  //                are untouched.
+  //   • DECLINE  — set this offer DECLINED. Walk up; every ancestor
+  //                also DECLINED.
+  //   • WITHDRAW — same status semantics as DECLINE but flagged WITHDRAWN
+  //                (the proposer retracts).
+  //   • COUNTER  — set this offer NEGOTIATING (no longer "their turn");
+  //                create a new offer with replyToOfferId = this row,
+  //                direction = flipped from this row, status = NEW.
+  app.post('/:id/offers/:offerId/respond', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id, offerId } = req.params as { id: string; offerId: string };
+    const body = z.object({
+      action: z.enum(['ACCEPT', 'DECLINE', 'WITHDRAW', 'COUNTER']),
+      counter: z.object({
+        amount:        z.number().int().nonnegative(),
+        relayedAmount: z.number().int().nonnegative().nullable().optional(),
+        notes:         z.string().max(2000).nullable().optional(),
+        paymentTerms:  z.string().max(2000).nullable().optional(),
+        handoverNotes: z.string().max(1000).nullable().optional(),
+      }).optional(),
+    }).parse(req.body);
+
+    const u = requireUser(req);
+    const ownsCondition = u.role === 'ADMIN'
+      ? { id: offerId, propertyId: id }
+      : { id: offerId, propertyId: id, property: { agentId: u.id } };
+    const target = await prisma.propertyOffer.findFirst({ where: ownsCondition });
+    if (!target) return reply.code(404).send({ error: { message: 'Not found' } });
+
+    // Walk up the thread to collect every ancestor id (including the
+    // root). We do this iteratively because Postgres recursive CTE +
+    // Prisma is overkill for typical 3-5 round threads.
+    const ancestorIds: string[] = [];
+    {
+      let cursor: string | null = target.replyToOfferId ?? null;
+      const seen = new Set<string>();
+      while (cursor && !seen.has(cursor)) {
+        seen.add(cursor);
+        ancestorIds.push(cursor);
+        const next: { replyToOfferId: string | null } | null =
+          await prisma.propertyOffer.findUnique({
+            where: { id: cursor },
+            select: { replyToOfferId: true },
+          });
+        cursor = next?.replyToOfferId ?? null;
+      }
+    }
+
+    // Helper — find the root id of any offer in this thread.
+    const rootIdOf = ancestorIds.length ? ancestorIds[ancestorIds.length - 1] : target.id;
+
+    if (body.action === 'COUNTER') {
+      if (!body.counter) {
+        return reply.code(400).send({ error: { message: 'counter payload is required for COUNTER action' } });
+      }
+      const flipped = target.direction === 'BUYER_TO_SELLER' ? 'SELLER_TO_BUYER' : 'BUYER_TO_SELLER';
+      const result = await prisma.$transaction([
+        // The offer the agent is countering moves from "awaiting a
+        // response" to "answered" (NEGOTIATING).
+        prisma.propertyOffer.update({
+          where: { id: target.id },
+          data: { status: 'NEGOTIATING' },
+        }),
+        // Brand-new round added at the top of the thread.
+        prisma.propertyOffer.create({
+          data: {
+            propertyId:     target.propertyId,
+            leadId:         target.leadId,
+            interestId:     target.interestId,
+            buyerName:      target.buyerName,
+            buyerPhone:     target.buyerPhone,
+            amount:         body.counter.amount,
+            relayedAmount:  body.counter.relayedAmount ?? null,
+            notes:          body.counter.notes ?? null,
+            paymentTerms:   body.counter.paymentTerms ?? null,
+            handoverNotes:  body.counter.handoverNotes ?? null,
+            direction:      flipped,
+            replyToOfferId: target.id,
+            status:         'NEW',
+          },
+        }),
+      ]);
+      return { offer: result[1], parent: result[0] };
+    }
+
+    // ACCEPT / DECLINE / WITHDRAW — simple status cascade up the thread.
+    const newStatus = body.action === 'ACCEPT' ? 'ACCEPTED'
+                    : body.action === 'WITHDRAW' ? 'WITHDRAWN'
+                    : 'DECLINED';
+
+    // Run cascading status updates in a transaction so partial
+    // failures don't leave the thread half-updated.
+    await prisma.$transaction(async (db) => {
+      // The target row carries the final terminal status (or "DECLINED"
+      // for a decline cascade).
+      await db.propertyOffer.update({
+        where: { id: target.id },
+        data: { status: newStatus },
+      });
+      // Ancestors: for ACCEPT they freeze at NEGOTIATING (history shows
+      // "this round was answered by the next, which got accepted"); for
+      // DECLINE/WITHDRAW the entire thread terminates at the same status.
+      if (ancestorIds.length) {
+        await db.propertyOffer.updateMany({
+          where: { id: { in: ancestorIds } },
+          data: { status: body.action === 'ACCEPT' ? 'NEGOTIATING' : newStatus },
+        });
+      }
+      // Sibling threads — only on ACCEPT. We pick a winner; everyone else
+      // (same lead) gets a polite "we picked another offer" close. Other
+      // leads' threads are untouched; the agent might still be in
+      // negotiation with them.
+      if (body.action === 'ACCEPT' && target.leadId) {
+        const allThreadIds = [...ancestorIds, target.id];
+        await db.propertyOffer.updateMany({
+          where: {
+            propertyId: id,
+            leadId: target.leadId,
+            id: { notIn: allThreadIds },
+            status: { in: ['NEW', 'NEGOTIATING'] },
+          },
+          data: { status: 'DECLINED' },
+        });
+      }
+    });
+
+    // Activity log entry — surfaces in the פעילות tab.
+    const verb = body.action === 'ACCEPT' ? 'offer_accepted'
+              : body.action === 'WITHDRAW' ? 'offer_withdrawn'
+              : 'offer_declined';
+    const summary = body.action === 'ACCEPT'
+      ? `הצעת ${target.buyerName} ב-₪${target.amount.toLocaleString('he-IL')} התקבלה`
+      : body.action === 'WITHDRAW'
+      ? `הצעת ${target.buyerName} בוטלה`
+      : `הצעת ${target.buyerName} נדחתה`;
+    await logActivity({
+      agentId:    (await prisma.property.findUnique({ where: { id }, select: { agentId: true } }))!.agentId,
+      actorId:    u.id,
+      verb, entityType: 'Property', entityId: id,
+      summary,
+      metadata: { offerId: target.id, rootId: rootIdOf },
+    });
+
+    return { ok: true, status: newStatus };
+  });
+
   app.delete('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const existing = await prisma.property.findUnique({ where: { id } });

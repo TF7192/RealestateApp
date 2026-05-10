@@ -898,12 +898,18 @@ export default function PropertyDetail() {
   }
 
   // ── V1 Refined — derived KPI values ─────────────────────────────
-  // Top active offer (status = NEW) — drives the "הצעה פעילה" tile in the
-  // KPI hero. Falls back to the highest amount when nothing is NEW.
-  const newOffers = offers.filter((o) => o.status === 'NEW' || o.status === 'NEGOTIATING');
-  const topOfferAmount = newOffers.length
-    ? Math.max(...newOffers.map((o) => Number(o.amount) || 0))
-    : (offers.length ? Math.max(...offers.map((o) => Number(o.amount) || 0)) : null);
+  // "הצעה פעילה" tile shows the highest BUYER-side amount in any
+  // thread that's not terminally closed. Was: included seller-side
+  // counter-offers (so a seller's counter inflated the "active buyer
+  // offer" number, which is wrong). Now filters direction first.
+  const buyerOffers = offers.filter(
+    (o) => (!o.direction || o.direction === 'BUYER_TO_SELLER')
+        && (o.status === 'NEW' || o.status === 'NEGOTIATING'),
+  );
+  const newOffers = buyerOffers.filter((o) => o.status === 'NEW');
+  const topOfferAmount = buyerOffers.length
+    ? Math.max(...buyerOffers.map((o) => Number(o.amount) || 0))
+    : null;
   const interestsCount = interests.length;
   // Active interests (status = IN_PROGRESS) drive the "מתעניינים פעילים"
   // sub-line on the KPI tile.
@@ -2146,28 +2152,102 @@ function embedUrl(url) {
 // the same row appears on /documents — so the agent can drop a PDF
 // once and reach it from either surface.
 /* ──────────────────────────────────────────────────────────────
- * OwnerOffersCard — seller-facing list of every PropertyOffer on the
- * asset, with quick accept / reject / counter affordances. Lives
- * inside the בעל הנכס tab so the agent can drive the negotiation
- * "ping-pong" between buyer and owner without leaving the page.
+ * 2026-05-11 — Offer/counter-offer rebuild.
  *
- * Per offer:
- *   • Buyer name + amount + when received
- *   • Status pill (NEW / NEGOTIATING / ACCEPTED / DECLINED / WITHDRAWN)
- *   • Inline accept / decline buttons → patch status on the offer row
- *   • "ענה הצעה נגדית" → opens a counter-offer popup (creates a new
- *     PropertyOffer with direction=SELLER_TO_BUYER + replyToOfferId).
+ * PropertyOffer rows form a buyer↔seller dialog: each row has a
+ * `direction` (BUYER_TO_SELLER / SELLER_TO_BUYER) and optionally a
+ * `replyToOfferId` that threads counter-offers to their parent. We
+ * group rows by their root id so the agent sees one CARD per
+ * negotiation thread instead of N flat sibling rows.
  *
- * The data already supports ping-pong threading (PropertyOffer.direction
- * + replyToOfferId, see backend/prisma/schema.prisma:1040). This card is
- * the first surface to make it visible end-to-end.
+ * Per thread:
+ *   • Header: buyer name + final/active status pill + summary
+ *   • Stack of rounds (oldest → newest), each with direction arrow
+ *     ("הצעה ראשונית" / "הצעה נגדית של בעל הנכס" / "הצעה נגדית של
+ *     המתעניין"), amount, optional relayed amount, notes.
+ *   • Latest round's actions (only on the LATEST round, only when
+ *     thread is active):
+ *       — קבל הצעה (sets target ACCEPTED, freezes ancestors,
+ *         declines competing threads on same lead)
+ *       — דחה הצעה (cascades DECLINED up the thread)
+ *       — ענה הצעה נגדית (creates a flipped-direction child)
+ *
+ * All actions go through the unified /respond endpoint so status
+ * transitions are atomic.
  * ────────────────────────────────────────────────────────────── */
+function fmtIls(n) {
+  return '₪' + Number(n || 0).toLocaleString('he-IL');
+}
+function offerStatusLabel(s) {
+  return s === 'NEW' ? 'ממתינה לתגובה' :
+         s === 'NEGOTIATING' ? 'במו״מ' :
+         s === 'ACCEPTED' ? 'התקבלה' :
+         s === 'DECLINED' ? 'נדחתה' :
+         s === 'WITHDRAWN' ? 'בוטלה' : s;
+}
+function offerStatusTone(s) {
+  if (s === 'ACCEPTED') return { background: 'rgba(21,128,61,0.12)', color: '#15803d' };
+  if (s === 'DECLINED' || s === 'WITHDRAWN') return { background: 'rgba(185,28,28,0.10)', color: '#b91c1c' };
+  if (s === 'NEW') return { background: 'rgba(180,139,76,0.18)', color: '#7a5c2c' };
+  if (s === 'NEGOTIATING') return { background: 'rgba(180,139,76,0.10)', color: '#6b6356' };
+  return { background: 'rgba(30,26,20,0.06)', color: '#6b6356' };
+}
+
+// Group flat offer rows into threads keyed by root id. Returns an
+// array of { rootId, rounds: PropertyOffer[] } sorted with newest
+// thread first (by latest round's receivedAt).
+function buildOfferThreads(offers) {
+  const byId = new Map(offers.map((o) => [o.id, o]));
+  const rootOf = (id) => {
+    let cur = byId.get(id);
+    const seen = new Set();
+    while (cur?.replyToOfferId && byId.has(cur.replyToOfferId) && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      cur = byId.get(cur.replyToOfferId);
+    }
+    return cur?.id || id;
+  };
+  const threads = new Map();
+  for (const o of offers) {
+    const r = rootOf(o.id);
+    if (!threads.has(r)) threads.set(r, []);
+    threads.get(r).push(o);
+  }
+  // Sort each thread oldest → newest, then sort threads newest-thread
+  // first by their latest round.
+  const out = [];
+  for (const [rootId, rounds] of threads) {
+    rounds.sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt));
+    out.push({ rootId, rounds });
+  }
+  out.sort((a, b) => {
+    const al = a.rounds[a.rounds.length - 1].receivedAt;
+    const bl = b.rounds[b.rounds.length - 1].receivedAt;
+    return new Date(bl) - new Date(al);
+  });
+  return out;
+}
+
+// Computes the thread-level status from its rounds. The latest round
+// dictates the "active" feel; if any round is ACCEPTED/DECLINED/
+// WITHDRAWN the thread is terminal.
+function computeThreadStatus(rounds) {
+  const last = rounds[rounds.length - 1];
+  if (rounds.some((r) => r.status === 'ACCEPTED')) return 'ACCEPTED';
+  if (rounds.every((r) => r.status === 'DECLINED' || r.status === 'WITHDRAWN')) {
+    return rounds[rounds.length - 1].status;
+  }
+  return last.status; // NEW or NEGOTIATING
+}
+
 function OwnerOffersCard({ propertyId, offers, onChange, marketingPrice }) {
   const toast = useToast();
-  const [counterOf, setCounterOf] = useState(null); // offer being countered
+  const [respondingTo, setRespondingTo] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
-  if (!offers || offers.length === 0) {
+  const threads = buildOfferThreads(offers || []);
+
+  if (threads.length === 0) {
     return (
       <section className="pi-panel" aria-label="הצעות מחיר על הנכס" dir="rtl">
         <header className="pi-header">
@@ -2184,22 +2264,19 @@ function OwnerOffersCard({ propertyId, offers, onChange, marketingPrice }) {
     );
   }
 
-  const fmtMoney = (n) => '₪' + Number(n || 0).toLocaleString('he-IL');
-  const labelFor = (s) =>
-    s === 'NEW' ? 'חדשה' :
-    s === 'NEGOTIATING' ? 'במו"מ' :
-    s === 'ACCEPTED' ? 'התקבלה' :
-    s === 'DECLINED' ? 'נדחתה' :
-    s === 'WITHDRAWN' ? 'נמשכה' : s;
-
-  const setStatus = async (offerId, status) => {
+  const respond = async (offerId, action, counter) => {
     setBusyId(offerId);
     try {
-      await api.updatePropertyOffer(propertyId, offerId, { status });
-      toast?.success?.(status === 'ACCEPTED' ? 'ההצעה התקבלה' : 'ההצעה נדחתה');
+      await api.respondToPropertyOffer(propertyId, offerId, { action, counter });
+      toast?.success?.(
+        action === 'ACCEPT' ? 'ההצעה התקבלה' :
+        action === 'DECLINE' ? 'ההצעה נדחתה' :
+        action === 'WITHDRAW' ? 'ההצעה בוטלה' :
+        'הצעה נגדית נשלחה'
+      );
       onChange?.();
     } catch (e) {
-      toast?.error?.(e?.message || 'עדכון נכשל');
+      toast?.error?.(e?.message || 'הפעולה נכשלה');
     } finally {
       setBusyId(null);
     }
@@ -2210,78 +2287,147 @@ function OwnerOffersCard({ propertyId, offers, onChange, marketingPrice }) {
       <header className="pi-header">
         <h3 className="pi-title">
           <Banknote size={16} />
-          הצעות מחיר · {offers.length} {offers.length === 1 ? 'הצעה' : 'הצעות'}
+          הצעות מחיר · {threads.length} {threads.length === 1 ? 'משא ומתן' : 'משאים ומתנים'}
         </h3>
       </header>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {offers.map((o) => {
-          const sellerSide = o.direction === 'SELLER_TO_BUYER';
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {threads.map(({ rootId, rounds }) => {
+          const last = rounds[rounds.length - 1];
+          const threadStatus = computeThreadStatus(rounds);
+          const isTerminal = threadStatus === 'ACCEPTED' || threadStatus === 'DECLINED' || threadStatus === 'WITHDRAWN';
+          // Whose turn is it? The LATEST round was proposed by the
+          // direction's "from" side — so the OTHER side owes a response.
+          const pendingSide = last.status !== 'NEW' ? null
+            : last.direction === 'BUYER_TO_SELLER' ? 'SELLER'
+            : 'BUYER';
           return (
             <li
-              key={o.id}
+              key={rootId}
               style={{
-                background: sellerSide ? 'rgba(180,139,76,0.05)' : '#fff',
-                border: `1px solid ${o.status === 'NEW' ? 'rgba(180,139,76,0.4)' : 'rgba(30,26,20,0.10)'}`,
+                background: '#fff',
+                border: `1px solid ${threadStatus === 'NEW' ? 'rgba(180,139,76,0.4)' : 'rgba(30,26,20,0.10)'}`,
                 borderRadius: 12,
-                padding: 12,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
+                overflow: 'hidden',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontWeight: 800, fontSize: 14 }}>
-                    {sellerSide ? 'הצעה נגדית' : 'הצעת מתעניין'}
-                  </span>
-                  <span style={{ color: '#6b6356', fontSize: 12 }}>·</span>
-                  <span style={{ fontSize: 13.5, color: '#1e1a14' }}>{o.buyerName || '—'}</span>
-                </div>
+              {/* Thread header */}
+              <header style={{
+                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                padding: '12px 14px',
+                background: 'linear-gradient(180deg, rgba(180,139,76,0.06), transparent)',
+                borderBottom: '1px solid rgba(30,26,20,0.06)',
+              }}>
+                <span style={{ fontWeight: 800, fontSize: 14, color: '#1e1a14' }}>
+                  {last.buyerName || 'מתעניין'}
+                </span>
+                <span style={{ fontSize: 12, color: '#9c9384' }}>· {rounds.length} {rounds.length === 1 ? 'סבב' : 'סבבים'}</span>
                 <span
-                  className="prd-pill"
                   style={{
-                    background: o.status === 'NEW' ? 'rgba(180,139,76,0.18)' :
-                                o.status === 'ACCEPTED' ? 'rgba(21,128,61,0.12)' :
-                                o.status === 'DECLINED' || o.status === 'WITHDRAWN' ? 'rgba(185,28,28,0.10)' :
-                                'rgba(180,139,76,0.10)',
-                    color: o.status === 'NEW' ? '#7a5c2c' :
-                           o.status === 'ACCEPTED' ? '#15803d' :
-                           o.status === 'DECLINED' || o.status === 'WITHDRAWN' ? '#b91c1c' : '#6b6356',
+                    marginInlineStart: 'auto',
+                    padding: '3px 9px', borderRadius: 999,
+                    fontSize: 11, fontWeight: 800,
+                    ...offerStatusTone(threadStatus),
                   }}
                 >
-                  {labelFor(o.status)}
+                  {offerStatusLabel(threadStatus)}
                 </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 22, fontWeight: 800, color: '#1e1a14', letterSpacing: -0.4 }}>
-                  {fmtMoney(o.amount)}
-                </span>
-                {o.relayedAmount != null && o.relayedAmount !== o.amount && (
-                  <span style={{ fontSize: 12, color: '#7a5c2c' }}>
-                    הועבר לבעלים: {fmtMoney(o.relayedAmount)}
+                {pendingSide && (
+                  <span style={{
+                    fontSize: 11.5, fontWeight: 700,
+                    color: '#7a5c2c',
+                    background: 'rgba(180,139,76,0.10)',
+                    padding: '3px 9px', borderRadius: 999,
+                  }}>
+                    {pendingSide === 'SELLER' ? 'ממתינה לתשובת בעל הנכס' : 'ממתינה לתשובת המתעניין'}
                   </span>
                 )}
-                {marketingPrice && (
-                  <span style={{ fontSize: 12, color: '#6b6356' }}>
-                    {Math.round((1 - o.amount / marketingPrice) * 100)}%- מהדרישה
-                  </span>
-                )}
-                {o.receivedAt && (
-                  <span style={{ fontSize: 11.5, color: '#9c9384', marginInlineStart: 'auto' }}>
-                    {new Date(o.receivedAt).toLocaleString('he-IL')}
-                  </span>
-                )}
-              </div>
-              {o.notes && (
-                <div style={{ fontSize: 12.5, color: '#3a3329', lineHeight: 1.5 }}>{o.notes}</div>
-              )}
-              {(o.status === 'NEW' || o.status === 'NEGOTIATING') && !sellerSide && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              </header>
+
+              {/* Rounds — oldest → newest */}
+              <ol style={{ listStyle: 'none', margin: 0, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {rounds.map((r, ix) => {
+                  const isBuyerSide = r.direction === 'BUYER_TO_SELLER';
+                  const isLast = ix === rounds.length - 1;
+                  return (
+                    <li
+                      key={r.id}
+                      style={{
+                        background: isBuyerSide ? 'rgba(29,78,216,0.04)' : 'rgba(180,139,76,0.05)',
+                        border: `1px solid ${isLast && r.status === 'NEW' ? 'rgba(180,139,76,0.35)' : 'rgba(30,26,20,0.06)'}`,
+                        borderRadius: 10,
+                        padding: 10,
+                        position: 'relative',
+                        marginInlineStart: isBuyerSide ? 0 : 22,
+                        marginInlineEnd:   isBuyerSide ? 22 : 0,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 800, color: isBuyerSide ? '#1d4ed8' : '#7a5c2c' }}>
+                          {ix === 0
+                            ? (isBuyerSide ? 'הצעה ראשונית מהמתעניין' : 'הצעת בעל הנכס')
+                            : (isBuyerSide ? 'תגובת המתעניין' : 'תגובת בעל הנכס')}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#9c9384' }}>
+                          · {new Date(r.receivedAt).toLocaleDateString('he-IL')} {new Date(r.receivedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 20, fontWeight: 800, color: '#1e1a14', letterSpacing: -0.4 }}>
+                          {fmtIls(r.amount)}
+                        </span>
+                        {r.relayedAmount != null && r.relayedAmount !== r.amount && (
+                          <span style={{ fontSize: 12, color: '#7a5c2c' }}>
+                            {isBuyerSide ? 'הועבר לבעלים' : 'הועבר לקונה'}: {fmtIls(r.relayedAmount)}
+                          </span>
+                        )}
+                        {marketingPrice && isBuyerSide && (
+                          <span style={{ fontSize: 12, color: '#6b6356' }}>
+                            {Math.round((1 - r.amount / marketingPrice) * 100)}%- מהדרישה
+                          </span>
+                        )}
+                      </div>
+                      {r.notes && (
+                        <div style={{ fontSize: 12.5, color: '#3a3329', lineHeight: 1.5, marginTop: 6 }}>
+                          {r.notes}
+                        </div>
+                      )}
+                      {(r.paymentTerms || r.handoverNotes) && (
+                        <div style={{ fontSize: 11.5, color: '#6b6356', marginTop: 6, lineHeight: 1.5 }}>
+                          {r.paymentTerms && <div>תנאי תשלום: {r.paymentTerms}</div>}
+                          {r.handoverNotes && <div>מסירה: {r.handoverNotes}</div>}
+                        </div>
+                      )}
+                      {/* Per-round status pill (helps when multiple
+                          rounds with different statuses coexist). */}
+                      {r.status !== 'NEW' && (
+                        <span style={{
+                          position: 'absolute',
+                          insetInlineEnd: 8, top: 8,
+                          fontSize: 10, fontWeight: 800,
+                          padding: '2px 7px', borderRadius: 999,
+                          ...offerStatusTone(r.status),
+                        }}>
+                          {offerStatusLabel(r.status)}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+
+              {/* Actions on the LATEST round, only when active. */}
+              {!isTerminal && last.status === 'NEW' && (
+                <div style={{
+                  display: 'flex', gap: 6, flexWrap: 'wrap',
+                  padding: '10px 14px',
+                  borderTop: '1px solid rgba(30,26,20,0.06)',
+                  background: 'rgba(180,139,76,0.04)',
+                }}>
                   <button
                     type="button"
                     className="prd-btn"
-                    onClick={() => setStatus(o.id, 'ACCEPTED')}
-                    disabled={busyId === o.id}
+                    onClick={() => respond(last.id, 'ACCEPT')}
+                    disabled={busyId === last.id}
                     style={{ borderColor: 'rgba(21,128,61,0.3)', color: '#15803d' }}
                   >
                     קבל הצעה
@@ -2289,8 +2435,8 @@ function OwnerOffersCard({ propertyId, offers, onChange, marketingPrice }) {
                   <button
                     type="button"
                     className="prd-btn"
-                    onClick={() => setStatus(o.id, 'DECLINED')}
-                    disabled={busyId === o.id}
+                    onClick={() => respond(last.id, 'DECLINE')}
+                    disabled={busyId === last.id}
                     style={{ borderColor: 'rgba(185,28,28,0.25)', color: '#b91c1c' }}
                   >
                     דחה הצעה
@@ -2298,8 +2444,8 @@ function OwnerOffersCard({ propertyId, offers, onChange, marketingPrice }) {
                   <button
                     type="button"
                     className="prd-btn prd-btn-primary"
-                    onClick={() => setCounterOf(o)}
-                    disabled={busyId === o.id}
+                    onClick={() => setRespondingTo(last)}
+                    disabled={busyId === last.id}
                   >
                     ענה הצעה נגדית
                   </button>
@@ -2310,22 +2456,33 @@ function OwnerOffersCard({ propertyId, offers, onChange, marketingPrice }) {
         })}
       </ul>
 
-      {counterOf && (
+      {respondingTo && (
         <CounterOfferPopup
-          parent={counterOf}
-          propertyId={propertyId}
-          onClose={() => setCounterOf(null)}
-          onCreated={() => { setCounterOf(null); onChange?.(); }}
+          parent={respondingTo}
+          marketingPrice={marketingPrice}
+          onClose={() => setRespondingTo(null)}
+          onSubmit={async (counter) => {
+            await respond(respondingTo.id, 'COUNTER', counter);
+            setRespondingTo(null);
+          }}
         />
       )}
     </section>
   );
 }
 
-function CounterOfferPopup({ parent, propertyId, onClose, onCreated }) {
-  const toast = useToast();
-  const [amount, setAmount] = useState(String(parent.amount || ''));
+// Counter popup — symmetric for both directions. Direction is implicit
+// (flipped from `parent.direction`), the agent doesn't pick. Includes a
+// `relayedAmount` field that's only relevant in the agent-mediated flow
+// (Israeli broker pattern of shaving the number passed to the other side).
+function CounterOfferPopup({ parent, marketingPrice, onClose, onSubmit }) {
+  const flippedDirection = parent.direction === 'BUYER_TO_SELLER' ? 'SELLER_TO_BUYER' : 'BUYER_TO_SELLER';
+  const isCounteringBuyer = flippedDirection === 'SELLER_TO_BUYER';
+  const [amount, setAmount] = useState('');
+  const [relayedAmount, setRelayedAmount] = useState('');
   const [notes, setNotes] = useState('');
+  const [paymentTerms, setPaymentTerms] = useState(parent.paymentTerms || '');
+  const [handoverNotes, setHandoverNotes] = useState(parent.handoverNotes || '');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     const onEsc = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -2337,36 +2494,30 @@ function CounterOfferPopup({ parent, propertyId, onClose, onCreated }) {
       document.removeEventListener('keydown', onEsc);
     };
   }, [onClose]);
+
   const submit = async (e) => {
     e?.preventDefault?.();
     const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt <= 0) {
-      toast?.error?.('יש להזין סכום תקין');
-      return;
-    }
+    if (!Number.isFinite(amt) || amt <= 0) return;
     setBusy(true);
     try {
-      await api.createPropertyOffer(propertyId, {
-        buyerName: parent.buyerName,
-        buyerPhone: parent.buyerPhone,
-        leadId: parent.leadId,
+      await onSubmit({
         amount: amt,
+        relayedAmount: relayedAmount ? Number(relayedAmount) : null,
         notes: notes.trim() || null,
-        direction: 'SELLER_TO_BUYER',
-        replyToOfferId: parent.id,
+        paymentTerms: paymentTerms.trim() || null,
+        handoverNotes: handoverNotes.trim() || null,
       });
-      // Mark the parent as in-negotiation so the next round of UI hides
-      // the accept/decline buttons in favour of the new counter row.
-      await api.updatePropertyOffer(propertyId, parent.id, { status: 'NEGOTIATING' });
-      toast?.success?.('הצעה נגדית נשלחה');
-      onCreated?.();
-    } catch (e2) {
-      toast?.error?.(e2?.message || 'יצירת הצעה נגדית נכשלה');
     } finally {
       setBusy(false);
     }
   };
-  return (
+
+  const spread = (Number(amount) && Number(relayedAmount))
+    ? Number(amount) - Number(relayedAmount)
+    : 0;
+
+  return createPortal(
     <div
       className="pi-popup-back"
       role="dialog"
@@ -2376,27 +2527,92 @@ function CounterOfferPopup({ parent, propertyId, onClose, onCreated }) {
     >
       <form onSubmit={submit} className="pi-popup-card" dir="rtl">
         <header className="pi-popup-head">
-          <span className="pi-popup-title">הצעה נגדית ל{parent.buyerName}</span>
+          <span className="pi-popup-title">
+            {isCounteringBuyer
+              ? 'הצעה נגדית מבעל הנכס למתעניין'
+              : 'הצעה נגדית מהמתעניין לבעל הנכס'}
+          </span>
           <button type="button" className="pi-popup-close" onClick={onClose} aria-label="סגור">
             <X size={18} />
           </button>
         </header>
         <div className="pi-popup-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 12, color: '#6b6356', fontWeight: 700 }}>הצעה מקורית</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#1e1a14' }}>
-              ₪{Number(parent.amount).toLocaleString('he-IL')}
+          <div style={{
+            background: 'rgba(30,26,20,0.04)',
+            border: '1px solid rgba(30,26,20,0.08)',
+            borderRadius: 8,
+            padding: '8px 12px',
+          }}>
+            <div style={{ fontSize: 11, color: '#6b6356', fontWeight: 700, marginBottom: 2 }}>
+              משיב להצעה
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#1e1a14' }}>
+              {fmtIls(parent.amount)} · {parent.buyerName}
             </div>
           </div>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#1e1a14' }}>הצעה נגדית — מחיר חדש</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#1e1a14' }}>
+              סכום ההצעה הנגדית (₪) *
+            </span>
             <input
-              type="number" min="0"
+              type="number" min="0" required
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               dir="ltr" style={{ textAlign: 'right' }}
               className="form-input"
-              required
+              autoFocus
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#1e1a14' }}>
+              סכום שיעבור לצד השני (₪)
+            </span>
+            <input
+              type="number" min="0"
+              value={relayedAmount}
+              onChange={(e) => setRelayedAmount(e.target.value)}
+              dir="ltr" style={{ textAlign: 'right' }}
+              className="form-input"
+              placeholder="(אופציונלי — אם זהה, השאר ריק)"
+            />
+          </label>
+          {spread !== 0 && (
+            <div style={{
+              padding: '6px 10px', borderRadius: 8,
+              background: spread > 0 ? 'rgba(21,128,61,0.08)' : 'rgba(185,28,28,0.08)',
+              fontSize: 12, color: spread > 0 ? '#15803d' : '#b91c1c',
+            }}>
+              {spread > 0
+                ? <>פער של <strong>{fmtIls(spread)}</strong> נשמר למשא ומתן</>
+                : <>הסכום שמועבר גבוה מההצעה — בדוק את הסכומים</>}
+            </div>
+          )}
+          {marketingPrice && (
+            <div style={{ fontSize: 11.5, color: '#6b6356' }}>
+              מחיר ביקוש: <strong>{fmtIls(marketingPrice)}</strong>
+              {Number(amount) > 0 && (
+                <> · ההצעה הנגדית = {Math.round((1 - Number(amount) / marketingPrice) * 100)}%- מהדרישה</>
+              )}
+            </div>
+          )}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#1e1a14' }}>תנאי תשלום</span>
+            <input
+              type="text"
+              value={paymentTerms}
+              onChange={(e) => setPaymentTerms(e.target.value)}
+              className="form-input"
+              placeholder='לדוגמה: "60% בחתימה, 35% תוך 30 יום, 5% במסירה"'
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#1e1a14' }}>מועד מסירה</span>
+            <input
+              type="text"
+              value={handoverNotes}
+              onChange={(e) => setHandoverNotes(e.target.value)}
+              className="form-input"
+              placeholder='לדוגמה: "1.9.2026", או "60 יום מהחתימה"'
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -2406,7 +2622,7 @@ function CounterOfferPopup({ parent, propertyId, onClose, onCreated }) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="form-textarea"
-              placeholder="לדוגמה: בעל הנכס מוכן לרדת ל..., לסגור עד..."
+              placeholder="הקשר, מה שנאמר בשיחה, וכו׳"
             />
           </label>
         </div>
@@ -2420,7 +2636,8 @@ function CounterOfferPopup({ parent, propertyId, onClose, onCreated }) {
           </button>
         </footer>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 

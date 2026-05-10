@@ -333,6 +333,12 @@ export const api = {
     request(`/properties/${id}/offers/${offerId}`, { method: 'PATCH', body }),
   deletePropertyOffer: (id, offerId) =>
     request(`/properties/${id}/offers/${offerId}`, { method: 'DELETE' }),
+  // 2026-05-11 — Unified offer-response. body = { action, counter? }
+  // where action ∈ ACCEPT | DECLINE | WITHDRAW | COUNTER. The COUNTER
+  // action also creates a new replyTo offer with flipped direction.
+  // All transitions cascade across the thread atomically.
+  respondToPropertyOffer: (id, offerId, body) =>
+    request(`/properties/${id}/offers/${offerId}/respond`, { method: 'POST', body }),
   deleteProperty: (id) => request(`/properties/${id}`, { method: 'DELETE' }),
   // 5.1 — Clones a property into a fresh draft. Backend tags the new
   // row's notes with "(עותק)" and does NOT carry over marketing/viewings.
