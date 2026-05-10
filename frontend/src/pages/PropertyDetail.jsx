@@ -776,7 +776,18 @@ export default function PropertyDetail() {
   const handleGalleryDrop = async (e) => {
     e.preventDefault();
     setDragOver(false);
-    const files = Array.from(e.dataTransfer?.files || []).filter((f) => f.type.startsWith('image/'));
+    // Chrome on Windows hands us HEIC / JFIF / WhatsApp images with an
+    // empty or `application/octet-stream` MIME, so a pure type check
+    // silently drops them. Accept by extension fallback and let the
+    // server (`assertAllowedMime`) be the final arbiter.
+    const all = Array.from(e.dataTransfer?.files || []);
+    const isImage = (f) => f.type?.startsWith('image/')
+      || /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(f.name || '');
+    const files = all.filter(isImage);
+    const skipped = all.length - files.length;
+    if (skipped > 0) {
+      toast?.info?.(`${skipped} קבצים שאינם תמונה דולגו`);
+    }
     if (!files.length) return;
     let uploaded = 0;
     for (const file of files) {

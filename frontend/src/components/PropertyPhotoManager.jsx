@@ -59,7 +59,24 @@ export default function PropertyPhotoManager({ propertyId, initial = [], onClose
   };
 
   const uploadOne = async (file, pendingId) => {
-    if (!file.type.startsWith('image/') && !/\.heic$/i.test(file.name || '')) return;
+    // Chrome on Windows often hands us HEIC/JFIF files with an empty
+    // or `application/octet-stream` MIME type, so a pure type check
+    // silently drops valid images. Accept by extension as a fallback,
+    // and surface a visible error when neither matches — silent
+    // return was the bug an agent hit on prod 2026-05-10.
+    const isImageMime = file.type?.startsWith('image/');
+    const isImageExt = /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(file.name || '');
+    if (!isImageMime && !isImageExt) {
+      setErr(`הקובץ "${file.name || 'ללא שם'}" אינו תמונה נתמכת (jpg / png / webp / heic)`);
+      // Drop the optimistic thumb that handleFiles seeded for this file.
+      setPending((cur) => {
+        const next = cur.filter((p) => p.id !== pendingId);
+        const dropped = cur.find((p) => p.id === pendingId);
+        if (dropped) { try { URL.revokeObjectURL(dropped.url); } catch { /* ignore */ } }
+        return next;
+      });
+      return;
+    }
     setUploading((n) => n + 1);
     setErr(null);
     try {
