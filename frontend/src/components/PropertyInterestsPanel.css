@@ -146,7 +146,11 @@
   color: var(--gold-dark, #7a5c2c);
 }
 
-/* Expand body — full stats + actions, only rendered when row is open. */
+/* Expand body — full stats + actions, only rendered when row is open.
+   The opacity-only fade (no transform) avoids the visual scroll-jump
+   the user flagged: transform changes the row's local coordinate
+   system mid-animation, which the browser stabilises by nudging the
+   page scroll back. Pure opacity = stable layout. */
 .pi-row-expand {
   padding: 0 16px 16px;
   display: flex;
@@ -155,12 +159,54 @@
   border-top: 1px solid rgba(30, 26, 20, 0.06);
   margin-top: 0;
   padding-top: 12px;
-  animation: pi-row-expand-in 180ms ease-out;
+  animation: pi-row-fade-in 140ms ease-out;
+  /* Stop the new content from being inserted on top of the next paint
+     and pushing layout — keep its size predictable so the page
+     scrollbar doesn't pingpong. */
+  overflow-anchor: auto;
 }
-@keyframes pi-row-expand-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+@keyframes pi-row-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
+
+/* Timeline — grouped by kind (offer / viewing / agreement / contract /
+   meeting). Each group has its own headline so the agent sees what
+   they're scrolling. */
+.pi-timeline-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pi-timeline-section {
+  background: var(--bg-secondary, #fbf7f0);
+  border: 1px solid rgba(30, 26, 20, 0.06);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.pi-timeline-headline {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--gold-dark, #7a5c2c);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.pi-timeline-headline-count {
+  font-size: 11px;
+  color: var(--text-muted, #6b6356);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.pi-timeline-section-offer    { background: rgba(180, 139, 76, 0.06); }
+.pi-timeline-section-viewing  { background: rgba(29, 78, 216, 0.04); }
+.pi-timeline-section-agreement { background: rgba(21, 128, 61, 0.04); }
+.pi-timeline-section-contract { background: rgba(21, 128, 61, 0.04); }
+.pi-timeline-section-meeting  { background: rgba(180, 83, 9, 0.04); }
 
 .pi-heat {
   font-size: 10px;

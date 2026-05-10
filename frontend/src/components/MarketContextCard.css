@@ -130,12 +130,13 @@
 
 .market-kpis {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  /* Responsive auto-fit so 4 KPIs collapse to 2 columns on narrow
+     panels without the values wrapping into 4-line stacks (was: fixed
+     2-up < 700 / 4-up ≥ 700, which split "טווח אפר׳ 1998 – פבר׳ 2026"
+     across 4 lines on the 600 px property tab). */
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   margin-bottom: 14px;
-}
-@media (min-width: 700px) {
-  .market-kpis { grid-template-columns: repeat(4, 1fr); }
 }
 .market-kpi {
   display: flex;
@@ -145,18 +146,25 @@
   background: var(--bg-secondary, #f7f3ec);
   border: 1px solid var(--border, rgba(30, 26, 20, 0.08));
   border-radius: 10px;
+  min-width: 0;
 }
 .market-kpi-label {
   font-size: 11px;
   font-weight: 700;
   color: var(--text-muted, #6b6356);
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 .market-kpi-value {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--text-primary, #1e1a14);
   font-variant-numeric: tabular-nums;
+  /* Don't break long range strings ("אפר׳ 1998 – פבר׳ 2026") into
+     vertical stacks — let them shrink + ellipsis within the cell. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .market-spark {
@@ -214,14 +222,24 @@
   to { transform: rotate(-360deg); }
 }
 
-/* Rooms filter — chip row above the KPIs. */
+/* Rooms filter — horizontal scroller (was wrap → 4 lines on narrow). */
 .market-filter {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   margin-top: 4px;
+  overflow-x: auto;
+  /* Hide scrollbar visually (still scrollable via swipe / wheel). */
+  scrollbar-width: thin;
+  padding-bottom: 4px;
 }
+.market-filter::-webkit-scrollbar { height: 4px; }
+.market-filter::-webkit-scrollbar-thumb {
+  background: rgba(30, 26, 20, 0.2);
+  border-radius: 2px;
+}
+.market-filter > * { flex-shrink: 0; }
 .market-filter-label {
   font-size: 12.5px;
   color: var(--text-secondary, #54503e);

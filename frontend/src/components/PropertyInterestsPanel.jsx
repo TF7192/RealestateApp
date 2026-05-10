@@ -76,6 +76,10 @@ export default function PropertyInterestsPanel({
   // 2026-05-10 — fires after any local mutation (action create, status,
   // attach, detach) so the parent page can re-pull its KPI hero counts.
   onAfterChange,
+  // 2026-05-11 — bumped by the parent page when something elsewhere
+  // (e.g. offer accept/decline in OwnerOffersCard) mutated state we own.
+  // Re-trigger our own load() so stats + history catch up.
+  refreshNonce = 0,
 }) {
   const toast = useToast();
   const mode = propertyId ? 'property' : 'lead';
@@ -83,7 +87,15 @@ export default function PropertyInterestsPanel({
   const [loading, setLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [allLeads, setAllLeads] = useState([]);
-  const [expandedId, setExpandedId] = useState(null);
+  // 2026-05-11 — multiple rows can be open at once. Set-of-ids; tap a
+  // row to toggle its membership.
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const toggleExpand = (rowId) => setExpandedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(rowId)) next.delete(rowId);
+    else next.add(rowId);
+    return next;
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,7 +112,7 @@ export default function PropertyInterestsPanel({
     }
   }, [mode, propertyId, leadId, toast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshNonce]);
 
   // Lazy-load the leads list for the picker on first open.
   useEffect(() => {
@@ -180,8 +192,8 @@ export default function PropertyInterestsPanel({
               key={it.id}
               interest={it}
               mode={mode}
-              isExpanded={expandedId === it.id}
-              onToggleExpand={() => setExpandedId(expandedId === it.id ? null : it.id)}
+              isExpanded={expandedIds.has(it.id)}
+              onToggleExpand={() => toggleExpand(it.id)}
               onStatusChange={onStatusChange}
               onDetach={onDetach}
               onActionCreated={reloadAll}
@@ -301,23 +313,38 @@ function InterestRow({
             )}
           </div>
 
-          <div className="pi-row-stats">
-            <span className="pi-stat"><Footprints size={13} /> {stats.tours || 0} סיורים</span>
-            <span className="pi-stat">
-              <Banknote size={13} /> {stats.offers || 0} {stats.offers === 1 ? 'הצעה' : 'הצעות'}
-              {stats.topOfferAmount != null && (
-                <span className="pi-stat-em"> · {fmtMoney(stats.topOfferAmount)}</span>
-              )}
-            </span>
-            <span className="pi-stat"><FileText size={13} /> {stats.agreements || 0} הסכמים</span>
-            <span className="pi-stat"><CalendarIcon size={13} /> {stats.meetings || 0} פגישות</span>
-          </div>
-
+          {/* Action buttons with their stat counts INSIDE — agent sees
+              "+ סיור · 0" and gets "this is what you have" + "click to add"
+              in one place. Was: stats above + buttons below = 2 rows. */}
           <div className="pi-row-actions">
-            <ActionBtn kind="viewing"   active={activeForm === 'viewing'}   label="סיור"   onToggle={() => setActiveForm(activeForm === 'viewing' ? null : 'viewing')} />
-            <ActionBtn kind="offer"     active={activeForm === 'offer'}     label="הצעה"   onToggle={() => setActiveForm(activeForm === 'offer' ? null : 'offer')} />
-            <ActionBtn kind="agreement" active={activeForm === 'agreement'} label="הסכם"  onToggle={() => setActiveForm(activeForm === 'agreement' ? null : 'agreement')} />
-            <ActionBtn kind="meeting"   active={activeForm === 'meeting'}   label="פגישה" onToggle={() => setActiveForm(activeForm === 'meeting' ? null : 'meeting')} />
+            <ActionBtn
+              kind="viewing"
+              active={activeForm === 'viewing'}
+              label={`סיור · ${stats.tours || 0}`}
+              onToggle={() => setActiveForm(activeForm === 'viewing' ? null : 'viewing')}
+            />
+            <ActionBtn
+              kind="offer"
+              active={activeForm === 'offer'}
+              label={
+                stats.topOfferAmount != null
+                  ? `הצעה · ${stats.offers} · ${fmtMoney(stats.topOfferAmount)}`
+                  : `הצעה · ${stats.offers || 0}`
+              }
+              onToggle={() => setActiveForm(activeForm === 'offer' ? null : 'offer')}
+            />
+            <ActionBtn
+              kind="agreement"
+              active={activeForm === 'agreement'}
+              label={`הסכם · ${stats.agreements || 0}`}
+              onToggle={() => setActiveForm(activeForm === 'agreement' ? null : 'agreement')}
+            />
+            <ActionBtn
+              kind="meeting"
+              active={activeForm === 'meeting'}
+              label={`פגישה · ${stats.meetings || 0}`}
+              onToggle={() => setActiveForm(activeForm === 'meeting' ? null : 'meeting')}
+            />
             <button
               type="button"
               className="pi-action-btn pi-action-detach"
@@ -413,25 +440,50 @@ function InterestTimeline({ interestId }) {
     return <div className="pi-timeline-empty">אין פעילות עדיין. השתמש בכפתורים שלמעלה כדי להוסיף סיור, הצעה או פגישה.</div>;
   }
 
+  // 2026-05-11 — group by kind so each section has its own headline
+  // (הצעות / סיורים / הסכמים / חוזים / פגישות). Within a section keep
+  // the timeline order (newest first).
+  const byKind = events.reduce((acc, e) => {
+    (acc[e.kind] = acc[e.kind] || []).push(e);
+    return acc;
+  }, {});
+  const SECTION_ORDER = ['offer', 'viewing', 'agreement', 'contract', 'meeting'];
+  const SECTION_LABEL = {
+    offer:     'הצעות',
+    viewing:   'סיורים',
+    agreement: 'הסכמים',
+    contract:  'חוזים',
+    meeting:   'פגישות',
+  };
+
   return (
-    <ul className="pi-timeline" role="list">
-      {events.map((e) => (
-        <li key={`${e.kind}-${e.id}`} className={`pi-event pi-event-${e.kind}`}>
-          <span className="pi-event-icon">
-            {e.kind === 'viewing' && <Footprints size={14} />}
-            {e.kind === 'offer' && <Banknote size={14} />}
-            {e.kind === 'agreement' && <FileText size={14} />}
-            {e.kind === 'contract' && <FileText size={14} />}
-            {e.kind === 'meeting' && <CalendarIcon size={14} />}
-          </span>
-          <div className="pi-event-body">
-            <div className="pi-event-title">{eventTitle(e)}</div>
-            {eventSubtitle(e) && <div className="pi-event-sub">{eventSubtitle(e)}</div>}
-          </div>
-          <span className="pi-event-time">{relDate(e.at)}</span>
-        </li>
+    <div className="pi-timeline-stack">
+      {SECTION_ORDER.filter((k) => byKind[k]?.length).map((k) => (
+        <section key={k} className={`pi-timeline-section pi-timeline-section-${k}`}>
+          <h4 className="pi-timeline-headline">
+            {SECTION_LABEL[k]} <span className="pi-timeline-headline-count">· {byKind[k].length}</span>
+          </h4>
+          <ul className="pi-timeline" role="list">
+            {byKind[k].map((e) => (
+              <li key={`${e.kind}-${e.id}`} className={`pi-event pi-event-${e.kind}`}>
+                <span className="pi-event-icon">
+                  {e.kind === 'viewing' && <Footprints size={14} />}
+                  {e.kind === 'offer' && <Banknote size={14} />}
+                  {e.kind === 'agreement' && <FileText size={14} />}
+                  {e.kind === 'contract' && <FileText size={14} />}
+                  {e.kind === 'meeting' && <CalendarIcon size={14} />}
+                </span>
+                <div className="pi-event-body">
+                  <div className="pi-event-title">{eventTitle(e)}</div>
+                  {eventSubtitle(e) && <div className="pi-event-sub">{eventSubtitle(e)}</div>}
+                </div>
+                <span className="pi-event-time">{relDate(e.at)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ))}
-    </ul>
+    </div>
   );
 }
 

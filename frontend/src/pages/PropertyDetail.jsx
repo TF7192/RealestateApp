@@ -341,6 +341,10 @@ export default function PropertyDetail() {
   const [statusBusy, setStatusBusy] = useState(false);
   // Owner-side exclusivity-agreement popup (was: routed to /edit)
   const [exclusivityOpen, setExclusivityOpen] = useState(false);
+  // 2026-05-11 — bumped after any cross-tab mutation (offer accept/
+  // decline in Owner tab, etc.) so the מתעניינים tab's panel re-fetches
+  // its interests + stats too.
+  const [refreshNonce, setRefreshNonce] = useState(0);
   // Landing-link copy feedback. Declared up here with the rest of the
   // top-level hooks — putting it below the `if (loading) return …`
   // guard triggers "Rendered more hooks than during the previous
@@ -399,6 +403,10 @@ export default function PropertyDetail() {
     api.listAgreements({ propertyId: id })
       .then((r) => setAgreementsCount((r.items || []).length))
       .catch(() => {});
+    // Bump the nonce so child panels (PropertyInterestsPanel) re-fetch
+    // their own internal data — covers cross-tab mutations like offer
+    // accept/decline triggered from the Owner tab.
+    setRefreshNonce((n) => n + 1);
   }, [id]);
 
   useEffect(() => { reloadAuxiliary(); }, [reloadAuxiliary]);
@@ -1563,6 +1571,7 @@ export default function PropertyDetail() {
                 <PropertyInterestsPanel
                   propertyId={property.id}
                   onAfterChange={reloadAuxiliary}
+                  refreshNonce={refreshNonce}
                 />
                 <div id="prd-agreements-anchor" />
                 <PropertyAgreementsSection propertyId={property.id} leads={leads} />
@@ -1570,7 +1579,7 @@ export default function PropertyDetail() {
             )}
 
             {tab === 'activity' && (
-              <ActivityPanel entityType="PROPERTY" entityId={property.id} />
+              <ActivityPanel entityType="Property" entityId={property.id} />
             )}
           </div>
         </div>
@@ -1889,7 +1898,7 @@ export default function PropertyDetail() {
           width="lg"
           onClose={() => setPanel(null)}
         >
-          <ActivityPanel entityType="PROPERTY" entityId={property.id} />
+          <ActivityPanel entityType="Property" entityId={property.id} />
         </PropertyPanelSheet>
       )}
 
