@@ -72,6 +72,8 @@ import AiMatchesDrawer from '../components/AiMatchesDrawer';
 import ActivityPanel from '../components/ActivityPanel';
 import PropertyAgreementsSection from '../components/PropertyAgreementsSection';
 import PropertyBrokersCard from '../components/PropertyBrokersCard';
+import PropertyInterestsPanel from '../components/PropertyInterestsPanel';
+import OwnerActivityPanel from '../components/OwnerActivityPanel';
 import { useCopyFeedback, useViewportMobile } from '../hooks/mobile';
 import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/share';
 import { isNative } from '../native/platform';
@@ -1072,6 +1074,19 @@ export default function PropertyDetail() {
           colleagues they're coordinating with on this specific listing.
           The "+ הוסף קולגה" button opens a popup form to add a new one. */}
       <PropertyBrokersCard propertyId={property.id} />
+
+      {/* 2026-05-10 — לוח פעילות: per-lead activity log for this listing.
+          Replaces the historical "matched leads" surface with an
+          actionable workflow — agent attaches leads, logs tours / offers
+          / agreements / meetings, owns a status (בתהליך / נסגר / נפל /
+          מושהה) per pair. Mirror panel lives on CustomerDetail. */}
+      <PropertyInterestsPanel propertyId={property.id} />
+
+      {/* 2026-05-10 — לוח פעילות: owner-side (commission talks, owner
+          feedback on specific buyers, price discussions, tour permissions,
+          objections, contract talks). Captures the SELLER half of the
+          negotiation triangle the agent mediates. */}
+      <OwnerActivityPanel propertyId={property.id} />
 
       {/* P-3 — Signed brokerage agreements for this asset. Hides
           itself when there are no signed prospects so the card doesn't

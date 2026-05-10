@@ -489,6 +489,10 @@ model User {
   primaryForProperties   Property[]                    @relation("PrimaryAgent")
   // Sprint 1 / MLS parity — Task D1.
   reminders              Reminder[]                    @relation("AgentReminders")
+  // 2026-05-10 — per-(lead, property) activity log rows authored by this agent.
+  propertyInterests      PropertyInterest[]            @relation("AgentInterests")
+  // 2026-05-10 — per-property owner-side activity log rows authored by this agent.
+  ownerActivities        OwnerActivity[]               @relation("AgentOwnerActivities")
   // Excel import — saved column mappings keyed by header signature so
   // repeat imports from the same vendor format auto-apply last choice.
   importMappings         ImportMapping[]
@@ -844,6 +848,19 @@ model Property {
   adverts          Advert[]
   // Sprint 6 — in-house digital contracts attached to this property.
   contracts        Contract[]
+  // 2026-05-10 — per-lead "activity log" anchors on this property.
+  // Each row is one (lead, property) pair the agent is actively working;
+  // all child entities (viewings, offers, agreements, contracts, meetings)
+  // optionally point back via `interestId`.
+  interests        PropertyInterest[]
+  // 2026-05-10 — meetings tagged with this property (showings, in-person
+  // negotiations, walkthroughs). Distinct from generic agent meetings.
+  meetings         LeadMeeting[]
+  // 2026-05-10 — owner-side interaction log (commission talks, price
+  // negotiations, owner feedback on specific buyers, marketing approvals,
+  // tour permissions, objections). Separate from PropertyInterest which
+  // is buyer-side.
+  ownerActivities  OwnerActivity[]
   // Sprint 9 — anonymous page-view tracking for marketing surfaces.
   views            PropertyView[]
 
@@ -1006,11 +1023,39 @@ model PropertyOffer {
   // When the offer was received. Defaults to row creation but can be
   // overridden when the agent is recording past offers.
   receivedAt DateTime            @default(now()) @db.Timestamptz(6)
+  // 2026-05-10 — "relayed amount" supports the Israeli broker
+  // negotiation pattern where the agent passes a SHAVED price to the
+  // seller (e.g., buyer offered 2.1M, agent relays 2.08M to keep 20K
+  // as room for negotiation / margin). `amount` is the buyer's real
+  // offer; `relayedAmount` is what the agent communicated to the
+  // seller. When relayedAmount is null, the agent passed the offer
+  // through as-is.
+  relayedAmount Int?
+  // ── Threaded buyer↔owner dialog ──────────────────────────────
+  // Each offer is one round of the dialog. `direction` flags which
+  // side proposed this round so the timeline can render arrows
+  // (BUYER_TO_SELLER ▶, SELLER_TO_BUYER ◀ counter-offer).
+  // `replyToOfferId` threads counters to their parent so a multi-round
+  // negotiation reads as a conversation, not a flat list.
+  direction       PropertyOfferDirection @default(BUYER_TO_SELLER)
+  replyToOfferId  String?
+  replyToOffer    PropertyOffer? @relation("OfferThread", fields: [replyToOfferId], references: [id], onDelete: SetNull)
+  replies         PropertyOffer[] @relation("OfferThread")
+  // ── Agreed deal terms per round ──────────────────────────────
+  // Free-text payment schedule and handover date for THIS particular
+  // offer round. Lets each counter-offer carry its own terms; the
+  // "winning" offer becomes the deal terms.
+  paymentTerms    String?
+  handoverNotes   String?
   createdAt  DateTime            @default(now()) @db.Timestamptz(6)
   updatedAt  DateTime            @updatedAt @db.Timestamptz(6)
+  // 2026-05-10 — back-link to the PropertyInterest activity log row.
+  interestId String?
+  interest   PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
 
   @@index([propertyId])
   @@index([leadId])
+  @@index([interestId])
   @@index([status])
   @@index([receivedAt])
 }
@@ -1021,6 +1066,15 @@ enum PropertyOfferStatus {
   ACCEPTED
   DECLINED
   WITHDRAWN
+}
+
+// 2026-05-10 — which side of the negotiation triangle proposed this
+// particular offer round. The agent sits in the middle and routinely
+// relays counter-offers between the two sides; tagging each row makes
+// the timeline read as a coherent dialog.
+enum PropertyOfferDirection {
+  BUYER_TO_SELLER   // buyer's offer (potentially relayed shaved to seller via `relayedAmount`)
+  SELLER_TO_BUYER   // seller's counter-offer back to the buyer
 }
 
 model PropertyVideo {
@@ -1062,9 +1116,15 @@ model PropertyViewing {
   viewedAt   DateTime @default(now()) @db.Timestamptz(6)
   source     String?
   notes      String?
+  // 2026-05-10 — back-link to the PropertyInterest pipeline row that
+  // owns this event. Nullable for back-compat with rows created before
+  // the activity log existed.
+  interestId String?
+  interest   PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
 
   @@index([propertyId])
   @@index([leadId])
+  @@index([interestId])
 }
 
 model PropertyInquiry {
@@ -1078,6 +1138,156 @@ model PropertyInquiry {
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([propertyId])
+}
+
+// 2026-05-10 — per-lead per-property "activity log" anchor. One row per
+// (lead, property) pair the agent is actively working. Holds high-level
+// status only (בתהליך / נסגר / נפל / מושהה); the timeline of actions
+// itself is reconstructed by querying the existing transactional tables
+// (PropertyViewing, PropertyOffer, Agreement, Contract, LeadMeeting)
+// filtered by interestId.
+//
+// The lead-property activity model intentionally rejects a linear-stage
+// approach. Israeli real-estate flows are routinely non-linear: a serious
+// buyer might offer without ever touring, the same lead can tour 4
+// listings before offering on one, and MOU/contract negotiation cycles
+// can run for months with viewings and offers in parallel. The "stage"
+// is just a status flag the agent owns.
+model PropertyInterest {
+  id          String                 @id @default(cuid())
+  agentId     String
+  agent       User                   @relation("AgentInterests", fields: [agentId], references: [id], onDelete: Cascade)
+  propertyId  String
+  property    Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  leadId      String
+  lead        Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status      PropertyInterestStatus @default(IN_PROGRESS)
+  notes       String?
+  // Free-text reason populated when the agent flips to LOST. Used for
+  // "why did this fall through?" reporting later.
+  lostReason  String?
+  // ── Buyer-side commission ─────────────────────────────────────
+  // The agent's fee from THIS buyer. Mirror of the owner-side
+  // commission lives on OwnerActivity (kind=COMMISSION_TALK) — Israeli
+  // brokers routinely charge both sides at different terms.
+  //
+  // Three modes the agent may use, depending on the deal:
+  //   1. Percentage of an agreed base price (the most common):
+  //      `buyerCommissionPct` × `buyerCommissionBase`
+  //   2. Flat fee (`buyerCommissionFlat` only)
+  //   3. % with discount (% × base − `buyerCommissionDiscount`)
+  // Frontend uses these three fields to compute + display the final
+  // amount. All optional so the row works even before commission is
+  // pinned down.
+  buyerCommissionPct      Float?
+  buyerCommissionBase     Int?    // ₪ — what the % applies to
+  buyerCommissionFlat     Int?    // ₪ — alternative flat fee
+  buyerCommissionDiscount Int?    // ₪ — optional reduction
+  buyerCommissionNotes    String?
+  // ── Agreed deal terms ────────────────────────────────────────
+  // Free-form text where the agent records what the parties have
+  // agreed on outside of the structured offer amount: payment
+  // schedule ("60% on signature, 35% in 30d, 5% on handover"),
+  // handover date ("מועד מסירה 1.9.2026"), any other shared
+  // condition. Acts as the "what's the deal we're converging on"
+  // memo, visible only to the agent.
+  dealNotes               String?
+  // Server-bumped whenever a child action (viewing/offer/agreement/meeting)
+  // is added with this interestId, so the panel can sort by "recent".
+  lastActionAt DateTime?              @db.Timestamptz(6)
+  createdAt   DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime               @updatedAt @db.Timestamptz(6)
+
+  // Back-relations to child action tables (all rows are linked through
+  // their own interestId column).
+  viewings    PropertyViewing[]
+  offers      PropertyOffer[]
+  agreements  Agreement[]
+  contracts   Contract[]
+  meetings    LeadMeeting[]
+
+  // Exactly one interest row per (property, lead) pair. Agent can detach
+  // (DELETE) and re-create if they want a clean slate.
+  @@unique([propertyId, leadId])
+  @@index([agentId])
+  @@index([propertyId, status])
+  @@index([leadId, status])
+  @@index([lastActionAt])
+}
+
+enum PropertyInterestStatus {
+  IN_PROGRESS  // בתהליך — default
+  CLOSED       // נסגר   — deal completed
+  FELL         // נפל    — fell through
+  PAUSED       // מושהה  — on hold
+}
+
+// 2026-05-10 — Owner-side interaction log for a listing. Each row is
+// one conversation/event the agent had with the property owner about
+// this specific listing. Captures the things an Israeli broker
+// routinely tracks: commission % discussions, owner feedback on
+// specific buyers, price negotiations, tour permissions, marketing
+// approvals, objections, MOU/contract talks.
+//
+// Separate from PropertyInterest because the owner is conceptually a
+// different counterparty — there's one owner per listing, but many
+// buyer-side interests, and the kinds of interactions are different.
+model OwnerActivity {
+  id            String   @id @default(cuid())
+  agentId       String
+  agent         User     @relation("AgentOwnerActivities", fields: [agentId], references: [id], onDelete: Cascade)
+  propertyId    String
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  kind          OwnerActivityKind
+  // Short summary line the agent types ("הצעתי 2%", "לא יורד מ-3M").
+  title         String
+  // Free-form longer notes — what the owner said, agent's reactions,
+  // follow-up needed.
+  notes         String?
+  // ── Commission-talk-specific fields ──────────────────────────
+  // Only populated when kind=COMMISSION_TALK. Captures BOTH percentage
+  // (e.g., 2%) AND flat-fee (e.g., ₪40,000) variants — Israeli brokers
+  // commonly quote one or the other. The agent fills whichever matches
+  // the conversation that happened.
+  commissionPct      Float?
+  commissionFlat     Int?     // ₪
+  commissionResponse OwnerCommissionResponse?
+  // ── Lead cross-reference ─────────────────────────────────────
+  // For kinds where the conversation was *about* a specific buyer
+  // (FEEDBACK_ON_LEAD, OBJECTION raised against a buyer, PRICE_TALK
+  // tied to a specific offer). SetNull so deleting the lead doesn't
+  // delete the historical record of what was said about them.
+  relatedLeadId String?
+  relatedLead   Lead?    @relation("OwnerActivityRelatedLead", fields: [relatedLeadId], references: [id], onDelete: SetNull)
+  // When the conversation happened. Defaults to now() but the agent
+  // can override when logging a past conversation.
+  occurredAt    DateTime @default(now()) @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([agentId])
+  @@index([propertyId])
+  @@index([propertyId, occurredAt(sort: Desc)])
+  @@index([relatedLeadId])
+}
+
+enum OwnerActivityKind {
+  COMMISSION_TALK    // שיחת עמלה
+  PRICE_TALK         // שיחת מחיר
+  FEEDBACK_ON_LEAD   // משוב על מתעניין
+  TOUR_PERMISSION    // אישור סיור
+  MARKETING_UPDATE   // עדכון שיווק
+  OBJECTION          // התנגדות
+  CONTRACT_TALK      // שיחת הסכם
+  GENERAL_UPDATE     // עדכון כללי
+  OTHER              // אחר
+}
+
+enum OwnerCommissionResponse {
+  PENDING            // ממתין לתשובה
+  ACCEPTED           // התקבל
+  COUNTER            // הצעה נגדית
+  REJECTED           // נדחה
 }
 
 model Lead {
@@ -1214,6 +1424,11 @@ model Lead {
   // makes an offer on a listing the row is captured here too so the
   // CRM can show "all offers from X" across properties.
   priceOffers     PropertyOffer[]
+  // 2026-05-10 — properties this lead is being shown / negotiated for.
+  interests       PropertyInterest[]
+  // 2026-05-10 — back-rel for owner-activity rows that reference this
+  // lead ("owner said X about buyer Y").
+  ownerActivityMentions OwnerActivity[]        @relation("OwnerActivityRelatedLead")
 
   // Excel-import tag. Set on every Lead row created via the wizard so
   // an agent who realises the mapping was wrong can bulk-delete the
@@ -1313,9 +1528,13 @@ model Agreement {
   signedAt    DateTime?       @db.Timestamptz(6)
   status      AgreementStatus @default(SENT)
   note        String?
+  // 2026-05-10 — back-link to the PropertyInterest activity log row.
+  interestId  String?
+  interest    PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
 
   @@index([leadId])
   @@index([propertyId])
+  @@index([interestId])
 }
 
 model UploadedFile {
@@ -1468,12 +1687,21 @@ model LeadMeeting {
   audioKey      String?
   summary       String?
   summaryJson   Json?
+  // 2026-05-10 — propertyId + interestId. Lets a meeting be a
+  // "property showing" (sale tour for a specific listing) instead of a
+  // generic agent meeting. Both nullable for back-compat.
+  propertyId    String?
+  property      Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  interestId    String?
+  interest      PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
   createdAt     DateTime @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([leadId])
   @@index([agentId])
   @@index([startsAt])
+  @@index([propertyId])
+  @@index([interestId])
   // P1-2 — agent calendar view scans (agentId, startsAt) on a date range.
   @@index([agentId, startsAt])
 }
@@ -1947,12 +2175,16 @@ model Contract {
   signedUserAgent    String?
   consentText        String?
   consentAcceptedAt  DateTime? @db.Timestamptz(6)
+  // 2026-05-10 — back-link to the PropertyInterest activity log row.
+  interestId    String?
+  interest      PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
 
   @@index([agentId])
   @@index([propertyId])
   @@index([leadId])
+  @@index([interestId])
   @@index([type])
 }
 

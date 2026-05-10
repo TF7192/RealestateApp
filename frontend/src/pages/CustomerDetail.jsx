@@ -21,6 +21,7 @@ import api from '../lib/api';
 import LeadMeetingDialog from '../components/LeadMeetingDialog';
 import RemindersPanel from '../components/RemindersPanel';
 import MatchingList from '../components/MatchingList';
+import PropertyInterestsPanel from '../components/PropertyInterestsPanel';
 import AiMatchesDrawer from '../components/AiMatchesDrawer';
 import MultiPropertySendDialog from '../components/MultiPropertySendDialog';
 import CustomerEditDialog from '../components/CustomerEditDialog';
@@ -317,6 +318,9 @@ export default function CustomerDetail() {
         gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 2026-05-10 — לוח פעילות: properties this lead is actively
+              being worked on. Mirror of the PropertyDetail panel. */}
+          <PropertyInterestsPanel leadId={lead.id} pickerDisabled />
           <section style={sectionCard()} aria-label="נכסים תואמים">
             <MatchingList leadId={lead.id} lead={lead} title="נכסים תואמים" />
           </section>

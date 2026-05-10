@@ -286,6 +286,30 @@ export const api = {
   getProperty: (id) => request(`/properties/${id}`),
   createProperty: (body) => request('/properties', { method: 'POST', body, headers: withIdempotency() }),
   updateProperty: (id, body) => request(`/properties/${id}`, { method: 'PATCH', body }),
+
+  // 2026-05-10 — PropertyInterest (per-lead-per-property activity log).
+  listPropertyInterests: (propertyId) =>
+    request(`/properties/${propertyId}/interests`),
+  createPropertyInterests: (propertyId, leadIds) =>
+    request(`/properties/${propertyId}/interests`, { method: 'POST', body: { leadIds } }),
+  listLeadInterests: (leadId) =>
+    request(`/leads/${leadId}/interests`),
+  getInterest: (id) => request(`/interests/${id}`),
+  getInterestTimeline: (id) => request(`/interests/${id}/timeline`),
+  updateInterest: (id, body) =>
+    request(`/interests/${id}`, { method: 'PATCH', body }),
+  deleteInterest: (id) =>
+    request(`/interests/${id}`, { method: 'DELETE' }),
+
+  // 2026-05-10 — OwnerActivity (per-property seller-side log).
+  listOwnerActivity: (propertyId) =>
+    request(`/properties/${propertyId}/owner-activity`),
+  createOwnerActivity: (propertyId, body) =>
+    request(`/properties/${propertyId}/owner-activity`, { method: 'POST', body }),
+  updateOwnerActivity: (id, body) =>
+    request(`/owner-activity/${id}`, { method: 'PATCH', body }),
+  deleteOwnerActivity: (id) =>
+    request(`/owner-activity/${id}`, { method: 'DELETE' }),
   // 2026-04-26 — Free-form Hebrew instruction → AI-extracted partial patch.
   aiEditProperty: (id, instruction) =>
     request(`/properties/${id}/ai-edit`, { method: 'POST', body: { instruction } }),

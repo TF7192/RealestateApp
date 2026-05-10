@@ -14,6 +14,8 @@ import { registerGoogleOAuthRoutes } from './routes/oauth-google.js';
 import { registerAppleOAuthRoutes } from './routes/oauth-apple.js';
 import { registerPropertyRoutes } from './routes/properties.js';
 import { registerLeadRoutes } from './routes/leads.js';
+import { registerInterestRoutes } from './routes/interests.js';
+import { registerOwnerActivityRoutes } from './routes/owner-activity.js';
 import { registerDealRoutes } from './routes/deals.js';
 import { registerAgreementRoutes } from './routes/agreements.js';
 import { registerContractRoutes } from './routes/contracts.js';
@@ -299,6 +301,13 @@ export async function build(opts: BuildOptions = {}) {
   await app.register(registerMeRoutes, { prefix: '/api/me' });
   await app.register(registerPropertyRoutes, { prefix: '/api/properties' });
   await app.register(registerLeadRoutes, { prefix: '/api/leads' });
+  // 2026-05-10 — PropertyInterest routes mount on TWO prefixes: the
+  // property/lead-scoped GET+POST live under /api (so the routes can
+  // declare `GET /properties/:id/interests` directly) and the single-
+  // interest read/patch/delete also live under /api. Single register
+  // call with /api prefix; the file owns the relative paths.
+  await app.register(registerInterestRoutes, { prefix: '/api' });
+  await app.register(registerOwnerActivityRoutes, { prefix: '/api' });
   await app.register(registerDealRoutes, { prefix: '/api/deals' });
   await app.register(registerAgreementRoutes, { prefix: '/api/agreements' });
   await app.register(registerContractRoutes, { prefix: '/api/contracts' });
