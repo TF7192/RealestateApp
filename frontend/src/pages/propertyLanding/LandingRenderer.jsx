@@ -14,7 +14,11 @@
 // live in the per-case JSX below.
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Phone, Mail, User, MessageSquareText, CheckCircle2, MapPin } from 'lucide-react';
+import {
+  ChevronLeft, ChevronRight, Phone, Mail, User, MessageSquareText,
+  CheckCircle2, MapPin, Check, Bed, Square, Building2, ArrowUpRight,
+  Compass, Coins,
+} from 'lucide-react';
 import api from '../../lib/api';
 import { defaultLandingConfig } from './defaultConfig';
 import { templateCopy } from './copy.he';
@@ -136,21 +140,18 @@ function SectionFrame({ children }) {
 
 function renderSection(section, ctx) {
   switch (section.type) {
-    case 'HERO':       return <HeroSection section={section} ctx={ctx} />;
-    case 'GALLERY':    return <GallerySection section={section} ctx={ctx} />;
-    case 'INQUIRY':    return <InquirySection section={section} ctx={ctx} />;
-    case 'AGENT_CARD': return <AgentCardSection ctx={ctx} />;
-    // Phase 3 — the remaining block types land here:
-    case 'DESCRIPTION':
-    case 'AMENITIES':
-    case 'NEIGHBORHOOD':
-    case 'VIDEO':
-    case 'VIRTUAL_TOUR':
-    case 'FLOOR_PLAN':
-    case 'SPECS':
-      return null; // not yet implemented; renderer silently skips
-    default:
-      return null;
+    case 'HERO':         return <HeroSection section={section} ctx={ctx} />;
+    case 'GALLERY':      return <GallerySection section={section} ctx={ctx} />;
+    case 'DESCRIPTION':  return <DescriptionSection section={section} />;
+    case 'AMENITIES':    return <AmenitiesSection section={section} />;
+    case 'NEIGHBORHOOD': return <NeighborhoodSection section={section} ctx={ctx} />;
+    case 'VIDEO':        return <VideoSection section={section} />;
+    case 'VIRTUAL_TOUR': return <VirtualTourSection section={section} />;
+    case 'FLOOR_PLAN':   return <FloorPlanSection section={section} ctx={ctx} />;
+    case 'SPECS':        return <SpecsSection section={section} ctx={ctx} />;
+    case 'INQUIRY':      return <InquirySection section={section} ctx={ctx} />;
+    case 'AGENT_CARD':   return <AgentCardSection ctx={ctx} />;
+    default:             return null;
   }
 }
 
@@ -337,4 +338,214 @@ function AgentCardSection({ ctx }) {
       <div className="lp-brand">Estia · פלטפורמת שיווק נדל״ן</div>
     </footer>
   );
+}
+
+// ─── DESCRIPTION ─────────────────────────────────────────────────
+
+function DescriptionSection({ section }) {
+  const { heading, body } = section.props;
+  if (!heading && !body) return null;
+  return (
+    <section className="lp-block lp-description">
+      {heading && <h2 className="lp-block-heading">{heading}</h2>}
+      {body && (
+        <div className="lp-block-body">
+          {/* Newlines preserved so an agent can paragraph their copy
+              without us shipping a rich-text editor or Markdown
+              parser. Plain text only — copy-paste from Word strips
+              cleanly. */}
+          {body.split(/\n+/).map((para, i) => (
+            <p key={i}>{para}</p>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ─── AMENITIES ───────────────────────────────────────────────────
+
+function AmenitiesSection({ section }) {
+  const { heading, items = [] } = section.props;
+  const real = items.filter((s) => (s || '').trim());
+  if (!heading && real.length === 0) return null;
+  return (
+    <section className="lp-block lp-amenities">
+      {heading && <h2 className="lp-block-heading">{heading}</h2>}
+      {real.length > 0 && (
+        <ul className="lp-amenities-list">
+          {real.map((label, i) => (
+            <li key={i}>
+              <Check size={16} aria-hidden="true" />
+              <span>{label}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ─── NEIGHBORHOOD ────────────────────────────────────────────────
+
+function NeighborhoodSection({ section, ctx }) {
+  const { heading, body, showMap } = section.props;
+  const city = ctx.property?.city;
+  const street = ctx.property?.street;
+  if (!heading && !body && !showMap) return null;
+
+  // Google Maps embed via the unauthenticated "?q=" iframe form —
+  // no API key, no SDK. Address is the property's street + city; if
+  // we have lat/lng we'd prefer those, but the agents pasted in raw
+  // strings on most rows so the address fallback is what reliably
+  // works. Keep loading="lazy" so off-screen sections don't pull
+  // the iframe in until they enter the viewport.
+  const mapQ = encodeURIComponent([street, city].filter(Boolean).join(', '));
+
+  return (
+    <section className="lp-block lp-neighborhood">
+      {heading && <h2 className="lp-block-heading">{heading}</h2>}
+      {body && (
+        <div className="lp-block-body">
+          {body.split(/\n+/).map((para, i) => <p key={i}>{para}</p>)}
+        </div>
+      )}
+      {showMap && mapQ && (
+        <div className="lp-map-wrap">
+          <iframe
+            title="מיקום על המפה"
+            className="lp-map"
+            src={`https://www.google.com/maps?q=${mapQ}&hl=he&z=15&output=embed`}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ─── VIDEO ───────────────────────────────────────────────────────
+
+function parseEmbedUrl(raw) {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+    if (host === 'youtu.be') {
+      const id = u.pathname.slice(1).split('/')[0];
+      return id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}` : null;
+    }
+    if (host.endsWith('youtube.com')) {
+      const id = u.searchParams.get('v');
+      if (id) return `https://www.youtube.com/embed/${encodeURIComponent(id)}`;
+      // /shorts/<id> and /embed/<id> formats
+      const m = u.pathname.match(/^\/(?:embed|shorts)\/([^/?#]+)/);
+      if (m) return `https://www.youtube.com/embed/${encodeURIComponent(m[1])}`;
+    }
+    if (host.endsWith('vimeo.com')) {
+      const m = u.pathname.match(/\/(\d+)/);
+      if (m) return `https://player.vimeo.com/video/${encodeURIComponent(m[1])}`;
+    }
+  } catch { /* not a URL */ }
+  return null;
+}
+
+function VideoSection({ section }) {
+  const { heading, url } = section.props;
+  const embed = parseEmbedUrl(url);
+  if (!embed) return null; // editor will show a "url חסר / לא נתמך" hint instead
+  return (
+    <section className="lp-block lp-video">
+      {heading && <h2 className="lp-block-heading">{heading}</h2>}
+      <div className="lp-video-wrap">
+        <iframe
+          title={heading || 'סרטון הנכס'}
+          src={embed}
+          loading="lazy"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          allowFullScreen
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+      </div>
+    </section>
+  );
+}
+
+// ─── VIRTUAL TOUR ────────────────────────────────────────────────
+
+function VirtualTourSection({ section }) {
+  const { heading, url, ctaLabel } = section.props;
+  if (!url) return null;
+  return (
+    <section className="lp-block lp-tour">
+      {heading && <h2 className="lp-block-heading">{heading}</h2>}
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="lp-tour-cta"
+      >
+        <Compass size={18} aria-hidden="true" />
+        <span>{ctaLabel || 'התחילו סיור וירטואלי'}</span>
+        <ArrowUpRight size={16} aria-hidden="true" />
+      </a>
+    </section>
+  );
+}
+
+// ─── FLOOR PLAN ──────────────────────────────────────────────────
+
+function FloorPlanSection({ section, ctx }) {
+  const { heading, photoId } = section.props;
+  const img = photoId ? ctx.images.find((i) => i.id === photoId) : null;
+  const src = img?.urlCard || img?.url;
+  if (!src) return null;
+  return (
+    <section className="lp-block lp-floor">
+      {heading && <h2 className="lp-block-heading">{heading}</h2>}
+      <div className="lp-floor-wrap">
+        <img src={src} alt={heading || 'תוכנית הקומה'} loading="lazy" decoding="async" />
+      </div>
+    </section>
+  );
+}
+
+// ─── SPECS ───────────────────────────────────────────────────────
+
+function SpecsSection({ section, ctx }) {
+  const { heading, showPrice, showRooms, showSqm, showFloor } = section.props;
+  const p = ctx.property || {};
+  const chips = [];
+  if (showRooms && p.rooms != null) {
+    chips.push({ icon: <Bed size={14} />, label: `${formatRooms(p.rooms)} חדרים` });
+  }
+  if (showSqm && p.sqm != null) {
+    chips.push({ icon: <Square size={14} />, label: `${p.sqm} מ״ר` });
+  }
+  if (showFloor && p.floor != null) {
+    const total = p.totalFloors ? ` / ${p.totalFloors}` : '';
+    chips.push({ icon: <Building2 size={14} />, label: `קומה ${p.floor}${total}` });
+  }
+  if (showPrice && p.marketingPrice) {
+    chips.push({ icon: <Coins size={14} />, label: `₪${Number(p.marketingPrice).toLocaleString('he-IL')}` });
+  }
+  if (chips.length === 0 && !heading) return null;
+  return (
+    <section className="lp-block lp-specs">
+      {heading && <h2 className="lp-block-heading">{heading}</h2>}
+      {chips.length > 0 && (
+        <ul className="lp-specs-list">
+          {chips.map((c, i) => (
+            <li key={i} className="lp-spec-chip">{c.icon}<span>{c.label}</span></li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function formatRooms(r) {
+  if (r == null) return '';
+  return String(r);
 }

@@ -377,3 +377,137 @@
   margin: 0 0 10px;
 }
 .lp-empty p { color: var(--lp-muted); margin: 0; }
+
+/* ── Editor blocks (Phase 3) ──────────────────────────────────── */
+
+.lp-block {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 48px 28px;
+}
+.lp-block-heading {
+  font-family: var(--lp-serif);
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 0 0 18px;
+  color: var(--lp-ink);
+}
+.lp-block-body p {
+  margin: 0 0 14px;
+  line-height: 1.75;
+  font-size: 16px;
+  color: var(--lp-ink);
+}
+.lp-block-body p:last-child { margin-bottom: 0; }
+
+/* Amenities — bulleted icon list, two columns on desktop */
+.lp-amenities-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px 32px;
+}
+@media (min-width: 700px) {
+  .lp-amenities-list { grid-template-columns: 1fr 1fr; }
+}
+.lp-amenities-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--lp-ink);
+}
+.lp-amenities-list li svg {
+  color: var(--gold, #b48b4c);
+  flex: 0 0 auto;
+}
+
+/* Neighborhood map embed */
+.lp-map-wrap {
+  margin-top: 22px;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ece6db;
+  box-shadow: 0 6px 24px rgba(40, 26, 8, 0.06);
+}
+.lp-map { width: 100%; height: 100%; border: 0; }
+
+/* Video — 16:9 embed */
+.lp-video-wrap {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #14110d;
+  box-shadow: 0 6px 24px rgba(40, 26, 8, 0.08);
+}
+.lp-video-wrap iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Virtual-tour CTA */
+.lp-tour-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  background: var(--lp-ink);
+  color: #f8f1df;
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 6px 22px rgba(40, 26, 8, 0.18);
+}
+.lp-tour-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(40, 26, 8, 0.24);
+}
+
+/* Floor plan */
+.lp-floor-wrap {
+  background: var(--lp-card);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 6px 24px rgba(40, 26, 8, 0.06);
+  display: grid;
+  place-items: center;
+}
+.lp-floor-wrap img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+/* Specs chips */
+.lp-specs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.lp-spec-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--lp-paper);
+  border: 1px solid #e5dec9;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--lp-ink);
+}
+.lp-spec-chip svg { color: var(--gold, #b48b4c); flex: 0 0 auto; }
