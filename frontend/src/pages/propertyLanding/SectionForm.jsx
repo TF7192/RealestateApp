@@ -8,8 +8,27 @@
 import { useRef, useState } from 'react';
 import { Image as ImageIcon, Trash2, Upload, Loader2 } from 'lucide-react';
 import { templateCopy } from './copy.he';
+import { FONT_OPTIONS } from './fontStacks';
 
 export default function SectionForm({ section, template, property, onChange, onUploadPhoto }) {
+  return (
+    <>
+      <TypeSpecificForm
+        section={section}
+        template={template}
+        property={property}
+        onChange={onChange}
+        onUploadPhoto={onUploadPhoto}
+      />
+      <ThemeOverrides
+        theme={section.theme}
+        onChange={(theme) => onChange({ ...section, theme })}
+      />
+    </>
+  );
+}
+
+function TypeSpecificForm({ section, template, property, onChange, onUploadPhoto }) {
   const update = (k, v) => onChange({
     ...section,
     props: { ...section.props, [k]: v },
@@ -65,6 +84,63 @@ export default function SectionForm({ section, template, property, onChange, onU
                 { value: 'IMAGE',  label: 'תמונה מלאה',     hint: 'תמונה מלאת מסך עם טקסט מעליה' },
                 { value: 'SPLIT',  label: 'תמונה + טקסט',   hint: 'תמונה בחצי מהמסך, טקסט בחצי השני' },
                 { value: 'BANNER', label: 'באנר עם כרטיס', hint: 'תמונה למעלה, כרטיס טקסט קרם מתחתיה' },
+              ]}
+            />
+          </Field>
+
+          {/* Per-variant tuning. Each control only shows when its
+              parent variant is selected, so the form stays focused. */}
+          {(section.props.variant || 'IMAGE') === 'IMAGE' && (
+            <Field label="עוצמת הצללה על התמונה">
+              <SegmentedSelect
+                value={section.props.imageOverlay || 'MEDIUM'}
+                onChange={(v) => update('imageOverlay', v)}
+                options={[
+                  { value: 'NONE',   label: 'ללא' },
+                  { value: 'LIGHT',  label: 'קלה' },
+                  { value: 'MEDIUM', label: 'בינונית' },
+                  { value: 'DARK',   label: 'חזקה' },
+                ]}
+              />
+              <Hint>אם הטקסט קשה לקריאה על התמונה — הגבירו.</Hint>
+            </Field>
+          )}
+
+          {(section.props.variant || 'IMAGE') === 'SPLIT' && (
+            <Field label="מיקום התמונה">
+              <SegmentedSelect
+                value={section.props.splitSide || 'START'}
+                onChange={(v) => update('splitSide', v)}
+                options={[
+                  { value: 'START', label: 'תמונה בצד התחלה' },
+                  { value: 'END',   label: 'תמונה בצד סיום' },
+                ]}
+              />
+            </Field>
+          )}
+
+          {(section.props.variant || 'IMAGE') === 'BANNER' && (
+            <Field label="גובה התמונה">
+              <SegmentedSelect
+                value={section.props.bannerHeight || 'DEFAULT'}
+                onChange={(v) => update('bannerHeight', v)}
+                options={[
+                  { value: 'SHORT',   label: 'קצר' },
+                  { value: 'DEFAULT', label: 'רגיל' },
+                  { value: 'TALL',    label: 'גבוה' },
+                ]}
+              />
+            </Field>
+          )}
+
+          <Field label="יישור טקסט">
+            <SegmentedSelect
+              value={section.props.textAlign || 'START'}
+              onChange={(v) => update('textAlign', v)}
+              options={[
+                { value: 'START',  label: 'התחלה' },
+                { value: 'CENTER', label: 'מרכז' },
+                { value: 'END',    label: 'סיום' },
               ]}
             />
           </Field>
@@ -390,6 +466,106 @@ function ItemsList({ items, onChange, max }) {
           + הוסיפו פריט
         </button>
       )}
+    </div>
+  );
+}
+
+function ThemeOverrides({ theme = {}, onChange }) {
+  const set = (key, value) => {
+    const next = { ...theme, [key]: value };
+    // Drop empty fields so the saved config doesn't accumulate
+    // null/empty noise — the schema treats `undefined` as
+    // "inherit global", which is the agent's intent when they
+    // clear a picker.
+    Object.keys(next).forEach((k) => {
+      if (next[k] === '' || next[k] == null) delete next[k];
+    });
+    onChange(Object.keys(next).length ? next : undefined);
+  };
+  return (
+    <details className="le-theme-overrides">
+      <summary>מראה הסקציה</summary>
+      <div className="le-theme-overrides-body">
+        <Field label="גופן">
+          <select
+            value={theme.font || 'DEFAULT'}
+            onChange={(e) => set('font', e.target.value === 'DEFAULT' ? '' : e.target.value)}
+          >
+            {FONT_OPTIONS.map((f) => (
+              <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </select>
+        </Field>
+        <ColorField label="רקע" value={theme.bg} onChange={(v) => set('bg', v)} />
+        <ColorField label="טקסט" value={theme.ink} onChange={(v) => set('ink', v)} />
+        <ColorField label="צבע הדגשה (כפתורים / אייקונים)" value={theme.accent} onChange={(v) => set('accent', v)} />
+        {(theme.font || theme.bg || theme.ink || theme.accent) && (
+          <button
+            type="button"
+            className="le-theme-reset"
+            onClick={() => onChange(undefined)}
+          >
+            איפוס לברירת מחדל
+          </button>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function ColorField({ label, value, onChange }) {
+  // <input type="color"> always produces a value; track "unset"
+  // separately via the explicit unset button. Empty value renders
+  // the swatch in the default state.
+  return (
+    <Field label={label}>
+      <div className="le-color-field">
+        <input
+          type="color"
+          value={value || '#b48b4c'}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={label}
+        />
+        <input
+          type="text"
+          value={value || ''}
+          onChange={(e) => {
+            const v = e.target.value.trim();
+            if (/^#[0-9a-fA-F]{6}$/.test(v) || v === '') onChange(v);
+          }}
+          placeholder="#b48b4c"
+          dir="ltr"
+          maxLength={7}
+          className="le-color-hex"
+        />
+        {value && (
+          <button
+            type="button"
+            className="le-color-clear"
+            onClick={() => onChange('')}
+            aria-label="נקה צבע"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+function SegmentedSelect({ value, onChange, options }) {
+  return (
+    <div className="le-seg-row">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          className={`le-seg-btn ${value === opt.value ? 'is-on' : ''}`}
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }

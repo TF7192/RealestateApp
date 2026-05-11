@@ -22,6 +22,7 @@ import {
 import api from '../../lib/api';
 import { defaultLandingConfig } from './defaultConfig';
 import { templateCopy } from './copy.he';
+import { fontStack, ensureFont } from './fontStacks';
 import '../PropertyLandingPage.css';
 
 export default function LandingRenderer({
@@ -144,7 +145,7 @@ export default function LandingRenderer({
         const idx = visibleIdx++;
         const lazy = lazyBelowFold && idx > 0;
         return (
-          <SectionFrame key={section.id} lazy={lazy}>
+          <SectionFrame key={section.id} lazy={lazy} theme={section.theme}>
             {rendered}
           </SectionFrame>
         );
@@ -153,9 +154,39 @@ export default function LandingRenderer({
   );
 }
 
-function SectionFrame({ children, lazy }) {
-  if (!lazy) return children;
-  return <LazyMount minHeight={320}>{children}</LazyMount>;
+function SectionFrame({ children, lazy, theme }) {
+  // Per-section theme override. The overrides set local CSS custom
+  // properties; every block below uses the same vars the global
+  // theme uses, so a hex change here cascades into every nested
+  // rule (.lp-form-card, .lp-spec-chip, etc.) without per-block
+  // conditionals. `null` / undefined values mean "inherit".
+  const themeStyle = useMemo(() => themeToStyle(theme), [theme]);
+  // Side effect — once a non-system font shows up in the config,
+  // make sure the Google Fonts stylesheet is in the document head.
+  useEffect(() => {
+    if (theme?.font) ensureFont(theme.font);
+  }, [theme?.font]);
+  const wrapped = themeStyle
+    ? <div className="lp-section-theme" style={themeStyle}>{children}</div>
+    : children;
+  if (!lazy) return wrapped;
+  return <LazyMount minHeight={320}>{wrapped}</LazyMount>;
+}
+
+function themeToStyle(theme) {
+  if (!theme) return null;
+  const style = {};
+  // Override BOTH paper and card so hero (full-bleed) and inner
+  // cards both pick up the same background. Agents rarely want to
+  // distinguish the two at the section level.
+  if (theme.bg)     { style['--lp-paper'] = theme.bg; style['--lp-card'] = theme.bg; }
+  if (theme.ink)    { style['--lp-ink'] = theme.ink; }
+  if (theme.accent) { style['--lp-gold'] = theme.accent; style['--gold'] = theme.accent; }
+  if (theme.font) {
+    const stack = fontStack(theme.font);
+    if (stack) { style['--lp-sans'] = stack; style['--lp-serif'] = stack; }
+  }
+  return Object.keys(style).length ? style : null;
 }
 
 // Render `children` only after the placeholder scrolls within
@@ -238,8 +269,17 @@ function HeroSection({ section, ctx }) {
     ? props.variant
     : 'IMAGE';
 
+  // Per-variant tuning. Defaults match the schema defaults so a
+  // legacy config without these fields renders the way it always
+  // did. Each value lands on the DOM as a `data-*` attribute so a
+  // single CSS rule per axis selects on it (no JSX branching).
+  const splitSide    = props.splitSide    || 'START';
+  const imageOverlay = props.imageOverlay || 'MEDIUM';
+  const bannerHeight = props.bannerHeight || 'DEFAULT';
+  const textAlign    = props.textAlign    || 'START';
+
   const content = (
-    <div className="lp-hero-content">
+    <div className="lp-hero-content" data-align={textAlign}>
       <span className="lp-eyebrow">{eyebrow}</span>
       <h1 className="lp-title">{title}</h1>
       <p className="lp-subtitle">{subtitle}</p>
@@ -261,7 +301,7 @@ function HeroSection({ section, ctx }) {
 
   if (variant === 'SPLIT') {
     return (
-      <header className="lp-hero lp-hero-split">
+      <header className="lp-hero lp-hero-split" data-photo-side={splitSide}>
         <div
           className="lp-hero-split-image"
           style={hero ? { backgroundImage: `url(${hero})` } : undefined}
@@ -278,7 +318,7 @@ function HeroSection({ section, ctx }) {
 
   if (variant === 'BANNER') {
     return (
-      <header className="lp-hero lp-hero-banner">
+      <header className="lp-hero lp-hero-banner" data-banner-height={bannerHeight}>
         <div
           className="lp-hero-banner-image"
           style={hero ? { backgroundImage: `url(${hero})` } : undefined}
@@ -294,7 +334,7 @@ function HeroSection({ section, ctx }) {
   }
 
   return (
-    <header className="lp-hero">
+    <header className="lp-hero" data-image-overlay={imageOverlay}>
       {hero && (
         <div
           className="lp-hero-image"

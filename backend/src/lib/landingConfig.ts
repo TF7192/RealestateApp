@@ -47,6 +47,32 @@ const Visibility = z.boolean().default(true);
 const SectionId = z.string().uuid();
 const PhotoId = z.string().min(1);
 
+// Per-section theme overrides. Each field is optional — when unset
+// the section inherits the global theme. Colors are validated as
+// 6-digit hex to prevent CSS injection via the inline style strings
+// the renderer applies. Font is an enum, not a free CSS family
+// string, both for safety and so the renderer can guarantee the
+// font is actually loaded (Google Fonts <link> is injected on first
+// use).
+const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'color must be #RRGGBB');
+const SectionFont = z.enum([
+  'DEFAULT',
+  'HEEBO',
+  'RUBIK',
+  'ASSISTANT',
+  'FRANK_RUHL_LIBRE',
+  'PLAYFAIR_DISPLAY',
+  'NOTO_SERIF_HEBREW',
+  'SYSTEM_SANS',
+  'SYSTEM_SERIF',
+]);
+const SectionTheme = z.object({
+  bg: HexColor.optional(),
+  ink: HexColor.optional(),
+  accent: HexColor.optional(),
+  font: SectionFont.optional(),
+}).optional();
+
 // ── Block prop schemas ────────────────────────────────────────────
 
 const HeroProps = z.object({
@@ -63,6 +89,16 @@ const HeroProps = z.object({
   //   BANNER = photo as a tall horizontal band at the top, copy
   //            in a cream card below.
   variant: z.enum(['IMAGE', 'SPLIT', 'BANNER']).default('IMAGE'),
+  // ── Per-variant tuning. Optional with sensible defaults applied
+  // by the renderer when unset; each value is only meaningful in
+  // its companion variant (e.g. splitSide does nothing in IMAGE).
+  // Kept as flat fields rather than a discriminated sub-union so
+  // an agent flipping variants doesn't lose the other values.
+  // ─────────────────────────────────────────────────────────────
+  splitSide:    z.enum(['START', 'END']).default('START'),
+  imageOverlay: z.enum(['NONE', 'LIGHT', 'MEDIUM', 'DARK']).default('MEDIUM'),
+  bannerHeight: z.enum(['SHORT', 'DEFAULT', 'TALL']).default('DEFAULT'),
+  textAlign:    z.enum(['START', 'CENTER', 'END']).default('START'),
 });
 
 const GalleryProps = z.object({
@@ -129,6 +165,7 @@ const InquiryProps = z.object({
 const SectionBase = z.object({
   id: SectionId,
   visible: Visibility,
+  theme: SectionTheme,
 });
 
 const Section = z.discriminatedUnion('type', [

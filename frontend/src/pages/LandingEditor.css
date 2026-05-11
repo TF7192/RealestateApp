@@ -323,6 +323,108 @@
 .le-variant-label { font-weight: 600; color: var(--le-ink); }
 .le-variant-hint { font-size: 11px; color: var(--le-muted); }
 
+.le-seg-row {
+  display: inline-flex;
+  background: var(--le-paper);
+  border: 1px solid var(--le-border);
+  border-radius: 999px;
+  padding: 3px;
+  flex-wrap: wrap;
+  gap: 0;
+}
+.le-seg-btn {
+  flex: 1 1 auto;
+  background: transparent;
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--le-muted);
+  font-family: inherit;
+  min-width: 0;
+}
+.le-seg-btn.is-on {
+  background: var(--le-card);
+  color: var(--le-ink);
+  box-shadow: 0 1px 4px rgba(40, 26, 8, 0.12);
+}
+.le-seg-btn:hover:not(.is-on) { color: var(--le-ink); }
+
+/* ── Per-section theme overrides ───────────────────────────── */
+.le-theme-overrides {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--le-border);
+}
+.le-theme-overrides summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--le-gold);
+  padding: 4px 0;
+  list-style: none;
+}
+.le-theme-overrides summary::-webkit-details-marker { display: none; }
+.le-theme-overrides summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.le-theme-overrides[open] summary::before { transform: rotate(90deg); }
+.le-theme-overrides-body { padding-top: 10px; }
+.le-theme-overrides select {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--le-border);
+  border-radius: 8px;
+  background: var(--le-paper);
+  font-size: 14px;
+  color: var(--le-ink);
+  font-family: inherit;
+}
+.le-color-field {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.le-color-field input[type="color"] {
+  width: 38px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--le-border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.le-color-hex {
+  flex: 1;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+}
+.le-color-clear {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--le-border);
+  background: transparent;
+  color: var(--le-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.le-color-clear:hover { color: var(--le-ink); }
+.le-theme-reset {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px dashed var(--le-border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  color: var(--le-muted);
+  cursor: pointer;
+}
+.le-theme-reset:hover { color: var(--le-ink); border-color: var(--le-gold); }
+
 .le-items {
   display: flex;
   flex-direction: column;

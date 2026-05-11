@@ -71,6 +71,9 @@
   z-index: 2;
   max-width: 720px;
   color: #fdf9f1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 .lp-commercial .lp-hero-content { color: #f4f7fb; }
 .lp-eyebrow {
@@ -680,6 +683,36 @@
   border-color: rgba(244, 236, 224, 0.12);
   color: var(--lp-ink);
 }
+
+/* ── Hero variant tuning (data-* selectors) ──────────────────── */
+/* imageOverlay — IMAGE variant. Controls the gradient strength
+   over the photo so white text stays readable on bright shots. */
+.lp-hero[data-image-overlay="NONE"]   .lp-hero-gradient { opacity: 0; }
+.lp-hero[data-image-overlay="LIGHT"]  .lp-hero-gradient { opacity: 0.45; }
+.lp-hero[data-image-overlay="MEDIUM"] .lp-hero-gradient { opacity: 1; }
+.lp-hero[data-image-overlay="DARK"]   .lp-hero-gradient {
+  opacity: 1;
+  background: linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.65) 100%);
+}
+
+/* splitSide — SPLIT variant. START keeps the photo on the leading
+   edge (in RTL = right side); END flips to the trailing edge. */
+.lp-hero-split[data-photo-side="END"] {
+  grid-template-columns: 1fr 1fr;
+}
+.lp-hero-split[data-photo-side="END"] .lp-hero-split-image { order: 2; }
+.lp-hero-split[data-photo-side="END"] .lp-hero-split-content { order: 1; }
+
+/* bannerHeight — BANNER variant. */
+.lp-hero-banner[data-banner-height="SHORT"]   .lp-hero-banner-image { height: 38vh; min-height: 240px; max-height: 380px; }
+.lp-hero-banner[data-banner-height="DEFAULT"] .lp-hero-banner-image { height: 56vh; min-height: 360px; max-height: 540px; }
+.lp-hero-banner[data-banner-height="TALL"]    .lp-hero-banner-image { height: 72vh; min-height: 460px; max-height: 720px; }
+
+/* textAlign — applies in all variants. Affects the eyebrow/title/
+   subtitle column inside .lp-hero-content. */
+.lp-hero-content[data-align="START"]  { text-align: start; }
+.lp-hero-content[data-align="CENTER"] { text-align: center; align-items: center; }
+.lp-hero-content[data-align="END"]    { text-align: end; align-items: flex-end; }
 
 .lp-page.lp-palette-olive-sand {
   --lp-ink: #2b2a1a;

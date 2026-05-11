@@ -32,7 +32,7 @@ export function defaultLandingConfig(opts = {}) {
     template,
     theme: { font: 'DEFAULT', palette: 'CREAM_GOLD' },
     sections: [
-      mk('HERO',       { eyebrow: '', title: '', subtitle: '', photoId: null, variant: 'IMAGE' }),
+      mk('HERO',       { eyebrow: '', title: '', subtitle: '', photoId: null, variant: 'IMAGE', splitSide: 'START', imageOverlay: 'MEDIUM', bannerHeight: 'DEFAULT', textAlign: 'START' }),
       mk('GALLERY',    { heading: '' }),
       mk('INQUIRY',    { heading: '', subHeading: '', ctaLabel: '' }),
       mk('AGENT_CARD', {}),
@@ -61,7 +61,7 @@ export const REQUIRED_BLOCK_TYPES = new Set(['HERO', 'AGENT_CARD', 'INQUIRY']);
 // Default `props` shape for each block type. Used when the editor
 // adds a new section so the rendered preview never sees undefined.
 export const DEFAULT_PROPS = {
-  HERO:         { eyebrow: '', title: '', subtitle: '', photoId: null, variant: 'IMAGE' },
+  HERO:         { eyebrow: '', title: '', subtitle: '', photoId: null, variant: 'IMAGE', splitSide: 'START', imageOverlay: 'MEDIUM', bannerHeight: 'DEFAULT', textAlign: 'START' },
   GALLERY:      { heading: '' },
   DESCRIPTION:  { heading: '', body: '' },
   AMENITIES:    { heading: '', items: [] },
