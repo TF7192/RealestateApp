@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   Megaphone,
   Sparkles,
+  Palette,
   Pencil,
   UserPlus,
   Users,
@@ -1228,6 +1229,33 @@ export default function PropertyDetail() {
                   const matches = (leads || []).filter((l) => leadMatchesProperty(l, property));
                   return `${matches.length} מתעניינים תואמים`;
                 })()}
+              </span>
+            </span>
+          </button>
+
+          {/* Edit landing page — premium-gated. Non-premium agents
+              get the standard PremiumGateDialog via the global event
+              listener in App.jsx; premium agents land on the editor. */}
+          <button
+            type="button"
+            className="prd-quick"
+            onClick={() => {
+              if (user?.isPremium) {
+                navigate(`/properties/${property.id}/landing-editor`);
+              } else {
+                try {
+                  window.dispatchEvent(new CustomEvent('estia:premium-gate', {
+                    detail: { feature: 'עריכת דף נחיתה' },
+                  }));
+                } catch { /* non-browser env */ }
+              }
+            }}
+          >
+            <span className="prd-quick-ico"><Palette size={15} /></span>
+            <span className="prd-quick-body">
+              <span className="prd-quick-label">ערוך דף נחיתה</span>
+              <span className="prd-quick-sub">
+                {user?.isPremium ? 'עצבו את דף הנחיתה של הנכס' : 'דורש מנוי פרימיום'}
               </span>
             </span>
           </button>
