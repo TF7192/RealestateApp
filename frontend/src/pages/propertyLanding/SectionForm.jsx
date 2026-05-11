@@ -5,10 +5,11 @@
 // types each have 1–5 fields and the schema is stable — pulling
 // each block into its own file would be more bureaucracy than help.
 
-import { Image as ImageIcon, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Image as ImageIcon, Trash2, Upload, Loader2 } from 'lucide-react';
 import { templateCopy } from './copy.he';
 
-export default function SectionForm({ section, template, property, onChange }) {
+export default function SectionForm({ section, template, property, onChange, onUploadPhoto }) {
   const update = (k, v) => onChange({
     ...section,
     props: { ...section.props, [k]: v },
@@ -52,7 +53,18 @@ export default function SectionForm({ section, template, property, onChange }) {
               images={images}
               value={section.props.photoId}
               onChange={(id) => update('photoId', id)}
+              onUpload={onUploadPhoto}
               hint="ברירת מחדל: התמונה הראשונה של הנכס"
+            />
+          </Field>
+          <Field label="סגנון תצוגה">
+            <VariantRadio
+              value={section.props.variant || 'IMAGE'}
+              onChange={(v) => update('variant', v)}
+              options={[
+                { value: 'IMAGE', label: 'תמונה מלאה',  hint: 'תמונה מלאת מסך עם טקסט מעליה' },
+                { value: 'SPLIT', label: 'תמונה + טקסט', hint: 'תמונה בחצי מהמסך, טקסט בחצי השני' },
+              ]}
             />
           </Field>
         </>
@@ -226,7 +238,8 @@ export default function SectionForm({ section, template, property, onChange }) {
               images={images}
               value={section.props.photoId}
               onChange={(id) => update('photoId', id)}
-              hint="העלו את תוכנית הקומה דרך ׳ניהול תמונות הנכס׳, ואז בחרו אותה כאן."
+              onUpload={onUploadPhoto}
+              hint="ניתן להעלות תמונה חדשה כאן או לבחור מתמונות הנכס הקיימות."
             />
           </Field>
         </>
@@ -380,12 +393,70 @@ function ItemsList({ items, onChange, max }) {
   );
 }
 
-function PhotoPicker({ images, value, onChange, hint }) {
+function VariantRadio({ value, onChange, options }) {
+  return (
+    <div className="le-variant-radio">
+      {options.map((opt) => (
+        <label
+          key={opt.value}
+          className={`le-variant-opt ${value === opt.value ? 'is-on' : ''}`}
+        >
+          <input
+            type="radio"
+            name="hero-variant"
+            value={opt.value}
+            checked={value === opt.value}
+            onChange={() => onChange(opt.value)}
+          />
+          <span className="le-variant-label">{opt.label}</span>
+          <span className="le-variant-hint">{opt.hint}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function PhotoPicker({ images, value, onChange, hint, onUpload }) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const pick = async (file) => {
+    if (!file) return;
+    setErr(null);
+    setUploading(true);
+    try {
+      const newId = await onUpload(file);
+      if (newId) onChange(newId);
+    } catch (e) {
+      setErr(e?.message || 'העלאה נכשלה');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Empty state with upload still available — first photo can come
+  // from right here, no need to bounce out to the photo manager.
   if (!images.length) {
     return (
-      <Hint>אין תמונות בנכס עדיין — העלו דרך ׳ניהול תמונות הנכס׳.</Hint>
+      <>
+        {onUpload ? (
+          <>
+            <UploadButton
+              fileRef={fileRef}
+              onPick={pick}
+              uploading={uploading}
+              variant="empty"
+            />
+            {err && <Hint>{err}</Hint>}
+          </>
+        ) : (
+          <Hint>אין תמונות בנכס עדיין — העלו דרך ׳ניהול תמונות הנכס׳.</Hint>
+        )}
+      </>
     );
   }
+
   return (
     <>
       <div className="le-photo-grid">
@@ -408,8 +479,48 @@ function PhotoPicker({ images, value, onChange, hint }) {
             aria-label="בחר תמונה"
           />
         ))}
+        {onUpload && (
+          <UploadButton
+            fileRef={fileRef}
+            onPick={pick}
+            uploading={uploading}
+            variant="tile"
+          />
+        )}
       </div>
+      {err && <Hint>{err}</Hint>}
       {hint && <Hint>{hint}</Hint>}
+    </>
+  );
+}
+
+function UploadButton({ fileRef, onPick, uploading, variant }) {
+  const open = () => fileRef.current?.click();
+  return (
+    <>
+      <button
+        type="button"
+        className={`le-photo le-photo-upload ${variant === 'empty' ? 'is-empty' : ''}`}
+        onClick={open}
+        disabled={uploading}
+      >
+        {uploading ? <Loader2 size={20} className="le-spin" /> : <Upload size={20} />}
+        <span>{uploading ? 'מעלה…' : 'העלאה'}</span>
+      </button>
+      {/* Same MIME / extension permissiveness as the photo manager
+          so HEIC / JFIF / empty-MIME files from Chrome on Windows
+          don't get silently dropped. */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*,.heic,.heif,.jfif"
+        className="le-file-hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files || []);
+          e.target.value = '';
+          if (files[0]) onPick(files[0]);
+        }}
+      />
     </>
   );
 }

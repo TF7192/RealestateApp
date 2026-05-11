@@ -13,7 +13,7 @@
 // owned by the renderer and threaded down. Per-block layout and copy
 // live in the per-case JSX below.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, Phone, Mail, User, MessageSquareText,
   CheckCircle2, MapPin, Check, Bed, Square, Building2, ArrowUpRight,
@@ -31,6 +31,11 @@ export default function LandingRenderer({
   // Editor preview passes `inquiryDisabled` to keep the form from
   // POSTing real inquiries while the agent is just playing.
   inquiryDisabled = false,
+  // Public viewers benefit from deferring heavy below-fold work
+  // (YouTube/Vimeo iframes, Google Maps embeds, full-size floor
+  // plans) until each block scrolls into view. The editor preview
+  // disables this so the agent can see every section at all times.
+  lazyBelowFold = true,
 }) {
   const effective = useMemo(() => (
     config || defaultLandingConfig({ assetClass: property?.assetClass })
@@ -117,25 +122,63 @@ export default function LandingRenderer({
     form, setForm, submit, submitting, submitted, formErr,
   };
 
+  // Wrap below-fold sections in a LazyMount so VIDEO iframes,
+  // NEIGHBORHOOD map embeds, and FLOOR_PLAN images don't load
+  // until they enter the viewport. The hero (index 0) is the LCP
+  // and always renders immediately; the second visible section
+  // typically sits within the initial viewport so its IO callback
+  // fires on first paint anyway — the cost is just a wrapper div.
+  let visibleIdx = 0;
   return (
     <div className={`lp-page ${isCommercial ? 'lp-commercial' : 'lp-residential'}`}>
       {effective.sections.map((section) => {
         if (!section.visible) return null;
         const rendered = renderSection(section, ctx);
         if (!rendered) return null;
-        // Wrap in a stable key so React reconciliation is happy
-        // across drag-reorder in the editor's preview.
-        return <SectionFrame key={section.id}>{rendered}</SectionFrame>;
+        const idx = visibleIdx++;
+        const lazy = lazyBelowFold && idx > 0;
+        return (
+          <SectionFrame key={section.id} lazy={lazy}>
+            {rendered}
+          </SectionFrame>
+        );
       })}
     </div>
   );
 }
 
-function SectionFrame({ children }) {
-  // Pass-through wrapper. Exists so the editor preview can later
-  // overlay per-section affordances (drag handle, hover outline)
-  // without re-shaping every block.
-  return children;
+function SectionFrame({ children, lazy }) {
+  if (!lazy) return children;
+  return <LazyMount minHeight={320}>{children}</LazyMount>;
+}
+
+// Render `children` only after the placeholder scrolls within
+// `rootMargin` of the viewport. Mounts once, never re-hides — once
+// visible, the block stays mounted so scrolling back up doesn't
+// trigger a fresh fetch. Falls open (immediate mount) when the
+// runtime lacks IntersectionObserver.
+function LazyMount({ children, minHeight = 200 }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (visible) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return undefined;
+    }
+    const node = ref.current;
+    if (!node) return undefined;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) {
+        setVisible(true);
+        io.disconnect();
+      }
+    }, { rootMargin: '200px 0px' });
+    io.observe(node);
+    return () => io.disconnect();
+  }, [visible]);
+  if (visible) return children;
+  return <div ref={ref} style={{ minHeight }} aria-hidden="true" />;
 }
 
 function renderSection(section, ctx) {
@@ -178,6 +221,51 @@ function HeroSection({ section, ctx }) {
 
   const docTitle = `${property?.type || 'נכס'} ב${property?.city || 'ישראל'}`;
 
+  // Two visual variants. IMAGE = full-bleed background photo with
+  // gradient + overlay text (current default). SPLIT = photo on one
+  // side, text on the other on desktop; stacks photo-over-text on
+  // mobile. The DOM stays similar so the gallery arrow controls and
+  // the content block keep working in both layouts.
+  const variant = props.variant === 'SPLIT' ? 'SPLIT' : 'IMAGE';
+
+  const content = (
+    <div className="lp-hero-content">
+      <span className="lp-eyebrow">{eyebrow}</span>
+      <h1 className="lp-title">{title}</h1>
+      <p className="lp-subtitle">{subtitle}</p>
+      {property?.city && (
+        <div className="lp-locator" aria-label="מיקום">
+          <MapPin size={14} aria-hidden="true" />
+          <span>{property.city}</span>
+        </div>
+      )}
+    </div>
+  );
+
+  const arrows = !props.photoId && images.length > 1 && (
+    <div className="lp-hero-arrows" aria-hidden="true">
+      <button type="button" onClick={prev} aria-label="תמונה קודמת"><ChevronRight size={18} /></button>
+      <button type="button" onClick={next} aria-label="תמונה הבאה"><ChevronLeft size={18} /></button>
+    </div>
+  );
+
+  if (variant === 'SPLIT') {
+    return (
+      <header className="lp-hero lp-hero-split">
+        <div
+          className="lp-hero-split-image"
+          style={hero ? { backgroundImage: `url(${hero})` } : undefined}
+          role="img"
+          aria-label={docTitle}
+        />
+        <div className="lp-hero-split-content">
+          {content}
+        </div>
+        {arrows}
+      </header>
+    );
+  }
+
   return (
     <header className="lp-hero">
       {hero && (
@@ -189,23 +277,8 @@ function HeroSection({ section, ctx }) {
         />
       )}
       <div className="lp-hero-gradient" />
-      <div className="lp-hero-content">
-        <span className="lp-eyebrow">{eyebrow}</span>
-        <h1 className="lp-title">{title}</h1>
-        <p className="lp-subtitle">{subtitle}</p>
-        {property?.city && (
-          <div className="lp-locator" aria-label="מיקום">
-            <MapPin size={14} aria-hidden="true" />
-            <span>{property.city}</span>
-          </div>
-        )}
-      </div>
-      {!props.photoId && images.length > 1 && (
-        <div className="lp-hero-arrows" aria-hidden="true">
-          <button type="button" onClick={prev} aria-label="תמונה קודמת"><ChevronRight size={18} /></button>
-          <button type="button" onClick={next} aria-label="תמונה הבאה"><ChevronLeft size={18} /></button>
-        </div>
-      )}
+      {content}
+      {arrows}
     </header>
   );
 }

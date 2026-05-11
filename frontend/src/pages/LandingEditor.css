@@ -231,6 +231,29 @@
 }
 .le-toggle input { margin: 0; cursor: pointer; }
 
+.le-variant-radio {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.le-variant-opt {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  align-items: center;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--le-border);
+  background: var(--le-paper);
+  cursor: pointer;
+  font-size: 13px;
+}
+.le-variant-opt:hover { background: var(--le-card); }
+.le-variant-opt.is-on { border-color: var(--le-gold); background: var(--le-card); box-shadow: 0 1px 4px rgba(180, 139, 76, 0.12); }
+.le-variant-opt input { margin: 0; grid-row: 1 / 3; }
+.le-variant-label { font-weight: 600; color: var(--le-ink); }
+.le-variant-hint { font-size: 11px; color: var(--le-muted); }
+
 .le-items {
   display: flex;
   flex-direction: column;
@@ -286,6 +309,12 @@
 }
 .le-photo:hover { transform: scale(1.03); }
 .le-photo.is-on { border-color: var(--le-gold); box-shadow: 0 0 0 2px rgba(180, 139, 76, 0.18); }
+.le-photo-upload { border-style: dashed; color: var(--le-gold); }
+.le-photo-upload.is-empty { aspect-ratio: 16 / 7; }
+.le-photo-upload:disabled { opacity: 0.6; cursor: progress; }
+.le-file-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.le-spin { animation: le-spin 1s linear infinite; }
+@keyframes le-spin { to { transform: rotate(360deg); } }
 
 /* ── Preview pane ───────────────────────────────────────────── */
 .le-preview {

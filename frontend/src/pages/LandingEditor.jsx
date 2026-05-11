@@ -19,6 +19,7 @@ import {
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useToast } from '../lib/toast';
+import { track } from '../lib/analytics';
 import LandingRenderer from './propertyLanding/LandingRenderer';
 import SectionForm from './propertyLanding/SectionForm';
 import { BLOCK_TYPES, REQUIRED_BLOCK_TYPES, newSection } from './propertyLanding/defaultConfig';
@@ -88,6 +89,15 @@ export default function LandingEditor() {
           setSelectedId(initial.sections?.[0]?.id || null);
           setDirty(!!draftRaw);
         }
+        // PostHog — fired once per editor open. `hasExistingConfig`
+        // separates "agent is iterating on a published page" from
+        // "first time touching the editor for this property", which
+        // matters for funnel analysis.
+        track('landing_editor_opened', {
+          propertyId: id,
+          hasExistingConfig: !!cfg?.hasSaved,
+          hadLocalDraft: !!draftRaw,
+        });
       } catch (e) {
         if (!cancelled) setLoadErr(e?.message || 'טעינת הנכס נכשלה');
       } finally {
@@ -135,6 +145,7 @@ export default function LandingEditor() {
     }));
     if (selectedId === sectionId) setSelectedId(null);
     setDirty(true);
+    track('landing_editor_section_removed', { propertyId: id, type: s.type });
   };
   const addSection = (type) => {
     const section = newSection(type);
@@ -149,6 +160,7 @@ export default function LandingEditor() {
     });
     setSelectedId(section.id);
     setDirty(true);
+    track('landing_editor_section_added', { propertyId: id, type });
   };
 
   // ── Drag-reorder (native HTML5, same pattern as PropertyPhotoManager) ─
@@ -188,11 +200,38 @@ export default function LandingEditor() {
       try { localStorage.removeItem(AUTOSAVE_KEY(id)); } catch { /* */ }
       setDirty(false);
       toast?.success?.('דף הנחיתה פורסם בהצלחה');
+      // PostHog — captures the published shape so we can chart which
+      // blocks agents actually use vs. ignore. `blocksUsed` only
+      // includes visible sections (an agent who staged but hid a
+      // block didn't ship it).
+      const visible = config.sections.filter((s) => s.visible);
+      track('landing_editor_published', {
+        propertyId: id,
+        sectionsCount: visible.length,
+        blocksUsed: visible.map((s) => s.type),
+        template: config.template,
+      });
     } catch (e) {
       toast?.error?.(e?.message || 'שמירת דף הנחיתה נכשלה');
     } finally {
       setSaving(false);
     }
+  };
+
+  // ── Photo upload from inside the editor ────────────────────────
+  // PhotoPicker (in SectionForm) calls this for "+ העלאת תמונה".
+  // We POST to /api/properties/:id/images (existing endpoint —
+  // already runs the variant pipeline), then refetch the property
+  // so the imageList in the picker shows the new photo and we
+  // return its id so the picker can auto-select it.
+  const uploadPhoto = async (file) => {
+    const res = await api.uploadPropertyImage(id, file);
+    const newImage = res?.image;
+    try {
+      const pr = await api.getProperty(id);
+      setProperty(pr?.property || pr);
+    } catch { /* refetch failed but image is uploaded — leave it */ }
+    return newImage?.id || null;
   };
 
   const onDiscardDraft = () => {
@@ -349,6 +388,7 @@ export default function LandingEditor() {
                 template={config.template}
                 property={property}
                 onChange={updateSection}
+                onUploadPhoto={uploadPhoto}
               />
             </div>
           )}
@@ -380,6 +420,7 @@ export default function LandingEditor() {
               property={property}
               agent={agentShape(user)}
               inquiryDisabled
+              lazyBelowFold={false}
             />
           </div>
         </main>
