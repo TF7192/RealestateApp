@@ -183,12 +183,34 @@ export function startRefresh(propertyId, kind = 'buy') {
 
 async function pollJob(jobId) {
   const deadline = Date.now() + POLL_CEILING_MS;
+  // 2026-05-11 — transient HTTP / network errors during polling (server
+  // restart, 502 from load balancer) used to throw immediately and
+  // surface as "השליפה נכשלה" even though the backend job kept running
+  // and would have completed on the next click. We now tolerate up to
+  // CONSECUTIVE_FAILURE_LIMIT consecutive request failures before
+  // giving up, and reset the counter on every successful poll.
+  const CONSECUTIVE_FAILURE_LIMIT = 4;
+  let consecutiveFailures = 0;
   await sleep(400);
   while (true) {
     if (Date.now() > deadline) {
-      throw new Error('השליפה לוקחת זמן חריג — נסה/י שוב מאוחר יותר');
+      throw new Error('השליפה לוקחת זמן חריג — נסה שוב מאוחר יותר');
     }
-    const snap = await api.marketJobStatus(jobId);
+    let snap;
+    try {
+      snap = await api.marketJobStatus(jobId);
+      consecutiveFailures = 0;
+    } catch (e) {
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
+        const err = new Error(e?.message || 'איבדתי קשר עם השרת בזמן שליפת הנתונים');
+        err.status = e?.status;
+        throw err;
+      }
+      // Back off and try again — the job may still be progressing.
+      await sleep(POLL_INTERVAL_MS);
+      continue;
+    }
     if (snap.status === 'done')  return snap.result;
     if (snap.status === 'error') {
       const env = snap.error || {};

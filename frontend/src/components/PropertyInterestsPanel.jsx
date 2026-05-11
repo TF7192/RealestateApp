@@ -432,6 +432,318 @@ function StatusPill({ status, onChange }) {
   );
 }
 
+// ── Offer threading helpers ────────────────────────────────────
+// Same logic as PropertyDetail's OwnerOffersCard — duplicated here so
+// the מתעניינים tab shows the buyer↔seller dialog with action buttons
+// on the latest round (was: flat list, no way to respond to a seller's
+// counter-offer from the מתעניין side).
+const OFFER_STATUS_LABEL = {
+  NEW:         'ממתינה לתגובה',
+  NEGOTIATING: 'במו״מ',
+  ACCEPTED:    'התקבלה',
+  DECLINED:    'נדחתה',
+  WITHDRAWN:   'בוטלה',
+};
+function offerToneStyles(s) {
+  if (s === 'ACCEPTED') return { background: 'rgba(21,128,61,0.12)', color: '#15803d' };
+  if (s === 'DECLINED' || s === 'WITHDRAWN') return { background: 'rgba(185,28,28,0.10)', color: '#b91c1c' };
+  if (s === 'NEW') return { background: 'rgba(180,139,76,0.18)', color: '#7a5c2c' };
+  if (s === 'NEGOTIATING') return { background: 'rgba(180,139,76,0.10)', color: '#6b6356' };
+  return { background: 'rgba(30,26,20,0.06)', color: '#6b6356' };
+}
+function buildOfferThreads(offers) {
+  const byId = new Map(offers.map((o) => [o.id, o]));
+  const rootOf = (id) => {
+    let cur = byId.get(id);
+    const seen = new Set();
+    while (cur?.replyToOfferId && byId.has(cur.replyToOfferId) && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      cur = byId.get(cur.replyToOfferId);
+    }
+    return cur?.id || id;
+  };
+  const threads = new Map();
+  for (const o of offers) {
+    const r = rootOf(o.id);
+    if (!threads.has(r)) threads.set(r, []);
+    threads.get(r).push(o);
+  }
+  const out = [];
+  for (const [rootId, rounds] of threads) {
+    rounds.sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt));
+    out.push({ rootId, rounds });
+  }
+  out.sort((a, b) => {
+    const al = a.rounds[a.rounds.length - 1].receivedAt;
+    const bl = b.rounds[b.rounds.length - 1].receivedAt;
+    return new Date(bl) - new Date(al);
+  });
+  return out;
+}
+function threadStatusOf(rounds) {
+  if (rounds.some((r) => r.status === 'ACCEPTED')) return 'ACCEPTED';
+  if (rounds.every((r) => r.status === 'DECLINED' || r.status === 'WITHDRAWN')) {
+    return rounds[rounds.length - 1].status;
+  }
+  return rounds[rounds.length - 1].status;
+}
+
+function OfferThreadList({ offers, propertyId, onChange }) {
+  const toast = useToast();
+  const [respondingTo, setRespondingTo] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const threads = buildOfferThreads(offers);
+
+  const respond = async (offerId, action, counter) => {
+    setBusyId(offerId);
+    try {
+      await api.respondToPropertyOffer(propertyId, offerId, { action, counter });
+      toast?.success?.(
+        action === 'ACCEPT' ? 'ההצעה התקבלה' :
+        action === 'DECLINE' ? 'ההצעה נדחתה' :
+        action === 'WITHDRAW' ? 'ההצעה בוטלה' : 'הצעה נגדית נשלחה'
+      );
+      onChange?.();
+    } catch (e) {
+      toast?.error?.(e?.message || 'הפעולה נכשלה');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {threads.map(({ rootId, rounds }) => {
+          const last = rounds[rounds.length - 1];
+          const tStatus = threadStatusOf(rounds);
+          const terminal = tStatus === 'ACCEPTED' || tStatus === 'DECLINED' || tStatus === 'WITHDRAWN';
+          const pendingSide = last.status !== 'NEW' ? null
+            : last.direction === 'BUYER_TO_SELLER' ? 'SELLER' : 'BUYER';
+          return (
+            <li
+              key={rootId}
+              style={{
+                background: '#fff',
+                border: `1px solid ${tStatus === 'NEW' ? 'rgba(180,139,76,0.4)' : 'rgba(30,26,20,0.10)'}`,
+                borderRadius: 10,
+                overflow: 'hidden',
+              }}
+            >
+              <header style={{
+                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                padding: '8px 12px',
+                background: 'linear-gradient(180deg, rgba(180,139,76,0.06), transparent)',
+                borderBottom: '1px solid rgba(30,26,20,0.06)',
+              }}>
+                <span style={{ fontWeight: 800, fontSize: 13 }}>
+                  {rounds.length} {rounds.length === 1 ? 'סבב' : 'סבבים'}
+                </span>
+                <span style={{
+                  marginInlineStart: 'auto',
+                  padding: '3px 8px', borderRadius: 999,
+                  fontSize: 11, fontWeight: 800,
+                  ...offerToneStyles(tStatus),
+                }}>
+                  {OFFER_STATUS_LABEL[tStatus] || tStatus}
+                </span>
+                {pendingSide && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, color: '#7a5c2c',
+                    background: 'rgba(180,139,76,0.10)',
+                    padding: '3px 8px', borderRadius: 999,
+                  }}>
+                    {pendingSide === 'SELLER' ? 'ממתינה לבעל הנכס' : 'ממתינה למתעניין'}
+                  </span>
+                )}
+              </header>
+              <ol style={{ listStyle: 'none', margin: 0, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {rounds.map((r, ix) => {
+                  const isBuyer = r.direction === 'BUYER_TO_SELLER';
+                  const isLast = ix === rounds.length - 1;
+                  return (
+                    <li key={r.id} style={{
+                      background: isBuyer ? 'rgba(29,78,216,0.04)' : 'rgba(180,139,76,0.05)',
+                      border: `1px solid ${isLast && r.status === 'NEW' ? 'rgba(180,139,76,0.32)' : 'rgba(30,26,20,0.06)'}`,
+                      borderRadius: 8, padding: 8,
+                      marginInlineStart: isBuyer ? 0 : 18,
+                      marginInlineEnd:   isBuyer ? 18 : 0,
+                      position: 'relative',
+                    }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 800, color: isBuyer ? '#1d4ed8' : '#7a5c2c', marginBottom: 2 }}>
+                        {ix === 0
+                          ? (isBuyer ? 'הצעה ראשונית מהמתעניין' : 'הצעת בעל הנכס')
+                          : (isBuyer ? 'תגובת המתעניין' : 'תגובת בעל הנכס')}
+                        <span style={{ marginInlineStart: 6, color: '#9c9384', fontWeight: 600 }}>
+                          · {relDate(r.receivedAt)}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: '#1e1a14' }}>
+                        {fmtMoney(r.amount)}
+                        {r.relayedAmount != null && r.relayedAmount !== r.amount && (
+                          <span style={{ marginInlineStart: 8, fontSize: 11, color: '#7a5c2c', fontWeight: 600 }}>
+                            (הועבר: {fmtMoney(r.relayedAmount)})
+                          </span>
+                        )}
+                      </div>
+                      {r.notes && (
+                        <div style={{ fontSize: 11.5, color: '#3a3329', marginTop: 3, lineHeight: 1.5 }}>{r.notes}</div>
+                      )}
+                      {r.status !== 'NEW' && (
+                        <span style={{
+                          position: 'absolute', insetInlineEnd: 6, top: 6,
+                          fontSize: 10, fontWeight: 800,
+                          padding: '2px 6px', borderRadius: 999,
+                          ...offerToneStyles(r.status),
+                        }}>
+                          {OFFER_STATUS_LABEL[r.status]}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+              {!terminal && last.status === 'NEW' && (
+                <div style={{
+                  display: 'flex', gap: 6, flexWrap: 'wrap',
+                  padding: '8px 12px',
+                  borderTop: '1px solid rgba(30,26,20,0.06)',
+                  background: 'rgba(180,139,76,0.04)',
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => respond(last.id, 'ACCEPT')}
+                    disabled={busyId === last.id}
+                    style={{
+                      ..._actionBtn,
+                      borderColor: 'rgba(21,128,61,0.3)', color: '#15803d',
+                    }}
+                  >קבל הצעה</button>
+                  <button
+                    type="button"
+                    onClick={() => respond(last.id, 'DECLINE')}
+                    disabled={busyId === last.id}
+                    style={{
+                      ..._actionBtn,
+                      borderColor: 'rgba(185,28,28,0.25)', color: '#b91c1c',
+                    }}
+                  >דחה הצעה</button>
+                  <button
+                    type="button"
+                    onClick={() => setRespondingTo(last)}
+                    disabled={busyId === last.id}
+                    style={{
+                      ..._actionBtn,
+                      background: 'linear-gradient(180deg,#d9b774,#b48b4c)',
+                      color: '#1e1a14', borderColor: 'transparent', fontWeight: 800,
+                    }}
+                  >ענה הצעה נגדית</button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {respondingTo && (
+        <CounterPopup
+          parent={respondingTo}
+          onClose={() => setRespondingTo(null)}
+          onSubmit={async (counter) => {
+            await respond(respondingTo.id, 'COUNTER', counter);
+            setRespondingTo(null);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+const _actionBtn = {
+  fontFamily: 'inherit', padding: '6px 12px', borderRadius: 8,
+  border: '1px solid rgba(30,26,20,0.12)', background: '#fff',
+  cursor: 'pointer', fontSize: 12, fontWeight: 700,
+};
+
+function CounterPopup({ parent, onClose, onSubmit }) {
+  const isCounteringBuyer = parent.direction === 'BUYER_TO_SELLER';
+  const [amount, setAmount] = useState('');
+  const [relayedAmount, setRelayedAmount] = useState('');
+  const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) return;
+    setBusy(true);
+    try {
+      await onSubmit({
+        amount: amt,
+        relayedAmount: relayedAmount ? Number(relayedAmount) : null,
+        notes: notes.trim() || null,
+      });
+    } finally { setBusy(false); }
+  };
+  return (
+    <FormPopup
+      title={isCounteringBuyer
+        ? 'הצעה נגדית מבעל הנכס למתעניין'
+        : 'הצעה נגדית מהמתעניין לבעל הנכס'}
+      onClose={onClose}
+    >
+      <form onSubmit={submit} className="pi-form" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+        <div style={{
+          background: 'rgba(30,26,20,0.04)', borderRadius: 8,
+          padding: '8px 12px', marginBottom: 10,
+        }}>
+          <div style={{ fontSize: 11, color: '#6b6356', fontWeight: 700, marginBottom: 2 }}>
+            משיב להצעה
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#1e1a14' }}>
+            {fmtMoney(parent.amount)} · {parent.buyerName}
+          </div>
+        </div>
+        <div className="pi-form-body">
+          <label className="pi-field">
+            <span>סכום ההצעה הנגדית (₪)</span>
+            <input
+              type="number" inputMode="numeric" required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              autoFocus
+            />
+          </label>
+          <label className="pi-field">
+            <span>סכום שיעבור לצד השני (₪)</span>
+            <input
+              type="number" inputMode="numeric"
+              value={relayedAmount}
+              onChange={(e) => setRelayedAmount(e.target.value)}
+              placeholder="(אופציונלי)"
+            />
+          </label>
+          <label className="pi-field pi-field-full">
+            <span>הערות</span>
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="הקשר, מה שנאמר בשיחה, וכו׳"
+            />
+          </label>
+        </div>
+        <div className="pi-form-actions" style={{ marginTop: 10 }}>
+          <button type="submit" disabled={busy} className="pi-add-btn">
+            <Save size={13} /> שלח הצעה נגדית
+          </button>
+          <button type="button" onClick={onClose} className="pi-form-cancel" disabled={busy}>
+            ביטול
+          </button>
+        </div>
+      </form>
+    </FormPopup>
+  );
+}
+
 function InterestTimeline({ interestId, propertyId }) {
   const toast = useToast();
   const [events, setEvents] = useState(null);
@@ -446,27 +758,6 @@ function InterestTimeline({ interestId, propertyId }) {
 
   useEffect(() => load(), [load]);
 
-  // Delete the underlying row by event kind. Each kind has its own
-  // backend route — offers via /properties/:id/offers/:offerId, etc.
-  // Some kinds (contract, agreement, meeting, viewing) don't have a
-  // delete endpoint yet so we silently fall back to a "not supported"
-  // toast.
-  const handleDelete = async (e) => {
-    if (!confirm('למחוק את הרשומה?')) return;
-    try {
-      if (e.kind === 'offer' && propertyId) {
-        await api.deletePropertyOffer(propertyId, e.id);
-      } else {
-        toast?.error?.('המחיקה לסוג זה אינה זמינה כרגע');
-        return;
-      }
-      toast?.success?.('הרשומה נמחקה');
-      load();
-    } catch (err) {
-      toast?.error?.(err?.message || 'מחיקה נכשלה');
-    }
-  };
-
   if (events === null) {
     return <div className="pi-timeline-empty">טוען היסטוריה…</div>;
   }
@@ -474,9 +765,9 @@ function InterestTimeline({ interestId, propertyId }) {
     return <div className="pi-timeline-empty">אין פעילות עדיין. השתמש בכפתורים שלמעלה כדי להוסיף סיור, הצעה או פגישה.</div>;
   }
 
-  // 2026-05-11 — group by kind so each section has its own headline
-  // (הצעות / סיורים / הסכמים / חוזים / פגישות). Within a section keep
-  // the timeline order (newest first).
+  // Group by kind so each section has its own headline. Within the
+  // 'offer' section we render thread cards (with accept/decline/
+  // counter actions on the latest round) instead of a flat list.
   const byKind = events.reduce((acc, e) => {
     (acc[e.kind] = acc[e.kind] || []).push(e);
     return acc;
@@ -489,19 +780,6 @@ function InterestTimeline({ interestId, propertyId }) {
     contract:  'חוזים',
     meeting:   'פגישות',
   };
-  const OFFER_STATUS_LABEL = {
-    NEW:         'חדשה',
-    NEGOTIATING: 'במו"מ',
-    ACCEPTED:    'התקבלה',
-    DECLINED:    'נדחתה',
-    WITHDRAWN:   'נמשכה',
-  };
-  const offerStatusTone = (s) => (
-    s === 'ACCEPTED' ? { background: 'rgba(21,128,61,0.12)', color: '#15803d' } :
-    s === 'DECLINED' || s === 'WITHDRAWN' ? { background: 'rgba(185,28,28,0.10)', color: '#b91c1c' } :
-    s === 'NEGOTIATING' ? { background: 'rgba(180,139,76,0.16)', color: '#7a5c2c' } :
-    { background: 'rgba(180,139,76,0.10)', color: '#7a5c2c' }
-  );
 
   return (
     <div className="pi-timeline-stack">
@@ -510,55 +788,31 @@ function InterestTimeline({ interestId, propertyId }) {
           <h4 className="pi-timeline-headline">
             {SECTION_LABEL[k]} <span className="pi-timeline-headline-count">· {byKind[k].length}</span>
           </h4>
-          <ul className="pi-timeline" role="list">
-            {byKind[k].map((e) => {
-              const p = e.payload || {};
-              return (
+          {k === 'offer' ? (
+            <OfferThreadList
+              offers={byKind[k].map((e) => e.payload).filter(Boolean)}
+              propertyId={propertyId}
+              onChange={load}
+            />
+          ) : (
+            <ul className="pi-timeline" role="list">
+              {byKind[k].map((e) => (
                 <li key={`${e.kind}-${e.id}`} className={`pi-event pi-event-${e.kind}`}>
                   <span className="pi-event-icon">
                     {e.kind === 'viewing' && <Footprints size={14} />}
-                    {e.kind === 'offer' && <Banknote size={14} />}
                     {e.kind === 'agreement' && <FileText size={14} />}
                     {e.kind === 'contract' && <FileText size={14} />}
                     {e.kind === 'meeting' && <CalendarIcon size={14} />}
                   </span>
                   <div className="pi-event-body">
-                    <div className="pi-event-title">
-                      {eventTitle(e)}
-                      {e.kind === 'offer' && p.status && (
-                        <span style={{
-                          marginInlineStart: 8,
-                          fontSize: 10.5,
-                          fontWeight: 800,
-                          padding: '2px 8px',
-                          borderRadius: 999,
-                          ...offerStatusTone(p.status),
-                        }}>
-                          {OFFER_STATUS_LABEL[p.status] || p.status}
-                        </span>
-                      )}
-                    </div>
+                    <div className="pi-event-title">{eventTitle(e)}</div>
                     {eventSubtitle(e) && <div className="pi-event-sub">{eventSubtitle(e)}</div>}
                   </div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span className="pi-event-time">{relDate(e.at)}</span>
-                    {e.kind === 'offer' && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(e)}
-                        title="מחק רשומה"
-                        aria-label="מחק רשומה"
-                        style={{
-                          background: 'transparent', border: 'none', padding: 4,
-                          borderRadius: 6, cursor: 'pointer', color: 'rgba(30,26,20,0.4)',
-                        }}
-                      ><Trash2 size={12} /></button>
-                    )}
-                  </div>
+                  <span className="pi-event-time">{relDate(e.at)}</span>
                 </li>
-              );
-            })}
-          </ul>
+              ))}
+            </ul>
+          )}
         </section>
       ))}
     </div>

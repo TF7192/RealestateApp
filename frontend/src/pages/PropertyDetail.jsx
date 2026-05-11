@@ -341,6 +341,10 @@ export default function PropertyDetail() {
   const [statusBusy, setStatusBusy] = useState(false);
   // Owner-side exclusivity-agreement popup (was: routed to /edit)
   const [exclusivityOpen, setExclusivityOpen] = useState(false);
+  // 2026-05-11 — rail-side "הוסף מתעניין" picker. Attaches selected
+  // leads to this property via createPropertyInterests, then switches
+  // to the מתעניינים tab so the agent lands on what they just added.
+  const [attachPickerOpen, setAttachPickerOpen] = useState(false);
   // 2026-05-11 — bumped after any cross-tab mutation (offer accept/
   // decline in Owner tab, etc.) so the מתעניינים tab's panel re-fetches
   // its interests + stats too.
@@ -1164,6 +1168,21 @@ export default function PropertyDetail() {
             </div>
           )}
 
+          {/* Attach interested lead — opens the lead picker in attach
+              mode and switches to the מתעניינים tab after attaching so
+              the agent sees what they just added. */}
+          <button
+            type="button"
+            className="prd-quick"
+            onClick={() => setAttachPickerOpen(true)}
+          >
+            <span className="prd-quick-ico"><UserPlus size={15} aria-hidden="true" /></span>
+            <span className="prd-quick-body">
+              <span className="prd-quick-label">הוסף מתעניין</span>
+              <span className="prd-quick-sub">{interestsCount} {interestsCount === 1 ? 'מתעניין משויך' : 'מתעניינים משויכים'}</span>
+            </span>
+          </button>
+
           {/* Call owner */}
           <button
             type="button"
@@ -1966,6 +1985,35 @@ export default function PropertyDetail() {
           onCreated={() => { setExclusivityOpen(false); load(); }}
         />
       )}
+
+      {/* Attach-from-rail lead picker. Single-pick or multi-pick → bulk
+          createPropertyInterests, then switch to the מתעניינים tab so
+          the agent lands on the new association. */}
+      {attachPickerOpen && (() => {
+        const handlePick = async (selectedLeadIds) => {
+          setAttachPickerOpen(false);
+          if (!selectedLeadIds?.length) return;
+          try {
+            await api.createPropertyInterests(property.id, selectedLeadIds);
+            toast?.success?.(`${selectedLeadIds.length} מתעניינים שויכו לנכס`);
+            reloadAuxiliary();
+            setTab('buyers');
+          } catch (e) {
+            toast?.error?.(e?.message || 'שיוך נכשל');
+          }
+        };
+        return (
+          <LeadPickerSheet
+            property={null}
+            mode="attach"
+            attachTitle="שייך מתעניין לנכס"
+            leads={leads}
+            onPick={(lead) => handlePick([lead.id])}
+            onMulti={(arr) => handlePick(arr.map((l) => l.id))}
+            onClose={() => setAttachPickerOpen(false)}
+          />
+        );
+      })()}
 
       {managingPhotos && (
         <PropertyPhotoManager
@@ -2987,49 +3035,147 @@ export function VideoTile({ video }) {
   );
 }
 
-// Internal "general notes" editor — uses Property.brokerNotes (not the
-// client-facing `notes` description). Save-on-blur so the agent never
-// has to hunt for a Save button.
+// Internal "general notes" — uses Property.brokerNotes. Each line in
+// the stored value is a separate timestamped note (format:
+// "ISO-TIMESTAMP\tBODY"). Press Enter (or click שמור) to commit the
+// current input as a new line; existing notes are read-only with a
+// delete button. The list is scrollable when it exceeds the card.
 function BrokerNotesEditor({ propertyId, initial, onSaved }) {
   const toast = useToast();
-  const [value, setValue] = useState(initial || '');
-  const [saving, setSaving] = useState(false);
-  useEffect(() => { setValue(initial || ''); }, [initial]);
-  const save = async () => {
-    if (value === (initial || '')) return;
-    setSaving(true);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // Parse the stored value (one note per line, tab-separated:
+  // `ISO\tBODY`). Legacy free-text values (no tab) get treated as a
+  // single note with no timestamp.
+  const parseNotes = (str) => {
+    if (!str) return [];
+    return str
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line, idx) => {
+        const tab = line.indexOf('\t');
+        if (tab > 0) {
+          return { id: `${idx}-${line.slice(0, tab)}`, at: line.slice(0, tab), body: line.slice(tab + 1) };
+        }
+        return { id: `${idx}-legacy`, at: null, body: line };
+      });
+  };
+  const serializeNotes = (arr) =>
+    arr.map((n) => (n.at ? `${n.at}\t${n.body}` : n.body)).join('\n');
+
+  const [notes, setNotes] = useState(() => parseNotes(initial));
+  useEffect(() => { setNotes(parseNotes(initial)); }, [initial]);
+
+  const commitDraft = async () => {
+    const body = draft.trim();
+    if (!body || busy) return;
+    setBusy(true);
+    const next = [...notes, { id: `local-${Date.now()}`, at: new Date().toISOString(), body }];
     try {
-      await api.updateProperty(propertyId, { brokerNotes: value.trim() || null });
-      toast?.success?.('הערות נשמרו');
+      await api.updateProperty(propertyId, { brokerNotes: serializeNotes(next) });
+      setNotes(next);
+      setDraft('');
       onSaved?.();
     } catch (e) {
-      toast?.error?.(e?.message || 'שמירת ההערות נכשלה');
+      toast?.error?.(e?.message || 'שמירת ההערה נכשלה');
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   };
+
+  const removeNote = async (id) => {
+    if (busy) return;
+    const next = notes.filter((n) => n.id !== id);
+    setBusy(true);
+    try {
+      await api.updateProperty(propertyId, { brokerNotes: next.length ? serializeNotes(next) : null });
+      setNotes(next);
+      onSaved?.();
+    } catch (e) {
+      toast?.error?.(e?.message || 'מחיקת ההערה נכשלה');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onKey = (e) => {
+    // Enter commits, Shift+Enter inserts newline (rare for short
+    // brokerage notes — keeps the multi-line escape hatch open).
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      commitDraft();
+    }
+  };
+
   return (
-    <textarea
-      rows={3}
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={save}
-      placeholder="הערות פנימיות שיופיעו רק לי — נימוקים על המחיר, הקשר עם הבעלים, מועדים שצריך לזכור..."
-      dir="auto"
-      style={{
-        width: '100%',
-        minHeight: 70,
-        padding: '10px 12px',
-        borderRadius: 10,
-        border: '1px solid rgba(30,26,20,0.12)',
-        background: '#fbf7f0',
-        fontSize: 13.5,
-        color: '#1e1a14',
-        resize: 'vertical',
-        fontFamily: 'inherit',
-        opacity: saving ? 0.7 : 1,
-      }}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {notes.length > 0 && (
+        <ul style={{
+          listStyle: 'none', margin: 0, padding: 0,
+          display: 'flex', flexDirection: 'column', gap: 6,
+          maxHeight: 220, overflowY: 'auto',
+        }}>
+          {notes.map((n) => (
+            <li
+              key={n.id}
+              style={{
+                background: '#fbf7f0',
+                border: '1px solid rgba(30,26,20,0.08)',
+                borderRadius: 8,
+                padding: '8px 10px',
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, color: '#1e1a14', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                  {n.body}
+                </div>
+                {n.at && (
+                  <div style={{ fontSize: 10.5, color: '#9c9384', marginTop: 3 }}>
+                    {new Date(n.at).toLocaleString('he-IL')}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => removeNote(n.id)}
+                disabled={busy}
+                aria-label="מחק הערה"
+                title="מחק הערה"
+                style={{
+                  background: 'transparent', border: 'none', padding: 4,
+                  borderRadius: 6, cursor: 'pointer', color: 'rgba(30,26,20,0.4)',
+                }}
+              >
+                <Trash2 size={13} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <textarea
+        rows={2}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={onKey}
+        placeholder="הערה פנימית… (Enter כדי לשמור, Shift+Enter שורה חדשה)"
+        dir="auto"
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          borderRadius: 10,
+          border: '1px solid rgba(30,26,20,0.12)',
+          background: '#ffffff',
+          fontSize: 13.5,
+          color: '#1e1a14',
+          resize: 'vertical',
+          fontFamily: 'inherit',
+          opacity: busy ? 0.7 : 1,
+        }}
+      />
+    </div>
   );
 }
 
