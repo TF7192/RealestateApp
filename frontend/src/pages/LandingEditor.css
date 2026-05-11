@@ -1,0 +1,389 @@
+/* /properties/:id/landing-editor — Cream & Gold dual-pane editor. */
+
+.le-page {
+  --le-paper: #faf7f1;
+  --le-ink: #1a160f;
+  --le-muted: #6e6657;
+  --le-border: #e5dec9;
+  --le-card: #ffffff;
+  --le-gold: #b48b4c;
+  background: var(--le-paper);
+  min-height: 100vh;
+  color: var(--le-ink);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.le-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--le-border);
+  background: var(--le-card);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.le-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--le-border);
+  border-radius: 8px;
+  padding: 7px 11px;
+  color: var(--le-ink);
+  cursor: pointer;
+  font-size: 13px;
+}
+.le-back:hover { background: var(--le-paper); }
+.le-title { flex: 1; min-width: 0; }
+.le-title h1 { font-size: 17px; margin: 0; font-weight: 700; }
+.le-title p { font-size: 13px; color: var(--le-muted); margin: 2px 0 0; }
+.le-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.le-discard {
+  background: transparent;
+  border: 1px solid var(--le-border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--le-muted);
+  cursor: pointer;
+}
+.le-discard:hover { color: var(--le-ink); }
+.le-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Body — sidebar + preview ───────────────────────────────── */
+.le-body {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+
+.le-sidebar {
+  background: var(--le-card);
+  border-inline-end: 1px solid var(--le-border);
+  padding: 18px 16px 40px;
+  overflow-y: auto;
+  max-height: calc(100vh - 64px);
+}
+.le-sidebar-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--le-muted);
+  margin: 0 0 10px;
+}
+
+/* ── Section list ───────────────────────────────────────────── */
+.le-section-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.le-section-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--le-paper);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+.le-section-row:hover { background: #f3ede1; }
+.le-section-row.is-on {
+  background: var(--le-card);
+  border-color: var(--le-gold);
+  box-shadow: 0 1px 6px rgba(180, 139, 76, 0.12);
+}
+.le-section-row.is-dragging { opacity: 0.5; }
+.le-grip { color: var(--le-muted); cursor: grab; flex: 0 0 auto; }
+.le-section-name { flex: 1; min-width: 0; }
+.le-eye, .le-del {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--le-muted);
+  padding: 4px;
+  border-radius: 4px;
+}
+.le-eye:hover, .le-del:hover { color: var(--le-ink); background: var(--le-paper); }
+
+/* ── Add menu ───────────────────────────────────────────────── */
+.le-add {
+  margin: 0 0 18px;
+  border-top: 1px dashed var(--le-border);
+  padding-top: 14px;
+}
+.le-add summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--le-gold);
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.le-add summary::-webkit-details-marker { display: none; }
+.le-add summary:hover { background: var(--le-paper); }
+.le-add-menu {
+  list-style: none;
+  padding: 4px 0 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.le-add-menu button {
+  background: var(--le-paper);
+  border: 1px solid var(--le-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--le-ink);
+}
+.le-add-menu button:hover { background: var(--le-card); border-color: var(--le-gold); }
+
+/* ── Per-section form ───────────────────────────────────────── */
+.le-form {
+  border-top: 1px solid var(--le-border);
+  padding-top: 14px;
+}
+.le-form-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+.le-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.le-field-label {
+  font-size: 12px;
+  color: var(--le-muted);
+  font-weight: 500;
+}
+.le-field input[type="text"],
+.le-field input[type="url"],
+.le-field input[type="email"],
+.le-field input[type="tel"],
+.le-field textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--le-border);
+  border-radius: 8px;
+  background: var(--le-paper);
+  font-size: 14px;
+  color: var(--le-ink);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.le-field input:focus,
+.le-field textarea:focus {
+  border-color: var(--le-gold);
+  background: var(--le-card);
+}
+.le-field textarea { resize: vertical; line-height: 1.5; }
+.le-field-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--le-muted);
+  line-height: 1.5;
+}
+.le-counter {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--le-muted);
+  margin-top: 4px;
+}
+
+.le-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.le-toggle input { margin: 0; cursor: pointer; }
+
+.le-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.le-item-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.le-item-row input { flex: 1; }
+.le-item-row button {
+  background: transparent;
+  border: 1px solid var(--le-border);
+  border-radius: 6px;
+  padding: 7px;
+  cursor: pointer;
+  color: var(--le-muted);
+}
+.le-item-row button:hover { color: #c4524f; border-color: #c4524f; }
+.le-item-add {
+  background: transparent;
+  border: 1px dashed var(--le-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--le-gold);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.le-item-add:hover { background: var(--le-paper); }
+
+/* ── Photo picker ───────────────────────────────────────────── */
+.le-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.le-photo {
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: var(--le-paper) center / cover no-repeat;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--le-muted);
+}
+.le-photo:hover { transform: scale(1.03); }
+.le-photo.is-on { border-color: var(--le-gold); box-shadow: 0 0 0 2px rgba(180, 139, 76, 0.18); }
+
+/* ── Preview pane ───────────────────────────────────────────── */
+.le-preview {
+  background: linear-gradient(180deg, #efe9df 0%, #ece6db 100%);
+  overflow-y: auto;
+  max-height: calc(100vh - 64px);
+}
+.le-preview-toolbar {
+  position: sticky;
+  top: 0;
+  background: rgba(250, 247, 241, 0.85);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--le-border);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+.le-preview-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid var(--le-border);
+  border-radius: 999px;
+  background: var(--le-card);
+  font-size: 12px;
+  color: var(--le-muted);
+  cursor: pointer;
+}
+.le-preview-toolbar button.is-on {
+  color: var(--le-ink);
+  border-color: var(--le-gold);
+  background: var(--le-paper);
+}
+.le-draft-pill {
+  margin-inline-start: auto;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #8a6312;
+}
+
+.le-preview-frame {
+  display: flex;
+  justify-content: center;
+  padding: 28px;
+  /* The LandingRenderer outputs a `.lp-page` root with full-bleed
+     hero etc. — wrap it in a viewport-shape container so the
+     mobile preview is a meaningful crop. */
+}
+.le-preview-desktop .le-preview-frame > * {
+  width: 100%;
+  max-width: 1280px;
+  background: var(--le-card);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(40, 26, 8, 0.12);
+  overflow: hidden;
+}
+.le-preview-mobile .le-preview-frame > * {
+  width: 390px;
+  background: var(--le-card);
+  border-radius: 30px;
+  box-shadow: 0 14px 44px rgba(40, 26, 8, 0.14);
+  overflow: hidden;
+}
+
+/* ── Narrow viewport / loading / error states ──────────────── */
+.le-narrow,
+.le-error,
+.le-loading {
+  display: grid;
+  place-items: center;
+  min-height: 70vh;
+  padding: 32px;
+  text-align: center;
+}
+.le-narrow svg, .le-error svg { color: var(--le-muted); margin-bottom: 14px; }
+.le-narrow h1, .le-error h1 {
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+.le-narrow p, .le-error p {
+  color: var(--le-muted);
+  max-width: 420px;
+  margin: 0 0 18px;
+}
+.le-skel {
+  width: min(80vw, 520px);
+  height: 220px;
+  background: linear-gradient(90deg, #ece6db 0%, #f4efe4 50%, #ece6db 100%);
+  background-size: 200% 100%;
+  border-radius: 16px;
+  animation: le-shine 1.4s linear infinite;
+}
+@keyframes le-shine {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

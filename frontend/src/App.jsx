@@ -31,6 +31,10 @@ const Deals = lazy(() => import('./pages/Deals'));
 const DealDetail = lazy(() => import('./pages/DealDetail'));
 const AgentPortal = lazy(() => import('./pages/AgentPortal'));
 const PropertyLandingPage = lazy(() => import('./pages/PropertyLandingPage'));
+// Premium agents author the per-property landing page here. Lazy
+// so the editor's section forms + drag-reorder UI don't weigh down
+// any other surface.
+const LandingEditor = lazy(() => import('./pages/LandingEditor'));
 const CustomerPropertyView = lazy(() => import('./pages/CustomerPropertyView'));
 const AgentTransferView = lazy(() => import('./pages/AgentTransferView'));
 const ProspectSign = lazy(() => import('./pages/ProspectSign'));
@@ -382,6 +386,7 @@ function AppRoutes() {
             <Route path="/properties" element={<Properties />} />
             <Route path="/properties/new" element={<NewProperty />} />
             <Route path="/properties/:id/edit" element={<NewProperty />} />
+            <Route path="/properties/:id/landing-editor" element={<LandingEditor />} />
             <Route path="/properties/:id" element={<PropertyDetail />} />
             <Route path="/owners" element={<Owners />} />
             <Route path="/owners/:id" element={<OwnerDetail />} />
