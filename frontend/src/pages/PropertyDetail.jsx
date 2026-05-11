@@ -1040,7 +1040,10 @@ export default function PropertyDetail() {
               return (
                 <span className={cls}>
                   <span className="prd-pill-dot" />
-                  {sc.label}{daysListed != null ? ` · יום ${daysListed}` : ''}
+                  {sc.label}
+                  {daysListed != null && (
+                    <> · {daysListed} {daysListed === 1 ? 'יום' : 'ימים'}</>
+                  )}
                 </span>
               );
             })()}
@@ -1361,19 +1364,25 @@ export default function PropertyDetail() {
               ))}
             </div>
             <div className="prd-more-pills">
+              {/* 2026-05-11 — count appears BEFORE the noun so the RTL
+                  reading order is "5 הצעות" / "1 מדיה" / "0/23 שיווק"
+                  instead of "הצעות 5" (was: label rendered first as a
+                  JSX sibling, which RTL flex laid out to the right of
+                  the count, so reading right-to-left the agent saw the
+                  noun first and the number second). */}
               <button type="button" className="prd-more-pill" onClick={() => setPanel('marketing')} aria-label="פתח פאנל פעולות שיווק">
-                <span>שיווק</span>
                 <span className="prd-more-pill-count">{done}/{total}</span>
+                <span>שיווק</span>
               </button>
               <button type="button" className="prd-more-pill" onClick={() => setManagingPhotos(true)} aria-label="ניהול מדיה (תמונות וסרטונים)">
-                <span>מדיה</span>
                 <span className="prd-more-pill-count">
                   {(property.images?.length || 0) + (property.videos?.length || 0)}
                 </span>
+                <span>מדיה</span>
               </button>
               <button type="button" className="prd-more-pill" onClick={() => setTab('buyers')} aria-label="עבור לטאב מתעניינים לצפייה בהצעות">
-                <span>הצעות</span>
                 <span className="prd-more-pill-count">{offers.length}</span>
+                <span>הצעות</span>
               </button>
               <button
                 type="button"
@@ -1384,8 +1393,8 @@ export default function PropertyDetail() {
                     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
               >
-                <span>הסכמים</span>
                 <span className="prd-more-pill-count">{agreementsCount}</span>
+                <span>הסכמים</span>
               </button>
             </div>
           </div>
