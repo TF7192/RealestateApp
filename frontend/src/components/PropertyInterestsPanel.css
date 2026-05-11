@@ -297,6 +297,21 @@
 }
 .pi-stat-em { color: var(--gold-dark, #7a5c2c); font-weight: 800; }
 
+/* 2026-05-11 — bidi-isolate the "N <Hebrew noun>" chips so the
+   number prefix doesn't get visually re-ordered when wrapped in a
+   parent whose paragraph direction the algorithm resolved to LTR. */
+.pi-stat,
+.pi-stat-compact,
+.pi-row-last,
+.pi-row-meta,
+.pi-event-title,
+.pi-event-sub,
+.pi-timeline-headline,
+.pi-timeline-headline-count {
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
 .pi-row-last {
   font-size: 12px;
   color: var(--text-secondary, #6b6356);

@@ -1622,6 +1622,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Bidi safety — make sure each sub-line renders in its own RTL
+     paragraph so a number prefix ("1 תמונות") doesn't get visually
+     re-ordered to "תמונות 1" when wrapped in a parent that the bidi
+     algorithm resolved to LTR (e.g. a button whose first strong
+     character is the Latin digit). Applies the same isolate to all
+     the mixed-script chips/sub-lines on the page below. */
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+/* 2026-05-11 — bidi-isolate wrappers for every place that renders
+   "N <Hebrew noun>" strings (KPI subs, pills, stats, meta lines).
+   Without this, the bidi algorithm can flip "8 ימים" to "ימים 8"
+   when the parent's resolved paragraph direction is LTR (which it
+   is for any container whose first strong character is a digit). */
+.prd-kpi-sub,
+.prd-kpi-label,
+.prd-id-meta,
+.prd-pill,
+.prd-more-pill,
+.prd-spec-value,
+.prd-spec-label {
+  direction: rtl;
+  unicode-bidi: isolate;
 }
 
 /* Tabs card */

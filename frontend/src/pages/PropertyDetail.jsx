@@ -345,6 +345,10 @@ export default function PropertyDetail() {
   // leads to this property via createPropertyInterests, then switches
   // to the מתעניינים tab so the agent lands on what they just added.
   const [attachPickerOpen, setAttachPickerOpen] = useState(false);
+  // 2026-05-11 — unified documents drawer. Combines PropertyDocuments
+  // (uploaded PDFs / DWGs / etc.) with brokerage agreement PDFs so the
+  // agent has one place to find everything related to the asset.
+  const [documentsOpen, setDocumentsOpen] = useState(false);
   // 2026-05-11 — bumped after any cross-tab mutation (offer accept/
   // decline in Owner tab, etc.) so the מתעניינים tab's panel re-fetches
   // its interests + stats too.
@@ -1276,6 +1280,21 @@ export default function PropertyDetail() {
               <span className="prd-quick-sub">לחתימה דיגיטלית של מתעניין</span>
             </span>
           </button>
+
+          {/* Unified documents drawer — shows uploaded files + every
+              signed brokerage agreement in one place so the agent
+              doesn't have to scroll between two sections. */}
+          <button
+            type="button"
+            className="prd-quick"
+            onClick={() => setDocumentsOpen(true)}
+          >
+            <span className="prd-quick-ico"><FileText size={15} /></span>
+            <span className="prd-quick-body">
+              <span className="prd-quick-label">הצגת מסמכים</span>
+              <span className="prd-quick-sub">קבצים והסכמי תיווך</span>
+            </span>
+          </button>
         </aside>
 
         {/* RIGHT — Tabs card */}
@@ -1901,6 +1920,22 @@ export default function PropertyDetail() {
           onClose={() => setPanel(null)}
         >
           <AdvertsPanel propertyId={property.id} toast={toast} />
+        </PropertyPanelSheet>
+      )}
+
+      {/* Unified documents drawer — files (PropertyDocuments) + signed
+          brokerage agreements (PropertyAgreementsSection) in one place. */}
+      {documentsOpen && (
+        <PropertyPanelSheet
+          title="מסמכי הנכס"
+          subtitle="קבצים שהועלו והסכמי תיווך"
+          width="lg"
+          onClose={() => setDocumentsOpen(false)}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <PropertyDocuments propertyId={property.id} />
+            <PropertyAgreementsSection propertyId={property.id} leads={leads} />
+          </div>
         </PropertyPanelSheet>
       )}
 
