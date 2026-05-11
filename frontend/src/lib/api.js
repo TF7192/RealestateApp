@@ -554,6 +554,15 @@ export const api = {
   yad2Import:  (listings) => request('/integrations/yad2/import',  {
     method: 'POST', body: { listings }, timeoutMs: 600_000, retries: 1,
   }),
+  // 2026-05-11 — single-listing flow ("ייבא נכס ספציפי"). URL is one
+  // realestate/item/<token> link; the backend scrapes that one page,
+  // returns a normalised listing the agent can confirm + import.
+  yad2SinglePreview: (url) => request('/integrations/yad2/single/preview', {
+    method: 'POST', body: { url }, timeoutMs: 60_000, retries: 1,
+  }),
+  yad2SingleImport:  (listing) => request('/integrations/yad2/single/import', {
+    method: 'POST', body: listing, timeoutMs: 60_000, retries: 1,
+  }),
   // Agency-wide endpoints — preferred. Walks all 3 sections × all
   // pages × server-side image re-host on import.
   //

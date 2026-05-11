@@ -590,15 +590,25 @@ export default function PropertyDetail() {
   // 768 px `urlCard` variant is plenty. The lightbox keeps the full
   // URL so zooming-in is still sharp. Both arrays stay in lockstep so
   // existing keyboard nav (`lightboxIdx`) just works.
-  const galleryImages = property.imageList?.length
-    ? property.imageList.map((i) => i.urlCard || i.url)
-    : (property.images?.length ? property.images : [
-        'https://via.placeholder.com/1200x675?text=Estia',
-      ]);
+  // 2026-05-11 — harden the gallery derivation. Adam reported some
+  // properties (e.g. אהרון יריב, חולון) showing a blank gallery. The
+  // bug: imageList rows sometimes have neither urlCard NOR url set
+  // (a partial Yad2 import row that never finished re-hosting), which
+  // turned the map into `[undefined]`. Now we filter falsy entries
+  // out THEN fall back to property.images, then a placeholder.
+  const PLACEHOLDER_IMG = 'https://via.placeholder.com/1200x675?text=Estia';
+  const fromImageList = (property.imageList || [])
+    .map((i) => i?.urlCard || i?.url)
+    .filter(Boolean);
+  const fromImagesArray = (property.images || []).filter(Boolean);
+  const galleryImages = fromImageList.length
+    ? fromImageList
+    : (fromImagesArray.length ? fromImagesArray : [PLACEHOLDER_IMG]);
   const images = galleryImages;
-  const lightboxImages = property.imageList?.length
-    ? property.imageList.map((i) => i.url)
-    : images;
+  const lightboxImages = (() => {
+    const full = (property.imageList || []).map((i) => i?.url).filter(Boolean);
+    return full.length ? full : images;
+  })();
 
   const mapsQuery = encodeURIComponent(`${property.street}, ${property.city}`);
   const mapsEmbed = `https://www.google.com/maps?q=${mapsQuery}&output=embed`;
@@ -1358,7 +1368,19 @@ export default function PropertyDetail() {
               <div className="prd-prop-grid">
                 <div className="prd-card prd-card-flush">
                   <div className="prd-prop-hero">
-                    <img src={images[currentImage] || images[0]} alt={`${property.street}, ${property.city}`} />
+                    <img
+                      src={images[currentImage] || images[0]}
+                      alt={`${property.street}, ${property.city}`}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        // Swap broken images (Yad2 URLs that expired,
+                        // 404s, hot-link blocks) for the placeholder
+                        // rather than rendering an empty <img>.
+                        if (e.currentTarget.src !== PLACEHOLDER_IMG) {
+                          e.currentTarget.src = PLACEHOLDER_IMG;
+                        }
+                      }}
+                    />
                     {images.length > 1 && (
                       <div className="prd-prop-thumbs">
                         {images.slice(0, 5).map((g, i) => (

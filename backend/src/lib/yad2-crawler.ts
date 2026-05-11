@@ -468,6 +468,97 @@ async function fetchListingDetails(ctx: BrowserContext, token: string): Promise<
   return null;
 }
 
+// ── Single-listing scraper ─────────────────────────────────────
+// 2026-05-11 — entry point for "ייבא נכס ספציפי". Takes a yad2.co.il
+// `/realestate/item/<token>` URL (or the bare token) and returns a
+// fully populated Yad2Listing by reading the detail page's
+// __NEXT_DATA__ blob. Section is inferred from `categoryId` /
+// `subcategoryId` when present; defaults to 'forsale' if Yad2 doesn't
+// expose it cleanly.
+//
+// Reuses the agency crawler's browser context so the WAF cookie set
+// by listing-page warmups carries over. Cheaper than crawlAgency
+// (one page, no pagination, no section walker).
+export async function crawlSingleListing(input: string): Promise<Yad2Listing | null> {
+  if (activeCrawls >= MAX_CONCURRENT_CRAWLS) {
+    throw new Yad2BusyError();
+  }
+  // Extract the token from either a full URL or a bare id.
+  let token = input.trim();
+  const m = /\/realestate\/item\/([^/?#]+)/.exec(token);
+  if (m) token = decodeURIComponent(m[1]);
+  if (!token) return null;
+
+  activeCrawls++;
+  try {
+    ensureShutdownHook();
+    const ctx = await newCrawlContext();
+    try {
+      const url = `https://www.yad2.co.il/realestate/item/${encodeURIComponent(token)}`;
+      // Detail-page fetch — longer nextDataTimeout because there's no
+      // listings phase to pre-warm the WAF cookie.
+      const r = await fetchPage(ctx, url, {
+        navTimeoutMs: 20_000,
+        nextDataTimeoutMs: 12_000,
+      });
+      if (!r.ok || !r.html) return null;
+      const data = extractNextData(r.html);
+      if (!data) return null;
+      const queries = data?.props?.pageProps?.dehydratedState?.queries;
+      if (!Array.isArray(queries)) return null;
+
+      // The detail page query has `state.data` shaped roughly like
+      // the listing-card item, plus an `images` array and richer
+      // address fields. Walk the queries until we find one with a
+      // metaData / address that looks like a listing.
+      for (const q of queries) {
+        const d = q?.state?.data;
+        if (!d || typeof d !== 'object') continue;
+        // Some queries are about the agency, related listings, etc.;
+        // skip those by checking for the address+metaData pair.
+        if (!d.address && !d.metaData) continue;
+
+        // Resolve section from category ids when possible. Yad2's
+        // taxonomy: categoryId 2 = residential (rent + sale),
+        // categoryId 6 = commercial.
+        const categoryId = typeof d.categoryId === 'number' ? d.categoryId : undefined;
+        const adType = pickStr(d.adType); // "1" = sale, "2" = rent on residential
+        const section: Yad2Section =
+          categoryId === 6 ? 'commercial' :
+          adType === '2' || /להשכרה/.test(d.adType || '') ? 'rent' :
+          'forsale';
+
+        const base = normalize(d, section);
+        if (!base) continue;
+
+        // Detail-page enrichment fields. The metaData.images blob
+        // tends to be the most reliable gallery source on the detail
+        // page; fall back to top-level images if Yad2 nests it
+        // differently.
+        const imgsRaw = Array.isArray(d.metaData?.images)
+          ? d.metaData.images
+          : Array.isArray(d.images) ? d.images : [];
+        const images = imgsRaw.filter((u: any) => typeof u === 'string');
+        const description = typeof d.additionalInfo?.description === 'string'
+          ? d.additionalInfo.description
+          : typeof d.description === 'string' ? d.description : undefined;
+
+        return {
+          ...base,
+          coverImage: base.coverImage || images[0],
+          images,
+          description,
+        };
+      }
+      return null;
+    } finally {
+      try { await ctx.close(); } catch { /* noop */ }
+    }
+  } finally {
+    activeCrawls--;
+  }
+}
+
 // ── Public API ───────────────────────────────────────────────────
 
 export async function crawlAgency(

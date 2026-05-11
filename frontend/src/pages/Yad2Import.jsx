@@ -349,6 +349,11 @@ function PasteStep({
         </div>
       )}
 
+      {/* 2026-05-11 — single-listing import card. Sits above the agency
+          flow so an agent who just wants to grab one private-seller
+          listing doesn't have to scroll past the agency URL. */}
+      <SingleListingImport isMobile={isMobile} />
+
       {/* Main paste card */}
       <section style={{
         background: DT.white,
@@ -1192,3 +1197,187 @@ function ScanBar({ label, pct, elapsed, url }) {
     </div>
   );
 }
+
+// 2026-05-11 — single-property import. Agent pastes one /item/<token>
+// URL, we preview it, agent confirms, we save it as a Property.
+function SingleListingImport({ isMobile }) {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [importing, setImporting] = useState(false);
+
+  const fetchPreview = async () => {
+    const trimmed = url.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    try {
+      const res = await api.yad2SinglePreview(trimmed);
+      setPreview(res);
+      const already = res.alreadyImported?.[res.listing?.sourceId];
+      if (already) {
+        toast.info('הנכס כבר קיים אצלך — לחיצה על "ייבא" תפתח את הנכס הקיים');
+      }
+    } catch (e) {
+      toast.error(e?.message || 'שליפת הנכס נכשלה');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doImport = async () => {
+    if (!preview?.listing) return;
+    const already = preview.alreadyImported?.[preview.listing.sourceId];
+    if (already) {
+      navigate(`/properties/${already}`);
+      return;
+    }
+    setImporting(true);
+    try {
+      const result = await api.yad2SingleImport(preview.listing);
+      const newId = result?.created?.[0]?.id;
+      if (newId) {
+        toast.success('הנכס נוסף בהצלחה');
+        navigate(`/properties/${newId}`);
+      } else if (result?.skipped?.length) {
+        toast.info('הנכס כבר היה אצלך — דילגתי');
+      } else {
+        toast.error(result?.failed?.[0]?.reason || 'הייבוא נכשל');
+      }
+    } catch (e) {
+      toast.error(e?.message || 'הייבוא נכשל');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const reset = () => { setPreview(null); setUrl(''); };
+  const l = preview?.listing;
+  const fmtIls = (n) => '₪' + Number(n || 0).toLocaleString('he-IL');
+
+  return (
+    <section style={{
+      background: DT.white,
+      border: `1px solid ${DT.border}`,
+      borderRadius: 14,
+      padding: isMobile ? 16 : 22,
+      display: 'flex', flexDirection: 'column', gap: 12,
+      marginBottom: 16,
+    }}>
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        fontSize: 11, color: DT.goldDark, fontWeight: 800, letterSpacing: 1,
+      }}>
+        <Link2 size={11} aria-hidden="true" />
+        ייבא נכס ספציפי
+      </div>
+      <label style={{ fontSize: 13, fontWeight: 700, color: DT.ink2, margin: 0 }}>
+        הדבק קישור של מודעה בודדת מ-Yad2 (yad2.co.il/realestate/item/...)
+      </label>
+
+      {!preview ? (
+        <>
+          <input
+            {...inputPropsForUrl()}
+            placeholder="https://www.yad2.co.il/realestate/item/..."
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !busy && url.trim()) fetchPreview(); }}
+            style={{
+              ...FONT,
+              width: '100%',
+              padding: '12px 14px',
+              border: `1px solid ${DT.borderStrong}`,
+              borderRadius: 10,
+              background: DT.cream4,
+              fontSize: 15,
+              color: DT.ink,
+              outline: 'none',
+              direction: 'ltr',
+              textAlign: 'start',
+              boxSizing: 'border-box',
+            }}
+          />
+          <button
+            type="button"
+            disabled={!url.trim() || busy}
+            onClick={fetchPreview}
+            style={{
+              ...primaryBtn({ small: true }),
+              minHeight: 42,
+              opacity: !url.trim() || busy ? 0.5 : 1,
+              cursor: !url.trim() || busy ? 'not-allowed' : 'pointer',
+              justifyContent: 'center',
+            }}
+          >
+            {busy ? <Loader2 size={14} style={spin} /> : <Download size={14} />}
+            {busy ? 'שולף נתוני נכס…' : 'משוך פרטים'}
+          </button>
+        </>
+      ) : (
+        <>
+          <div style={{
+            background: DT.cream,
+            border: `1px solid ${DT.border}`,
+            borderRadius: 10,
+            padding: 12,
+            display: 'flex', gap: 12, alignItems: 'flex-start',
+          }}>
+            {l.coverImage && (
+              <img
+                src={l.coverImage}
+                alt=""
+                style={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }}
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: DT.ink }}>
+                {[l.street, l.city].filter(Boolean).join(', ') || l.title || 'נכס מ-Yad2'}
+              </div>
+              <div style={{ fontSize: 12, color: DT.muted, marginTop: 3 }}>
+                {[
+                  l.type,
+                  l.rooms ? `${l.rooms} חד׳` : null,
+                  l.sqm ? `${l.sqm} מ״ר` : null,
+                  l.floor != null ? `קומה ${l.floor}` : null,
+                ].filter(Boolean).join(' · ')}
+              </div>
+              {l.price && (
+                <div style={{ fontSize: 16, fontWeight: 800, color: DT.goldDark, marginTop: 4 }}>
+                  {fmtIls(l.price)}
+                </div>
+              )}
+              {l.images?.length > 1 && (
+                <div style={{ fontSize: 11, color: DT.muted, marginTop: 4 }}>
+                  {l.images.length} תמונות בגלריה
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              disabled={importing}
+              onClick={doImport}
+              style={{ ...primaryBtn({ small: true }), justifyContent: 'center', flex: 1 }}
+            >
+              {importing ? <Loader2 size={14} style={spin} /> : <Download size={14} />}
+              {importing ? 'מייבא…' : (preview.alreadyImported?.[l.sourceId] ? 'פתח נכס קיים' : 'ייבא נכס')}
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              disabled={importing}
+              style={{ ...ghostBtn(), justifyContent: 'center' }}
+            >
+              ביטול
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+

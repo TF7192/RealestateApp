@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { getUser } from '../middleware/auth.js';
 import { processPropertyImage } from '../lib/imageVariants.js';
-import { crawlAgency, mapSectionToAssetClass, type Yad2Listing } from '../lib/yad2-crawler.js';
+import { crawlAgency, crawlSingleListing, mapSectionToAssetClass, type Yad2Listing } from '../lib/yad2-crawler.js';
 import { normalizeAddress } from '../lib/addressNormalize.js';
 import { assertRehostUrlSafe } from '../lib/rehostGuards.js';
 
@@ -415,6 +415,67 @@ export const registerYad2Routes: FastifyPluginAsync = async (app) => {
       }
     }
     return reply.code(400).send({ error: { message: 'נא להדביק כתובת של דף סוכנות (yad2.co.il/realestate/agency/...)' } });
+  });
+
+  // ── Single-listing preview + import ──────────────────────────────
+  // 2026-05-11 — "ייבא נכס ספציפי" entry point. Accepts a
+  // yad2.co.il/realestate/item/<token> URL, scrapes that one row, and
+  // returns the normalised listing. The frontend then either bins it
+  // or POSTs it back to /single/import to create a Property.
+  //
+  // Costs 1 quota slot per preview (same as agency preview); we
+  // refund on empty result so a bad URL doesn't burn the agent's
+  // quota.
+  const SingleQ = z.object({
+    url: z.string().refine(
+      (u) => /\/realestate\/item\/[A-Za-z0-9_-]+/.test(u) || /^[A-Za-z0-9_-]{4,}$/.test(u),
+      { message: 'יש להזין קישור של נכס בודד (yad2.co.il/realestate/item/...)' },
+    ),
+  });
+  app.post('/single/preview', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const parsed = SingleQ.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: { message: parsed.error.errors[0]?.message || 'קישור לא תקין' } });
+    }
+    const u = getUser(req);
+    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    const reservation = await tryReserveYad2Quota(u.id);
+    if (!reservation.reserved) return quotaExceededReply(reply, reservation.quota);
+    try {
+      const listing = await crawlSingleListing(parsed.data.url);
+      if (!listing) {
+        await refundYad2Quota(u.id);
+        const quotaAfter = await getYad2Quota(u.id);
+        return reply.code(422).send({
+          error: { message: 'לא הצלחתי למשוך פרטים מהקישור — ייתכן שהמודעה הוסרה או שיש לבדוק את הקישור', quota: quotaAfter },
+        });
+      }
+      const alreadyImported = await findAlreadyImported(u.id, [listing.sourceId]);
+      return {
+        listing,
+        alreadyImported,
+        quota: reservation.quota,
+      };
+    } catch (err) {
+      await refundYad2Quota(u.id);
+      throw err;
+    }
+  });
+
+  // Persist a single previewed listing as a Property row. Reuses
+  // runAgencyImport so cover image rehosting, [yad2:<token>] idempotency
+  // and address normalisation match the agency-bulk path exactly.
+  app.post('/single/import', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const u = getUser(req);
+    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
+    const parsed = ImportListingZ.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: { message: parsed.error.errors[0]?.message || 'נתונים לא תקינים' } });
+    }
+    // runAgencyImport is declared inside this registerYad2Routes closure
+    // and accepts an array. We just pass a one-element list.
+    const result = await runAgencyImport([parsed.data], u.id, req.log);
+    return result;
   });
 
   // ── Agency-wide preview ──────────────────────────────────────────
