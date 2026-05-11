@@ -828,6 +828,13 @@ model Property {
   // pushing. Default 0 = no boost.
   priority Int @default(0)
 
+  // 2026-05-11 — premium agents can design their own landing page per
+  // property via /properties/:id/landing-editor. Shape lives in
+  // backend/src/lib/landingConfig.ts (zod-validated). Null = use the
+  // hard-coded default layout (PropertyLandingPage's pre-editor
+  // behavior), so existing rows render unchanged.
+  landingPageConfig Json?
+
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
