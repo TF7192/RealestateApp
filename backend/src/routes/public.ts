@@ -202,6 +202,10 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
         avatarUrl: (agent as any).avatarUrl ?? null,
       },
       property: flatProperty,
+      // 2026-05-11 — premium agents can author a per-property landing
+      // config via /properties/:id/landing-editor. Public renderer
+      // treats `null` as "use the hard-coded default layout".
+      landingPageConfig: (property as any).landingPageConfig ?? null,
     };
   });
 

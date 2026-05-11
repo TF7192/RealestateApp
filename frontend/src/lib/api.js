@@ -425,6 +425,14 @@ export const api = {
   reorderPropertyImages: (id, order) =>
     request(`/properties/${id}/images/reorder`, { method: 'PUT', body: { order } }),
 
+  // Per-property landing-page editor config. GET returns the saved
+  // config OR the synthesized default; PATCH is premium-gated server-
+  // side (the editor route refuses to open without isPremium too).
+  getLandingConfig: (id) =>
+    request(`/properties/${id}/landing-page`),
+  saveLandingConfig: (id, config) =>
+    request(`/properties/${id}/landing-page`, { method: 'PATCH', body: { config } }),
+
   // Property videos
   listPropertyVideos: (id) => request(`/properties/${id}/videos`),
   uploadPropertyVideo: (id, file, onProgress) => {

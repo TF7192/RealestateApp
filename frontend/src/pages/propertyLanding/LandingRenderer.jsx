@@ -33,7 +33,27 @@ export default function LandingRenderer({
   ), [config, property?.assetClass]);
 
   const tpl = templateCopy(effective.template);
-  const images = property?.images || [];
+  // The public serializer flattens `images` to a string[] (URL list)
+  // for back-compat with CustomerPropertyView, but the renderer needs
+  // full PropertyImage objects so it can pick variants (urlCard /
+  // urlThumb) and resolve hero photo-id selection. `imageList` is
+  // the parallel-shaped object array the serializer emits alongside.
+  // Inside the editor (where this component runs against an already-
+  // fetched /api/properties/:id payload), `images` IS the object
+  // array — so fall back to that.
+  const images = useMemo(() => {
+    const list = property?.imageList;
+    if (Array.isArray(list) && list.length) return list;
+    const raw = property?.images;
+    if (!Array.isArray(raw)) return [];
+    // Heuristic: if the first element is a string, the array is the
+    // flat URL list; coerce into objects so the rest of the renderer
+    // doesn't have to branch.
+    if (typeof raw[0] === 'string') {
+      return raw.map((url, i) => ({ id: `img-${i}`, url, urlCard: url, urlThumb: url, sortOrder: i }));
+    }
+    return raw;
+  }, [property?.imageList, property?.images]);
 
   // Active photo state lives at the renderer level so both HERO and
   // GALLERY blocks stay in sync — clicking a thumb updates the hero.

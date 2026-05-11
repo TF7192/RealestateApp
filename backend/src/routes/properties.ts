@@ -27,10 +27,17 @@ function canActOnProperty<T extends { agentId: string }>(
   return u.id === prop.agentId || u.role === 'ADMIN';
 }
 import { tryServiceTokenAuth } from '../middleware/service-token.js';
+import { requirePremium } from '../middleware/requirePremium.js';
 import { ensureInterest } from './interests.js';
 import { propertySlug, ensureUniqueSlug } from '../lib/slug.js';
 import { putUpload, deleteUpload, urlToKey } from '../lib/storage.js';
 import { processPropertyImage } from '../lib/imageVariants.js';
+import {
+  parseLandingConfig,
+  defaultLandingConfig,
+  assertVideoUrlSafe,
+  assertTourUrlSafe,
+} from '../lib/landingConfig.js';
 import { track as phTrack } from '../lib/analytics.js';
 import { assertAllowedMime } from '../lib/uploadGuards.js';
 import { evaluateLeadProperty } from '../lib/matching.js';
@@ -1511,6 +1518,82 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     });
     return { image };
   });
+
+  // ── Landing-page editor ───────────────────────────────────────
+  // GET returns the saved config OR the synthesized default the
+  // public renderer would have used. Non-premium agents are allowed
+  // to GET so they can preview the editor; PATCH is gated.
+  app.get('/:id/landing-page', { onRequest: [app.requireAgent] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const property = await prisma.property.findUnique({
+      where: { id },
+      select: { id: true, agentId: true, assetClass: true, landingPageConfig: true, images: { select: { id: true } } },
+    });
+    if (!canActOnProperty(req, property)) {
+      return reply.code(404).send({ error: { message: 'Not found' } });
+    }
+    const saved = (property.landingPageConfig as unknown) ?? null;
+    const config = saved
+      ? saved
+      : defaultLandingConfig({
+          assetClass: property.assetClass === 'COMMERCIAL' ? 'COMMERCIAL' : 'RESIDENTIAL',
+        });
+    return { config, hasSaved: !!saved };
+  });
+
+  app.patch(
+    '/:id/landing-page',
+    { onRequest: [app.requireAgent, requirePremium({ feature: 'עריכת דף נחיתה' })] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const property = await prisma.property.findUnique({
+        where: { id },
+        select: { id: true, agentId: true, images: { select: { id: true } } },
+      });
+      if (!canActOnProperty(req, property)) {
+        return reply.code(404).send({ error: { message: 'Not found' } });
+      }
+
+      let parsed;
+      try {
+        parsed = parseLandingConfig((req.body as any)?.config);
+      } catch (e: any) {
+        return reply.code(400).send({ error: { message: e?.message || 'תצורת דף הנחיתה לא תקינה' } });
+      }
+
+      // Per-section secondary validation. The zod schema enforces
+      // shape + size; this round enforces cross-row constraints (URL
+      // allowlists, photo ids belong to THIS property) that the
+      // schema can't express on its own.
+      const ownPhotoIds = new Set(property.images.map((i) => i.id));
+      for (const section of parsed.sections) {
+        if (section.type === 'VIDEO') {
+          try { assertVideoUrlSafe(section.props.url); }
+          catch (e: any) {
+            return reply.code(400).send({ error: { message: `סרטון: ${e.message}` } });
+          }
+        }
+        if (section.type === 'VIRTUAL_TOUR') {
+          try { assertTourUrlSafe(section.props.url); }
+          catch (e: any) {
+            return reply.code(400).send({ error: { message: `סיור וירטואלי: ${e.message}` } });
+          }
+        }
+        if (section.type === 'HERO' && section.props.photoId && !ownPhotoIds.has(section.props.photoId)) {
+          return reply.code(400).send({ error: { message: 'תמונת השער לא שייכת לנכס זה' } });
+        }
+        if (section.type === 'FLOOR_PLAN' && section.props.photoId && !ownPhotoIds.has(section.props.photoId)) {
+          return reply.code(400).send({ error: { message: 'תוכנית הקומה לא שייכת לנכס זה' } });
+        }
+      }
+
+      await prisma.property.update({
+        where: { id },
+        data: { landingPageConfig: parsed as any },
+      });
+      return { config: parsed };
+    },
+  );
 };
 
 function normalize(body: Partial<z.infer<typeof propertyInput>>) {
