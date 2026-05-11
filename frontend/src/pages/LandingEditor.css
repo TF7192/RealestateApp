@@ -63,21 +63,94 @@
   gap: 6px;
 }
 
-/* ── Body — sidebar + preview ───────────────────────────────── */
+/* ── Body — 3-column layout (structure | details | preview) ── */
 .le-body {
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 240px 440px 1fr;
   flex: 1;
   min-height: 0;
 }
 
-.le-sidebar {
+.le-structure {
   background: var(--le-card);
   border-inline-end: 1px solid var(--le-border);
-  padding: 18px 16px 40px;
+  padding: 16px 12px 40px;
   overflow-y: auto;
   max-height: calc(100vh - 64px);
 }
+
+/* ── Details column — selected section's form ──────────────── */
+.le-details {
+  background: var(--le-paper);
+  border-inline-end: 1px solid var(--le-border);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+.le-details-head {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--le-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--le-card);
+}
+.le-details-eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--le-muted);
+  font-weight: 700;
+}
+.le-details-head h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--le-ink);
+}
+.le-details-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.le-details-eye,
+.le-details-del {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--le-border);
+  background: var(--le-paper);
+  color: var(--le-muted);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.le-details-eye:hover { color: var(--le-ink); }
+.le-details-del:hover { color: #b8413e; border-color: #b8413e; }
+.le-details-body {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+.le-details-empty {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  padding: 60px 32px;
+  color: var(--le-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Legacy class kept around so any stray reference still works,
+   but the new layout doesn't render it. */
+.le-sidebar { display: none; }
 .le-sidebar-title {
   font-size: 13px;
   font-weight: 700;
@@ -130,18 +203,18 @@
 }
 .le-palette-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  grid-template-columns: 1fr;
+  gap: 4px;
 }
 .le-palette {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
   align-items: center;
-  gap: 6px;
-  padding: 10px 6px;
+  padding: 7px 9px;
   background: var(--le-paper);
   border: 1px solid var(--le-border);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: border-color 0.15s;
 }
@@ -149,12 +222,19 @@
 .le-palette.is-on { border-color: var(--le-gold); background: var(--le-card); box-shadow: 0 1px 4px rgba(180, 139, 76, 0.18); }
 .le-palette-swatch {
   display: inline-block;
-  width: 22px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 4px;
+  grid-row: 1;
 }
-.le-palette-swatch + .le-palette-swatch { margin-top: -6px; }
-.le-palette-name { font-size: 11px; color: var(--le-ink); }
+.le-palette-swatch + .le-palette-swatch { margin-inline-start: -8px; grid-row: 1; }
+.le-palette-name {
+  font-size: 12px;
+  color: var(--le-ink);
+  grid-column: 2;
+  grid-row: 1;
+  text-align: start;
+}
 
 /* ── Section list ───────────────────────────────────────────── */
 .le-section-list {

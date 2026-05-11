@@ -70,12 +70,33 @@
   position: relative;
   z-index: 2;
   max-width: 720px;
-  color: #fdf9f1;
+  /* Default white-on-photo for the IMAGE variant; SPLIT/BANNER
+     override `--lp-hero-text` to `--lp-ink` so they pick up dark
+     text. A section-level color override sets `--lp-hero-text`
+     directly, winning over both defaults. */
+  color: var(--lp-hero-text, #fdf9f1);
+  /* Re-declare font-family at this level so the wrapper's local
+     --lp-sans cascades into the eyebrow / subtitle / locator
+     inline text. (Inheritance carries the computed value from
+     .lp-page, not the variable reference, so without this the
+     section font override only flipped the explicit
+     `font-family: var(--lp-serif)` declarations like .lp-title.) */
+  font-family: var(--lp-sans);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
 }
-.lp-commercial .lp-hero-content { color: #f4f7fb; }
+.lp-commercial .lp-hero-content { --lp-hero-text: #f4f7fb; }
+.lp-hero-split-content .lp-hero-content,
+.lp-hero-banner-card .lp-hero-content { --lp-hero-text: var(--lp-ink); }
+/* Wrapper around per-section overrides — re-resolve --lp-sans at
+   this level so descendants inherit the new font even though they
+   don't carry an explicit `font-family: var(--lp-sans)` of their
+   own. */
+.lp-section-theme {
+  font-family: var(--lp-sans);
+  color: inherit;
+}
 .lp-eyebrow {
   display: inline-block;
   font-size: 12px;

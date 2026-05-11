@@ -180,7 +180,14 @@ function themeToStyle(theme) {
   // cards both pick up the same background. Agents rarely want to
   // distinguish the two at the section level.
   if (theme.bg)     { style['--lp-paper'] = theme.bg; style['--lp-card'] = theme.bg; }
-  if (theme.ink)    { style['--lp-ink'] = theme.ink; }
+  if (theme.ink) {
+    style['--lp-ink'] = theme.ink;
+    // Also override the hero overlay text — its default is the
+    // hardcoded white-on-photo (#fdf9f1) since the IMAGE variant
+    // expects light text on top of a photo. When the agent
+    // explicitly picks an ink color, that intent wins everywhere.
+    style['--lp-hero-text'] = theme.ink;
+  }
   if (theme.accent) { style['--lp-gold'] = theme.accent; style['--gold'] = theme.accent; }
   if (theme.font) {
     const stack = fontStack(theme.font);

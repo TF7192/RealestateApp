@@ -483,7 +483,7 @@ function ThemeOverrides({ theme = {}, onChange }) {
     onChange(Object.keys(next).length ? next : undefined);
   };
   return (
-    <details className="le-theme-overrides">
+    <details className="le-theme-overrides" open>
       <summary>מראה הסקציה</summary>
       <div className="le-theme-overrides-body">
         <Field label="גופן">

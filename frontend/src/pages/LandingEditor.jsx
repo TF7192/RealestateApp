@@ -25,7 +25,7 @@ import SectionForm from './propertyLanding/SectionForm';
 import { BLOCK_TYPES, REQUIRED_BLOCK_TYPES, newSection } from './propertyLanding/defaultConfig';
 import './LandingEditor.css';
 
-const VIEWPORT_MIN = 1024;
+const VIEWPORT_MIN = 1100;
 const AUTOSAVE_KEY = (id) => `estia-landing-draft-${id}`;
 
 const TYPE_LABELS = {
@@ -252,7 +252,7 @@ export default function LandingEditor() {
       <div className="le-narrow">
         <Monitor size={48} aria-hidden="true" />
         <h1>פתחו במחשב לעריכה</h1>
-        <p>עורך דף הנחיתה דורש מסך רחב מ-1024 פיקסלים. הקישור יישמר — חזרו ממחשב לשולחן עבודה.</p>
+        <p>עורך דף הנחיתה דורש מסך רחב מ-1100 פיקסלים. הקישור יישמר — חזרו ממחשב לשולחן עבודה.</p>
         <button className="btn btn-secondary" onClick={() => navigate(`/properties/${id}`)}>
           חזרה לנכס
         </button>
@@ -320,7 +320,11 @@ export default function LandingEditor() {
       </header>
 
       <div className="le-body">
-        <aside className="le-sidebar">
+        {/* Column 1 — STRUCTURE: global theme + ordered section list +
+            add menu. Narrow column (240 px), nothing here is type-
+            specific, so it stays compact while the agent focuses on
+            the details column. */}
+        <aside className="le-structure">
           <ThemePanel
             theme={config.theme || { font: 'DEFAULT', palette: 'CREAM_GOLD' }}
             onChange={(theme) => {
@@ -328,7 +332,7 @@ export default function LandingEditor() {
               setDirty(true);
             }}
           />
-          <h2 className="le-sidebar-title">סדר וסקצריות</h2>
+          <h2 className="le-sidebar-title">סקציות</h2>
           <ul className="le-section-list">
             {config.sections.map((section) => {
               const isSelected = section.id === selectedId;
@@ -384,22 +388,57 @@ export default function LandingEditor() {
               </ul>
             </details>
           )}
+        </aside>
 
-          {selected && (
-            <div className="le-form">
-              <h3 className="le-form-title">
-                {TYPE_LABELS[selected.type]}
-              </h3>
-              <SectionForm
-                section={selected}
-                template={config.template}
-                property={property}
-                onChange={updateSection}
-                onUploadPhoto={uploadPhoto}
-              />
+        {/* Column 2 — DETAILS: the selected section's full form,
+            visible without scrolling past the section list. Empty
+            state nudges the agent to click a section in column 1. */}
+        <section className="le-details">
+          {selected ? (
+            <>
+              <header className="le-details-head">
+                <div>
+                  <span className="le-details-eyebrow">סקציה נבחרה</span>
+                  <h2>{TYPE_LABELS[selected.type]}</h2>
+                </div>
+                <div className="le-details-actions">
+                  <button
+                    type="button"
+                    className="le-details-eye"
+                    title={selected.visible ? 'הסתר סקציה' : 'הצג סקציה'}
+                    onClick={() => toggleVisible(selected.id)}
+                  >
+                    {selected.visible ? <Eye size={15} /> : <EyeOff size={15} />}
+                    <span>{selected.visible ? 'מוצגת' : 'מוסתרת'}</span>
+                  </button>
+                  {!REQUIRED_BLOCK_TYPES.has(selected.type) && (
+                    <button
+                      type="button"
+                      className="le-details-del"
+                      title="הסר סקציה זו"
+                      onClick={() => deleteSection(selected.id)}
+                    >
+                      <Trash2 size={15} /> הסר
+                    </button>
+                  )}
+                </div>
+              </header>
+              <div className="le-details-body">
+                <SectionForm
+                  section={selected}
+                  template={config.template}
+                  property={property}
+                  onChange={updateSection}
+                  onUploadPhoto={uploadPhoto}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="le-details-empty">
+              <p>בחרו סקציה מהרשימה משמאל כדי לערוך אותה.</p>
             </div>
           )}
-        </aside>
+        </section>
 
         <main className={`le-preview le-preview-${previewMode}`}>
           <div className="le-preview-toolbar">
