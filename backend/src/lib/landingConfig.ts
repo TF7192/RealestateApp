@@ -57,9 +57,12 @@ const HeroProps = z.object({
   subtitle: z.string().max(subtitleMax).default(''),
   // Which property photo to use for the hero. `null` = first photo.
   photoId: PhotoId.nullable().default(null),
-  // Visual variant. IMAGE = current full-bleed photo + gradient.
-  // SPLIT = photo on one side, text on the other (desktop only).
-  variant: z.enum(['IMAGE', 'SPLIT']).default('IMAGE'),
+  // Visual variant.
+  //   IMAGE  = full-bleed photo with copy overlaid on gradient.
+  //   SPLIT  = photo and copy share the viewport 50/50.
+  //   BANNER = photo as a tall horizontal band at the top, copy
+  //            in a cream card below.
+  variant: z.enum(['IMAGE', 'SPLIT', 'BANNER']).default('IMAGE'),
 });
 
 const GalleryProps = z.object({
@@ -154,9 +157,19 @@ export const REQUIRED_SECTIONS: ReadonlyArray<SectionType> = [
 export const Template = z.enum(['RESIDENTIAL', 'COMMERCIAL', 'LUXURY', 'INVESTMENT']);
 export type TemplateKind = z.infer<typeof Template>;
 
+// Curated theme presets. Agents pick a font pairing and a palette
+// from a fixed set instead of arbitrary color/font pickers — keeps
+// every landing page on-brand and the QA surface bounded.
+export const Theme = z.object({
+  font: z.enum(['DEFAULT', 'MODERN', 'CLASSIC']).default('DEFAULT'),
+  palette: z.enum(['CREAM_GOLD', 'CHARCOAL_BRONZE', 'OLIVE_SAND']).default('CREAM_GOLD'),
+});
+export type LandingTheme = z.infer<typeof Theme>;
+
 export const LandingConfig = z.object({
   version: z.literal(LATEST_VERSION),
   template: Template.default('RESIDENTIAL'),
+  theme: Theme.default({ font: 'DEFAULT', palette: 'CREAM_GOLD' }),
   sections: z.array(Section)
     .min(1)
     .max(20)
@@ -201,6 +214,7 @@ export function defaultLandingConfig(opts: {
   return {
     version: LATEST_VERSION,
     template,
+    theme: { font: 'DEFAULT', palette: 'CREAM_GOLD' },
     sections: [
       mkSection('HERO',       { eyebrow: '', title: '', subtitle: '', photoId: null, variant: 'IMAGE' }),
       mkSection('GALLERY',    { heading: '' }),

@@ -30,6 +30,7 @@ export function defaultLandingConfig(opts = {}) {
   return {
     version: 1,
     template,
+    theme: { font: 'DEFAULT', palette: 'CREAM_GOLD' },
     sections: [
       mk('HERO',       { eyebrow: '', title: '', subtitle: '', photoId: null, variant: 'IMAGE' }),
       mk('GALLERY',    { heading: '' }),

@@ -114,6 +114,31 @@ describe('parseLandingConfig()', () => {
   });
 });
 
+describe('theme presets', () => {
+  it('defaultLandingConfig includes the cream-gold + default-font theme', () => {
+    const cfg = defaultLandingConfig({ assetClass: 'RESIDENTIAL' });
+    expect(cfg.theme).toEqual({ font: 'DEFAULT', palette: 'CREAM_GOLD' });
+  });
+
+  it('parses a config with a CHARCOAL_BRONZE / MODERN theme', () => {
+    const cfg = defaultLandingConfig({ assetClass: 'RESIDENTIAL' });
+    cfg.theme = { font: 'MODERN', palette: 'CHARCOAL_BRONZE' };
+    expect(() => parseLandingConfig(cfg)).not.toThrow();
+  });
+
+  it('rejects an off-list font', () => {
+    const cfg = defaultLandingConfig({ assetClass: 'RESIDENTIAL' }) as any;
+    cfg.theme = { font: 'COMIC_SANS', palette: 'CREAM_GOLD' };
+    expect(() => parseLandingConfig(cfg)).toThrow();
+  });
+
+  it('rejects an off-list palette', () => {
+    const cfg = defaultLandingConfig({ assetClass: 'RESIDENTIAL' }) as any;
+    cfg.theme = { font: 'DEFAULT', palette: 'NEON_PINK' };
+    expect(() => parseLandingConfig(cfg)).toThrow();
+  });
+});
+
 describe('assertVideoUrlSafe()', () => {
   it('allows youtube.com', () => {
     expect(() => assertVideoUrlSafe('https://www.youtube.com/watch?v=abc')).not.toThrow();

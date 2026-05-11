@@ -1258,7 +1258,7 @@ export default function PropertyDetail() {
             <span className="prd-quick-body">
               <span className="prd-quick-label">ערוך דף נחיתה</span>
               <span className="prd-quick-sub">
-                {user?.isPremium ? 'עצבו את דף הנחיתה של הנכס' : 'דורש מנוי פרימיום'}
+                {user?.isPremium ? 'עיצוב מותאם לנכס' : 'דורש פרימיום'}
               </span>
             </span>
           </button>

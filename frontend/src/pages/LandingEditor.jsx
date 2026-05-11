@@ -321,6 +321,13 @@ export default function LandingEditor() {
 
       <div className="le-body">
         <aside className="le-sidebar">
+          <ThemePanel
+            theme={config.theme || { font: 'DEFAULT', palette: 'CREAM_GOLD' }}
+            onChange={(theme) => {
+              setConfig((cur) => ({ ...cur, theme }));
+              setDirty(true);
+            }}
+          />
           <h2 className="le-sidebar-title">סדר וסקצריות</h2>
           <ul className="le-section-list">
             {config.sections.map((section) => {
@@ -424,6 +431,56 @@ export default function LandingEditor() {
             />
           </div>
         </main>
+      </div>
+    </div>
+  );
+}
+
+function ThemePanel({ theme, onChange }) {
+  const set = (key, value) => onChange({ ...theme, [key]: value });
+  return (
+    <div className="le-theme">
+      <h2 className="le-sidebar-title">מראה כללי</h2>
+      <div className="le-theme-row">
+        <span className="le-theme-row-label">גופן</span>
+        <div className="le-segmented">
+          {[
+            { v: 'DEFAULT', label: 'קלאסי' },
+            { v: 'MODERN',  label: 'מודרני' },
+            { v: 'CLASSIC', label: 'אקדמי' },
+          ].map((opt) => (
+            <button
+              key={opt.v}
+              type="button"
+              className={`le-seg ${theme.font === opt.v ? 'is-on' : ''}`}
+              onClick={() => set('font', opt.v)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="le-theme-row">
+        <span className="le-theme-row-label">פלטה</span>
+        <div className="le-palette-row">
+          {[
+            { v: 'CREAM_GOLD',      label: 'קרם וזהב',     colors: ['#faf7f1', '#b48b4c'] },
+            { v: 'CHARCOAL_BRONZE', label: 'פחם וברונזה',  colors: ['#1a1612', '#c89967'] },
+            { v: 'OLIVE_SAND',      label: 'זית וחול',      colors: ['#f3eedf', '#6e7a3e'] },
+          ].map((opt) => (
+            <button
+              key={opt.v}
+              type="button"
+              className={`le-palette ${theme.palette === opt.v ? 'is-on' : ''}`}
+              onClick={() => set('palette', opt.v)}
+              title={opt.label}
+            >
+              <span className="le-palette-swatch" style={{ background: opt.colors[0] }} />
+              <span className="le-palette-swatch" style={{ background: opt.colors[1] }} />
+              <span className="le-palette-name">{opt.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

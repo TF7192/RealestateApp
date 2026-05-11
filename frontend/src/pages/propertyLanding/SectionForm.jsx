@@ -62,8 +62,9 @@ export default function SectionForm({ section, template, property, onChange, onU
               value={section.props.variant || 'IMAGE'}
               onChange={(v) => update('variant', v)}
               options={[
-                { value: 'IMAGE', label: 'תמונה מלאה',  hint: 'תמונה מלאת מסך עם טקסט מעליה' },
-                { value: 'SPLIT', label: 'תמונה + טקסט', hint: 'תמונה בחצי מהמסך, טקסט בחצי השני' },
+                { value: 'IMAGE',  label: 'תמונה מלאה',     hint: 'תמונה מלאת מסך עם טקסט מעליה' },
+                { value: 'SPLIT',  label: 'תמונה + טקסט',   hint: 'תמונה בחצי מהמסך, טקסט בחצי השני' },
+                { value: 'BANNER', label: 'באנר עם כרטיס', hint: 'תמונה למעלה, כרטיס טקסט קרם מתחתיה' },
               ]}
             />
           </Field>

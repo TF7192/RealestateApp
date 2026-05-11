@@ -208,6 +208,64 @@
   .lp-hero-split-content { padding: 36px 22px 48px; }
 }
 
+/* ── Hero BANNER variant ──────────────────────────────────────── */
+/* Photo as a tall horizontal band at the top, copy in a cream card
+   floating slightly above the image's bottom edge. The card sits
+   in the page flow so the next block reads naturally below it.
+   Mobile collapses the negative-margin overlap so the card doesn't
+   hang off the screen edge. */
+.lp-hero-banner {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  min-height: auto;
+  background: var(--lp-paper);
+}
+.lp-hero-banner-image {
+  height: 56vh;
+  min-height: 360px;
+  max-height: 540px;
+  background: center / cover no-repeat #ece6db;
+}
+.lp-hero-banner-card {
+  background: var(--lp-card);
+  border-radius: 18px;
+  padding: clamp(28px, 4vw, 48px) clamp(28px, 5vw, 80px) clamp(36px, 5vw, 64px);
+  margin: -64px auto 32px;
+  width: min(900px, calc(100% - 32px));
+  box-shadow: 0 20px 56px rgba(40, 26, 8, 0.14);
+  color: var(--lp-ink);
+  position: relative;
+  z-index: 2;
+}
+.lp-hero-banner-card .lp-hero-content {
+  position: static;
+  padding: 0;
+  color: var(--lp-ink);
+  max-width: none;
+}
+.lp-hero-banner-card .lp-eyebrow { color: var(--gold, #b48b4c); }
+.lp-hero-banner-card .lp-title { color: var(--lp-ink); }
+.lp-hero-banner-card .lp-subtitle { color: var(--lp-muted); }
+.lp-hero-banner-card .lp-locator {
+  background: rgba(20, 17, 13, 0.06);
+  color: var(--lp-ink);
+  border: 1px solid #e5dec9;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.lp-hero-banner .lp-hero-arrows {
+  position: absolute;
+  bottom: auto;
+  top: calc(56vh - 60px);
+  inset-inline-start: 24px;
+}
+@media (max-width: 640px) {
+  .lp-hero-banner-image { height: 44vh; min-height: 280px; }
+  .lp-hero-banner-card { margin: -32px 16px 24px; padding: 24px; border-radius: 14px; }
+  .lp-hero-banner .lp-hero-arrows { top: calc(44vh - 56px); inset-inline-start: 12px; }
+}
+
 /* ── Gallery ──────────────────────────────────────────────────── */
 .lp-gallery {
   padding: 24px 48px 0;
@@ -573,3 +631,62 @@
   color: var(--lp-ink);
 }
 .lp-spec-chip svg { color: var(--gold, #b48b4c); flex: 0 0 auto; }
+
+/* ── Themes (font + palette presets) ──────────────────────────── */
+/* Three curated font pairings. DEFAULT is the original Playfair +
+   Heebo. MODERN drops the serif entirely for a sans-on-sans look.
+   CLASSIC pushes the serif into the sans slot too for an editorial
+   /print feel. */
+.lp-page.lp-font-default { /* default — declared on .lp-page above */ }
+.lp-page.lp-font-modern {
+  --lp-serif: 'Heebo', 'Assistant', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.lp-page.lp-font-classic {
+  --lp-sans: 'Frank Ruhl Libre', 'Playfair Display', 'Georgia', serif;
+}
+
+/* Three palette presets. CREAM_GOLD is the original. CHARCOAL_BRONZE
+   inverts to a dark editorial mode with bronze CTAs. OLIVE_SAND
+   leans warm earthtone — works well for villas / luxury rural.
+   Palettes override commercial too — explicit choice beats the
+   commercial heuristic that ships when the agent hasn't picked. */
+.lp-page.lp-palette-cream-gold {
+  /* default — declared on .lp-page above */
+}
+.lp-page.lp-palette-charcoal-bronze {
+  --lp-ink: #f4ece0;
+  --lp-muted: #b0a48f;
+  --lp-paper: #1a1612;
+  --lp-card: #211b14;
+  --lp-gold: #c89967;
+  --lp-gold-soft: rgba(200, 153, 103, 0.18);
+  --lp-border: rgba(244, 236, 224, 0.08);
+  --lp-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+}
+.lp-page.lp-palette-charcoal-bronze .lp-form-card,
+.lp-page.lp-palette-charcoal-bronze .lp-floor-wrap,
+.lp-page.lp-palette-charcoal-bronze .lp-hero-banner-card {
+  background: var(--lp-card);
+}
+.lp-page.lp-palette-charcoal-bronze .lp-spec-chip,
+.lp-page.lp-palette-charcoal-bronze .lp-locator {
+  background: rgba(244, 236, 224, 0.06);
+  border-color: rgba(244, 236, 224, 0.12);
+  color: var(--lp-ink);
+}
+.lp-page.lp-palette-charcoal-bronze .lp-field input,
+.lp-page.lp-palette-charcoal-bronze .lp-field textarea {
+  background: rgba(244, 236, 224, 0.04);
+  border-color: rgba(244, 236, 224, 0.12);
+  color: var(--lp-ink);
+}
+
+.lp-page.lp-palette-olive-sand {
+  --lp-ink: #2b2a1a;
+  --lp-muted: #6e6c52;
+  --lp-paper: #f3eedf;
+  --lp-card: #fdfaf0;
+  --lp-gold: #6e7a3e;             /* olive instead of gold */
+  --lp-gold-soft: rgba(110, 122, 62, 0.14);
+  --lp-border: rgba(43, 42, 26, 0.08);
+}

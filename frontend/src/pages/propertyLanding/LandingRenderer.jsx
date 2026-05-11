@@ -129,8 +129,14 @@ export default function LandingRenderer({
   // typically sits within the initial viewport so its IO callback
   // fires on first paint anyway — the cost is just a wrapper div.
   let visibleIdx = 0;
+  // Theme classes override CSS custom properties on `.lp-page` so a
+  // bespoke palette / font pair affects every block without per-
+  // block conditionals.
+  const themeFont = effective.theme?.font || 'DEFAULT';
+  const themePalette = effective.theme?.palette || 'CREAM_GOLD';
+  const themeClass = `lp-font-${themeFont.toLowerCase()} lp-palette-${themePalette.toLowerCase().replace(/_/g, '-')}`;
   return (
-    <div className={`lp-page ${isCommercial ? 'lp-commercial' : 'lp-residential'}`}>
+    <div className={`lp-page ${isCommercial ? 'lp-commercial' : 'lp-residential'} ${themeClass}`}>
       {effective.sections.map((section) => {
         if (!section.visible) return null;
         const rendered = renderSection(section, ctx);
@@ -221,12 +227,16 @@ function HeroSection({ section, ctx }) {
 
   const docTitle = `${property?.type || 'נכס'} ב${property?.city || 'ישראל'}`;
 
-  // Two visual variants. IMAGE = full-bleed background photo with
-  // gradient + overlay text (current default). SPLIT = photo on one
-  // side, text on the other on desktop; stacks photo-over-text on
-  // mobile. The DOM stays similar so the gallery arrow controls and
-  // the content block keep working in both layouts.
-  const variant = props.variant === 'SPLIT' ? 'SPLIT' : 'IMAGE';
+  // Three visual variants.
+  //   IMAGE  — full-bleed background photo with copy overlaid on
+  //            gradient (current default).
+  //   SPLIT  — photo and copy share the viewport 50/50; stacks
+  //            photo-over-copy on mobile.
+  //   BANNER — photo as a tall horizontal band at the top, copy
+  //            inside a cream card directly below.
+  const variant = ['IMAGE', 'SPLIT', 'BANNER'].includes(props.variant)
+    ? props.variant
+    : 'IMAGE';
 
   const content = (
     <div className="lp-hero-content">
@@ -259,6 +269,23 @@ function HeroSection({ section, ctx }) {
           aria-label={docTitle}
         />
         <div className="lp-hero-split-content">
+          {content}
+        </div>
+        {arrows}
+      </header>
+    );
+  }
+
+  if (variant === 'BANNER') {
+    return (
+      <header className="lp-hero lp-hero-banner">
+        <div
+          className="lp-hero-banner-image"
+          style={hero ? { backgroundImage: `url(${hero})` } : undefined}
+          role="img"
+          aria-label={docTitle}
+        />
+        <div className="lp-hero-banner-card">
           {content}
         </div>
         {arrows}
