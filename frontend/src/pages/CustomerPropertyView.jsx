@@ -30,6 +30,7 @@ import api from '../lib/api';
 import { formatFloor, formatFloorOutOf } from '../lib/formatFloor';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import LogoMark from '../components/LogoMark';
+import { waUrl } from '../lib/waLink';
 import './CustomerPropertyView.css';
 
 // ── Money & shape helpers ─────────────────────────────────────────────
@@ -256,7 +257,7 @@ export default function CustomerPropertyView() {
   const handleWhatsApp = () => {
     const text = `שלום ${agentName}, אני מתעניין/ת בנכס ב${property.street}, ${property.city}. אשמח לפרטים נוספים.`;
     const target = agentPhoneDigits || '';
-    window.open(`https://wa.me/${target}?text=${encodeURIComponent(text)}`, '_blank');
+    window.open(waUrl(target, text), '_blank');
   };
 
   const handleShare = async () => {

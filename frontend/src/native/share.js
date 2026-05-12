@@ -4,6 +4,7 @@ import { App } from '@capacitor/app';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { isNative, isIOS } from './platform';
 import { composeStoryImage } from './storyComposer';
+import { waEncodeText } from '../lib/waLink';
 
 /**
  * Generic share sheet — text/url. On native iOS this brings up the OS share
@@ -52,13 +53,20 @@ export function openExternal(url) {
 export async function openWhatsApp({ phone, text } = {}) {
   const digits = (phone || '').replace(/[^\d]/g, '');
   const intl = digits.startsWith('0') ? '972' + digits.slice(1) : digits;
-  const params = new URLSearchParams();
-  if (intl) params.set('phone', intl);
-  if (text) params.set('text', text);
-  const deepLink = `whatsapp://send?${params.toString()}`;
+  // 2026-05-12 — was URLSearchParams + encodeURIComponent in two
+  // different places (deep link vs web URL), which encoded spaces
+  // differently (`+` vs `%20`). Agents reported emojis appearing as
+  // "?" on WhatsApp Web — most likely a parser quirk on certain
+  // recipient devices when the URL mixed both forms. Now both the
+  // native deep link and the web URL go through one helper
+  // (waEncodeText) so the bytes WhatsApp sees are identical.
+  const encodedText = waEncodeText(text || '');
+  const deepLink = intl
+    ? `whatsapp://send?phone=${intl}&text=${encodedText}`
+    : `whatsapp://send?text=${encodedText}`;
   const webUrl = intl
-    ? `https://wa.me/${intl}?text=${encodeURIComponent(text || '')}`
-    : `https://wa.me/?text=${encodeURIComponent(text || '')}`;
+    ? `https://wa.me/${intl}?text=${encodedText}`
+    : `https://wa.me/?text=${encodedText}`;
 
   if (isNative()) {
     try {

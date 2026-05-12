@@ -49,7 +49,7 @@ import { useViewportMobile, useDelayedFlag, useRefreshOnRefocus } from '../hooks
 import PageTour from '../components/PageTour';
 import { pageCache } from '../lib/pageCache';
 import { shareSheet, openWhatsApp, shareWithPhotos } from '../native/share';
-import { telUrl, wazeUrl } from '../lib/waLink';
+import { telUrl, wazeUrl, waUrl, waUrlNoRecipient } from '../lib/waLink';
 import haptics from '../lib/haptics';
 import { useToast } from '../lib/toast';
 import {
@@ -2076,12 +2076,13 @@ export default function Properties() {
             if (!prop) return;
             const text = editedText || buildMessageForProp(prop);
             if (lead === null) {
-              window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+              window.open(waUrlNoRecipient(text), '_blank', 'noopener,noreferrer');
               return;
             }
-            const phone = (lead.phone || '').replace(/[^\d]/g, '');
-            const intl = phone.startsWith('0') ? '972' + phone.slice(1) : phone;
-            window.open('https://wa.me/' + intl + '?text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+            // waUrl handles Israeli phone normalisation + emoji-safe
+            // encoding (NFC + percent-encode) — same encoding pipeline
+            // every other WhatsApp entry-point uses.
+            window.open(waUrl(lead.phone, text), '_blank', 'noopener,noreferrer');
           }}
           onClose={() => setMatchesPickerFor(null)}
         />

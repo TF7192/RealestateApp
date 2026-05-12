@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, MessageCircle, Send } from 'lucide-react';
+import { waUrlNoRecipient } from '../lib/waLink';
 
 const PALETTE = {
   ink: '#1e1a14', muted: '#6b6356', cream: '#fbf7f0',
@@ -44,8 +45,10 @@ export default function BulkWhatsAppDialog({ leads = [], onClose }) {
     // wa.me/?text= opens WhatsApp's "send to" picker so the agent
     // chooses recipients inside the WhatsApp UI. No ?phone= because
     // we'd need a single number — bulk sending is the user's job.
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    // 2026-05-12 — through waUrlNoRecipient so encoding (NFC normalise
+    // + percent-encode) matches every other WA entry-point. Emoji bytes
+    // and modifier sequences stay intact.
+    window.open(waUrlNoRecipient(message), '_blank', 'noopener,noreferrer');
     onClose?.();
   };
 
