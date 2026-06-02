@@ -245,7 +245,7 @@ export async function runChatTool(
           rooms: true, sqm: true, floor: true, totalFloors: true,
           marketingPrice: true, type: true, assetClass: true,
           category: true, status: true, stage: true,
-          isPublicMatch: true, createdAt: true,
+          createdAt: true,
         },
       });
       return { count: rows.length, items: rows };

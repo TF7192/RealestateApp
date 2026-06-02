@@ -770,7 +770,7 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
         signerEmail: input.signerEmail && input.signerEmail !== '' ? input.signerEmail : null,
         propertyId:  input.propertyId ?? null,
         leadId:      input.leadId ?? null,
-        propertiesSnapshot: input.propertiesSnapshot ?? null,
+        propertiesSnapshot: input.propertiesSnapshot ?? undefined,
         baseContractId:     input.baseContractId ?? null,
         publicSignToken,
         publicSignTokenExpiresAt,
