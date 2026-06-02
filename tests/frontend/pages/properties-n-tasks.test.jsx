@@ -27,7 +27,6 @@ function mountProperties(items = sampleProperties, favorites = []) {
   server.use(
     http.get('/api/properties', () => HttpResponse.json({ items })),
     http.get('/api/favorites', () => HttpResponse.json({ items: favorites })),
-    http.get('/api/templates', () => HttpResponse.json({ templates: [] })),
     http.get('/api/leads', () => HttpResponse.json({ items: [] })),
   );
 }

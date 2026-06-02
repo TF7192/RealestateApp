@@ -18,7 +18,6 @@ const PROTECTED = [
   '/customers',
   '/customers/new',
   '/deals',
-  '/templates',
   '/profile',
   '/admin/chats',
   '/admin/users',

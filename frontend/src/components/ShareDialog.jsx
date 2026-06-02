@@ -8,7 +8,7 @@
 // Accepts `{ kind, entity, onClose }`:
 //   kind   — 'property' | 'catalog' | 'agent' | 'contract'
 //   entity — shape depends on kind:
-//     property : { property, agent, templates?, url?, message? }
+//     property : { property, agent, url?, message? }
 //     catalog  : { url, agentName? }
 //     agent    : { agent, url }
 //     contract : { contract, url?, recipient? }
@@ -36,11 +36,6 @@ import { useToast } from '../lib/toast';
 import { track } from '../lib/analytics';
 import { isNative, isIOS } from '../native/platform';
 import { shareSheet, openWhatsApp } from '../native/share';
-import {
-  buildVariables as tplBuildVars,
-  renderTemplate as tplRender,
-  pickTemplateKind as tplPickKind,
-} from '../lib/templates';
 import { normalizeIsraeliPhone } from '../lib/waLink';
 
 // Cream & Gold DT tokens — match OwnerEditDialog / ContractDetail / the
@@ -91,7 +86,7 @@ function defaultsFor({ kind, entity }) {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
   if (kind === 'property') {
-    const { property, agent, templates, url, message } = entity || {};
+    const { property, agent, url, message } = entity || {};
     if (!property) return { title: 'שיתוף נכס', url: url || '', message: message || '' };
     const slugPath = property.slug && (agent?.slug || property.agentSlug)
       ? `/agents/${encodeURI(agent?.slug || property.agentSlug)}/${encodeURI(property.slug)}`
@@ -99,20 +94,13 @@ function defaultsFor({ kind, entity }) {
     const finalUrl = url || `${origin}${slugPath}`;
     let finalMessage = message || '';
     if (!finalMessage) {
-      const kindKey = tplPickKind(property, 'client');
-      const tpl = (templates || []).find((t) => t.kind === kindKey);
-      if (tpl?.body) {
-        const vars = tplBuildVars(property, agent, { stripAgent: false });
-        finalMessage = tplRender(tpl.body, vars);
-      } else {
-        // Minimal built-in fallback — keeps the dialog useful even
-        // when the agent hasn't created any templates yet.
-        finalMessage = [
-          `${property.type || 'נכס'} ב${property.street || ''}, ${property.city || ''}`,
-          property.rooms ? `${property.rooms} חדרים · ${property.sqm || '—'} מ״ר` : null,
-          finalUrl,
-        ].filter(Boolean).join('\n');
-      }
+      // Minimal built-in default message — assembled inline now that
+      // the per-agent template system is gone.
+      finalMessage = [
+        `${property.type || 'נכס'} ב${property.street || ''}, ${property.city || ''}`,
+        property.rooms ? `${property.rooms} חדרים · ${property.sqm || '—'} מ״ר` : null,
+        finalUrl,
+      ].filter(Boolean).join('\n');
     }
     const title = `${property.street || ''}${property.city ? ', ' + property.city : ''}`.trim()
       || 'שיתוף נכס';

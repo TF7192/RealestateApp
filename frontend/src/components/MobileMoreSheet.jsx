@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, UserCircle, Share2, LogOut, UserPlus, Plus, Check, Search, FileText, Shield, Calculator, Download as DownloadIcon, BarChart2, Activity as ActivityIcon, Bell } from 'lucide-react';
+import { User, UserCircle, Share2, LogOut, UserPlus, Plus, Check, Search, Shield, Calculator, Download as DownloadIcon, BarChart2, Activity as ActivityIcon, Bell } from 'lucide-react';
 
 // SEC-010 — admin status reads off user.role, not the email allowlist.
 const isAdminUser = (u) => !!u && u.role === 'ADMIN';
@@ -184,11 +184,6 @@ export default function MobileMoreSheet({ open, onClose, onOpenPalette }) {
             <button className="mms-row" onClick={() => go('/owners')}>
               <span className="mms-row-icon"><UserCircle size={18} /></span>
               <span className="mms-row-text"><strong>בעלי נכסים</strong><small>ניהול בעלי הנכסים שלך</small></span>
-              <span className="mms-arrow">›</span>
-            </button>
-            <button className="mms-row" onClick={() => go('/templates')}>
-              <span className="mms-row-icon"><FileText size={18} /></span>
-              <span className="mms-row-text"><strong>תבניות הודעה</strong><small>וואטסאפ אוטומטי מפרטי הנכס</small></span>
               <span className="mms-arrow">›</span>
             </button>
             {/* Mobile entry to the seller calculator + Yad2 importer.

@@ -11,7 +11,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  ArrowRight, Phone, MessageCircle, MessageSquare, Calendar, FileText,
+  ArrowRight, Phone, MessageCircle, MessageSquare, Calendar,
   AlertCircle, History, Flame, Thermometer, Snowflake, Building2,
   Sparkles, Printer, Maximize2, Edit3,
 } from 'lucide-react';
@@ -190,9 +190,6 @@ export default function CustomerDetail() {
           לקוחות
         </Link>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <Link to="/templates" style={secondaryBtn()} title="ערוך תבניות הודעה">
-            <FileText size={14} /> ערוך תבניות הודעה
-          </Link>
           {lead.phone && (
             <>
               <a

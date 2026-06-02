@@ -20,7 +20,6 @@ if (process.env.NODE_ENV === 'production' && process.env.ESTIA_ALLOW_SEED !== '1
 
 const { PrismaClient } = await import('@prisma/client');
 const argon2 = (await import('argon2')).default;
-const { createHash } = await import('node:crypto');
 
 const prisma = new PrismaClient();
 
@@ -1392,22 +1391,15 @@ async function main() {
   // ─── Manager marketing data (property views / inquiries / agreements)
   // ─────────────────────────────────────────────────────────────────
   //
-  // Sprint 9 marketing (lane D). The /marketing page aggregates three
-  // funnel steps per property: views → inquiries → agreements. Without
-  // seed rows each tab renders an empty chart on the walkthrough. This
-  // block seeds realistic per-property distributions for דנה לוי so
-  // the top-performer chart, sparkline, and agreement-status mix all
-  // look natural.
+  // Sprint 9 marketing (lane D, partially deleted). The landing page +
+  // PropertyView + PropertyInquiry feature was removed on 2026-06-02
+  // (see docs/removal-2026-06-02-feature-cull.md §7); the agreement
+  // seeds below are retained for the deals/agreements surface, but the
+  // per-property views/inquiries seeds are gone with the tables.
   //
-  // Idempotent on re-run: wipe every manager-scoped marketing row we're
+  // Idempotent on re-run: wipe every manager-scoped agreement row we're
   // about to re-create before seeding. Scoped strictly to manager-owned
   // properties + leads so the team agents' data stays untouched.
-  await prisma.propertyView.deleteMany({
-    where: { property: { agentId: manager.id } },
-  });
-  await prisma.propertyInquiry.deleteMany({
-    where: { property: { agentId: manager.id } },
-  });
   await prisma.agreement.deleteMany({
     where: {
       OR: [
@@ -1417,97 +1409,7 @@ async function main() {
     },
   });
 
-  // 1. PropertyView — ~180 rows across the 8 manager properties, spread
-  // over the last 30 days. Distribution matches the brief: busier
-  // properties get more views (top performer ~45, quietest ~6). Total =
-  // 45 + 32 + 28 + 22 + 18 + 16 + 13 + 6 = 180.
-  //
-  // visitorHash = sha256(ip + userAgent + ISO-date) so the @@unique
-  // ([propertyId, visitorHash, viewedAt]) constraint is satisfied per
-  // row; we vary the ip every iteration so no collisions occur even
-  // when multiple views land on the same UTC day.
-  const viewsPerProperty = [45, 32, 28, 22, 18, 16, 13, 6];
-  const userAgents = [
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  ];
-  const referrers: (string | null)[] = [
-    null,
-    'https://wa.me/',
-    'https://www.facebook.com/',
-    'https://www.instagram.com/',
-    'https://www.google.com/',
-  ];
-  let totalViews = 0;
-  for (let pIdx = 0; pIdx < managerPropertyIds.length; pIdx++) {
-    const propertyId = managerPropertyIds[pIdx];
-    const count = viewsPerProperty[pIdx] ?? 10;
-    for (let v = 0; v < count; v++) {
-      // Spread viewedAt across the last 30 days — busier properties
-      // skew toward the last two weeks so the sparkline trends up.
-      const daysAgo = Math.floor((v / count) * 30);
-      const hour = 8 + ((v * 7) % 14); // 08:00 – 21:00
-      const minute = (v * 13) % 60;
-      const viewedAt = atOffset(-daysAgo, hour, minute);
-      // Unique-ish IP per row so (propertyId, visitorHash, viewedAt)
-      // doesn't collide even when two views share the same UTC date.
-      const ip = `203.0.${pIdx}.${v + 1}`;
-      const userAgent = userAgents[v % userAgents.length];
-      const referrer = referrers[(v + pIdx) % referrers.length];
-      const isoDate = viewedAt.toISOString().slice(0, 10);
-      const visitorHash = createHash('sha256')
-        .update(`${ip}${userAgent}${isoDate}`)
-        .digest('hex');
-      await prisma.propertyView.create({
-        data: {
-          propertyId,
-          visitorHash,
-          userAgent,
-          referrer,
-          viewedAt,
-        },
-      });
-      totalViews += 1;
-    }
-  }
-
-  // 2. PropertyInquiry — 9 rows across 5 of the manager's properties.
-  // Hebrew contactName values, Israeli mobile numbers, mix of
-  // with/without email and with/without message. createdAt spread
-  // across the last 21 days.
-  const inquirySeeds: Array<{
-    propertyIdx: number; contactName: string; contactPhone: string;
-    contactEmail?: string | null; message?: string | null;
-    daysAgo: number;
-  }> = [
-    { propertyIdx: 0, contactName: 'עידן פרץ',       contactPhone: '050-9010101', contactEmail: 'idan.peretz@example.com', message: 'מתעניין, נא להחזיר טלפון',     daysAgo: 1 },
-    { propertyIdx: 0, contactName: 'שני כהן-דוד',   contactPhone: '052-9020202', contactEmail: 'shani.cd@example.com',     message: 'האם יש פרקינג?',                daysAgo: 4 },
-    { propertyIdx: 0, contactName: 'רונן אלמוג',     contactPhone: '053-9030303',                                            message: null,                              daysAgo: 9 },
-    { propertyIdx: 2, contactName: 'נועה ברזילי',    contactPhone: '054-9040404', contactEmail: 'noa.b@example.com',        message: 'מעוניינת לקבוע ביקור סוף שבוע', daysAgo: 2 },
-    { propertyIdx: 2, contactName: 'אסף חייט',       contactPhone: '058-9050505',                                            message: 'מתעניין, נא להחזיר טלפון',     daysAgo: 11 },
-    { propertyIdx: 3, contactName: 'מירב שטרית',     contactPhone: '050-9060606', contactEmail: 'merav.sh@example.com',     message: null,                              daysAgo: 6 },
-    { propertyIdx: 4, contactName: 'יוסף מזרחי',     contactPhone: '052-9070707',                                            message: 'האם יש פרקינג?',                daysAgo: 14 },
-    { propertyIdx: 6, contactName: 'ליאור שמואלי',   contactPhone: '053-9080808', contactEmail: 'lior.sh@example.com',      message: 'מחפש משרד לסטארטאפ, יש סיור?',  daysAgo: 8 },
-    { propertyIdx: 6, contactName: 'תמר אסרף',       contactPhone: '054-9090909',                                            message: null,                              daysAgo: 18 },
-  ];
-  for (const i of inquirySeeds) {
-    const propertyId = managerPropertyIds[i.propertyIdx];
-    if (!propertyId) continue;
-    await prisma.propertyInquiry.create({
-      data: {
-        propertyId,
-        contactName: i.contactName,
-        contactPhone: i.contactPhone,
-        contactEmail: i.contactEmail ?? null,
-        message: i.message ?? null,
-        createdAt: atOffset(-i.daysAgo, 9 + (i.daysAgo % 10), (i.daysAgo * 7) % 60),
-      },
-    });
-  }
-
-  // 3. Agreement — 5 rows linked to manager properties + 3 of the
+  // 1. Agreement — 5 rows linked to manager properties + 3 of the
   // manager's leads. 2 SIGNED (signedAt within last 14 days), 2 SENT
   // (sentAt within last 7 days, no signedAt), 1 EXPIRED.
   // signerPhone mirrors the linked lead so the agreements page shows
@@ -1589,7 +1491,7 @@ async function main() {
     });
   }
 
-  console.log(`✓ manager marketing: ${totalViews} views, ${inquirySeeds.length} inquiries, ${agreementSeeds.length} agreements`);
+  console.log(`✓ manager marketing: ${agreementSeeds.length} agreements`);
   console.log('🌱 done');
 }
 

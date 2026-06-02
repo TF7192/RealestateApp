@@ -11,7 +11,7 @@
 
 import { Link } from 'react-router-dom';
 import {
-  MapPin, UserCircle, MessageSquare, ChevronLeft,
+  MapPin, UserCircle, ChevronLeft,
 } from 'lucide-react';
 
 const DT = {
@@ -38,13 +38,6 @@ const CARDS = [
     title: 'הפרופיל שלי',
     description: 'שם, טלפון, אווטר, חיבור ל-Google Calendar.',
     Icon: UserCircle,
-  },
-  {
-    key: 'templates',
-    to: '/templates',
-    title: 'תבניות הודעה',
-    description: 'תבניות WhatsApp ודוא"ל לשליחה מהירה ללקוחות.',
-    Icon: MessageSquare,
   },
 ];
 

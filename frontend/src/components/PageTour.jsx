@@ -9,7 +9,7 @@ import { areToursKilled, subscribeTourKill } from '../lib/tourKill';
 // statically importing the heavy `Joyride` symbol AND the OnboardingTour
 // CSS via the named re-exports, which dragged the whole tour bundle
 // (and its render-blocking CSS) into every page that mounted a tour
-// (Properties, PropertyDetail, NewProperty, Templates, Transfers).
+// (Properties, PropertyDetail, NewProperty).
 // OWNER + CUSTOMER + already-completed-AGENT + mobile sessions paid
 // that cost for nothing. Splitting the actual Joyride mount into a
 // lazy inner component means the chunk only loads when shouldRun is

@@ -11,9 +11,9 @@
 //      /public/p/:token (frontend) and POSTs to this backend's
 //      /prospects/public/:token endpoint to attach the signature.
 //
-// Each completed prospect counts toward the property's "visits + inquiries"
-// tile on PropertyDetail — the UI computes the combined number from
-// `viewings.count + inquiries.count + prospects.count`.
+// Each completed prospect counts toward the property's "visits" tile
+// on PropertyDetail — the UI computes the combined number from
+// `viewings.count + prospects.count`.
 
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';

@@ -10,7 +10,6 @@ const ROUTE_TITLES = {
   '/properties': 'נכסים',
   '/customers':  'לקוחות',
   '/deals':      'עסקאות',
-  '/templates':  'תבניות',
   '/profile':    'פרופיל',
   '/properties/new': 'נכס חדש',
   '/customers/new':  'מתעניין חדש',
@@ -92,7 +91,6 @@ export function useGlobalShortcuts({ onOpenPalette, onOpenHelp }) {
         else if (k === 'c') navigate('/customers');
         else if (k === 'd') navigate('/deals');
         else if (k === 'h') navigate('/dashboard');
-        else if (k === 't') navigate('/templates');
         return;
       }
 

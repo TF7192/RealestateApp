@@ -475,7 +475,6 @@ model User {
   leads                  Lead[]                        @relation("AgentLeads")
   deals                  Deal[]                        @relation("AgentDeals")
   files                  UploadedFile[]
-  templates              MessageTemplate[]
   conversations          Conversation[]                @relation("UserConversations")
   sentMessages           Message[]                     @relation("SentMessages")
   prospects              Prospect[]
@@ -809,19 +808,11 @@ model Property {
   // pushing. Default 0 = no boost.
   priority Int @default(0)
 
-  // 2026-05-11 — premium agents can design their own landing page per
-  // property via /properties/:id/landing-editor. Shape lives in
-  // backend/src/lib/landingConfig.ts (zod-validated). Null = use the
-  // hard-coded default layout (PropertyLandingPage's pre-editor
-  // behavior), so existing rows render unchanged.
-  landingPageConfig Json?
-
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   images           PropertyImage[]
   viewings         PropertyViewing[]
-  inquiries        PropertyInquiry[]
   videos           PropertyVideo[]
   documents        UploadedFile[]
   deal             Deal?
@@ -847,8 +838,6 @@ model Property {
   // tour permissions, objections). Separate from PropertyInterest which
   // is buyer-side.
   ownerActivities  OwnerActivity[]
-  // Sprint 9 — anonymous page-view tracking for marketing surfaces.
-  views            PropertyView[]
 
   // Excel-import tag. Same purpose as Lead.importBatchId.
   importBatchId   String?
@@ -1065,19 +1054,6 @@ model PropertyViewing {
   @@index([propertyId])
   @@index([leadId])
   @@index([interestId])
-}
-
-model PropertyInquiry {
-  id           String   @id @default(cuid())
-  propertyId   String
-  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  contactName  String
-  contactPhone String?
-  contactEmail String?
-  message      String?
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
-
-  @@index([propertyId])
 }
 
 // 2026-05-10 — per-lead per-property "activity log" anchor. One row per
@@ -1507,25 +1483,6 @@ model UploadedFile {
   @@index([kind])
   @@index([ownerId, kind])
   @@index([propertyId])
-}
-
-enum MessageTemplateKind {
-  BUY_PRIVATE // residential + sale
-  RENT_PRIVATE // residential + rent
-  BUY_COMMERCIAL // commercial + sale
-  RENT_COMMERCIAL // commercial + rent
-}
-
-model MessageTemplate {
-  id        String              @id @default(cuid())
-  agentId   String
-  agent     User                @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  kind      MessageTemplateKind
-  body      String
-  updatedAt DateTime            @updatedAt @db.Timestamptz(6)
-
-  @@unique([agentId, kind])
-  @@index([agentId])
 }
 
 model CityLookup {
@@ -2124,36 +2081,6 @@ model Contract {
   @@index([leadId])
   @@index([interestId])
   @@index([type])
-}
-
-// ────────────────────────────────────────────────────────────────────
-// Sprint 9 / marketing surfaces (lane A) — anonymous page-view counter
-// for the per-property public landing page. One row per (property ×
-// visitor × UTC-day); the tracker endpoint in `marketingTrack.ts`
-// dedups same-day reloads via the unique constraint below. Aggregation
-// endpoints (served by a sibling lane) fan the composite
-// (propertyId, viewedAt) index for counts and daily bucketing.
-//
-// The `visitorHash` column is a SHA-256 of (ip + userAgent + UTC-date);
-// we deliberately do NOT store the raw IP. A same-day refresh collides
-// on the unique index and the tracker route swallows the P2002 as a
-// dedup. A different day produces a fresh hash (date is part of the
-// input) and therefore a new row.
-// ────────────────────────────────────────────────────────────────────
-model PropertyView {
-  id          String   @id @default(cuid())
-  propertyId  String
-  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  // SHA-256 of (ip + user-agent + date-in-UTC). Same visitor hitting
-  // the page twice in the same UTC day dedupes to a single row via the
-  // unique constraint below. Different days → new row.
-  visitorHash String
-  referrer    String?
-  userAgent   String?
-  viewedAt    DateTime @default(now()) @db.Timestamptz(6)
-
-  @@unique([propertyId, visitorHash, viewedAt])
-  @@index([propertyId, viewedAt])
 }
 
 // ────────────────────────────────────────────────────────────────────

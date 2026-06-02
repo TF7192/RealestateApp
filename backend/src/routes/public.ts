@@ -199,10 +199,6 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
         avatarUrl: (agent as any).avatarUrl ?? null,
       },
       property: flatProperty,
-      // 2026-05-11 — premium agents can author a per-property landing
-      // config via /properties/:id/landing-editor. Public renderer
-      // treats `null` as "use the hard-coded default layout".
-      landingPageConfig: (property as any).landingPageConfig ?? null,
     };
   });
 
@@ -249,48 +245,6 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     const agentSlug = await findOrCreateAgentSlug(agent.id);
     const propSlug = await findOrCreatePropertySlug(property.id);
     return sendPropertyOg(reply, agent, property, agentSlug, propSlug);
-  });
-
-  /** Public inquiry — lead form on the per-asset landing page (/l/:agentSlug/:propertySlug).
-   *  Accepts name + phone + optional email / message. Stored as a
-   *  PropertyInquiry row on the owning property; the agent sees it
-   *  in the property detail "פניות" counter + activity stream.
-   *  Rate-limited via the global plugin default; no auth required. */
-  app.post('/agents/:agentSlug/properties/:propertySlug/inquiry', async (req, reply) => {
-    const { agentSlug, propertySlug: propSlug } = req.params as {
-      agentSlug: string; propertySlug: string;
-    };
-    const body = (req.body || {}) as {
-      contactName?: unknown; contactPhone?: unknown;
-      contactEmail?: unknown; message?: unknown;
-    };
-    const name = String(body.contactName || '').trim().slice(0, 120);
-    const phone = String(body.contactPhone || '').trim().slice(0, 40);
-    const email = body.contactEmail ? String(body.contactEmail).trim().slice(0, 120) : null;
-    const message = body.message ? String(body.message).trim().slice(0, 2000) : null;
-    if (!name || !phone) {
-      return reply.code(400).send({ error: { message: 'שם וטלפון הם שדות חובה' } });
-    }
-    const agent =
-      (await prisma.user.findUnique({ where: { slug: agentSlug } })) ||
-      (await prisma.user.findUnique({ where: { id: agentSlug } }));
-    if (!agent || agent.role !== 'AGENT' && agent.role !== 'OWNER') {
-      return reply.code(404).send({ error: { message: 'Not found' } });
-    }
-    const property =
-      (await prisma.property.findFirst({ where: { agentId: agent.id, slug: propSlug } })) ||
-      (await prisma.property.findFirst({ where: { agentId: agent.id, id: propSlug } }));
-    if (!property) return reply.code(404).send({ error: { message: 'Not found' } });
-    await prisma.propertyInquiry.create({
-      data: {
-        propertyId: property.id,
-        contactName: name,
-        contactPhone: phone,
-        contactEmail: email,
-        message,
-      },
-    });
-    return reply.code(201).send({ ok: true });
   });
 
   /** Slug lookup helper — given an internal id, return the public URL.

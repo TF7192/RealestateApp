@@ -423,14 +423,6 @@ export const api = {
   reorderPropertyImages: (id, order) =>
     request(`/properties/${id}/images/reorder`, { method: 'PUT', body: { order } }),
 
-  // Per-property landing-page editor config. GET returns the saved
-  // config OR the synthesized default; PATCH is premium-gated server-
-  // side (the editor route refuses to open without isPremium too).
-  getLandingConfig: (id) =>
-    request(`/properties/${id}/landing-page`),
-  saveLandingConfig: (id, config) =>
-    request(`/properties/${id}/landing-page`, { method: 'PATCH', body: { config } }),
-
   // Property videos
   listPropertyVideos: (id) => request(`/properties/${id}/videos`),
   uploadPropertyVideo: (id, file, onProgress) => {
@@ -640,14 +632,6 @@ export const api = {
   // receiving agent doesn't see who originated the listing.
   transferProperty: (id) =>
     request(`/public/transfer/property/${encodeURIComponent(id)}`),
-  // Per-asset landing-page inquiry form. Public, no auth — called by
-  // the /l/:agentSlug/:propertySlug landing page when a prospect
-  // submits the contact form. Stored as a PropertyInquiry row.
-  submitPropertyInquiry: (agentSlug, propertySlug, body) =>
-    request(
-      `/public/agents/${encodeURIComponent(agentSlug)}/properties/${encodeURIComponent(propertySlug)}/inquiry`,
-      { method: 'POST', body },
-    ),
 
   // Owners
   listOwners:        () => request('/owners'),
@@ -665,13 +649,6 @@ export const api = {
     request(`/owner-phones/${id}`, { method: 'PATCH', body }),
   deleteOwnerPhone:  (id) =>
     request(`/owner-phones/${id}`, { method: 'DELETE' }),
-
-  // Message templates
-  listTemplates: () => request('/templates'),
-  saveTemplate: (kind, body) =>
-    request(`/templates/${kind}`, { method: 'PUT', body: { body } }),
-  resetTemplate: (kind) =>
-    request(`/templates/${kind}`, { method: 'DELETE' }),
 
   // Agent lookup — used by PropertyAssigneesPanel and PropertyPipelineBlock
   // to resolve a co-agent / primary-agent by email. Previously lived at

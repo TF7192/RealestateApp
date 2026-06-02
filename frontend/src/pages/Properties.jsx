@@ -26,7 +26,6 @@ import {
   Upload,
 } from 'lucide-react';
 import api from '../lib/api';
-import { formatFloor } from '../lib/formatFloor';
 import { priorityShort, priorityTone } from '../lib/priorityLabels';
 import { useAuth } from '../lib/auth';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -35,26 +34,19 @@ import PropertyNotesDialog from '../components/PropertyNotesDialog';
 import EmptyState from '../components/EmptyState';
 import { useRouteScrollRestore } from '../hooks/useScrollRestore';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
-import WhatsAppSheet from '../components/WhatsAppSheet';
 import PullRefresh from '../components/PullRefresh';
 import LeadPickerSheet from '../components/LeadPickerSheet';
 import SwipeRow from '../components/SwipeRow';
-import WhatsAppIcon from '../components/WhatsAppIcon';
 import StickyActionBar from '../components/StickyActionBar';
 import Portal from '../components/Portal';
 import { OverflowSheet } from '../components/MobilePickers';
 import { useViewportMobile, useDelayedFlag, useRefreshOnRefocus } from '../hooks/mobile';
 import PageTour from '../components/PageTour';
 import { pageCache } from '../lib/pageCache';
-import { shareSheet, openWhatsApp, shareWithPhotos } from '../native/share';
-import { telUrl, wazeUrl, waUrl, waUrlNoRecipient } from '../lib/waLink';
+import { shareSheet } from '../native/share';
+import { telUrl, wazeUrl } from '../lib/waLink';
 import haptics from '../lib/haptics';
 import { useToast } from '../lib/toast';
-import {
-  buildVariables as tplBuildVars,
-  renderTemplate as tplRender,
-  pickTemplateKind as tplPickKind,
-} from '../lib/templates';
 import {
   getDistanceKm,
   resolveLocation,
@@ -185,40 +177,6 @@ function formatPrice(price) {
   if (!price) return '—';
   if (price < 10000) return `₪${price.toLocaleString('he-IL')}/חודש`;
   return `₪${price.toLocaleString('he-IL')}`;
-}
-
-function buildWhatsAppMessage(prop, agent) {
-  const lines = [];
-  lines.push(`*${prop.type} — ${prop.street}, ${prop.city}*`);
-  lines.push('');
-  lines.push(`מחיר: ${formatPrice(prop.marketingPrice)}`);
-  lines.push(`שטח: ${prop.sqm} מ״ר`);
-  if (prop.rooms != null) lines.push(`חדרים: ${prop.rooms}`);
-  if (prop.floor != null) lines.push(`קומה: ${formatFloor(prop.floor, prop.totalFloors)}`);
-  if (prop.balconySize > 0) lines.push(`מרפסת: ${prop.balconySize} מ״ר`);
-  lines.push(`חניה: ${prop.parking ? 'יש' : 'אין'}`);
-  lines.push(`מחסן: ${prop.storage ? 'יש' : 'אין'}`);
-  lines.push(`מזגנים: ${prop.ac ? 'יש' : 'אין'}`);
-  if (prop.assetClass === 'RESIDENTIAL') {
-    lines.push(`ממ״ד: ${prop.safeRoom ? 'יש' : 'אין'}`);
-  }
-  lines.push(`מעלית: ${prop.elevator ? 'יש' : 'אין'}`);
-  if (prop.airDirections) lines.push(`כיווני אוויר: ${prop.airDirections}`);
-  lines.push(`מצב: ${prop.renovated || '—'}`);
-  if (prop.buildingAge != null) lines.push(`בניין בן: ${prop.buildingAge === 0 ? 'חדש' : `${prop.buildingAge} שנים`}`);
-  if (prop.vacancyDate) lines.push(`פינוי: ${prop.vacancyDate}`);
-  if (prop.notes) { lines.push(''); lines.push(prop.notes); }
-  lines.push('');
-  lines.push(`📷 תמונות ופרטים נוספים:`);
-  const pUrl = prop.slug && agent?.slug
-    ? `${window.location.origin}/agents/${encodeURI(agent.slug)}/${encodeURI(prop.slug)}`
-    : `${window.location.origin}/p/${prop.id}`;
-  lines.push(pUrl);
-  if (agent?.displayName) {
-    lines.push('');
-    lines.push(`${agent.displayName} | ${agent.agency || ''} | ${agent.phone || ''}`);
-  }
-  return lines.join('\n');
 }
 
 // P3-M8 / P3-M9 — does a lead "match" a property? Returns boolean.
@@ -494,34 +452,16 @@ export default function Properties() {
       toast?.warning?.(`נמחקו ${done} מתוך ${ids.length} — ${failed} נכשלו`);
     }
   };
-  const [waShare, setWaShare] = useState(null); // { text, title }
-  const [templates, setTemplates] = useState(null);
-  const [leads, setLeads] = useState([]);
-  const [leadPickerFor, setLeadPickerFor] = useState(null); // prop being shared
   const [overflowFor, setOverflowFor] = useState(null); // prop for ⋯ menu
   const [similarFor, setSimilarFor] = useState(null); // prop for "חפש דומים"
   // N-7 removed the page-level ⋯ sheet; `pageOverflowOpen` is gone and the
   // two actions it hid now live in the toolbar as direct buttons.
-  const [matchesPickerFor, setMatchesPickerFor] = useState(null); // P3-M8: { prop, leads }
 
   // Sprint 7 B4 — favorites for properties. Seed the id set once so each
   // card's star reflects the current state without waiting for the first
   // toggle. Empty set on failure is fine; the star just starts inactive.
   const [favoriteIds, setFavoriteIds] = useState(() => new Set());
 
-  // PERF-020 — `templates` + `leads` are only consulted from the
-  // WhatsApp share / lead-picker dialogs. They were previously fetched
-  // on mount, dragging ~200 KB of unrelated data into the critical
-  // path. We now lazy-load them the first time the agent opens the
-  // share dialog (`ensureSharePrereqs()`), and seed favorites — which
-  // IS used on every card render — eagerly here.
-  const [sharePrereqsLoaded, setSharePrereqsLoaded] = useState(false);
-  const ensureSharePrereqs = useCallback(() => {
-    if (sharePrereqsLoaded) return;
-    setSharePrereqsLoaded(true);
-    api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
-    api.listLeads().then((r) => setLeads(r.items || r.leads || [])).catch(() => {});
-  }, [sharePrereqsLoaded]);
   useEffect(() => {
     api.listFavorites('PROPERTY')
       .then((r) => {
@@ -730,56 +670,6 @@ export default function Properties() {
       window.dispatchEvent(new CustomEvent('estia:title', { detail: '' }));
     };
   }, [isMobile, filtered.length]);
-
-  const agentInfo = {
-    displayName: user?.displayName,
-    agency: user?.agentProfile?.agency,
-    phone: user?.phone,
-  };
-
-  const buildMessageForProp = (prop) => {
-    const kind = tplPickKind(prop, 'client');
-    const tpl = templates?.find((t) => t.kind === kind);
-    if (tpl?.body) {
-      const vars = tplBuildVars(prop, user, { stripAgent: false });
-      return tplRender(tpl.body, vars);
-    }
-    return buildWhatsAppMessage(prop, agentInfo);
-  };
-
-  // Entry point for sharing: show lead picker first; fall back to WhatsAppSheet
-  // (no recipient) if user taps "פתח ללא נמען".
-  const handleWhatsApp = (e, prop) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    haptics.tap();
-    // PERF-020 — fetch templates + leads lazily on first share open.
-    ensureSharePrereqs();
-    setLeadPickerFor(prop);
-  };
-
-  const handlePickLead = async (lead, editedText, opts) => {
-    const prop = leadPickerFor;
-    setLeadPickerFor(null);
-    if (!prop) return;
-    const text = editedText || buildMessageForProp(prop);
-    const url = prop.slug && user?.slug
-      ? `${window.location.origin}/agents/${encodeURI(user.slug)}/${encodeURI(prop.slug)}`
-      : `${window.location.origin}/p/${prop.id}`;
-    // Native iOS only: share with photos via OS share sheet
-    if (opts?.withPhotos) {
-      await shareWithPhotos({
-        photos: opts.photos,
-        text,
-        title: `${prop.street}, ${prop.city}`,
-        url,
-      });
-      return;
-    }
-    await openWhatsApp({ phone: lead?.phone, text });
-  };
 
   const handleGenerateLink = () => {
     const shareFilters = {
@@ -1345,12 +1235,6 @@ export default function Properties() {
                 onClick: () => { window.location.href = `tel:${prop.ownerPhone}`; },
               },
               {
-                icon: WhatsAppIcon,
-                label: 'וואטסאפ',
-                color: 'green',
-                onClick: () => handleWhatsApp(null, prop),
-              },
-              {
                 icon: Navigation,
                 label: 'ניווט',
                 color: 'blue',
@@ -1442,21 +1326,12 @@ export default function Properties() {
                             )}
                           </div>
                           {matchCount > 0 && (
-                            <button
-                              type="button"
+                            <span
                               className="pc-match-pill"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                haptics.tap();
-                                // PERF-020 — lazy-load templates + leads.
-                                ensureSharePrereqs();
-                                setMatchesPickerFor(prop);
-                              }}
                               aria-label={`${matchCount} מתעניינים תואמים — ${prop.street}`}
                             >
                               {matchCount} מתעניינים תואמים
-                            </button>
+                            </span>
                           )}
                         </div>
                       </Link>
@@ -1492,15 +1367,6 @@ export default function Properties() {
                           <Phone />
                           <span>התקשר</span>
                         </a>
-                        <button
-                          type="button"
-                          className="pc-rail-btn pc-rail-wa"
-                          onClick={(e) => handleWhatsApp(e, prop)}
-                          aria-label={`שלח את ${prop.street} בוואטסאפ`}
-                        >
-                          <WhatsAppIcon />
-                          <span>שלח בוואטסאפ</span>
-                        </button>
                         <a
                           href={wazeUrl(`${prop.street} ${prop.city}`)}
                           target="_blank"
@@ -1627,20 +1493,12 @@ export default function Properties() {
                       </span>
                     </div>
                     {matchCount > 0 && (
-                      <button
-                        type="button"
+                      <span
                         className="property-match-pill"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          // PERF-020 — lazy-load templates + leads.
-                          ensureSharePrereqs();
-                          setMatchesPickerFor(prop);
-                        }}
                         aria-label={`${matchCount} מתעניינים תואמים — ${prop.street}`}
                       >
                         {matchCount} מתעניינים תואמים
-                      </button>
+                      </span>
                     )}
                     <div className="property-price-overlay">
                       {formatPrice(prop.marketingPrice)}
@@ -1794,14 +1652,6 @@ export default function Properties() {
                     </div>
                   </div>
                 </Link>
-                <button
-                  className="property-wa-btn"
-                  onClick={(e) => handleWhatsApp(e, prop)}
-                  title="שלח את כל פרטי הנכס + תמונות בוואטסאפ"
-                >
-                  <WhatsAppIcon size={16} />
-                  <span>שלח בוואטסאפ</span>
-                </button>
                 {/* N-3 — direct card actions. Duplicate + quick-edit icons
                  * sit next to the ⋯ menu at the card's logical-end corner
                  * (visual top-left). The overflow menu stays for the long
@@ -2015,25 +1865,6 @@ export default function Properties() {
         </Portal>
       )}
 
-      {waShare && (
-        <WhatsAppSheet
-          title={waShare.title}
-          subtitle="ערוך את ההודעה — לחיצה על 'פתח בוואטסאפ' תעביר לבחירת נמען"
-          message={waShare.text}
-          onClose={() => setWaShare(null)}
-        />
-      )}
-
-      {leadPickerFor && (
-        <LeadPickerSheet
-          property={leadPickerFor}
-          leads={leads}
-          previewText={buildMessageForProp(leadPickerFor)}
-          onPick={handlePickLead}
-          onClose={() => setLeadPickerFor(null)}
-        />
-      )}
-
       <OverflowSheet
         open={!!overflowFor}
         onClose={() => setOverflowFor(null)}
@@ -2047,30 +1878,6 @@ export default function Properties() {
         title="חיפוש נכסים דומים"
         actions={similarActions}
       />
-
-      {/* P3-M8 — picker filtered to matching leads only */}
-      {matchesPickerFor && (
-        <LeadPickerSheet
-          property={matchesPickerFor}
-          leads={matchesByProp.get(matchesPickerFor.id) || []}
-          previewText={buildMessageForProp(matchesPickerFor)}
-          onPick={(lead, editedText) => {
-            const prop = matchesPickerFor;
-            setMatchesPickerFor(null);
-            if (!prop) return;
-            const text = editedText || buildMessageForProp(prop);
-            if (lead === null) {
-              window.open(waUrlNoRecipient(text), '_blank', 'noopener,noreferrer');
-              return;
-            }
-            // waUrl handles Israeli phone normalisation + emoji-safe
-            // encoding (NFC + percent-encode) — same encoding pipeline
-            // every other WhatsApp entry-point uses.
-            window.open(waUrl(lead.phone, text), '_blank', 'noopener,noreferrer');
-          }}
-          onClose={() => setMatchesPickerFor(null)}
-        />
-      )}
 
       {/* N-7 — the page-level ⋯ sheet was removed; its two actions
           ("בחירה מרובה" + "קישור ללקוח") are now direct buttons in the

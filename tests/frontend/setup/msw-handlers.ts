@@ -80,15 +80,6 @@ export const defaultHandlers = [
   // Deals
   http.get('/api/deals', () => HttpResponse.json({ items: [] })),
 
-  // Templates
-  http.get('/api/templates', () =>
-    HttpResponse.json({
-      templates: [
-        { kind: 'BUY_PRIVATE', body: 'דוגמה', updatedAt: null, custom: false },
-      ],
-    })
-  ),
-
   // Lookups (cities, streets)
   http.get('/api/lookups/cities', () => HttpResponse.json({ items: [] })),
   http.get('/api/lookups/streets', () => HttpResponse.json({ items: [] })),

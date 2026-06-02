@@ -65,13 +65,6 @@ describe('<Settings>', () => {
     expect(link).toHaveAttribute('href', '/profile');
   });
 
-  it('templates card links to /templates', async () => {
-    asAgent();
-    render(<Settings />);
-    const link = await screen.findByRole('link', { name: /תבניות הודעה/ });
-    expect(link).toHaveAttribute('href', '/templates');
-  });
-
   it('each card renders as a link, not a generic div', async () => {
     asAgent();
     render(<Settings />);

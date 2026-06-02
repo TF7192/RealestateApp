@@ -19,7 +19,6 @@ import {
   FileText,
   ChevronLeft,
   Sparkles,
-  Palette,
   Pencil,
   UserPlus,
   Users,
@@ -46,11 +45,9 @@ import ProspectDialog from '../components/ProspectDialog';
 import PropertyPhotoManager from '../components/PropertyPhotoManager';
 import PropertyVideoManager from '../components/PropertyVideoManager';
 import OwnerPicker from '../components/OwnerPicker';
-import WhatsAppSheet from '../components/WhatsAppSheet';
 import ShareDialog from '../components/ShareDialog';
 import LeadPickerSheet from '../components/LeadPickerSheet';
 import StickyActionBar from '../components/StickyActionBar';
-import WhatsAppIcon from '../components/WhatsAppIcon';
 import PageTour from '../components/PageTour';
 import MarketContextCard from '../components/MarketContextCard';
 import PropertyPanelSheet from '../components/PropertyPanelSheet';
@@ -63,17 +60,11 @@ import PropertyBrokersCard from '../components/PropertyBrokersCard';
 import PropertyInterestsPanel from '../components/PropertyInterestsPanel';
 import OwnerActivityPanel from '../components/OwnerActivityPanel';
 import OwnerAgreementDialog from '../components/OwnerAgreementDialog';
-import { openWhatsApp, shareWithPhotos, shareToInstagramStory } from '../native/share';
+import { shareWithPhotos, shareToInstagramStory } from '../native/share';
 import { isNative } from '../native/platform';
 import { track } from '../lib/analytics';
 import { telUrl, wazeUrl } from '../lib/waLink';
-import { leadMatchesProperty } from './Properties';
 import { relativeDate } from '../lib/relativeDate';
-import {
-  buildVariables as tplBuildVars,
-  renderTemplate as tplRender,
-  pickTemplateKind as tplPickKind,
-} from '../lib/templates';
 import { useToast } from '../lib/toast';
 import './PropertyDetail.css';
 
@@ -191,48 +182,6 @@ function formatPrice(price) {
   return base;
 }
 
-function buildFullWhatsAppMessage(prop, agent, opts = {}) {
-  const lines = [];
-  lines.push(`*${prop.type} — ${prop.street}, ${prop.city}*`);
-  lines.push('');
-  lines.push(`💰 מחיר: ${formatPrice(prop.marketingPrice)}`);
-  lines.push(`📐 שטח: ${prop.sqm} מ״ר`);
-  if (prop.rooms != null) lines.push(`🛏️ חדרים: ${prop.rooms}`);
-  if (prop.floor != null) lines.push(`🏢 קומה: ${formatFloor(prop.floor, prop.totalFloors)}`);
-  if (prop.balconySize > 0) lines.push(`🌤️ מרפסת: ${prop.balconySize} מ״ר`);
-  lines.push(`🚗 חניה: ${prop.parking ? 'יש' : 'אין'}`);
-  lines.push(`📦 מחסן: ${prop.storage ? 'יש' : 'אין'}`);
-  lines.push(`❄️ מזגנים: ${prop.ac ? 'יש' : 'אין'}`);
-  if (prop.assetClass === 'RESIDENTIAL') {
-    lines.push(`🛡️ ממ״ד: ${prop.safeRoom ? 'יש' : 'אין'}`);
-  }
-  lines.push(`🛗 מעלית: ${prop.elevator ? 'יש' : 'אין'}`);
-  if (prop.airDirections) lines.push(`🧭 כיווני אוויר: ${prop.airDirections}`);
-  lines.push(`🛠️ מצב: ${prop.renovated || '—'}`);
-  if (prop.vacancyDate) lines.push(`📅 פינוי: ${prop.vacancyDate}`);
-  if (prop.notes) { lines.push(''); lines.push(prop.notes); }
-  lines.push('');
-  lines.push(`📷 פרטי הנכס:`);
-  // Same precedence as the customerLink builder in the component:
-  // server-resolved publicPath (always pretty) → inline agent.slug +
-  // prop.slug → bare /p/:id fallback.
-  const pUrl = opts.publicSlugPath
-    ? `${window.location.origin}${opts.publicSlugPath}`
-    : prop.slug && agent?.slug
-    ? `${window.location.origin}/agents/${encodeURI(agent.slug)}/${encodeURI(prop.slug)}`
-    : `${window.location.origin}/p/${prop.id}`;
-  lines.push(pUrl);
-  if (agent?.displayName) {
-    lines.push('');
-    lines.push('—');
-    lines.push(`👤 ${agent.displayName}`);
-    if (agent.agency) lines.push(`🏢 ${agent.agency}`);
-    if (agent.phone) lines.push(`📞 ${agent.phone}`);
-    if (agent.bio) { lines.push(''); lines.push(agent.bio); }
-  }
-  return lines.join('\n');
-}
-
 export default function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -247,10 +196,8 @@ export default function PropertyDetail() {
   const [managingPhotos, setManagingPhotos] = useState(false);
   const [managingVideos, setManagingVideos] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
-  const [waShare, setWaShare] = useState(null);
   // Sprint 7 — universal Share dialog (property channel picker).
   const [shareOpen, setShareOpen] = useState(false);
-  const [templates, setTemplates] = useState(null);
   const [leads, setLeads] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerLeadsOverride, setPickerLeadsOverride] = useState(null);
@@ -281,11 +228,6 @@ export default function PropertyDetail() {
   // decline in Owner tab, etc.) so the מתעניינים tab's panel re-fetches
   // its interests + stats too.
   const [refreshNonce, setRefreshNonce] = useState(0);
-  // Landing-link copy feedback. Declared up here with the rest of the
-  // top-level hooks — putting it below the `if (loading) return …`
-  // guard triggers "Rendered more hooks than during the previous
-  // render" on the loading → loaded transition.
-  const [landingCopied, setLandingCopied] = useState(false);
   // Active sliding panel: 'owner' | 'photos' | 'exclusivity' | 'notes' | 'map' | null
   const [panel, setPanel] = useState(() => {
     try {
@@ -321,7 +263,6 @@ export default function PropertyDetail() {
   const [publicSlugPath, setPublicSlugPath] = useState(null);
 
   useEffect(() => {
-    api.listTemplates().then((r) => setTemplates(r.templates || [])).catch(() => {});
     api.listLeads().then((r) => setLeads(r.items || r.leads || [])).catch(() => {});
   }, []);
 
@@ -546,106 +487,13 @@ export default function PropertyDetail() {
     ? `${window.location.origin}/agents/${encodeURI(user.slug)}/${encodeURI(property.slug)}`
     : `${window.location.origin}/p/${property.id}`;
 
-  // Per-asset landing page URL. Same slug pair, different frontend
-  // route — serves a photo-first "brochure" (no price / details) that
-  // drives inquiries through the public form. Falls back to the
-  // internal id if slugs haven't been minted yet.
-  const landingLink = property.slug && user?.slug
-    ? `${window.location.origin}/l/${encodeURI(user.slug)}/${encodeURI(property.slug)}`
-    : null;
-  const copyLandingLink = async () => {
-    let url = landingLink;
-    if (!url) {
-      // No slugs yet — hit the lookup endpoint to mint + return them.
-      try {
-        const res = await api.lookupPropertySlug(property.id);
-        if (res?.agentSlug && res?.propertySlug) {
-          url = `${window.location.origin}/l/${encodeURI(res.agentSlug)}/${encodeURI(res.propertySlug)}`;
-        }
-      } catch { /* fall through */ }
-    }
-    if (!url) {
-      toast?.error?.('לא ניתן להפיק קישור כרגע');
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setLandingCopied(true);
-      toast?.success?.('קישור דף הנחיתה הועתק');
-      setTimeout(() => setLandingCopied(false), 1800);
-    } catch {
-      // Legacy execCommand fallback — covers contexts where the async
-      // Clipboard API is unavailable. window.prompt would also work
-      // but doesn't render in iOS WKWebView, leaving the user stuck.
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = url;
-        ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        const ok = document.execCommand('copy');
-        document.body.removeChild(ta);
-        if (ok) {
-          setLandingCopied(true);
-          toast?.success?.('קישור דף הנחיתה הועתק');
-          setTimeout(() => setLandingCopied(false), 1800);
-        } else {
-          toast?.error?.('ההעתקה נכשלה — נסה שוב');
-        }
-      } catch {
-        toast?.error?.('ההעתקה נכשלה — נסה שוב');
-      }
-    }
-  };
-
-  const buildMessage = () => {
-    const kind = tplPickKind(property, 'client');
-    const tpl = templates?.find((t) => t.kind === kind);
-    if (tpl?.body) {
-      const vars = tplBuildVars(property, user, { stripAgent: false });
-      return tplRender(tpl.body, vars);
-    }
-    return buildFullWhatsAppMessage(
-      property,
-      {
-        displayName: user?.displayName,
-        agency: user?.agentProfile?.agency,
-        phone: user?.phone,
-        bio: user?.agentProfile?.bio,
-        slug: user?.slug,
-      },
-      { publicSlugPath },
-    );
-  };
-
-  const handleWhatsApp = () => {
-    const matches = (leads || []).filter((l) => leadMatchesProperty(l, property));
-    if (matches.length === 1) {
-      const lead = matches[0];
-      // 2.1 — route through openWhatsApp so the named-target reuse
-      // logic kicks in (WA-web tab is reused instead of spawning a
-      // fresh one each click).
-      openWhatsApp({ phone: lead.phone, text: buildMessage() });
-      return;
-    }
-    if (matches.length >= 2 && matches.length <= 5) {
-      setPickerLeadsOverride(matches);
-      setPickerOpen(true);
-      return;
-    }
-    setPickerLeadsOverride(null);
-    setPickerOpen(true);
-  };
-
   const handlePickLead = async (lead, editedText, opts) => {
     setPickerOpen(false);
     setPickerLeadsOverride(null);
-    const text = editedText || buildMessage();
+    const text = editedText || '';
     track('property_shared', {
       property_id: property.id,
-      mode: opts?.withPhotos ? 'share_with_photos' : (lead ? 'direct_wa' : 'open_wa'),
+      mode: opts?.withPhotos ? 'share_with_photos' : 'open_share',
       has_recipient: !!lead,
     });
     if (opts?.withPhotos) {
@@ -655,9 +503,7 @@ export default function PropertyDetail() {
         title: `${property.street}, ${property.city}`,
         url: customerLink,
       });
-      return;
     }
-    await openWhatsApp({ phone: lead?.phone, text });
   };
 
   // Sprint 7 — the Share button now opens the universal ShareDialog
@@ -775,14 +621,11 @@ export default function PropertyDetail() {
   })();
 
   // ── KPI data (1.4) ──
-  // "Visits" here means real page-views of the public property URL
-  // (PropertyViewing rows) + prospects who filled the intake form;
-  // "Inquiries" means inbound contact attempts (PropertyInquiry rows).
-  // Both are exposed via backend's _count.
+  // "Visits" here means PropertyViewing rows + prospects who filled the
+  // intake form; both are exposed via backend's _count.
   const visitsCount    = Number(property._count?.viewings ?? property._count?.visits ?? property.visitsCount ?? 0);
   const prospectsCount = Number(property._count?.prospects ?? 0);
   const pageViews      = visitsCount + prospectsCount;
-  const inquiriesCount = Number(property._count?.inquiries ?? property.inquiriesCount ?? 0);
 
   // ── Notes summary chips: build a compact list of features ──
   const featureChips = [];
@@ -968,10 +811,6 @@ export default function PropertyDetail() {
                   <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); handleDuplicate(); }} disabled={duplicating}>
                     <Copy size={14} /> {duplicating ? 'משכפל…' : 'שכפל נכס'}
                   </button>
-                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); copyLandingLink(); }}>
-                    {landingCopied ? <Check size={14} /> : <Sparkles size={14} />}
-                    {landingCopied ? 'הקישור הועתק' : 'דף נחיתה ללקוחות'}
-                  </button>
                   <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); setProspectOpen(true); }}>
                     <UserPlus size={14} /> צור הסכם תיווך
                   </button>
@@ -1027,7 +866,7 @@ export default function PropertyDetail() {
           </div>
           <div className="prd-kpi-value">{pageViews}</div>
           <div className={`prd-kpi-sub ${pageViews > 0 ? 'prd-tone-info' : 'prd-tone-muted'}`}>
-            {inquiriesCount > 0 ? `${inquiriesCount} פניות` : 'כניסות לעמוד'}
+            כניסות לעמוד
           </div>
         </div>
         <div className="prd-kpi">
@@ -1102,62 +941,6 @@ export default function PropertyDetail() {
             <span className="prd-quick-body">
               <span className="prd-quick-label">{ownerPhone ? 'התקשר לבעלים' : 'הוסף בעל נכס'}</span>
               <span className="prd-quick-sub">{ownerName || 'עדיין לא מקושר'}</span>
-            </span>
-          </button>
-
-          {/* WhatsApp to buyers */}
-          <button
-            type="button"
-            className="prd-quick prd-quick-wa"
-            onClick={handleWhatsApp}
-          >
-            <span className="prd-quick-ico"><WhatsAppIcon size={15} /></span>
-            <span className="prd-quick-body">
-              <span className="prd-quick-label">WhatsApp לקונים</span>
-              <span className="prd-quick-sub">
-                {(() => {
-                  const matches = (leads || []).filter((l) => leadMatchesProperty(l, property));
-                  return `${matches.length} מתעניינים תואמים`;
-                })()}
-              </span>
-            </span>
-          </button>
-
-          {/* Edit landing page — premium-gated. Non-premium agents
-              get the standard PremiumGateDialog via the global event
-              listener in App.jsx; premium agents land on the editor. */}
-          <button
-            type="button"
-            className="prd-quick"
-            onClick={() => {
-              if (user?.isPremium) {
-                navigate(`/properties/${property.id}/landing-editor`);
-              } else {
-                try {
-                  window.dispatchEvent(new CustomEvent('estia:premium-gate', {
-                    detail: { feature: 'עריכת דף נחיתה' },
-                  }));
-                } catch { /* non-browser env */ }
-              }
-            }}
-          >
-            <span className="prd-quick-ico"><Palette size={15} /></span>
-            <span className="prd-quick-body">
-              <span className="prd-quick-label">ערוך דף נחיתה</span>
-              <span className="prd-quick-sub">
-                {user?.isPremium ? 'עיצוב מותאם לנכס' : 'דורש פרימיום'}
-              </span>
-            </span>
-          </button>
-
-          {/* Share landing page */}
-          <button type="button" className="prd-quick" onClick={copyLandingLink}>
-            <span className="prd-quick-ico">{landingCopied ? <Check size={15} /> : <Share2 size={15} />}</span>
-            <span className="prd-quick-body">
-              <span className="prd-quick-label">{landingCopied ? 'הקישור הועתק' : 'שתף דף נחיתה'}</span>
-              <span className="prd-quick-sub" dir="ltr">
-                {landingLink ? landingLink.replace(/^https?:\/\//, '') : 'estia.app/l/...'}
-              </span>
             </span>
           </button>
 
@@ -1448,19 +1231,6 @@ export default function PropertyDetail() {
                         </span>
                       </a>
                     )}
-                    {ownerPhone && (
-                      <button
-                        type="button"
-                        className="prd-quick prd-quick-wa"
-                        onClick={() => openWhatsApp({ phone: ownerPhone, text: `שלום ${ownerName}` })}
-                      >
-                        <span className="prd-quick-ico"><WhatsAppIcon size={15} /></span>
-                        <span className="prd-quick-body">
-                          <span className="prd-quick-label">WhatsApp</span>
-                          <span className="prd-quick-sub">עדכון שיווק</span>
-                        </span>
-                      </button>
-                    )}
                     {ownerEmail && (
                       <a href={`mailto:${ownerEmail}`} className="prd-quick">
                         <span className="prd-quick-ico"><FileText size={15} /></span>
@@ -1597,18 +1367,9 @@ export default function PropertyDetail() {
               </div>
               <div className="pd-panel-actions">
                 {ownerPhone && (
-                  <>
-                    <a href={telUrl(ownerPhone)} className="btn btn-secondary">
-                      <Phone size={14} />התקשר
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => openWhatsApp({ phone: ownerPhone, text: `שלום ${ownerName}` })}
-                      className="btn btn-whatsapp"
-                    >
-                      <WhatsAppIcon size={14} />וואטסאפ
-                    </button>
-                  </>
+                  <a href={telUrl(ownerPhone)} className="btn btn-secondary">
+                    <Phone size={14} />התקשר
+                  </a>
                 )}
                 {linkedOwner?.id && (
                   <Link to={`/owners/${linkedOwner.id}`} className="btn btn-secondary">
@@ -1928,19 +1689,10 @@ export default function PropertyDetail() {
         />
       )}
 
-      {waShare && (
-        <WhatsAppSheet
-          title={waShare.title || `שליחת ${property.street}, ${property.city}`}
-          subtitle="ערוך את ההודעה — לחיצה על 'פתח בוואטסאפ' תעביר לבחירת נמען"
-          message={waShare.text}
-          onClose={() => setWaShare(null)}
-        />
-      )}
-
       {shareOpen && (
         <ShareDialog
           kind="property"
-          entity={{ property, agent: user, templates }}
+          entity={{ property, agent: user }}
           onClose={() => setShareOpen(false)}
         />
       )}
@@ -1972,7 +1724,6 @@ export default function PropertyDetail() {
         <LeadPickerSheet
           property={property}
           leads={pickerLeadsOverride || leads}
-          previewText={buildMessage()}
           onPick={handlePickLead}
           onClose={() => { setPickerOpen(false); setPickerLeadsOverride(null); }}
         />
@@ -2032,15 +1783,6 @@ export default function PropertyDetail() {
           <Phone size={18} />
           <span>התקשר</span>
         </a>
-        <button
-          type="button"
-          className="btn btn-whatsapp"
-          onClick={handleWhatsApp}
-          aria-label={`WhatsApp ${property.street}`}
-        >
-          <WhatsAppIcon size={18} />
-          <span>שלח בוואטסאפ</span>
-        </button>
         <button
           type="button"
           className="btn btn-secondary"

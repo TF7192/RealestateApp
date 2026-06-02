@@ -49,20 +49,17 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       include: {
         viewings: true,
-        inquiries: true,
       },
     });
     if (!property || property.agentId !== requireUser(req).id) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const inquiries = property.inquiries.filter((i) => i.createdAt >= weekAgo).length;
     const viewings = property.viewings.filter((v) => v.viewedAt >= weekAgo).length;
     return {
       stats: {
-        inquiries,
         viewings,
-        views: inquiries + viewings * 3 + 4,
+        views: viewings * 3 + 4,
         offers: property.offer ? 1 : 0,
       },
     };

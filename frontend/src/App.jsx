@@ -30,11 +30,6 @@ const OwnerDetail = lazy(() => import('./pages/OwnerDetail'));
 const Deals = lazy(() => import('./pages/Deals'));
 const DealDetail = lazy(() => import('./pages/DealDetail'));
 const AgentPortal = lazy(() => import('./pages/AgentPortal'));
-const PropertyLandingPage = lazy(() => import('./pages/PropertyLandingPage'));
-// Premium agents author the per-property landing page here. Lazy
-// so the editor's section forms + drag-reorder UI don't weigh down
-// any other surface.
-const LandingEditor = lazy(() => import('./pages/LandingEditor'));
 const CustomerPropertyView = lazy(() => import('./pages/CustomerPropertyView'));
 const ProspectSign = lazy(() => import('./pages/ProspectSign'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -55,10 +50,9 @@ import PremiumGateDialog from './components/PremiumGateDialog';
 // can show on any page (landing, login, app). Until the user accepts,
 // initAnalytics() short-circuits and PostHog never loads.
 import CookieBanner from './components/CookieBanner';
-// S13: Templates, AdminChats, CommandPalette are heavy and not on the
+// S13: AdminChats, CommandPalette are heavy and not on the
 // critical path for the first page paint. Lazy-load them so the main
 // bundle drops ~90KB and cold-start on cellular gets noticeably faster.
-const Templates = lazy(() => import('./pages/Templates'));
 // Market Discovery (2026-04-27) — hourly Yad2 metadata watcher feed.
 const MarketDiscovery = lazy(() => import('./pages/MarketDiscovery'));
 // Phase 4 — admin observability for the Market Discovery watcher.
@@ -297,12 +291,6 @@ function AppRoutes() {
           {/* SEO-friendly public routes */}
           <Route path="/agents/:agentSlug" element={<AgentPortal />} />
           <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
-          {/* Per-asset premium landing page — the shareable, minimal
-              marketing-brochure surface (hero + photos + contact form).
-              /agents/:slug/:slug is the full catalog listing with
-              address / price / details; this is the curated variant
-              the agent shares to drive inquiries. */}
-          <Route path="/l/:agentSlug/:propertySlug" element={<PropertyLandingPage />} />
           {/* Public prospect sign page (1.5) — no login required. */}
           <Route path="/public/p/:token" element={<ProspectSign />} />
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
@@ -342,7 +330,7 @@ function AppRoutes() {
     <>
       <OfflineBanner />
       {/* F-26 — Suspense fallback is now a tiny page-aware skeleton
-          instead of a silent blank. Kicks in while Templates / AdminChats /
+          instead of a silent blank. Kicks in while AdminChats /
           SellerCalculator / Yad2Import lazy chunks load on first visit. */}
       <Suspense fallback={(
         <div className="app-loading app-loading-skel" aria-hidden>
@@ -370,7 +358,6 @@ function AppRoutes() {
             <Route path="/properties" element={<Properties />} />
             <Route path="/properties/new" element={<NewProperty />} />
             <Route path="/properties/:id/edit" element={<NewProperty />} />
-            <Route path="/properties/:id/landing-editor" element={<LandingEditor />} />
             <Route path="/properties/:id" element={<PropertyDetail />} />
             <Route path="/owners" element={<Owners />} />
             <Route path="/owners/:id" element={<OwnerDetail />} />
@@ -386,7 +373,6 @@ function AppRoutes() {
                 get bounced back to the dashboard; the active guard
                 above catches the "not onboarded yet" case. */}
             <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/templates" element={<Templates />} />
             {/* Market Discovery — hourly Yad2 watcher feed. */}
             <Route path="/market-discovery" element={<MarketDiscovery />} />
             <Route path="/admin/market-watcher" element={<AdminMarketWatcher />} />
@@ -469,7 +455,6 @@ function AppRoutes() {
           {/* SEO-friendly public routes */}
           <Route path="/agents/:agentSlug" element={<AgentPortal />} />
           <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
-          <Route path="/l/:agentSlug/:propertySlug" element={<PropertyLandingPage />} />
           {/* Public prospect-sign page — also mounted here so an agent
               who clicks the generated "צור קישור" URL while signed in
               reaches the kiosk page instead of a 404. ProspectSign is
