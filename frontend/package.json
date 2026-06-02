@@ -37,7 +37,7 @@
     "react-joyride": "^3.0.2",
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.14.1",
-    "recharts": "^3.8.1"
+    "recharts": "^2.15.4"
   },
   "browserslist": [
     "last 2 Chrome versions",

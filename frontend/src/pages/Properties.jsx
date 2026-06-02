@@ -1197,22 +1197,8 @@ export default function Properties() {
               sortValue: (p) => p.owner || '',
               render: (p) => <span className="cell-muted">{p.owner || '—'}</span>,
             },
-            {
-              key: 'progress', header: 'שיווק',
-              render: (p) => {
-                const done = Object.values(p.marketingActions || {}).filter(Boolean).length;
-                const total = Object.values(p.marketingActions || {}).length || 22;
-                const pct = Math.round((done / total) * 100);
-                return (
-                  <span className="cell-progress">
-                    <span className="cell-progress-bar">
-                      <span className="cell-progress-fill" style={{ width: `${pct}%` }} />
-                    </span>
-                    <span className="cell-progress-label">{pct}%</span>
-                  </span>
-                );
-              },
-            },
+            // "שיווק" progress column removed 2026-06-02 with the
+            // ניהול שיווקי cull — MarketingAction is gone from the API.
           ]}
         />
       ) : (
@@ -1222,10 +1208,6 @@ export default function Properties() {
             // Lighthouse flagged it as lazy + no fetchpriority; eager-load
             // the first one and let the rest stay lazy as before.
             const isLcpCandidate = i === 0;
-            const actions = prop.marketingActions || {};
-            const done = Object.values(actions).filter(Boolean).length;
-            const total = Object.values(actions).length || 22;
-            const pct = Math.round((done / total) * 100);
             const delayClass = `animate-in-delay-${Math.min(i + 1, 5)}`;
             // PERF-005 — card view uses ~360 px wide images; the 768 px
             // `imageThumbs[0]`/`imageList[0].urlCard` is plenty. We
@@ -1648,12 +1630,6 @@ export default function Properties() {
                       <div className="property-owner">
                         <div className="owner-avatar">{prop.owner?.charAt(0)}</div>
                         <span>{prop.owner}</span>
-                      </div>
-                      <div className="marketing-mini-progress">
-                        <div className="progress-bar small">
-                          <div className="progress-fill" style={{ width: `${pct}%` }} />
-                        </div>
-                        <span>{pct}%</span>
                       </div>
                     </div>
                   </div>
