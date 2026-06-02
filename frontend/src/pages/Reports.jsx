@@ -2,7 +2,7 @@
 // styles, Hebrew-first RTL, matching the "Estia Refined Pages"
 // bundle (2026-04-24). Same owner-scoped endpoints as before
 // (E1 /reports/new-properties, /reports/new-customers,
-// /reports/deals, /reports/viewings, /reports/marketing-actions,
+// /reports/deals, /reports/viewings,
 // B5 /reports/export/*.csv) — re-laid-out as a hero summary,
 // KPI chip row, deals-by-status progress strip, and a polished
 // export card with planned (disabled) buttons tooltipped.
@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   BarChart3, Building2, Users, Handshake, CalendarDays,
-  Megaphone, Download, FileSpreadsheet, TrendingUp, Banknote,
+  Download, FileSpreadsheet, TrendingUp, Banknote,
   Sparkles,
 } from 'lucide-react';
 import api from '../lib/api';
@@ -45,7 +45,6 @@ const CSV_KINDS = [
 // buttons with a tooltip rather than ship dead links.
 const PLANNED_CSV_KINDS = [
   { kind: 'viewings',          label: 'צפיות',          Icon: CalendarDays },
-  { kind: 'marketing-actions', label: 'פעולות שיווק',   Icon: Megaphone },
 ];
 const PLANNED_CSV_TOOLTIP = 'ייצוא CSV בפיתוח — נוסף בקרוב';
 
@@ -93,7 +92,6 @@ export default function Reports() {
     newCustomers:      { count: 0 },
     deals:             { count: 0, totalCommission: 0, byStatus: {} },
     viewings:          { count: 0 },
-    marketingActions:  { count: 0 },
   });
 
   const params = useMemo(() => {
@@ -108,14 +106,13 @@ export default function Reports() {
     (async () => {
       setLoading(true);
       try {
-        const [nProps, nCust, deals, views, mkt] = await Promise.all([
+        const [nProps, nCust, deals, views] = await Promise.all([
           api.reportNewProperties(params).catch(() => ({ count: 0 })),
           api.reportNewCustomers(params).catch(() => ({ count: 0 })),
           api.reportDeals(params).catch(() => ({
             count: 0, totalCommission: 0, byStatus: {},
           })),
           api.reportViewings(params).catch(() => ({ count: 0 })),
-          api.reportMarketingActions(params).catch(() => ({ count: 0 })),
         ]);
         if (cancelled) return;
         setData({
@@ -123,7 +120,6 @@ export default function Reports() {
           newCustomers:     nCust,
           deals,
           viewings:         views,
-          marketingActions: mkt,
         });
       } catch {
         if (!cancelled) toast.error('שגיאה בטעינת הדוחות');
@@ -166,12 +162,6 @@ export default function Reports() {
       count: data.viewings?.count || 0,
       Icon: CalendarDays,
       sub: 'מפגשים שנרשמו',
-    },
-    {
-      key: 'marketing',  label: 'פעולות שיווק',
-      count: data.marketingActions?.count || 0,
-      Icon: Megaphone,
-      sub: 'הושלמו בטווח',
     },
   ];
 

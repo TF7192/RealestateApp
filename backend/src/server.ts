@@ -30,7 +30,6 @@ import { registerImportRoutes } from './routes/import.js';
 import { registerMarketRoutes } from './routes/market.js';
 import { registerMarketDiscoveryRoutes } from './routes/marketDiscovery.js';
 import { registerNotificationPreferencesRoutes } from './routes/notificationPreferences.js';
-import { registerMarketingRoutes } from './routes/marketing.js';
 import { registerSitemapRoute } from './routes/sitemap.js';
 import { registerProspectRoutes } from './routes/prospects.js';
 import { registerProspectPdfRoutes } from './routes/prospect-pdf.js';
@@ -42,7 +41,6 @@ import { registerAgentRoutes } from './routes/agents.js';
 import { registerTemplateRoutes } from './routes/templates.js';
 import { registerGeoRoutes } from './routes/geo.js';
 import { registerPublicRoutes } from './routes/public.js';
-import { registerMarketingTrackRoutes } from './routes/marketingTrack.js';
 import { registerOwnerRoutes, registerOwnerPhoneRoutes } from './routes/owners.js';
 import { registerOfficeRoutes } from './routes/office.js';
 import { registerTeamRoutes } from './routes/team.js';
@@ -315,10 +313,6 @@ export async function build(opts: BuildOptions = {}) {
   await app.register(registerTemplateRoutes, { prefix: '/api/templates' });
   await app.register(registerGeoRoutes, { prefix: '/api/geo' });
   await app.register(registerPublicRoutes, { prefix: '/api/public' });
-  // Sprint 9 / marketing (lane A) — public page-view tracker. Shares
-  // the /api/public prefix so it sits alongside the existing inquiry
-  // + landing-page routes; no auth, rate-limited by the global plugin.
-  await app.register(registerMarketingTrackRoutes, { prefix: '/api/public' });
   await app.register(registerOwnerRoutes, { prefix: '/api/owners' });
   await app.register(registerOwnerPhoneRoutes, { prefix: '/api' });
   await app.register(registerChatRoutes, { prefix: '/api/chat' });
@@ -332,10 +326,6 @@ export async function build(opts: BuildOptions = {}) {
   // Phase 3 — per-user opt-in notification preferences (in-app /
   // email / SMS toggles + min-score-for-external-delivery threshold).
   await app.register(registerNotificationPreferencesRoutes, { prefix: '/api/notification-preferences' });
-  // Sprint 9 / marketing (lane B) — aggregation + inquiry→lead promotion
-  // for the agent-facing "ניהול שיווקי" dashboard. Distinct prefix from
-  // /api/market (nadlan market-context).
-  await app.register(registerMarketingRoutes, { prefix: '/api/marketing' });
   await app.register(registerProspectRoutes, { prefix: '/api' });
   // P-3 — prospect agreement PDF + lead-link endpoints. Same /api prefix
   // so the routes sit next to /api/prospects/* from registerProspectRoutes.

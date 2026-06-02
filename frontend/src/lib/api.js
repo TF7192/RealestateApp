@@ -406,8 +406,6 @@ export const api = {
     fd.append('audio', audioFile, audioFile?.name || 'meeting.webm');
     return request(`/meetings/${meetingId}/summarize`, { method: 'POST', body: fd });
   },
-  toggleMarketingAction: (id, body) =>
-    request(`/properties/${id}/marketing-actions`, { method: 'PUT', body }),
   uploadPropertyImage: (id, file) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -881,7 +879,6 @@ export const api = {
   reportNewCustomers:    (params = {}) => request(`/reports/new-customers${qsFrom(params)}`),
   reportDeals:           (params = {}) => request(`/reports/deals${qsFrom(params)}`),
   reportViewings:        (params = {}) => request(`/reports/viewings${qsFrom(params)}`),
-  reportMarketingActions: (params = {}) => request(`/reports/marketing-actions${qsFrom(params)}`),
   // B5 — CSV export URLs. Browser downloads need a plain URL (no fetch),
   // so this returns the string and the caller sets window.location or an
   // <a href>. `kind` is one of 'properties' | 'leads' | 'deals'.
@@ -1185,22 +1182,6 @@ export const api = {
   addFavorite:         (body) => request('/favorites', { method: 'POST', body }),
   removeFavorite:      (entityType, entityId) =>
     request(`/favorites/${entityType}/${entityId}`, { method: 'DELETE' }),
-
-  // Sprint 9 — Marketing hub (/marketing). Lane C owns the frontend; the
-  // backend endpoints are built in parallel by the other lanes. The
-  // overview aggregates views / inquiries / agreements into KPIs, a
-  // top-performer list, and a per-property row set with a 14-day
-  // viewsTrend array that the UI renders as an inline SVG sparkline.
-  marketingOverview:       () => request('/marketing/overview'),
-  listMarketingInquiries:  () => request('/marketing/inquiries'),
-  promoteMarketingInquiry: (id) => request(`/marketing/inquiries/${id}/promote`, { method: 'POST' }),
-  // Public landing-page view tracker — fire-and-forget POST called once
-  // per tab-session by PropertyLandingPage. Body is an empty object so
-  // Content-Length stays >0 (some CDNs mis-handle empty POST bodies).
-  trackPublicPropertyView: (agentSlug, propertySlug) => request(
-    `/public/agents/${encodeURIComponent(agentSlug)}/properties/${encodeURIComponent(propertySlug)}/view`,
-    { method: 'POST', body: {} },
-  ),
 
   // Market Discovery (Phases 1–4, 2026-04-27) — hourly Yad2 metadata
   // watcher feed + lead-listing matches + opt-in notification

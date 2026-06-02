@@ -46,15 +46,6 @@ import { normalizeAddress, normalizeCity } from '../lib/addressNormalize.js';
 import { buildAnthropic } from '../lib/anthropic.js';
 import { recordAnthropic } from '../lib/aiUsage.js';
 
-// Canonical action keys for newly-created properties. `externalCoop` is
-// kept in existing rows but new keys use the renamed `brokerCoop`.
-const DEFAULT_ACTION_KEYS = [
-  'tabuExtract', 'photography', 'buildingPhoto', 'dronePhoto', 'virtualTour',
-  'sign', 'iList', 'yad2', 'facebook', 'marketplace', 'onMap', 'madlan',
-  'whatsappGroup', 'officeWhatsapp', 'brokerCoop', 'video', 'neighborLetters',
-  'coupons', 'flyers', 'newspaper', 'agentTour', 'openHouse',
-];
-
 const listQuery = z.object({
   assetClass: z.enum(['RESIDENTIAL', 'COMMERCIAL']).optional(),
   category: z.enum(['SALE', 'RENT']).optional(),
@@ -329,9 +320,6 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
           orderBy: { sortOrder: 'asc' },
           take: 1,
         },
-        marketingActions: {
-          select: { actionKey: true, done: true },
-        },
       },
       // Priority floats to the top so an agent can surface the
        // listings they are actively pushing; createdAt is the secondary
@@ -343,12 +331,8 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     const hasMore = items.length > take;
     const page = hasMore ? items.slice(0, take) : items;
     const nextCursor = hasMore ? page[page.length - 1].id : null;
-    // List view uses only `marketingActions` (bool map) — the heavier
-    // `marketingActionsDetail` block (done/notes/link/doneAt per action)
-    // is ~1.4 KB per property and only consumed by PropertyDetail,
-    // which has its own endpoint. Pass `{ compact: true }` to drop it.
     return {
-      items: page.map((p) => serialize(p, { compact: true })),
+      items: page.map((p) => serialize(p)),
       nextCursor,
     };
   });
@@ -359,7 +343,6 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       include: {
         images: { orderBy: { sortOrder: 'asc' } },
-        marketingActions: true,
         videos: { orderBy: { sortOrder: 'asc' } },
         propertyOwner: true,
         // 1.4 — surface real counts so the UI can render the combined
@@ -441,14 +424,11 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         // could diverge on future bulk imports.
         marketingStartDate: data.marketingStartDate ?? new Date(),
         ...data,
-        marketingActions: {
-          create: DEFAULT_ACTION_KEYS.map((key) => ({ actionKey: key })),
-        },
         images: body.images
           ? { create: body.images.map((url, i) => ({ url, sortOrder: i })) }
           : undefined,
       },
-      include: { images: true, marketingActions: true, propertyOwner: true },
+      include: { images: true, propertyOwner: true },
     });
     phTrack('property_created', agentId, {
       property_id: created.id,
@@ -500,7 +480,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         ...normalize(body),
         ...ownerRel,
       },
-      include: { images: true, marketingActions: true, propertyOwner: true },
+      include: { images: true, propertyOwner: true },
     });
     await logActivity({
       agentId: existing.agentId, actorId: requireUser(req).id,
@@ -569,17 +549,13 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
         // Mark the copy so agents eyeballing the list see it instantly.
         notes: payload.notes ? `${payload.notes}\n\n(עותק)` : '(עותק)',
         marketingStartDate: new Date(),
-        // Re-seed the marketing checklist — every new listing gets its own.
-        marketingActions: {
-          create: DEFAULT_ACTION_KEYS.map((key) => ({ actionKey: key })),
-        },
         // Photos — copy the URLs only (point at the same S3 objects); the
         // agent can delete them or re-upload per listing if needed.
         images: sourceImages?.length
           ? { create: sourceImages.map((img: any, i: number) => ({ url: img.url, sortOrder: i })) }
           : undefined,
       },
-      include: { images: true, marketingActions: true, propertyOwner: true },
+      include: { images: true, propertyOwner: true },
     });
     return { property: serialize(created) };
   });
@@ -654,7 +630,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     const updated = await prisma.property.update({
       where: { id },
       data: normalize(validated),
-      include: { images: true, marketingActions: true, propertyOwner: true },
+      include: { images: true, propertyOwner: true },
     });
     await logActivity({
       agentId, actorId: agentId,
@@ -1243,41 +1219,6 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     return { items: scored };
   });
 
-  // Toggle / set a marketing action
-  const actionInput = z.object({
-    actionKey: z.string().min(1).max(60),
-    done: z.boolean(),
-    notes: z.string().max(500).nullable().optional(),
-    link: z.string().max(500).nullable().optional(),
-  });
-
-  app.put('/:id/marketing-actions', { onRequest: [app.requireAgent] }, async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const body = actionInput.parse(req.body);
-    const property = await prisma.property.findUnique({ where: { id } });
-    if (!canActOnProperty(req, property)) {
-      return reply.code(404).send({ error: { message: 'Not found' } });
-    }
-    const action = await prisma.marketingAction.upsert({
-      where: { propertyId_actionKey: { propertyId: id, actionKey: body.actionKey } },
-      create: {
-        propertyId: id,
-        actionKey: body.actionKey,
-        done: body.done,
-        doneAt: body.done ? new Date() : null,
-        notes: body.notes ?? undefined,
-        link: body.link ?? undefined,
-      },
-      update: {
-        done: body.done,
-        doneAt: body.done ? new Date() : null,
-        notes: body.notes ?? undefined,
-        link: body.link ?? undefined,
-      },
-    });
-    return { action };
-  });
-
   // Delete a property image
   app.delete('/:id/images/:imageId', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id, imageId } = req.params as { id: string; imageId: string };
@@ -1643,24 +1584,7 @@ function normalize(body: Partial<z.infer<typeof propertyInput>>) {
   return data;
 }
 
-function serialize(prop: any, opts: { compact?: boolean } = {}) {
-  const actionsMap: Record<string, boolean> = {};
-  const actionsDetail: Record<string, any> | null = opts.compact ? null : {};
-  for (const key of DEFAULT_ACTION_KEYS) {
-    actionsMap[key] = false;
-    if (actionsDetail) actionsDetail[key] = { done: false, notes: null, link: null, doneAt: null };
-  }
-  for (const a of prop.marketingActions || []) {
-    actionsMap[a.actionKey] = a.done;
-    if (actionsDetail) {
-      actionsDetail[a.actionKey] = {
-        done: a.done,
-        notes: a.notes,
-        link: a.link,
-        doneAt: a.doneAt,
-      };
-    }
-  }
+function serialize(prop: any) {
   const out: any = {
     ...prop,
     // Back-compat: `images` is the list of full-size URLs (what most
@@ -1680,8 +1604,6 @@ function serialize(prop: any, opts: { compact?: boolean } = {}) {
       sortOrder: i.sortOrder,
     })),
     videos: prop.videos || [],
-    marketingActions: actionsMap,
   };
-  if (actionsDetail) out.marketingActionsDetail = actionsDetail;
   return out;
 }

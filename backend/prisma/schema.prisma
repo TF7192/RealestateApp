@@ -820,7 +820,6 @@ model Property {
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   images           PropertyImage[]
-  marketingActions MarketingAction[]
   viewings         PropertyViewing[]
   inquiries        PropertyInquiry[]
   videos           PropertyVideo[]
@@ -1045,20 +1044,6 @@ model PropertyVideo {
   sortOrder  Int      @default(0)
   createdAt  DateTime @default(now()) @db.Timestamptz(6)
 
-  @@index([propertyId])
-}
-
-model MarketingAction {
-  id         String    @id @default(cuid())
-  propertyId String
-  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  actionKey  String // e.g. "tabuExtract", "photography"…
-  done       Boolean   @default(false)
-  doneAt     DateTime? @db.Timestamptz(6)
-  notes      String?
-  link       String? // Listing URL (yad2/madlan/facebook) or any reference URL
-
-  @@unique([propertyId, actionKey])
   @@index([propertyId])
 }
 
@@ -1840,9 +1825,8 @@ model Favorite {
 }
 
 // Sprint 6 / MLS parity — Task F1. Per-channel marketing advert
-// ("פרסום") for a property. MarketingAction tracks which channels
-// have been touched; Advert tracks what copy was pushed to each
-// channel (Yad2/Facebook/Onmap…) so agents can tweak titles and
+// ("פרסום") for a property. Advert tracks what copy was pushed to
+// each channel (Yad2/Facebook/Onmap…) so agents can tweak titles and
 // prices independently per outlet.
 enum AdvertChannel {
   YAD2

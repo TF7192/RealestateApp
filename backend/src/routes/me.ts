@@ -199,7 +199,7 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
         where: { id: uid },
         include: { agentProfile: true, customerProfile: true },
       }),
-      prisma.property.findMany({ where: { agentId: uid }, include: { images: true, videos: true, marketingActions: true, priceOffers: true } }),
+      prisma.property.findMany({ where: { agentId: uid }, include: { images: true, videos: true, priceOffers: true } }),
       prisma.lead.findMany({ where: { agentId: uid }, include: { searchProfiles: true, viewings: true } }),
       prisma.owner.findMany({ where: { agentId: uid } }),
       prisma.deal.findMany({ where: { agentId: uid } }),

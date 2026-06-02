@@ -454,9 +454,6 @@ export const defaultHandlers = [
   http.get('/api/reports/new-properties', () => HttpResponse.json({ items: [], count: 0 })),
   http.get('/api/reports/new-customers', () => HttpResponse.json({ items: [], count: 0 })),
   http.get('/api/reports/viewings', () => HttpResponse.json({ items: [], count: 0 })),
-  http.get('/api/reports/marketing-actions', () =>
-    HttpResponse.json({ items: [], count: 0 })
-  ),
   http.get('/api/reports/deals', () =>
     HttpResponse.json({ items: [], count: 0, totalCommission: 0, byStatus: {} })
   ),

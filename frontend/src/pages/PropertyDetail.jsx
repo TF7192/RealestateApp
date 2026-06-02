@@ -5,23 +5,19 @@ import {
   MapPin,
   Building2,
   Phone,
-  CheckCircle2,
   Check,
-  Circle,
   ExternalLink,
   X,
   Images,
   Film,
   Edit3,
   Trash2,
-  Link2,
   Navigation,
   Share2,
   Clock,
   User,
   FileText,
   ChevronLeft,
-  Megaphone,
   Sparkles,
   Palette,
   Pencil,
@@ -45,7 +41,6 @@ import { inputPropsForPrice } from '../lib/inputProps';
 import { displayPrice } from '../lib/display';
 import { PROPERTY_STAGE_LABELS } from '../lib/mlsLabels';
 import { useAuth } from '../lib/auth';
-import MarketingActionDialog from '../components/MarketingActionDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ProspectDialog from '../components/ProspectDialog';
 import PropertyPhotoManager from '../components/PropertyPhotoManager';
@@ -185,70 +180,6 @@ function statusChipMeta(status) {
   return { label: 'פעיל', bg: 'rgba(21,128,61,0.12)', fg: _DT.success };
 }
 
-const MARKETING_LABELS = {
-  tabuExtract: 'הפקת נסח טאבו',
-  photography: 'צילום הנכס',
-  buildingPhoto: 'צילום הבניין',
-  dronePhoto: 'צילום מקצועי רחפן',
-  virtualTour: 'סיור וירטואלי',
-  sign: 'תליית שלט',
-  iList: 'i-list',
-  yad2: 'יד 2',
-  facebook: 'פייסבוק',
-  marketplace: 'מרקט פלייס',
-  onMap: 'on map',
-  madlan: 'מדלן',
-  whatsappGroup: 'קבוצת וואטס-אפ',
-  officeWhatsapp: 'וואטס-אפ משרדי',
-  // `externalCoop` is the legacy key (still in old rows); we keep it in
-  // the label map so historical data renders, but we expose it under the
-  // renamed meaning — שיתופי פעולה עם מתווכים.
-  externalCoop: 'שיתופי פעולה מתווכים',
-  brokerCoop: 'שיתופי פעולה מתווכים',
-  video: 'סרטון',
-  neighborLetters: 'מכתבי שכנים',
-  coupons: 'גזירונים',
-  flyers: 'עלונים',
-  newspaper: 'עיתונות מקומית',
-  agentTour: 'סיור סוכנים',
-  openHouse: 'בית פתוח',
-};
-
-// Group the 22 actions into three scannable sections so the agent can find
-// and mark the one they want in a couple of glances instead of scrolling.
-//
-// Within "שטח ופרינט" the order follows the agent's real workflow:
-// photography first (shots are the base asset), then sign + tabu extract,
-// then mailed-to-neighbors outreach (this is the agent's opening move —
-// the whole building learns about the listing), then the print channels
-// (flyers/coupons) and finally local press.
-const MARKETING_GROUPS = [
-  {
-    key: 'digital',
-    label: 'פרסום דיגיטלי',
-    keys: ['iList', 'yad2', 'facebook', 'marketplace', 'onMap', 'madlan', 'virtualTour', 'video'],
-  },
-  {
-    key: 'field',
-    label: 'שטח ופרינט',
-    keys: [
-      'photography', 'buildingPhoto', 'dronePhoto',
-      'sign', 'tabuExtract',
-      'neighborLetters',
-      'flyers', 'coupons',
-      'newspaper',
-    ],
-  },
-  {
-    key: 'agent',
-    label: 'פעילות סוכנים',
-    keys: ['whatsappGroup', 'officeWhatsapp', 'brokerCoop', 'agentTour', 'openHouse'],
-  },
-];
-
-// Channels that get a quick "✓ / ◯" preview on the marketing card
-const MARKETING_HIGHLIGHTS = ['facebook', 'yad2', 'madlan', 'iList'];
-
 // Local wrapper around the canonical displayPrice helper. The only
 // extra logic here is the "/חודש" suffix for rent-magnitude prices —
 // the heuristic stays for back-compat (a future cleanup can switch
@@ -311,7 +242,6 @@ export default function PropertyDetail() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
-  const [actionDialog, setActionDialog] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [managingPhotos, setManagingPhotos] = useState(false);
@@ -356,14 +286,12 @@ export default function PropertyDetail() {
   // guard triggers "Rendered more hooks than during the previous
   // render" on the loading → loaded transition.
   const [landingCopied, setLandingCopied] = useState(false);
-  // Active sliding panel: 'marketing' | 'owner' | 'photos' | 'exclusivity' | 'notes' | 'map' | null
-  // F-4.3 — respect `?panel=marketing` deep-link from the Dashboard's
-  // marketing-progress card.
+  // Active sliding panel: 'owner' | 'photos' | 'exclusivity' | 'notes' | 'map' | null
   const [panel, setPanel] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search).get('panel');
       const allowed = [
-        'marketing', 'owner', 'photos', 'exclusivity', 'notes', 'map',
+        'owner', 'photos', 'exclusivity', 'notes', 'map',
         // MLS parity panels
         'pipeline', 'adverts', 'assignees', 'matching', 'activity', 'reminders',
       ];
@@ -577,12 +505,6 @@ export default function PropertyDetail() {
       </div>
     );
   }
-
-  const actionsDetail = property.marketingActionsDetail || {};
-  const actionsMap = property.marketingActions || {};
-  const done = Object.values(actionsMap).filter(Boolean).length;
-  const total = Object.keys(MARKETING_LABELS).length;
-  const pct = Math.round((done / total) * 100);
 
   // PERF-005 — gallery slides render in a ~1200 px viewport; the
   // 768 px `urlCard` variant is plenty. The lightbox keeps the full
@@ -809,35 +731,6 @@ export default function PropertyDetail() {
       toast.error(e?.message || 'שכפול נכשל');
     } finally {
       setDuplicating(false);
-    }
-  };
-
-  // ── Marketing toggle handler (re-used inside the marketing panel) ──
-  const toggleMarketingAction = async (key) => {
-    const detail = actionsDetail[key] || { done: false };
-    const nextDone = !detail.done;
-    const next = {
-      ...property,
-      marketingActions: { ...actionsMap, [key]: nextDone },
-      marketingActionsDetail: {
-        ...actionsDetail,
-        [key]: { ...detail, done: nextDone, doneAt: nextDone ? new Date().toISOString() : null },
-      },
-    };
-    setProperty(next);
-    try {
-      await api.toggleMarketingAction(property.id, {
-        actionKey: key,
-        done: nextDone,
-        notes: detail.notes || null,
-        link: detail.link || null,
-      });
-      toast.success(nextDone
-        ? `${MARKETING_LABELS[key]} · סומן כהושלם`
-        : `${MARKETING_LABELS[key]} · סימון הוסר`);
-    } catch (e) {
-      setProperty(property);
-      toast.error(e?.message || 'שגיאה — השינוי בוטל');
     }
   };
 
@@ -1359,15 +1252,9 @@ export default function PropertyDetail() {
             </div>
             <div className="prd-more-pills">
               {/* 2026-05-11 — count appears BEFORE the noun so the RTL
-                  reading order is "5 הצעות" / "1 מדיה" / "0/23 שיווק"
-                  instead of "הצעות 5" (was: label rendered first as a
-                  JSX sibling, which RTL flex laid out to the right of
-                  the count, so reading right-to-left the agent saw the
-                  noun first and the number second). */}
-              <button type="button" className="prd-more-pill" onClick={() => setPanel('marketing')} aria-label="פתח פאנל פעולות שיווק">
-                <span className="prd-more-pill-count">{done}/{total}</span>
-                <span>שיווק</span>
-              </button>
+                  reading order is "5 הצעות" / "1 מדיה" instead of
+                  "הצעות 5" (label rendered first as a JSX sibling, which
+                  RTL flex laid out to the right of the count). */}
               <button type="button" className="prd-more-pill" onClick={() => setManagingPhotos(true)} aria-label="ניהול מדיה (תמונות וסרטונים)">
                 <span className="prd-more-pill-count">
                   {(property.images?.length || 0) + (property.videos?.length || 0)}
@@ -1683,73 +1570,6 @@ export default function PropertyDetail() {
       </div>
 
       {/* ── Slide-in panels ── */}
-      {panel === 'marketing' && (
-        <PropertyPanelSheet
-          title="פעולות שיווק"
-          subtitle={`${done} מתוך ${total} הושלמו · ${pct}%`}
-          width="lg"
-          onClose={() => setPanel(null)}
-        >
-          <div className="pd-panel-marketing">
-            <div className="dc-progress-row dc-progress-row-lg">
-              <div className="dc-progress-bar">
-                <div className="dc-progress-fill" style={{ width: `${pct}%` }} />
-              </div>
-              <span className="dc-progress-num">{pct}%</span>
-            </div>
-            {MARKETING_GROUPS.map((group) => {
-              const gTotal = group.keys.length;
-              const groupDone = group.keys.filter((k) => actionsMap[k]).length;
-              return (
-                <MarketingGroup
-                  key={group.key}
-                  id={group.key}
-                  label={group.label}
-                  done={groupDone}
-                  total={gTotal}
-                >
-                  <div className="marketing-checklist">
-                    {group.keys.map((key) => {
-                      const label = MARKETING_LABELS[key];
-                      const detail = actionsDetail[key] || { done: false };
-                      return (
-                        <div key={key} className={`checklist-item interactive ${detail.done ? 'is-done' : ''}`}>
-                          <button
-                            type="button"
-                            className="checklist-toggle"
-                            onClick={() => toggleMarketingAction(key)}
-                          >
-                            {detail.done ? (
-                              <CheckCircle2 size={18} className="check-done" />
-                            ) : (
-                              <Circle size={18} className="check-pending" />
-                            )}
-                            <span className={detail.done ? 'done' : ''}>{label}</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="checklist-detail-btn"
-                            onClick={() => setActionDialog({ key, detail })}
-                            title="פרטים / העלאה / קישור"
-                            aria-label={`פרטי ${label}`}
-                          >
-                            {detail.link
-                              ? <Link2 size={13} />
-                              : detail.notes
-                              ? <FileText size={13} />
-                              : <FileText size={13} style={{ opacity: 0.4 }} />}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </MarketingGroup>
-              );
-            })}
-          </div>
-        </PropertyPanelSheet>
-      )}
-
       {panel === 'owner' && (
         <PropertyPanelSheet
           title="בעל הנכס"
@@ -2034,19 +1854,6 @@ export default function PropertyDetail() {
       )}
 
       {/* ── Dialogs ── */}
-      {actionDialog && (
-        <MarketingActionDialog
-          propertyId={property.id}
-          actionKey={actionDialog.key}
-          initial={actionDialog.detail}
-          onClose={() => setActionDialog(null)}
-          onSaved={async () => {
-            setActionDialog(null);
-            await load();
-          }}
-        />
-      )}
-
       {confirmDelete && (
         <ConfirmDialog
           title="מחיקת נכס"
@@ -3315,30 +3122,3 @@ function NotesInlineEditor({ propertyId, initial, onSaved, toast }) {
   );
 }
 
-function MarketingGroup({ id, label, done, total, children }) {
-  const [open, setOpen] = useState(() => {
-    try { return localStorage.getItem(`estia-mg-${id}`) !== '0'; }
-    catch { return true; }
-  });
-  const pct = total ? Math.round((done / total) * 100) : 0;
-  const toggle = () => {
-    setOpen((v) => {
-      const next = !v;
-      try { localStorage.setItem(`estia-mg-${id}`, next ? '1' : '0'); } catch { /* ignore */ }
-      return next;
-    });
-  };
-  return (
-    <div className={`mg-section ${open ? 'open' : ''}`}>
-      <button type="button" className="mg-header" onClick={toggle}>
-        <span className="mg-chev">{open ? '▾' : '◂'}</span>
-        <span className="mg-title">{label}</span>
-        <span className="mg-progress">
-          <span className="mg-bar"><span style={{ width: `${pct}%` }} /></span>
-          <span className="mg-count">{done}/{total}</span>
-        </span>
-      </button>
-      {open && <div className="mg-body">{children}</div>}
-    </div>
-  );
-}

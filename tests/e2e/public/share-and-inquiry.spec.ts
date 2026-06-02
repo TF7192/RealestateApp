@@ -9,8 +9,9 @@ import { loginViaUI } from '../helpers/login.ts';
  *    so we don't have to scrape slugs.
  * 3. Open that URL in an unauthed browser context (incognito), submit
  *    the inquiry form via the public POST endpoint.
- * 4. Switch back to the authed agent context and verify the inquiry
- *    surfaces under /api/marketing/inquiries.
+ * 4. The inquiry POST is the round-trip we care about — the agent-facing
+ *    marketing inbox that previously surfaced these rows was removed in
+ *    the 2026-06-02 feature cull (§ 4).
  */
 
 test.describe('Public share + inquiry @critical', () => {
@@ -18,7 +19,7 @@ test.describe('Public share + inquiry @critical', () => {
     await loginViaUI(page);
   });
 
-  test('public viewer submits an inquiry; agent sees it on /marketing/inquiries', async ({ page, browser }) => {
+  test('public viewer submits an inquiry through the public landing page', async ({ page, browser }) => {
     const stamp = Date.now();
 
     // 1. Seed a property the public page can render.
@@ -69,12 +70,5 @@ test.describe('Public share + inquiry @critical', () => {
     });
     expect(inquiryRes.ok()).toBeTruthy();
     await incognito.close();
-
-    // 4. Authed agent should see the inquiry in their marketing list.
-    const inboxRes = await page.request.get('/api/marketing/inquiries');
-    expect(inboxRes.ok()).toBeTruthy();
-    const inbox = await inboxRes.json();
-    const items: Array<{ name?: string }> = inbox.items || [];
-    expect(items.some((i) => (i.name || '').includes(`מתעניין ${stamp}`))).toBe(true);
   });
 });

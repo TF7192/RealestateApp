@@ -27,7 +27,6 @@ const PRELOADERS = {
   '/activity':         () => import('../pages/ActivityLog'),
   '/notifications':    () => import('../pages/Notifications'),
   '/documents':        () => import('../pages/Documents'),
-  '/marketing':        () => import('../pages/Marketing'),
   '/map':              () => import('../pages/Map'),
   '/office':           () => import('../pages/Office'),
   '/team':             () => import('../pages/Team'),

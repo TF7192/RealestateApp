@@ -27,7 +27,7 @@ import {
   Bell, Search, MessageCircle, LogOut, Menu, X,
   ChevronsLeft, ChevronsRight, Calculator, FileText,
   Activity as ActivityIcon, Download as DownloadIcon, Heart,
-  Star, FolderOpen, HelpCircle, IdCard, Megaphone, ShieldCheck,
+  Star, FolderOpen, HelpCircle, IdCard, ShieldCheck,
   UserPlus, Plus,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
@@ -116,9 +116,6 @@ const TOOL_NAV = [
   // the bottom of the sidebar.
   { k: 'import',    to: '/import',            label: 'ייבוא',         Icon: Upload },
   { k: 'calculator', to: '/calculator',       label: 'מחשבון',         Icon: Calculator },
-  // Sprint 9 — Marketing hub. Lives next to /documents in the tools rail
-  // so the "שיווק / פרסום" surface is one click away from anywhere.
-  { k: 'marketing',  to: '/marketing',        label: 'ניהול שיווקי',   Icon: Megaphone },
   { k: 'team',       to: '/team',             label: 'הצוות שלי',      Icon: UsersRound },
   { k: 'office',     to: '/office',           label: 'המשרד שלי',      Icon: Building2 },
   { k: 'settings',   to: '/settings',         label: 'הגדרות',         Icon: Settings },

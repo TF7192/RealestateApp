@@ -48,7 +48,6 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
     const property = await prisma.property.findUnique({
       where: { id },
       include: {
-        marketingActions: true,
         viewings: true,
         inquiries: true,
       },
@@ -59,17 +58,12 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const inquiries = property.inquiries.filter((i) => i.createdAt >= weekAgo).length;
     const viewings = property.viewings.filter((v) => v.viewedAt >= weekAgo).length;
-    const done = property.marketingActions.filter((a) => a.done).length;
     return {
       stats: {
         inquiries,
         viewings,
         views: inquiries + viewings * 3 + 4,
         offers: property.offer ? 1 : 0,
-        completedActions: done,
-        totalActions: property.marketingActions.length,
-        doneActionKeys: property.marketingActions.filter((a) => a.done).map((a) => a.actionKey),
-        pendingActionKeys: property.marketingActions.filter((a) => !a.done).map((a) => a.actionKey),
       },
     };
   });
@@ -230,27 +224,6 @@ export const registerReportRoutes: FastifyPluginAsync = async (app) => {
         lead:     { select: { id: true, name: true, phone: true } },
       },
       orderBy: { viewedAt: 'desc' },
-    });
-    return { items, count: items.length };
-  });
-
-  // 5. Marketing actions completed in range — useful to show the owner
-  // what's been done on their listing.
-  app.get('/marketing-actions', { onRequest: [app.requireAgent] }, async (req) => {
-    const { from, to } = rangeSchema.parse(req.query);
-    const uid = requireUser(req).id;
-    const where: any = { done: true, property: { agentId: uid } };
-    if (from || to) {
-      where.doneAt = {};
-      if (from) where.doneAt.gte = new Date(from);
-      if (to)   where.doneAt.lte = new Date(to);
-    }
-    const items = await prisma.marketingAction.findMany({
-      where,
-      include: {
-        property: { select: { id: true, street: true, city: true, type: true } },
-      },
-      orderBy: { doneAt: 'desc' },
     });
     return { items, count: items.length };
   });

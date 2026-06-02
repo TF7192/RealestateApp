@@ -126,13 +126,6 @@ async function main() {
   }
   if (shouldSeedSoloProperties) {
 
-  const ACTION_KEYS = [
-    'tabuExtract', 'photography', 'buildingPhoto', 'dronePhoto', 'virtualTour',
-    'sign', 'iList', 'yad2', 'facebook', 'marketplace', 'onMap', 'madlan',
-    'whatsappGroup', 'officeWhatsapp', 'externalCoop', 'video', 'neighborLetters',
-    'coupons', 'flyers', 'newspaper', 'agentTour', 'openHouse',
-  ];
-
   const sampleProps = [
     {
       assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
@@ -147,7 +140,6 @@ async function main() {
         'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80',
         'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80',
       ],
-      completedKeys: ['tabuExtract','photography','buildingPhoto','sign','iList','yad2','facebook','marketplace','onMap'],
     },
     {
       assetClass: 'RESIDENTIAL', category: 'SALE', type: 'דירה',
@@ -159,7 +151,6 @@ async function main() {
       ac: true, safeRoom: true, buildingAge: 8, sector: 'כללי',
       notes: 'דירה משופצת ברמה גבוהה, קרובה למרכז',
       images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'],
-      completedKeys: ACTION_KEYS.slice(0, 18),
     },
     {
       assetClass: 'RESIDENTIAL', category: 'SALE', type: 'פנטהאוז',
@@ -174,7 +165,6 @@ async function main() {
         'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80',
         'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80',
       ],
-      completedKeys: ACTION_KEYS.slice(0, 21),
     },
     {
       assetClass: 'RESIDENTIAL', category: 'RENT', type: 'דירה',
@@ -186,7 +176,6 @@ async function main() {
       ac: true, safeRoom: false, buildingAge: 30, sector: 'כללי',
       notes: 'להשכרה בלבד, דירה מתוחזקת היטב',
       images: ['https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800&q=80'],
-      completedKeys: ['photography','buildingPhoto','sign','iList','yad2','facebook','marketplace','officeWhatsapp'],
     },
     {
       assetClass: 'COMMERCIAL', category: 'SALE', type: 'משרד',
@@ -198,7 +187,6 @@ async function main() {
       ac: true, safeRoom: false, buildingAge: 10, sector: 'כללי',
       notes: 'משרד ייצוגי במרכז העיר, מתאים לעו״ד / רו״ח',
       images: ['https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80'],
-      completedKeys: ['tabuExtract','photography','buildingPhoto','sign','iList','yad2','facebook','onMap','officeWhatsapp','externalCoop'],
     },
     {
       assetClass: 'COMMERCIAL', category: 'RENT', type: 'חנות',
@@ -210,25 +198,17 @@ async function main() {
       ac: true, safeRoom: false, buildingAge: 25, sector: 'כללי',
       notes: 'חנות ברחוב מרכזי, חזית רחבה',
       images: ['https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=800&q=80'],
-      completedKeys: ['photography','buildingPhoto','sign','yad2','facebook','marketplace','officeWhatsapp'],
     },
   ];
 
   for (const p of sampleProps) {
-    const { images, completedKeys, ...rest } = p as any;
+    const { images, ...rest } = p as any;
     const created = await prisma.property.create({
       data: {
         agentId,
         ...rest,
         exclusiveStart: new Date('2025-02-01'),
         exclusiveEnd: new Date('2025-10-01'),
-        marketingActions: {
-          create: ACTION_KEYS.map((key) => ({
-            actionKey: key,
-            done: completedKeys.includes(key),
-            doneAt: completedKeys.includes(key) ? new Date() : null,
-          })),
-        },
         images: { create: images.map((url: string, i: number) => ({ url, sortOrder: i })) },
       },
     });

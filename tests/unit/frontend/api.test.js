@@ -58,7 +58,6 @@ const MLS_API_METHODS = [
   'reportNewCustomers',
   'reportDeals',
   'reportViewings',
-  'reportMarketingActions',
   'exportUrl',
   // Neighborhoods (G1)
   'listNeighborhoods',

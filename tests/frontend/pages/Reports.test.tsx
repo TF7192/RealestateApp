@@ -30,9 +30,6 @@ describe('<Reports>', () => {
       http.get('/api/reports/viewings', () =>
         HttpResponse.json({ items: [], count: 9 })
       ),
-      http.get('/api/reports/marketing-actions', () =>
-        HttpResponse.json({ items: [], count: 3 })
-      ),
     );
     render(<Reports />);
     // Counts now share their tile container with the byStatus row
@@ -43,7 +40,7 @@ describe('<Reports>', () => {
     await waitFor(() => {
       const tiles = Array.from(document.querySelectorAll('.report-tile-count'))
         .map((el) => el.textContent?.trim());
-      expect(tiles).toEqual(expect.arrayContaining(['4', '7', '2', '9', '3']));
+      expect(tiles).toEqual(expect.arrayContaining(['4', '7', '2', '9']));
     });
     // Total commission tile sub-line
     expect(screen.getByText(/עמלה כוללת/)).toBeInTheDocument();
@@ -84,22 +81,16 @@ describe('<Reports>', () => {
     expect(propsA).toHaveAttribute('download');
   });
 
-  it('viewings + marketing-actions CSV buttons render disabled with an in-progress tooltip', () => {
+  it('viewings CSV button renders disabled with an in-progress tooltip', () => {
     render(<Reports />);
     const viewings = screen.getByTestId('csv-viewings') as HTMLButtonElement;
-    const marketing = screen.getByTestId('csv-marketing-actions') as HTMLButtonElement;
-    // Disabled state avoids shipping dead links — the backend endpoints
-    // don't exist yet.
+    // Disabled state avoids shipping dead links — the backend endpoint
+    // doesn't exist yet.
     expect(viewings.tagName).toBe('BUTTON');
-    expect(marketing.tagName).toBe('BUTTON');
     expect(viewings).toBeDisabled();
-    expect(marketing).toBeDisabled();
     expect(viewings).toHaveAttribute('aria-disabled', 'true');
-    expect(marketing).toHaveAttribute('aria-disabled', 'true');
     expect(viewings.getAttribute('title')).toContain('בפיתוח');
-    expect(marketing.getAttribute('title')).toContain('בפיתוח');
     // Visible label still says "ייצוא X" so the feature is recognisable.
     expect(viewings.textContent).toContain('צפיות');
-    expect(marketing.textContent).toContain('פעולות שיווק');
   });
 });

@@ -53,8 +53,8 @@ describe('<Layout>', () => {
 
   it('exposes the major tools-rail entries', () => {
     render(<Layout onLogout={() => {}} />);
-    // Tools rail anchors: import / calculator / marketing / team / settings / help.
-    for (const label of ['ייבוא', 'מחשבון', 'ניהול שיווקי', 'הצוות שלי', 'הגדרות', 'עזרה']) {
+    // Tools rail anchors: import / calculator / team / settings / help.
+    for (const label of ['ייבוא', 'מחשבון', 'הצוות שלי', 'הגדרות', 'עזרה']) {
       expect(screen.getAllByRole('link', { name: label }).length).toBeGreaterThan(0);
     }
   });

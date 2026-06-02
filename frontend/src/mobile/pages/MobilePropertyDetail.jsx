@@ -86,9 +86,9 @@ export default function MobilePropertyDetail() {
     toast({ message: fav ? 'הוסר מהמועדפים' : 'נוסף למועדפים' });
   };
 
-  const actionsDone = Object.values(prop.marketingActions).filter(Boolean).length;
-  const actionsTotal = Object.values(prop.marketingActions).length;
-  const pct = Math.round((actionsDone / actionsTotal) * 100);
+  const actionsDone = Object.values(prop.marketingActions || {}).filter(Boolean).length;
+  const actionsTotal = Object.values(prop.marketingActions || {}).length;
+  const pct = actionsTotal ? Math.round((actionsDone / actionsTotal) * 100) : 0;
 
   return (
     <div className="m-detail">
@@ -244,7 +244,7 @@ export default function MobilePropertyDetail() {
             <div className="m-progress-fill" style={{ width: `${pct}%` }} />
           </div>
           <div className="m-actions-list">
-            {Object.entries(prop.marketingActions).map(([key, done]) => (
+            {Object.entries(prop.marketingActions || {}).map(([key, done]) => (
               <div key={key} className={`m-action-row ${done ? 'done' : ''}`}>
                 <span className="m-action-check">
                   {done ? <CheckCircle2 size={14} /> : <Check size={14} style={{ opacity: 0.25 }} />}
