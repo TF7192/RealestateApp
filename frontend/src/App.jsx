@@ -43,11 +43,6 @@ const Profile = lazy(() => import('./pages/Profile'));
 // history timeline). Lazy so neither weighs down first paint.
 const AgentCard = lazy(() => import('./pages/AgentCard'));
 const LeadHistory = lazy(() => import('./pages/LeadHistory'));
-// Sprint 7 — /inbox premium-gated placeholder. The WhatsApp Business
-// integration is deferred until Meta approves Estia as a Tech
-// Provider; the page gives the sidebar entry a real route to point
-// at and funnels early-access interest to /contact.
-const Inbox = lazy(() => import('./pages/Inbox'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
@@ -454,11 +449,6 @@ function AppRoutes() {
                 (WhatsApp / email / contact form). Static JSON registry,
                 no Intercom. */}
             <Route path="/help" element={<Help />} />
-            {/* Sprint 7 — /inbox premium-gated WhatsApp Business Inbox
-                placeholder. Real integration is deferred pending Meta
-                Tech Provider approval; the page advertises the feature
-                and points early-access CTAs at /contact. */}
-            <Route path="/inbox" element={<Inbox />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/neighborhoods" element={<NeighborhoodAdmin />} />
             {/* Sprint 6 / ScreenContract — in-house digital contract

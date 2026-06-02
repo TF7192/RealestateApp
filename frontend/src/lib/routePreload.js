@@ -37,7 +37,6 @@ const PRELOADERS = {
   '/settings':         () => import('../pages/Settings'),
   '/contracts':        () => import('../pages/Contracts'),
   '/ai':               () => import('../pages/Ai'),
-  '/inbox':            () => import('../pages/Inbox'),
   '/help':             () => import('../pages/Help'),
   '/import':           () => import('../pages/ImportPicker'),
   '/voice-demo':       () => import('../pages/VoiceDemo'),
