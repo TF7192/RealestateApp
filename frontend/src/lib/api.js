@@ -726,9 +726,9 @@ export const api = {
   // 5-call Promise.all in Dashboard.jsx.
   dashboardFull:       () => request('/dashboard/full'),
   // PERF-019 — combined topbar counts. Returns
-  //   { unreadNotifications, publicMatches, hasOpenChat }
-  // Replaces the 3-way fan-out Layout.jsx used to do
-  // (/notifications?limit=1, /public-matches/count, /chat/me).
+  //   { unreadNotifications, hasOpenChat }
+  // Replaces the fan-out Layout.jsx used to do
+  // (/notifications?limit=1, /chat/me).
   topbarCounts:        () => request('/topbar-counts'),
   adminUsersSummary:   () => request('/admin/users-summary'),
   // A1 fill-in — email-based invites. The server returns a surrogate
@@ -815,22 +815,6 @@ export const api = {
       timeoutMs: 90_000,
     });
   },
-
-  // Sprint 10 — התאמות פומביות (cross-agent shared pool).
-  listPublicMatches:    () => request('/public-matches'),
-  publicMatchesCount:   () => request('/public-matches/count'),
-  publishPublicMatch:   (propertyId, body = {}) =>
-    request(`/public-matches/publish/${propertyId}`, { method: 'POST', body }),
-  unpublishPublicMatch: (propertyId) =>
-    request(`/public-matches/publish/${propertyId}`, { method: 'DELETE' }),
-  duplicatePublicMatch: (id, body = {}) =>
-    request(`/public-matches/${id}/duplicate`, { method: 'POST', body }),
-  publicMatchCopies:    (propertyId) =>
-    request(`/public-matches/property/${propertyId}/copies`),
-  publicMatchSeen:      (id) =>
-    request(`/public-matches/${id}/seen`, { method: 'POST' }),
-  publicMatchUnseen:    (id) =>
-    request(`/public-matches/${id}/seen`, { method: 'DELETE' }),
 
   // LeadSearchProfile (K4)
   listLeadSearchProfiles:   (leadId) => request(`/leads/${leadId}/search-profiles`),

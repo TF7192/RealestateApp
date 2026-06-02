@@ -50,7 +50,6 @@ import { registerTeamRoutes } from './routes/team.js';
 import { registerTagRoutes } from './routes/tags.js';
 import { registerReminderRoutes } from './routes/reminders.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
-import { registerPublicMatchRoutes } from './routes/public-matches.js';
 import { registerLeadSearchProfileRoutes } from './routes/leadSearchProfiles.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { registerActivityRoutes } from './routes/activity.js';
@@ -351,7 +350,6 @@ export async function build(opts: BuildOptions = {}) {
   await app.register(registerTagRoutes, { prefix: '/api/tags' });
   await app.register(registerReminderRoutes, { prefix: '/api/reminders' });
   await app.register(registerNotificationRoutes, { prefix: '/api/notifications' });
-  await app.register(registerPublicMatchRoutes, { prefix: '/api/public-matches' });
   await app.register(registerLeadSearchProfileRoutes, { prefix: '/api' });
   await app.register(registerSearchRoutes, { prefix: '/api/search' });
   await app.register(registerActivityRoutes, { prefix: '/api/activity' });

@@ -40,9 +40,6 @@ test.describe('Public share + inquiry @critical', () => {
     const propertyId: string = (await propRes.json()).property?.id;
     expect(propertyId).toBeTruthy();
 
-    // Publish it — the public-matches surface gates on isPublicMatch.
-    await page.request.post(`/api/public-matches/publish/${propertyId}`);
-
     // 2. Look up the (agentSlug, propertySlug) pair via the lookup
     // endpoint so we don't have to know either slug up-front.
     const lookupRes = await page.request.get(`/api/public/lookup/property/${propertyId}`);

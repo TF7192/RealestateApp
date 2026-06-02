@@ -13,10 +13,9 @@ import './MatchingList.css';
 //   - leadId  → listing matching properties (property link per row)
 //   - propertyId → listing matching customers (lead link per row)
 //
-// Lead-direction surfaces a 3-source picker:
+// Lead-direction surfaces a 2-source picker:
 //   - 'system'      → api.leadMatches (internal scoring, default)
 //   - 'yad2'        → api.listMarketListings filtered by lead profile
-//   - 'colleagues'  → api.listPublicMatches (cross-agent pool)
 //
 // Data shape (from the backend matching engine):
 //   { items: [{ id, score, reasons: string[], property?: {...}, lead?: {...} }] }
@@ -24,7 +23,6 @@ import './MatchingList.css';
 const SOURCE_OPTIONS = [
   { k: 'system', label: 'מהמערכת' },
   { k: 'yad2', label: 'מיד 2' },
-  { k: 'colleagues', label: 'מקולגות' },
 ];
 
 export default function MatchingList({
@@ -83,21 +81,6 @@ export default function MatchingList({
           // Yad2 listings link out to /market-discovery/listings/:id
           // (a snapshot card inside our app), not /properties.
           _yad2: true,
-        }));
-      } else if (source === 'colleagues') {
-        const res = await api.listPublicMatches();
-        const list = res?.items || res?.matches || [];
-        raw = list.map((m) => ({
-          id: `coll-${m.id}`,
-          score: m.matchCount ?? 0,
-          reasons: [],
-          property: {
-            id: m.id,
-            street: m.street || m.address || null,
-            city: m.city || null,
-            price: m.price ?? null,
-          },
-          _colleague: true,
         }));
       }
       setItems(limit ? raw.slice(0, limit) : raw);
@@ -229,9 +212,7 @@ function MatchRow({ match, direction }) {
   const href = direction === 'lead'
     ? (match._yad2
         ? (entity?.id ? `/market-discovery/listings/${encodeURIComponent(entity.id)}` : null)
-        : match._colleague
-          ? '/public-matches'
-          : (entity?.id ? `/properties/${entity.id}` : null))
+        : (entity?.id ? `/properties/${entity.id}` : null))
     : (entity?.id ? `/customers/${entity.id}` : null);
   const Icon = direction === 'lead' ? Building2 : User;
 

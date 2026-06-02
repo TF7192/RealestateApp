@@ -726,26 +726,6 @@ function Topbar({ narrow, onOpenPalette, onOpenChat, user, isAdmin }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifs, setLoadingNotifs] = useState(false);
   const notifAnchorRef = useRef(null);
-  // Sprint 10 — badge count for התאמות פומביות. Refetched on mount,
-  // then again whenever any page dispatches 'estia:public-matches-changed'
-  // (duplicate, publish, unpublish — so agents who publish see the
-  // badge update without a hard reload).
-  const [publicMatchBadge, setPublicMatchBadge] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    const load = () => {
-      api.publicMatchesCount?.()
-        .then((r) => { if (!cancelled) setPublicMatchBadge(r?.count || 0); })
-        .catch(() => {});
-    };
-    load();
-    const onChange = () => load();
-    window.addEventListener('estia:public-matches-changed', onChange);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('estia:public-matches-changed', onChange);
-    };
-  }, []);
 
   useEffect(() => {
     if (!notifOpen) return undefined;
@@ -929,41 +909,6 @@ function Topbar({ narrow, onOpenPalette, onOpenChat, user, isAdmin }) {
               }}
             >
               <MessageCircle size={13} /> צ׳אט AI
-            </button>
-            {/* Sprint 10 — התאמות פומביות CTA with red badge counting pool
-                properties that match *this* agent's leads. Gold-on-cream
-                to read as a "feature" rather than a primary action. */}
-            <button
-              type="button"
-              onClick={() => navigate('/public-matches')}
-              {...preloadOn('/public-matches')}
-              aria-label="התאמות פומביות"
-              style={{
-                ...FONT,
-                background: `linear-gradient(180deg, ${DT.goldLight || '#d9b774'}, ${DT.gold})`,
-                border: 'none',
-                padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
-                color: DT.ink, display: 'inline-flex', gap: 6, alignItems: 'center',
-                fontSize: 12, fontWeight: 800,
-                position: 'relative',
-                boxShadow: '0 2px 6px rgba(180,139,76,0.25)',
-              }}
-            >
-              <Sparkles size={14} /> התאמות פומביות
-              {publicMatchBadge > 0 && (
-                <span
-                  aria-label={`${publicMatchBadge} התאמות רלוונטיות`}
-                  style={{
-                    position: 'absolute', top: -6, insetInlineEnd: -6,
-                    minWidth: 18, height: 18, padding: '0 5px',
-                    borderRadius: 99, background: '#b91c1c', color: '#fff',
-                    fontSize: 10, fontWeight: 800,
-                    display: 'grid', placeItems: 'center',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-                    border: '2px solid #f7f3ec',
-                  }}
-                >{publicMatchBadge > 99 ? '99+' : publicMatchBadge}</span>
-              )}
             </button>
           </>
         )}

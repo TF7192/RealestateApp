@@ -539,9 +539,6 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
       // are gated behind their relations.
       propertyOwnerId: srcOwnerId,
       primaryAgentId: _pa,
-      // Public-match metadata is per-listing and does not transfer.
-      publicMatchSourceId: _pms, isPublicMatch: _ipm,
-      publicMatchAt: _pma, publicMatchNote: _pmn,
       images: sourceImages,
       ...payload
     } = source as any;
@@ -1123,10 +1120,9 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
   //
   // PERF-009 — push the obvious filters into the SQL `where` clause so
   // we don't pull every lead into Node just to discard most of them.
-  // PERF-027 — also exclude terminal customer statuses (mirrors what
-  // /public-matches/count already does). The soft scorer still runs in
-  // JS on the narrowed set so the return shape and scoring output are
-  // unchanged (FE renders `score` + `reasons` directly).
+  // PERF-027 — also exclude terminal customer statuses. The soft scorer
+  // still runs in JS on the narrowed set so the return shape and
+  // scoring output are unchanged (FE renders `score` + `reasons`).
   app.get('/:id/matching-customers', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const property = await prisma.property.findFirst({
@@ -1145,7 +1141,7 @@ export const registerPropertyRoutes: FastifyPluginAsync = async (app) => {
     const interestType = property.assetClass === 'COMMERCIAL' ? 'COMMERCIAL' : 'PRIVATE';
     const where: any = {
       agentId: property.agentId,
-      // PERF-027 — skip closed-out customers. Mirrors public-matches.
+      // PERF-027 — skip closed-out customers.
       OR: [
         { customerStatus: null },
         { customerStatus: { notIn: ['CANCELLED', 'BOUGHT', 'RENTED'] } },

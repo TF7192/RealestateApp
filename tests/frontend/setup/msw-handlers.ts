@@ -138,7 +138,6 @@ export const defaultHandlers = [
   http.get('/api/dashboard/topbar-counts', () =>
     HttpResponse.json({
       unreadNotifications: 0,
-      publicMatchesCount: 0,
       hasOpenChat: false,
     })
   ),
@@ -147,15 +146,6 @@ export const defaultHandlers = [
   http.get('/api/notifications', () => HttpResponse.json({ items: [] })),
   http.post('/api/notifications/:id/read', () => HttpResponse.json({ ok: true })),
   http.post('/api/notifications/read-all', () => HttpResponse.json({ ok: true })),
-
-  // Public matches — Layout's promotion badge + Properties detail panel
-  http.get('/api/public-matches', () => HttpResponse.json({ items: [] })),
-  http.get('/api/public-matches/count', () =>
-    HttpResponse.json({ count: 0 })
-  ),
-  http.get('/api/public-matches/property/:id/copies', () =>
-    HttpResponse.json({ items: [] })
-  ),
 
   // Lead PATCH — inline editors on lead cards / detail panes call this.
   http.patch('/api/leads/:id', async ({ params, request }) => {

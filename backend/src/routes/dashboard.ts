@@ -1,7 +1,7 @@
 // PERF-007 / PERF-019 — server-computed dashboard summary + topbar
 // counts. Replaces the four unbounded list calls Dashboard.jsx + Layout
 // fan out today (listLeads / listProperties / listDeals / listReminders +
-// listNotifications + publicMatchesCount) with two narrow endpoints
+// listNotifications) with two narrow endpoints
 // that return pre-shaped, ≤5-row payloads.
 //
 // Both endpoints are owner-scoped via JWT and return the exact response
@@ -18,7 +18,7 @@ import { createLru } from '../lib/lru.js';
 // re-computation under SPA navigation bursts (Layout mounts the topbar
 // on every page change). Eviction is per-user so a notification-read
 // for one agent doesn't stale another agent's cache.
-const topbarCache = createLru<string, { unreadNotifications: number; publicMatches: number; hasOpenChat: boolean; cachedAt: number }>({
+const topbarCache = createLru<string, { unreadNotifications: number; hasOpenChat: boolean; cachedAt: number }>({
   max: 10_000,
   ttlMs: 30_000,
 });
@@ -215,33 +215,21 @@ export const registerDashboardRoutes: FastifyPluginAsync = async (app) => {
 
 };
 
-// PERF-019 — combined topbar counts (notifications, public matches,
-// and a hasOpenChat flag). Layout.jsx today fires three separate calls
-// every page mount; this collapses them into one round-trip. The
-// existing endpoints stay live (additive change) so the legacy FE
-// keeps working until Commit B switches over.
+// PERF-019 — combined topbar counts (notifications + hasOpenChat flag).
+// Layout.jsx today fires two separate calls every page mount; this
+// collapses them into one round-trip. The existing endpoints stay live
+// (additive change) so the legacy FE keeps working until Commit B
+// switches over.
 export const registerTopbarRoutes: FastifyPluginAsync = async (app) => {
   app.get('/topbar-counts', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const u = requireUser(req);
 
     const payload = await topbarCache.wrap(u.id, async () => {
       // PERF — 2026-05-01 v3: Promise.all over $transaction (read-only,
-      // no need for atomicity). 3 round-trips become parallel.
-      const [unreadNotifications, publicMatchesCount, openChat] = await Promise.all([
+      // no need for atomicity). Round-trips run in parallel.
+      const [unreadNotifications, openChat] = await Promise.all([
         prisma.notification.count({
           where: { userId: u.id, readAt: null },
-        }),
-        // Mirrors the per-viewer pool count pattern in public-matches.ts
-        // but in narrow form — we only need the row count for the badge,
-        // not the matched-leads computation. The `/public-matches/count`
-        // endpoint stays canonical for the case where the FE wants the
-        // full O(pool×leads) evaluation; this is the cheap fallback that
-        // surfaces "anything new in the pool at all".
-        prisma.property.count({
-          where: {
-            isPublicMatch: true,
-            NOT: { agentId: u.id },
-          },
         }),
         // hasOpenChat: viewer has any conversation with at least one
         // unread admin-side message. Cheap because Conversation has the
@@ -258,7 +246,6 @@ export const registerTopbarRoutes: FastifyPluginAsync = async (app) => {
       ]);
       return {
         unreadNotifications,
-        publicMatches: publicMatchesCount,
         hasOpenChat: !!openChat,
         cachedAt: Date.now(),
       };

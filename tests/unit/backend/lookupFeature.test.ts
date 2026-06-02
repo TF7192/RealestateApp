@@ -96,31 +96,6 @@ describe('lookup_feature tool', () => {
     expect(out.items.length).toBeLessThanOrEqual(8);
   });
 
-  it('returns property-public-matches as #1 for "שיתוף לבריכה הפומבית" / "פומביות" (regression: AI confused with lead-ai-matches)', async () => {
-    const out = (await runChatTool(
-      'lookup_feature',
-      { query: 'איך אני משתף את הנכס שלי להתאמות הפומביות' },
-      ctx,
-    )) as any;
-    expect(out.items[0].id).toBe('property-public-matches');
-    expect(out.topScore).toBeGreaterThanOrEqual(10);
-  });
-
-  it('does NOT confuse התאמות חכמות (lead drawer) with התאמות פומביות (public pool)', async () => {
-    const out = (await runChatTool(
-      'lookup_feature',
-      { query: 'התאמות פומביות' },
-      ctx,
-    )) as any;
-    // property-public-matches must rank above lead-ai-matches.
-    const ids = out.items.map((it: any) => it.id);
-    const idxPublic = ids.indexOf('property-public-matches');
-    const idxLead = ids.indexOf('lead-ai-matches');
-    expect(idxPublic).toBeGreaterThanOrEqual(0);
-    if (idxLead >= 0) {
-      expect(idxPublic).toBeLessThan(idxLead);
-    }
-  });
 
   it('returns the deletion entry for "מחיקת חשבון"', async () => {
     const out = (await runChatTool(
