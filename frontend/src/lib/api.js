@@ -684,25 +684,11 @@ export const api = {
   // endpoints are owner-scoped on the server. Keep these grouped by
   // feature so future renames land in one block.
 
-  // Office (A1)
-  getOffice:           () => request('/office'),
-  createOffice:        (body) => request('/office', { method: 'POST', body }),
-  updateOffice:        (body) => request('/office', { method: 'PATCH', body }),
-  addOfficeMember:     (body) => request('/office/members', { method: 'POST', body }),
-  // Sprint 10 — close the office. body: { mode: 'delete'|'transfer', newOwnerId? }.
-  closeOffice:         (body) => request('/office/close', { method: 'POST', body }),
-  removeOfficeMember:  (id) => request(`/office/members/${id}`, { method: 'DELETE' }),
-  // Invites addressed to the current user — shown on /office before
-  // the caller has an office of their own.
-  listMyOfficeInvites: () => request('/office/invites/mine'),
-  acceptOfficeInvite:  (id) => request(`/office/invites/${id}/accept`, { method: 'POST' }),
-  // Promote a member to OWNER without closing the office.
-  promoteOfficeMember: (id) => request(`/office/members/${id}/promote`, { method: 'POST' }),
-  // OWNER-scoped AI spend observability for the office (now also
-  // admin-only — see backend route).
-  officeAiUsage:       (month) => request(`/office/ai-usage${month ? `?month=${encodeURIComponent(month)}` : ''}`),
   // Admin platform observability — gated on role=ADMIN server-side
-  // (SEC-010; was an email allowlist).
+  // (SEC-010; was an email allowlist). The /office/ai-usage endpoint
+  // is admin-only AI spend observability — kept after the "המשרד שלי"
+  // UI removal because the Admin dashboard consumes it.
+  officeAiUsage:       (month) => request(`/office/ai-usage${month ? `?month=${encodeURIComponent(month)}` : ''}`),
   adminOverview:       () => request('/admin/overview'),
   adminMonitoring:     () => request('/admin/monitoring'),
   // PERF-007 — single round-trip dashboard load. Returns:
@@ -723,13 +709,6 @@ export const api = {
   // (/notifications?limit=1, /chat/me).
   topbarCounts:        () => request('/topbar-counts'),
   adminUsersSummary:   () => request('/admin/users-summary'),
-  // A1 fill-in — email-based invites. The server returns a surrogate
-  // inviteUrl ({origin}/accept-invite?token=<id>) that the owner can
-  // copy/share manually; the invite resolves automatically when the
-  // invitee logs in or signs up.
-  createOfficeInvite:  (body) => request('/office/invites', { method: 'POST', body }),
-  listOfficeInvites:   () => request('/office/invites'),
-  revokeOfficeInvite:  (id) => request(`/office/invites/${id}`, { method: 'DELETE' }),
 
   // Tags (A2)
   listTags:            () => request('/tags'),

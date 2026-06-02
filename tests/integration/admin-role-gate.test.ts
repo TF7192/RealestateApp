@@ -95,26 +95,6 @@ describe('SEC-010 — admin role gate', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  // ── /api/office/ai-usage ───────────────────────────────────────
-  it('AGENT gets 403 from /api/office/ai-usage', async () => {
-    const agent = await createAgent(prisma);
-    const cookie = await loginAs(app, agent.email, agent._plainPassword);
-    const res = await app.inject({
-      method: 'GET', url: '/api/office/ai-usage', headers: { cookie },
-    });
-    expect(res.statusCode).toBe(403);
-  });
-
-  it('ADMIN with non-magic email gets 200 from /api/office/ai-usage', async () => {
-    const u = await createAgent(prisma, { email: 'x4@example.com' });
-    await promoteToAdmin(u.id);
-    const cookie = await loginAs(app, u.email, u._plainPassword);
-    const res = await app.inject({
-      method: 'GET', url: '/api/office/ai-usage', headers: { cookie },
-    });
-    expect(res.statusCode).toBe(200);
-  });
-
   // ── Legacy-email-as-AGENT must NOT escalate to admin. ──────────
   it('AGENT whose email is talfuks1234@gmail.com but role=AGENT is NOT admin', async () => {
     // This is the SEC-010 acceptance criterion — the legacy email
@@ -129,10 +109,6 @@ describe('SEC-010 — admin role gate', () => {
       method: 'GET', url: '/api/chat/admin/conversations', headers: { cookie },
     });
     expect(chats.statusCode).toBe(403);
-    const aiUsage = await app.inject({
-      method: 'GET', url: '/api/office/ai-usage', headers: { cookie },
-    });
-    expect(aiUsage.statusCode).toBe(403);
   });
 
   // ── CUSTOMER role rejected too. ────────────────────────────────

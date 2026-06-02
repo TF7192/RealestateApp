@@ -7,15 +7,12 @@
 // that route will be added in a later batch (Agent 9 / G2) — the link
 // sits dormant until then, at which point it lights up automatically.
 //
-// `/office` is OWNER-only; hidden for AGENT-role accounts.
-//
 // Cream & Gold inline-style re-skin matching the rest of the port.
 
 import { Link } from 'react-router-dom';
 import {
-  MapPin, Building2, UserCircle, MessageSquare, ChevronLeft,
+  MapPin, UserCircle, MessageSquare, ChevronLeft,
 } from 'lucide-react';
-import { useAuth } from '../lib/auth';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -36,14 +33,6 @@ const CARDS = [
     Icon: MapPin,
   },
   {
-    key: 'office',
-    to: '/office',
-    title: 'משרד',
-    description: 'פרטי המשרד, לוגו וחברי הצוות. זמין רק לבעלי חשבון מנהל.',
-    ownerOnly: true,
-    Icon: Building2,
-  },
-  {
     key: 'profile',
     to: '/profile',
     title: 'הפרופיל שלי',
@@ -60,10 +49,7 @@ const CARDS = [
 ];
 
 export default function Settings() {
-  const { user } = useAuth();
-  const isOwner = user?.role === 'OWNER';
-
-  const visible = CARDS.filter((card) => !card.ownerOnly || isOwner);
+  const visible = CARDS;
 
   return (
     <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
@@ -76,7 +62,7 @@ export default function Settings() {
           fontSize: 13, color: DT.muted, margin: '4px 0 0', lineHeight: 1.6,
           maxWidth: 640,
         }}>
-          כל מה שצריך להתאים לפני שיוצאים לעבודה — תגיות, שכונות, משרד, פרופיל ותבניות.
+          כל מה שצריך להתאים לפני שיוצאים לעבודה — תגיות, שכונות, פרופיל ותבניות.
         </p>
       </header>
 

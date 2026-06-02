@@ -66,17 +66,7 @@ describe('<Layout>', () => {
     expect(screen.getAllByRole('link', { name: 'מסמכים' }).length).toBeGreaterThan(0);
   });
 
-  it('renders the Office link for AGENT and OWNER roles alike', async () => {
-    // The "המשרד שלי" tools-rail entry is unconditional — both AGENT
-    // (default seeded user) and OWNER see it. Office membership scoping
-    // happens server-side, not via the nav.
-    render(<Layout onLogout={() => {}} />);
-    await waitFor(() =>
-      expect(screen.getAllByRole('link', { name: 'המשרד שלי' }).length).toBeGreaterThan(0),
-    );
-  });
-
-  it('shows the empty-favorites hint when the user has no favorites', async () => {
+it('shows the empty-favorites hint when the user has no favorites', async () => {
     render(<Layout onLogout={() => {}} />);
     // Hint copy lives directly in the sidebar tree (no testid). Match
     // a stable substring that survives minor copy tweaks.

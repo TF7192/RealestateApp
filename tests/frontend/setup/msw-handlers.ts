@@ -182,9 +182,6 @@ export const defaultHandlers = [
     HttpResponse.json({ property: null })
   ),
 
-  // Office invites — Layout / Profile poll mine to surface pending invites.
-  http.get('/api/office/invites/mine', () => HttpResponse.json({ items: [] })),
-
   // Yad2 integration
   http.get('/api/integrations/yad2/quota', () =>
     HttpResponse.json({ limit: 3, remaining: 3, used: 0, resetAt: null, msUntilReset: 0 })
@@ -234,41 +231,6 @@ export const defaultHandlers = [
   // Default handlers return empty / minimal shapes so component tests
   // render their empty states cleanly. Tests that need populated data
   // override with `server.use(...)`.
-
-  // Office (A1)
-  http.get('/api/office', () => HttpResponse.json({ office: null, members: [] })),
-  http.post('/api/office', async ({ request }) => {
-    const body = (await request.json().catch(() => ({}))) as { name?: string };
-    return HttpResponse.json({ office: { id: 'office-1', name: body?.name ?? 'משרד' } });
-  }),
-  http.patch('/api/office', () =>
-    HttpResponse.json({ office: { id: 'office-1', name: 'משרד' } })
-  ),
-  http.post('/api/office/members', () =>
-    HttpResponse.json({ member: { id: 'm1', userId: 'u1', role: 'MEMBER' } })
-  ),
-  http.delete('/api/office/members/:id', () => HttpResponse.json({ ok: true })),
-  // A1 fill-in — email invites.
-  http.get('/api/office/invites', () => HttpResponse.json({ items: [] })),
-  http.post('/api/office/invites', async ({ request }) => {
-    const body = (await request.json().catch(() => ({}))) as { email?: string };
-    const id = 'invite-1';
-    return HttpResponse.json({
-      invite: {
-        id,
-        officeId: 'office-1',
-        email: body?.email ?? '',
-        invitedById: 'test-agent-1',
-        acceptedAt: null,
-        acceptedById: null,
-        revokedAt: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        inviteUrl: `http://localhost:5174/accept-invite?token=${id}`,
-      },
-    });
-  }),
-  http.delete('/api/office/invites/:id', () => HttpResponse.json({ ok: true })),
 
   // Tags (A2)
   http.get('/api/tags', () => HttpResponse.json({ items: [] })),

@@ -96,7 +96,6 @@ const Calendar = lazy(() => import('./pages/Calendar'));
 // ~150KB leaflet + react-leaflet chunk doesn't weigh down first paint
 // for agents who never open the map view.
 const MapPage = lazy(() => import('./pages/Map'));
-const Office = lazy(() => import('./pages/Office'));
 // Sprint 7 — full-page results for the global search (?q=foo). Links
 // from CommandPalette's new "ראה את כל התוצאות" footer button.
 const SearchResults = lazy(() => import('./pages/SearchResults'));
@@ -428,7 +427,6 @@ function AppRoutes() {
                 OpenStreetMap tile layer. Auth-gated via the outer
                 `if (!user)` check above. */}
             <Route path="/map" element={<MapPage />} />
-            <Route path="/office" element={<Office />} />
             {/* Sprint 7 — full-page results for the ⌘K global search.
                 Reads ?q= from the URL and renders 4 buckets. The
                 palette's "ראה את כל התוצאות" footer button deep-

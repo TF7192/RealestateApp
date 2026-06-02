@@ -1,7 +1,7 @@
 import { useOutletContext, Link } from 'react-router-dom';
 import {
   LogOut, User, Bell, Shield, Sparkles, ChevronLeft, Mail, Phone,
-  Building2, Award, Users, Moon,
+  Award, Moon,
 } from 'lucide-react';
 import { agentProfile } from '../../data/mockData';
 import { haptics, isNative, removeItem, Keys } from '../../native';
@@ -74,20 +74,6 @@ export default function MobileSettings() {
         <Link to="#" className="m-settings-row" onClick={() => haptics.tap()}>
           <Shield size={18} />
           <div>פרטיות וביטחון</div>
-          <ChevronLeft size={16} />
-        </Link>
-      </section>
-
-      <section className="m-settings-group">
-        <div className="m-settings-group-label">המשרד שלי</div>
-        <Link to="#" className="m-settings-row" onClick={() => haptics.tap()}>
-          <Building2 size={18} />
-          <div>פרטי סוכנות</div>
-          <ChevronLeft size={16} />
-        </Link>
-        <Link to="#" className="m-settings-row" onClick={() => haptics.tap()}>
-          <Users size={18} />
-          <div>חברי צוות</div>
           <ChevronLeft size={16} />
         </Link>
       </section>

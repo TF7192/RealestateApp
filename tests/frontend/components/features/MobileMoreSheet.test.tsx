@@ -3,9 +3,7 @@
 // bottom tab bar doesn't get crowded.
 
 import { describe, it, expect, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
-import { server } from '../../setup/msw-server';
-import { render, screen, userEvent, waitFor } from '../../setup/test-utils';
+import { render, screen, userEvent } from '../../setup/test-utils';
 import MobileMoreSheet from '@estia/frontend/components/MobileMoreSheet.jsx';
 
 describe('<MobileMoreSheet>', () => {
@@ -20,33 +18,6 @@ describe('<MobileMoreSheet>', () => {
     expect(screen.getByRole('button', { name: /דוחות/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /פעילות/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /תזכורות/ })).toBeInTheDocument();
-  });
-
-  it('does NOT show the Office row for AGENT role', async () => {
-    render(<MobileMoreSheet open={true} onClose={() => {}} />);
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /המשרד שלי/ })).toBeNull();
-    });
-  });
-
-  it('shows the Office row for OWNER role', async () => {
-    server.use(
-      http.get('/api/me', () =>
-        HttpResponse.json({
-          user: {
-            id: 'test-owner-1',
-            email: 'owner@estia.app',
-            role: 'OWNER',
-            displayName: 'בעל משרד',
-            agentProfile: { agency: 'Acme', title: '', bio: '' },
-          },
-        })
-      )
-    );
-    render(<MobileMoreSheet open={true} onClose={() => {}} />);
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /המשרד שלי/ })).toBeInTheDocument();
-    });
   });
 
   it('clicking a new entry closes the sheet', async () => {

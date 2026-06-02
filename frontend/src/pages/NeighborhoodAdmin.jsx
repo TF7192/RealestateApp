@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { MapPin, Plus, Trash2, Pencil, Check, X as XIcon } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -201,8 +200,9 @@ export default function NeighborhoodAdmin() {
 
   // OWNER gate — the page is OWNER-only, but a silent redirect to
   // /dashboard felt like a broken link from Settings. Render an
-  // in-place locked card with the requirement + a CTA to /office
-  // where a user can create or join an office (and be promoted).
+  // in-place locked card with the requirement. (The standalone office
+  // admin UI was removed in the 2026-06-02 feature cull; office
+  // ownership is now provisioned out-of-band.)
   if (user && user.role !== 'OWNER') {
     return (
       <div className="nbhadmin-page" dir="rtl" style={{ padding: 28 }}>
@@ -227,23 +227,8 @@ export default function NeighborhoodAdmin() {
           </h2>
           <p style={{ fontSize: 14, color: '#6b6356', lineHeight: 1.7, margin: '0 0 16px' }}>
             כדי להגדיר קבוצות שכונות (למשל: "צפון ישן תל אביב") ולשתף אותן בין
-            סוכני המשרד, יש ליצור משרד או להצטרף לאחד קיים. לאחר יצירת משרד
-            תשודרג אוטומטית לתפקיד OWNER.
+            סוכני המשרד, נדרשת הרשאת מנהל/ת משרד.
           </p>
-          <div style={{ paddingTop: 80 }}>
-            <Link
-              to="/office"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: 'linear-gradient(180deg, #d9b774, #b48b4c)',
-                color: '#1e1a14', padding: '9px 16px', borderRadius: 10,
-                fontWeight: 800, fontSize: 13, textDecoration: 'none',
-                boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
-              }}
-            >
-              לניהול המשרד
-            </Link>
-          </div>
         </div>
       </div>
     );

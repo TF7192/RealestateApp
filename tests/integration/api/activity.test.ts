@@ -87,65 +87,6 @@ describe('ActivityLog', () => {
 // row is persisted with the right shape.
 // ──────────────────────────────────────────────────────────────────
 
-describe('ActivityLog — Office', () => {
-  async function makeOwner() {
-    const agent = await createAgent(prisma);
-    await prisma.user.update({ where: { id: agent.id }, data: { role: 'OWNER' } });
-    return agent;
-  }
-
-  it('logs Office/created on POST /api/office', async () => {
-    const owner = await makeOwner();
-    const cookie = await loginAs(app, owner.email, owner._plainPassword);
-    const res = await app.inject({
-      method: 'POST', url: '/api/office', headers: { cookie },
-      payload: { name: 'Acme' },
-    });
-    expect(res.statusCode).toBe(200);
-    const rows = await activityFor(owner.id, 'Office', 'created');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].summary).toContain('Acme');
-  });
-
-  it('logs Office/added_member on POST /api/office/members', async () => {
-    const owner = await makeOwner();
-    const office = await prisma.office.create({
-      data: { name: 'Acme', members: { connect: { id: owner.id } } },
-    });
-    const target = await createAgent(prisma);
-    const cookie = await loginAs(app, owner.email, owner._plainPassword);
-    const res = await app.inject({
-      method: 'POST', url: '/api/office/members', headers: { cookie },
-      payload: { email: target.email },
-    });
-    expect(res.statusCode).toBe(200);
-    const rows = await activityFor(owner.id, 'Office', 'added_member');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].entityId).toBe(office.id);
-    expect((rows[0].metadata as any).memberId).toBe(target.id);
-  });
-
-  it('logs Office/removed_member on DELETE /api/office/members/:id', async () => {
-    const owner = await makeOwner();
-    const target = await createAgent(prisma);
-    const office = await prisma.office.create({
-      data: {
-        name: 'Acme',
-        members: { connect: [{ id: owner.id }, { id: target.id }] },
-      },
-    });
-    const cookie = await loginAs(app, owner.email, owner._plainPassword);
-    const res = await app.inject({
-      method: 'DELETE', url: `/api/office/members/${target.id}`, headers: { cookie },
-    });
-    expect(res.statusCode).toBe(200);
-    const rows = await activityFor(owner.id, 'Office', 'removed_member');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].entityId).toBe(office.id);
-    expect((rows[0].metadata as any).memberId).toBe(target.id);
-  });
-});
-
 describe('ActivityLog — Tag', () => {
   it('logs Tag/created on POST /api/tags', async () => {
     const agent = await createAgent(prisma);

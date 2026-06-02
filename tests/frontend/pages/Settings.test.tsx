@@ -2,8 +2,7 @@
 //
 // Covers:
 //   - Page heading + subtitle render
-//   - All five cards render for an OWNER user
-//   - The OWNER-only "משרד" card is hidden for an AGENT user
+//   - All three cards render
 //   - Each card is a link to the expected route
 //   - Cards use the canonical .btn .btn-secondary styling
 
@@ -26,12 +25,6 @@ const BASE_AGENT = {
   firstLoginPlatform: 'web',
 };
 
-function asOwner() {
-  server.use(
-    http.get('/api/me', () => HttpResponse.json({ user: { ...BASE_AGENT, role: 'OWNER' } }))
-  );
-}
-
 function asAgent() {
   server.use(
     http.get('/api/me', () => HttpResponse.json({ user: { ...BASE_AGENT, role: 'AGENT' } }))
@@ -47,27 +40,14 @@ describe('<Settings>', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows all four cards for an OWNER user', async () => {
-    asOwner();
-    render(<Settings />);
-    // The auth provider fetches /me asynchronously; wait for the
-    // OWNER-only card to appear before asserting the full list.
-    await waitFor(() => {
-      expect(screen.getByRole('link', { name: /^משרד/ })).toBeInTheDocument();
-    });
-    expect(screen.getByRole('link', { name: /שכונות/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /הפרופיל שלי/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /תבניות הודעה/ })).toBeInTheDocument();
-    expect(screen.getAllByRole('link')).toHaveLength(4);
-  });
-
-  it('hides the "משרד" card for an AGENT (non-owner) user', async () => {
+  it('shows the three cards (neighborhoods / profile / templates)', async () => {
     asAgent();
     render(<Settings />);
-    // Wait for non-owner-only cards to render first.
-    await screen.findByRole('link', { name: /שכונות/ });
-    expect(screen.queryByRole('link', { name: /^משרד/ })).not.toBeInTheDocument();
-    // Three links for an agent.
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /שכונות/ })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: /הפרופיל שלי/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /תבניות הודעה/ })).toBeInTheDocument();
     expect(screen.getAllByRole('link')).toHaveLength(3);
   });
 
@@ -76,13 +56,6 @@ describe('<Settings>', () => {
     render(<Settings />);
     const link = await screen.findByRole('link', { name: /שכונות/ });
     expect(link).toHaveAttribute('href', '/settings/neighborhoods');
-  });
-
-  it('office card links to /office when visible', async () => {
-    asOwner();
-    render(<Settings />);
-    const link = await screen.findByRole('link', { name: /^משרד/ });
-    expect(link).toHaveAttribute('href', '/office');
   });
 
   it('profile card links to /profile', async () => {

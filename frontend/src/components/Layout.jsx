@@ -116,7 +116,6 @@ const TOOL_NAV = [
   // the bottom of the sidebar.
   { k: 'import',    to: '/import',            label: 'ייבוא',         Icon: Upload },
   { k: 'calculator', to: '/calculator',       label: 'מחשבון',         Icon: Calculator },
-  { k: 'office',     to: '/office',           label: 'המשרד שלי',      Icon: Building2 },
   { k: 'settings',   to: '/settings',         label: 'הגדרות',         Icon: Settings },
   // Sprint 7 — in-app help surface. Lives in the tools rail so it's
   // always one click away, with a matching ? icon in the topbar.
