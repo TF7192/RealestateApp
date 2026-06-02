@@ -17,14 +17,12 @@
 // office still sees the create-office form (the server atomically
 // promotes them to OWNER on first createOffice).
 //
-// Distinct from /team — /team = quarterly KPI scoreboard, /office =
-// identity + membership admin. We cross-link to /team from the header.
+// Identity + membership admin.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Building2, UserPlus, Users, Mail, Crown, Trash2, Plus, Copy, Send,
-  X, Sparkles, Trophy, AlertCircle, Link2, LogOut, ArrowLeftRight,
+  X, Sparkles, AlertCircle, Link2, LogOut, ArrowLeftRight,
   Activity as ActivityIcon,
 } from 'lucide-react';
 import api from '../lib/api';
@@ -319,7 +317,7 @@ export default function Office() {
 
   return (
     <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
-      {/* Title row + cross-link to /team */}
+      {/* Title row */}
       <div style={{
         display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
         gap: 16, marginBottom: 18, flexWrap: 'wrap',
@@ -333,11 +331,6 @@ export default function Office() {
               ? 'הזמנת סוכנים, ניהול חברים והזמנות בהמתנה.'
               : 'צוות המשרד וחברי הצוות הפעילים.'}
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Link to="/team" style={secondaryBtn()}>
-            <Trophy size={14} /> דוח צוות
-          </Link>
         </div>
       </div>
 

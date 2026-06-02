@@ -6,7 +6,7 @@ import path from 'node:path';
 // R-1 — Reports page, refined layout (Sprint 8.x, claude-design
 // bundle 2026-04-24). The page was ported from the CSS-variable
 // design-system to the cream & gold DT palette with inline styles,
-// mirroring Team.jsx / Dashboard.jsx. This test pins the new
+// mirroring Dashboard.jsx. This test pins the new
 // contract:
 //   * h1 + subtitle, semantic sections
 //   * dir="rtl" on root

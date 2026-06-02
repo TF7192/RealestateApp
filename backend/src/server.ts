@@ -43,7 +43,6 @@ import { registerGeoRoutes } from './routes/geo.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerOwnerRoutes, registerOwnerPhoneRoutes } from './routes/owners.js';
 import { registerOfficeRoutes } from './routes/office.js';
-import { registerTeamRoutes } from './routes/team.js';
 import { registerTagRoutes } from './routes/tags.js';
 import { registerReminderRoutes } from './routes/reminders.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
@@ -334,7 +333,6 @@ export async function build(opts: BuildOptions = {}) {
   await app.register(registerOutlookCalendarRoutes, { prefix: '/api/integrations/outlook-calendar' });
   await app.register(registerMeetingRoutes, { prefix: '/api/meetings' });
   await app.register(registerOfficeRoutes, { prefix: '/api/office' });
-  await app.register(registerTeamRoutes, { prefix: '/api/team' });
   await app.register(registerTagRoutes, { prefix: '/api/tags' });
   await app.register(registerReminderRoutes, { prefix: '/api/reminders' });
   await app.register(registerNotificationRoutes, { prefix: '/api/notifications' });

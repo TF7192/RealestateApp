@@ -29,7 +29,6 @@ const PRELOADERS = {
   '/documents':        () => import('../pages/Documents'),
   '/map':              () => import('../pages/Map'),
   '/office':           () => import('../pages/Office'),
-  '/team':             () => import('../pages/Team'),
   '/search':           () => import('../pages/SearchResults'),
   '/profile':          () => import('../pages/Profile'),
   '/agent-card':       () => import('../pages/AgentCard'),

@@ -731,25 +731,6 @@ export const api = {
   listOfficeInvites:   () => request('/office/invites'),
   revokeOfficeInvite:  (id) => request(`/office/invites/${id}`, { method: 'DELETE' }),
 
-  // Sprint 6 — team scoreboard. Returns
-  // { agents: [{ agentId, displayName, avatarUrl, closedDeals,
-  //              totalVolume, avgRating, leadsOpen, propertiesActive }],
-  //   quarter }
-  // scoped to the caller's office. `quarter` is optional ("Qx-yyyy");
-  // server defaults to the current quarter when omitted.
-  teamScoreboard:      (quarter) => {
-    const qs = quarter ? `?${new URLSearchParams({ quarter }).toString()}` : '';
-    return request(`/team/scoreboard${qs}`);
-  },
-  // Full per-agent intel for the /team/:agentId detail page —
-  // { agent, properties, leads, deals, totals } scoped to the
-  // caller's office; 404 for an unknown id or cross-office access.
-  teamAgent:           (agentId) => request(`/team/agents/${agentId}`),
-  // Sprint 10 — office-scoped widget aggregator powering the /team
-  // stats dashboard. One round-trip with every bucket the 14 widgets
-  // need; lone-agent callers get 404.
-  teamStats:           () => request('/team/stats'),
-
   // Tags (A2)
   listTags:            () => request('/tags'),
   createTag:           (body) => request('/tags', { method: 'POST', body }),

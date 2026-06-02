@@ -78,7 +78,6 @@
   { "id": "settings-neighborhoods", "feature": "ניהול שכונות", "category": "account", "page": "/settings/neighborhoods", "pageFile": "frontend/src/pages/Settings.jsx", "howTo": "/settings/neighborhoods — ניהול רשימת שכונות מותאמות לטופסי נכסים.", "buttons": [], "prerequisites": "—", "premium": false, "keywords": ["neighborhoods", "שכונות"] },
   { "id": "premium-gate", "feature": "Premium Gate (גישה לפיצ׳רים מתקדמים)", "category": "account", "page": "—", "pageFile": "frontend/src/components/PremiumGateDialog.jsx", "howTo": "כשניסית להשתמש בפיצ׳ר Premium ואין לך מנוי — נפתח דיאלוג עם הסבר וכפתור 'צרו קשר' לשדרוג.", "buttons": [{ "label": "צרו קשר", "where": "footer", "does": "ניווט ל-/contact" }], "prerequisites": "—", "premium": false, "keywords": ["premium", "paywall", "subscription", "מנוי"] },
 
-  { "id": "team-overview", "feature": "הצוות שלי", "category": "admin", "page": "/team", "pageFile": "frontend/src/pages/Team.jsx", "howTo": "/team — חברי הצוות במשרד. לחיצה על סוכן פותחת דף פרטים.", "buttons": [{ "label": "סוכן", "where": "list", "does": "ניווט ל-/team/:id" }], "prerequisites": "Office linkage", "premium": false, "keywords": ["team", "צוות", "office"] },
   { "id": "office-overview", "feature": "המשרד שלי", "category": "admin", "page": "/office", "pageFile": "frontend/src/pages/Office.jsx", "howTo": "/office — סטטיסטיקות ופרטי המשרד.", "buttons": [], "prerequisites": "—", "premium": false, "keywords": ["office", "משרד"] },
 
 
