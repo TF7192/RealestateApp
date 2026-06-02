@@ -17,8 +17,6 @@ import useFocusTrap from '../hooks/useFocusTrap';
 import {
   inputPropsForName,
   inputPropsForEmail,
-  inputPropsForCity,
-  inputPropsForAddress,
   inputPropsForRooms,
 } from '../lib/inputProps';
 import { cityNames as fallbackCityNames } from '../data/mockData';

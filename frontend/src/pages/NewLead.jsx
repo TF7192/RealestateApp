@@ -25,7 +25,6 @@ import { useDraftAutosave, readDraft, useClipboardPhone } from '../hooks/mobile'
 import { relLabel } from '../lib/relativeDate';
 import {
   inputPropsForName,
-  inputPropsForCity,
 } from '../lib/inputProps';
 import { NumberField, PhoneField, PriceRange, Segmented, SelectField } from '../components/SmartFields';
 import { toE164 } from '../lib/phone';

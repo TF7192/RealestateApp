@@ -461,6 +461,12 @@ export default function Properties() {
   // card's star reflects the current state without waiting for the first
   // toggle. Empty set on failure is fine; the star just starts inactive.
   const [favoriteIds, setFavoriteIds] = useState(() => new Set());
+  // Matched-leads badge on each property card needs the agent's lead
+  // list. Best-effort fetch (silent on failure — badges just won't render).
+  const [leads, setLeads] = useState([]);
+  useEffect(() => {
+    api.listLeads().then((r) => setLeads(r.items || r.leads || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     api.listFavorites('PROPERTY')

@@ -535,18 +535,6 @@ function inputStyle() {
   };
 }
 
-function primaryBtn() {
-  return {
-    ...FONT,
-    background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
-    border: 'none', color: DT.ink,
-    padding: '10px 14px', borderRadius: 10,
-    cursor: 'pointer', fontSize: 13, fontWeight: 800,
-    display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
-  };
-}
-
 function whatsappBtn() {
   return {
     ...FONT,

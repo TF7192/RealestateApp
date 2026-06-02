@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -213,7 +214,6 @@ export default function PropertyDetail() {
   const [interests, setInterests] = useState([]);
   const [offers, setOffers] = useState([]);
   const [agreementsCount, setAgreementsCount] = useState(0);
-  const [statusBusy, setStatusBusy] = useState(false);
   // Owner-side exclusivity-agreement popup (was: routed to /edit)
   const [exclusivityOpen, setExclusivityOpen] = useState(false);
   // 2026-05-11 — rail-side "הוסף מתעניין" picker. Attaches selected
@@ -673,27 +673,6 @@ export default function PropertyDetail() {
   const pricePerSqm = property.marketingPrice && property.sqm
     ? Math.round(Number(property.marketingPrice) / Number(property.sqm))
     : null;
-
-  // ── V1 Refined — pause / resume marketing ──────────────────────
-  // Server accepts ACTIVE / PAUSED via PATCH. Optimistic update keeps the
-  // header pill in sync; on failure we revert and toast the error.
-  const togglePauseMarketing = async () => {
-    if (statusBusy) return;
-    const next = property.status === 'PAUSED' ? 'ACTIVE' : 'PAUSED';
-    setStatusBusy(true);
-    const prev = property;
-    setProperty({ ...property, status: next });
-    try {
-      await api.updateProperty(property.id, { status: next });
-      toast.success(next === 'PAUSED' ? 'השיווק הושהה' : 'השיווק חודש');
-      await load();
-    } catch (e) {
-      setProperty(prev);
-      toast.error(e?.message || 'עדכון הסטטוס נכשל');
-    } finally {
-      setStatusBusy(false);
-    }
-  };
 
   // ── V1 Refined — next-best action heuristic ────────────────────
   // Picks the most pressing pending interaction so the action rail can

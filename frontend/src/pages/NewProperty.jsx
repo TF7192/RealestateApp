@@ -30,7 +30,6 @@ import CityField from '../components/CityField';
 import { useDraftAutosave, readDraft } from '../hooks/mobile';
 import { relLabel } from '../lib/relativeDate';
 import {
-  inputPropsForName,
   inputPropsForContactName,
   inputPropsForCity,
   inputPropsForEmail,

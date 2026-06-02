@@ -745,7 +745,6 @@ function CounterPopup({ parent, onClose, onSubmit }) {
 }
 
 function InterestTimeline({ interestId, propertyId }) {
-  const toast = useToast();
   const [events, setEvents] = useState(null);
 
   const load = useCallback(() => {
