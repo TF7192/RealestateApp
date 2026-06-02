@@ -138,7 +138,7 @@ describe('P-9 — tabs no longer hang on a spinner when props missing', () => {
   it('PropertyDetail passes the correct prop shapes', () => {
     const pd = read('frontend/src/pages/PropertyDetail.jsx');
     expect(pd).toMatch(/<RemindersPanel\s+propertyId=\{property\.id\}/);
-    expect(pd).toMatch(/<ActivityPanel\s+entityType="PROPERTY"\s+entityId=\{property\.id\}/);
+    expect(pd).toMatch(/<ActivityPanel\s+entityType="Property"\s+entityId=\{property\.id\}/);
   });
 });
 

@@ -62,8 +62,8 @@ describe('<PropertyDetail> — V1 Refined layout', () => {
     expect(screen.getByRole('tab', { name: 'בעל הנכס' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /מתעניינים/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'פעילות' })).toBeInTheDocument();
-    // More pills — secondary surfaces
-    expect(screen.getByRole('button', { name: /פאנל פעולות שיווק/ })).toBeInTheDocument();
+    // More pills — secondary surfaces (פאנל פעולות שיווק was removed
+    // with the ניהול שיווקי cull on 2026-06-02).
     expect(screen.getByRole('button', { name: /ניהול מדיה/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /גלול אל הסכמי תיווך/ })).toBeInTheDocument();
   });

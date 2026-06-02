@@ -40,15 +40,14 @@ describe('<Settings>', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the three cards (neighborhoods / profile / templates)', async () => {
+  it('shows the two cards (neighborhoods / profile)', async () => {
     asAgent();
     render(<Settings />);
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /שכונות/ })).toBeInTheDocument();
     });
     expect(screen.getByRole('link', { name: /הפרופיל שלי/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /תבניות הודעה/ })).toBeInTheDocument();
-    expect(screen.getAllByRole('link')).toHaveLength(3);
+    expect(screen.getAllByRole('link')).toHaveLength(2);
   });
 
   it('neighborhoods card links to /settings/neighborhoods (even before that route exists)', async () => {

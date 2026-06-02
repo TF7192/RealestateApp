@@ -11,12 +11,9 @@ import { describe, it, expect } from 'vitest';
 import { api } from '../../../frontend/src/lib/api.js';
 
 const MLS_API_METHODS = [
-  // Office (A1)
-  'getOffice',
-  'createOffice',
-  'updateOffice',
-  'addOfficeMember',
-  'removeOfficeMember',
+  // Office admin UI was removed 2026-06-02; Office tables stay
+  // (they scope tenants) but the createOffice/updateOffice/etc.
+  // methods are gone. No public office RPCs remain.
   // Tags (A2)
   'listTags',
   'createTag',
