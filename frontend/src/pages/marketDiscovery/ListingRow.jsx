@@ -4,12 +4,17 @@
 // agents can fire actions without triggering the drawer.
 
 import { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Copy as CopyIcon, MoreHorizontal, CheckCircle2, Sparkles, User, Briefcase } from 'lucide-react';
+import { ExternalLink, Copy as CopyIcon, MoreHorizontal, CheckCircle2, Sparkles, User, Briefcase, Plus, Tag as TagIcon } from 'lucide-react';
 import { displayPriceShort } from '../../lib/display';
 import { freshLabel } from './freshLabel';
 import { floorLabel } from './floorLabel';
+import MarketTagPicker from './MarketTagPicker';
 
-export default function ListingRow({ listing, isMatched, isDuplicated, onOpen, onOpenMine, onDuplicate, onOverflow }) {
+export default function ListingRow({
+  listing, isMatched, isDuplicated,
+  onOpen, onOpenMine, onDuplicate, onOverflow,
+  tags = [], onAttachTag, onDetachTag, onCreateAndAttachTag,
+}) {
   const accent = isDuplicated ? 'duplicated' : isMatched ? 'matched' : null;
   const matched = (Array.isArray(listing.matches) ? listing.matches : []).filter(Boolean);
   const namesShown = matched.slice(0, 3).map((m) => m.leadName).filter(Boolean).join(', ');
@@ -69,6 +74,14 @@ export default function ListingRow({ listing, isMatched, isDuplicated, onOpen, o
             התאמה למתעניין: {namesShown}{namesOverflow ? ` +${namesOverflow}` : ''}
           </div>
         )}
+
+        <TagChipCluster
+          listing={listing}
+          tags={tags}
+          onAttachTag={onAttachTag}
+          onDetachTag={onDetachTag}
+          onCreateAndAttachTag={onCreateAndAttachTag}
+        />
       </div>
 
       <div className="md-row-price-block">
@@ -173,6 +186,59 @@ function RowOverflow({ onOverflow }) {
   );
 }
 
+
+// 2026-06-02 — Inline tag chips + add-button per row. Clicking a chip
+// opens the popover anchored to the cluster; the popover lets the agent
+// add/remove tags (and quick-create new ones) for THIS row.
+function TagChipCluster({ listing, tags, onAttachTag, onDetachTag, onCreateAndAttachTag }) {
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef(null);
+  const assignedIds = listing.assignedTagIds || [];
+  const byId = new Map(tags.map((t) => [t.id, t]));
+  const assignedTags = assignedIds.map((id) => byId.get(id)).filter(Boolean);
+
+  return (
+    <div
+      className="md-row-tag-cluster"
+      ref={anchorRef}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {assignedTags.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          className="md-row-tag-chip"
+          style={{ background: t.color }}
+          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+          title={`ערוך תגיות`}
+        >
+          <TagIcon size={10} />
+          {t.name}
+        </button>
+      ))}
+      <button
+        type="button"
+        className="md-row-tag-add"
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        aria-label="הוסף תגית"
+      >
+        <Plus size={10} />
+        {assignedTags.length === 0 ? 'הוסף תגית' : null}
+      </button>
+      {open && (
+        <MarketTagPicker
+          tags={tags}
+          assignedTagIds={assignedIds}
+          onAttach={onAttachTag}
+          onDetach={onDetachTag}
+          onCreateAndAttach={onCreateAndAttachTag}
+          onClose={() => setOpen(false)}
+          anchorRef={anchorRef}
+        />
+      )}
+    </div>
+  );
+}
 
 function OverflowItem({ action, onPick }) {
   const labels = {

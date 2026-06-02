@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Filter, Mail, MailCheck, Eye, EyeOff, List, Grid, X, Sparkles } from 'lucide-react';
+import { Building2, Filter, Mail, MailCheck, Eye, EyeOff, List, Grid, X, Sparkles, Tags } from 'lucide-react';
 import api from './../lib/api';
 import { useToast } from './../lib/toast';
 import { freshLabel } from './marketDiscovery/freshLabel';
@@ -27,6 +27,8 @@ import ListingCard from './marketDiscovery/ListingCard';
 import ListingDrawer from './marketDiscovery/ListingDrawer';
 import MatchSendDialog from './marketDiscovery/MatchSendDialog';
 import EmailSignupModal from './marketDiscovery/EmailSignupModal';
+import MarketTagManager from './marketDiscovery/MarketTagManager';
+import CityFilterBar from './marketDiscovery/CityFilterBar';
 import './MarketDiscovery.css';
 
 const SORTS = [
@@ -84,6 +86,16 @@ export default function MarketDiscovery() {
     catch { return new Set(); }
   });
 
+  // 2026-06-02 — per-asset tags + inline city/area filter.
+  // `tags` is the agent's full catalogue (used by the picker, manager,
+  // and filter bar). `selectedTagIds` is the active filter (OR-semantics).
+  // `cityScope` is the agent's saved specialtyCities — both consumed by
+  // the backend's listings endpoint when present.
+  const [tags, setTags] = useState([]);
+  const [selectedTagIds, setSelectedTagIds] = useState([]);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
+  const [cityScope, setCityScope] = useState([]);
+
   // Email pref state — same shape as the legacy page.
   const [emailPref, setEmailPref] = useState(null);
   const [emailSaving, setEmailSaving] = useState(false);
@@ -136,6 +148,31 @@ export default function MarketDiscovery() {
     return () => { cancelled = true; };
   }, []);
 
+  // 2026-06-02 — load this agent's MarketTag catalogue once. The picker
+  // popover, the filter bar, and the manager dialog all read from this
+  // single state — they don't re-fetch. We refresh after every mutation
+  // (create/update/delete) so the inline UI stays in sync.
+  const refreshTags = useCallback(async () => {
+    try {
+      const res = await api.listMarketTags();
+      setTags(res?.tags || []);
+    } catch { /* tolerate */ }
+  }, []);
+  useEffect(() => { refreshTags(); }, [refreshTags]);
+
+  // 2026-06-02 — load saved specialty-cities so the inline city bar at
+  // the top of the page is pre-populated. The bar mutates this state +
+  // persists via PATCH /me/specialty-cities; the backend listings
+  // endpoint reads the same field, so a refresh after a city change
+  // keeps the feed consistent with the bar.
+  useEffect(() => {
+    let cancelled = false;
+    api.getSpecialtyCities()
+      .then((res) => { if (!cancelled) setCityScope(res?.cities || []); })
+      .catch(() => { /* tolerate empty */ });
+    return () => { cancelled = true; };
+  }, []);
+
   // Match deep-link via ?match=:id.
   useEffect(() => {
     if (!matchId) { setMatchContext(null); return undefined; }
@@ -163,7 +200,8 @@ export default function MarketDiscovery() {
     setItems([]);
     setHasMoreServer(false);
     const serverFilters = stripClientFilters(filters);
-    api.listMarketListings({ ...serverFilters, sort, limit: PAGE_SIZE, offset: 0 }).then(
+    const tagParam = selectedTagIds.length > 0 ? { tagIds: selectedTagIds.join(',') } : {};
+    api.listMarketListings({ ...serverFilters, ...tagParam, sort, limit: PAGE_SIZE, offset: 0 }).then(
       (res) => {
         if (myReqId !== reqIdRef.current) return;
         const fetched = res?.items || [];
@@ -186,7 +224,12 @@ export default function MarketDiscovery() {
   }, [filters.city, filters.neighborhood, filters.propertyType, filters.kind,
       filters.posterType, filters.minPrice, filters.maxPrice, filters.minRooms,
       filters.maxRooms, filters.minSqm, filters.maxSqm, filters.status,
-      filters.firstSeenAfter, sort]);
+      filters.firstSeenAfter, sort,
+      // 2026-06-02 — re-fetch when the active tag filter or the saved
+      // city scope changes. selectedTagIds → tagIds query param.
+      // cityScope persists to the User row and the backend reads it
+      // back on the next /listings call.
+      selectedTagIds, cityScope]);
 
   // Fetch the next page of listings, appending to `items`. The stale-
   // request check (req-id) prevents an in-flight next-page from clobbering
@@ -197,8 +240,9 @@ export default function MarketDiscovery() {
     setLoadingMore(true);
     try {
       const serverFilters = stripClientFilters(filters);
+      const tagParam = selectedTagIds.length > 0 ? { tagIds: selectedTagIds.join(',') } : {};
       const res = await api.listMarketListings({
-        ...serverFilters, sort,
+        ...serverFilters, ...tagParam, sort,
         limit: PAGE_SIZE,
         offset: items.length,
       });
@@ -215,7 +259,7 @@ export default function MarketDiscovery() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loading, loadingMore, hasMoreServer, filters, sort, items.length, toast]);
+  }, [loading, loadingMore, hasMoreServer, filters, sort, items.length, toast, selectedTagIds]);
 
   const updateFilters = useCallback((patch) => {
     setFilters((f) => {
@@ -386,6 +430,114 @@ export default function MarketDiscovery() {
     }
   }, [toast]);
 
+  // 2026-06-02 — Tag handlers. Optimistic local-state updates so the
+  // chip UI on each row reacts instantly; we reconcile from the server
+  // on next refresh (refreshTags / refetch on filter change).
+  const handleAttachTag = useCallback(async (listingId, tag) => {
+    setItems((rows) => rows.map((r) => (
+      r.id === listingId && !r.assignedTagIds?.includes(tag.id)
+        ? { ...r, assignedTagIds: [...(r.assignedTagIds || []), tag.id] }
+        : r
+    )));
+    try {
+      await api.assignMarketTag(tag.id, listingId);
+    } catch (err) {
+      toast.error?.(err?.message || 'הצמדת תגית נכשלה');
+      // Roll back the optimistic change.
+      setItems((rows) => rows.map((r) => (
+        r.id === listingId
+          ? { ...r, assignedTagIds: (r.assignedTagIds || []).filter((id) => id !== tag.id) }
+          : r
+      )));
+    }
+  }, [toast]);
+
+  const handleDetachTag = useCallback(async (listingId, tag) => {
+    setItems((rows) => rows.map((r) => (
+      r.id === listingId
+        ? { ...r, assignedTagIds: (r.assignedTagIds || []).filter((id) => id !== tag.id) }
+        : r
+    )));
+    try {
+      await api.unassignMarketTag(tag.id, listingId);
+    } catch (err) {
+      toast.error?.(err?.message || 'הסרת תגית נכשלה');
+      setItems((rows) => rows.map((r) => (
+        r.id === listingId && !r.assignedTagIds?.includes(tag.id)
+          ? { ...r, assignedTagIds: [...(r.assignedTagIds || []), tag.id] }
+          : r
+      )));
+    }
+  }, [toast]);
+
+  const handleCreateTag = useCallback(async ({ name, color }) => {
+    try {
+      const res = await api.createMarketTag({ name, color });
+      const tag = res?.tag;
+      if (tag) setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name, 'he')));
+      return tag;
+    } catch (err) {
+      toast.error?.(err?.message || 'יצירת תגית נכשלה');
+      return null;
+    }
+  }, [toast]);
+
+  // Used by the per-row picker — creates a tag and attaches it to the
+  // current listing in one shot. Sequenced (create → attach) because
+  // the assign endpoint needs the tag id.
+  const handleCreateAndAttach = useCallback(async (listingId, { name, color }) => {
+    const tag = await handleCreateTag({ name, color });
+    if (tag) await handleAttachTag(listingId, tag);
+  }, [handleCreateTag, handleAttachTag]);
+
+  const handleUpdateTag = useCallback(async (tagId, patch) => {
+    try {
+      const res = await api.updateMarketTag(tagId, patch);
+      const updated = res?.tag;
+      if (updated) {
+        setTags((prev) => prev.map((t) => (t.id === tagId ? { ...t, ...updated } : t)));
+      }
+    } catch (err) {
+      toast.error?.(err?.message || 'עדכון תגית נכשל');
+    }
+  }, [toast]);
+
+  const handleDeleteTag = useCallback(async (tagId) => {
+    try {
+      await api.deleteMarketTag(tagId);
+      setTags((prev) => prev.filter((t) => t.id !== tagId));
+      setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+      // Strip the deleted tag id from any rows currently rendered so
+      // we don't show a stale chip until the next refetch.
+      setItems((rows) => rows.map((r) => ({
+        ...r,
+        assignedTagIds: (r.assignedTagIds || []).filter((id) => id !== tagId),
+      })));
+    } catch (err) {
+      toast.error?.(err?.message || 'מחיקת תגית נכשלה');
+    }
+  }, [toast]);
+
+  const toggleTagFilter = useCallback((tagId) => {
+    setSelectedTagIds((prev) => (
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+    ));
+  }, []);
+
+  // 2026-06-02 — Persist city-scope changes back to /me/specialty-cities
+  // so Profile + the next visit see the same list. Optimistic local
+  // state so the chip strip + the filtered feed update immediately.
+  const handleCityScopeChange = useCallback(async (next) => {
+    const prev = cityScope;
+    setCityScope(next);
+    try {
+      await api.setSpecialtyCities(next);
+    } catch (err) {
+      toast.error?.(err?.message || 'שמירת ערים נכשלה');
+      setCityScope(prev);
+    }
+  }, [cityScope, toast]);
+
   // Email modal handlers.
   const openEmailModal = () => {
     if (emailPref == null) return;
@@ -487,11 +639,67 @@ export default function MarketDiscovery() {
         </div>
       </div>
 
+      <CityFilterBar
+        value={cityScope}
+        onChange={handleCityScopeChange}
+      />
+
       <PulseStrip
         pulse={pulse}
         loading={pulseLoading}
         onApply={(patch) => updateFilters(patch)}
       />
+
+      {/* 2026-06-02 — horizontal tag filter strip. OR-semantics across
+          selected chips. The "ניהול תגיות" affordance sits on the far
+          end so the most-used surface (toggling) stays one tap away. */}
+      <div className="md-tag-bar" role="toolbar" aria-label="פילטר תגיות">
+        <span className="md-tag-bar-label">
+          <Tags size={12} />
+          תגיות
+        </span>
+        {tags.length === 0 && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            עדיין אין תגיות — לחצ/י "ניהול תגיות" כדי להתחיל.
+          </span>
+        )}
+        {tags.map((t) => {
+          const active = selectedTagIds.includes(t.id);
+          return (
+            <button
+              key={t.id}
+              type="button"
+              className="md-tag-filter-chip"
+              data-active={active ? 'true' : 'false'}
+              onClick={() => toggleTagFilter(t.id)}
+              aria-pressed={active}
+            >
+              <span className="md-tag-filter-dot" style={{ background: t.color }} aria-hidden />
+              {t.name}
+            </button>
+          );
+        })}
+        {selectedTagIds.length > 0 && (
+          <button
+            type="button"
+            className="md-tag-manage-btn"
+            onClick={() => setSelectedTagIds([])}
+            title="נקה פילטר תגיות"
+            style={{ marginInlineStart: 4 }}
+          >
+            <X size={12} />
+            נקה
+          </button>
+        )}
+        <button
+          type="button"
+          className="md-tag-manage-btn"
+          onClick={() => setTagManagerOpen(true)}
+        >
+          <Tags size={12} />
+          ניהול תגיות
+        </button>
+      </div>
 
       <div className="md-layout">
         <FilterRail
@@ -632,6 +840,10 @@ export default function MarketDiscovery() {
                   onOpenMine={handleOpenMine}
                   onDuplicate={handleDuplicate}
                   onOverflow={(target, action) => handleOverflow(target, action)}
+                  tags={tags}
+                  onAttachTag={(tag) => handleAttachTag(l.id, tag)}
+                  onDetachTag={(tag) => handleDetachTag(l.id, tag)}
+                  onCreateAndAttachTag={(payload) => handleCreateAndAttach(l.id, payload)}
                 />
               ))}
             </div>
@@ -688,6 +900,15 @@ export default function MarketDiscovery() {
         match={sendDialog?.match}
         listing={sendDialog?.listing}
         onClose={() => setSendDialog(null)}
+      />
+
+      <MarketTagManager
+        open={tagManagerOpen}
+        tags={tags}
+        onCreate={handleCreateTag}
+        onUpdate={handleUpdateTag}
+        onDelete={handleDeleteTag}
+        onClose={() => setTagManagerOpen(false)}
       />
 
       <EmailSignupModal

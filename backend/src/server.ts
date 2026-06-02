@@ -30,6 +30,7 @@ import { registerYad2Routes } from './routes/yad2.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerMarketRoutes } from './routes/market.js';
 import { registerMarketDiscoveryRoutes } from './routes/marketDiscovery.js';
+import { registerMarketTagRoutes } from './routes/marketTags.js';
 import { registerNotificationPreferencesRoutes } from './routes/notificationPreferences.js';
 import { registerSitemapRoute } from './routes/sitemap.js';
 import { registerProspectRoutes } from './routes/prospects.js';
@@ -322,6 +323,9 @@ export async function build(opts: BuildOptions = {}) {
   // Market Discovery (2026-04-27) — hourly Yad2 metadata watcher
   // surface. Read-only listings + per-agent matches + duplicate flow.
   await app.register(registerMarketDiscoveryRoutes, { prefix: '/api/market-discovery' });
+  // 2026-06-02 — per-agent Gmail-style labels on /market-discovery rows.
+  // Mounted under /api/market/tags (sibling to /api/market/property/*).
+  await app.register(registerMarketTagRoutes, { prefix: '/api/market/tags' });
   // Phase 3 — per-user opt-in notification preferences (in-app /
   // email / SMS toggles + min-score-for-external-delivery threshold).
   await app.register(registerNotificationPreferencesRoutes, { prefix: '/api/notification-preferences' });

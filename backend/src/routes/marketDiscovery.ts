@@ -40,6 +40,10 @@ const listFiltersSchema = z.object({
     'price-desc',
     'pricePerSqm-asc',
   ]).default('firstSeenAt-desc'),
+  // 2026-06-02 — tag filter. Comma-separated list of MarketTag.id; OR
+  // semantics (a row matches if it carries ANY of the listed tags).
+  // Capped at 20 to bound the IN-list size.
+  tagIds:         z.string().trim().min(1).optional(),
   // Pagination
   limit:          z.coerce.number().int().min(1).max(100).default(50),
   offset:         z.coerce.number().int().min(0).default(0),
@@ -165,6 +169,30 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
         ...(f.maxSqm != null ? { lte: f.maxSqm } : {}),
       };
     }
+    // 2026-06-02 — tag filter (OR semantics). Resolve the supplied ids
+    // to THIS agent's tags only; ids belonging to other agents are
+    // silently dropped (rather than 400'd) so a stale chip in another
+    // tab doesn't blow up the feed.
+    let tagFilterIds: string[] | null = null;
+    if (f.tagIds) {
+      const requested = f.tagIds.split(',').map((s) => s.trim()).filter(Boolean);
+      const capped = requested.slice(0, 20);
+      if (capped.length > 0) {
+        const owned = await prisma.marketTag.findMany({
+          where: { id: { in: capped }, agentId: userId },
+          select: { id: true },
+        });
+        tagFilterIds = owned.map((t) => t.id);
+      }
+    }
+    if (tagFilterIds) {
+      // If the agent passed tag ids but NONE belong to them, force an
+      // empty result rather than dropping the filter entirely.
+      if (tagFilterIds.length === 0) {
+        return reply.send({ items: [], total: 0, limit: f.limit, offset: f.offset });
+      }
+      where.tagAssignments = { some: { tagId: { in: tagFilterIds } } };
+    }
 
     const [rawItems, total] = await Promise.all([
       prisma.marketListing.findMany({
@@ -188,7 +216,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     // the chosen sort. With f.limit ≤ 100 the second query is cheap.
     // (`userId` is captured above, before the where-clause is built.)
     const ids = rawItems.map((x) => x.id);
-    const [myMatches, myDuplicates] = await Promise.all([
+    const [myMatches, myDuplicates, myTagAssignments] = await Promise.all([
       ids.length
         ? prisma.marketListingLeadMatch.findMany({
             where: {
@@ -216,6 +244,19 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
             select: { id: true, marketListingId: true },
           })
         : Promise.resolve([] as any[]),
+      // 2026-06-02 — hydrate THIS agent's tag assignments per listing.
+      // Single covering query; tag-id list is attached to each row as
+      // `assignedTagIds` so the FE can render the inline chips without
+      // a second round-trip.
+      ids.length
+        ? prisma.marketTagAssignment.findMany({
+            where: {
+              marketListingId: { in: ids },
+              tag: { is: { agentId: userId } },
+            },
+            select: { tagId: true, marketListingId: true },
+          })
+        : Promise.resolve([] as Array<{ tagId: string; marketListingId: string }>),
     ]);
     // Group ALL matches per listing (was: top-only). UI now shows lead
     // names ("מתאים לטל פוקס, הדר…") instead of a 55/100 score, so we
@@ -230,6 +271,12 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     const duplicateByListing = new Map<string, string>();
     for (const p of myDuplicates) {
       if (p.marketListingId) duplicateByListing.set(p.marketListingId, p.id);
+    }
+    const tagsByListing = new Map<string, string[]>();
+    for (const a of myTagAssignments) {
+      const arr = tagsByListing.get(a.marketListingId) || [];
+      arr.push(a.tagId);
+      tagsByListing.set(a.marketListingId, arr);
     }
     const items = rawItems.map((x) => {
       const ms = matchesByListing.get(x.id) || [];
@@ -248,6 +295,7 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
         topMatch: matches[0] || null,
         matches,
         duplicatedByMe: duplicateByListing.get(x.id) || null,
+        assignedTagIds: tagsByListing.get(x.id) || [],
       };
     });
     // Stable in-memory sort: matched listings first (by top score desc),
