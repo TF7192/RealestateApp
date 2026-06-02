@@ -15,14 +15,10 @@ import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
 import Portal from '../components/Portal';
 import NewMeetingDialog from '../components/NewMeetingDialog';
-import { Suspense } from 'react';
-import {
-  PipelineDonut,
-  LeadSourceDonut,
-  MatchCoverageGauge,
-  DaysOnMarketBar,
-  SilenceBucketsBar,
-} from '../components/DashboardChartsLazy';
+// DashboardCharts removed 2026-06-02 — recharts@3.8 pulls es-toolkit
+// CJS shims that trip rolldown's interop and crash module init in
+// production builds. Charts will return once we swap to a chart lib
+// without the CJS dep, or once rolldown ships a fix.
 
 // ─── Tokens lifted from the bundle's shell.jsx ──────────────
 const DT = {
@@ -682,22 +678,7 @@ export default function Dashboard() {
         gap: 14,
         marginBottom: 14,
       }}>
-        <Suspense fallback={<div style={{ minHeight: 220 }} />}>
-          <PipelineDonut deals={deals} />
-          <LeadSourceDonut leads={leads} />
-          <MatchCoverageGauge leads={leads} properties={properties} />
-        </Suspense>
-      </div>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
-        gap: 14,
-        marginBottom: 14,
-      }}>
-        <Suspense fallback={<div style={{ minHeight: 220 }} />}>
-          <DaysOnMarketBar properties={properties} />
-          <SilenceBucketsBar leads={leads} />
-        </Suspense>
+        {/* Charts temporarily removed — see header comment. */}
       </div>
 
       <div style={{
