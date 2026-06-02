@@ -364,33 +364,33 @@ model OfficeInvite {
 // currently use citext anywhere so this is a larger migration sweep,
 // deferred from the SEC hardening pass.
 model User {
-  id                    String       @id @default(cuid())
+  id                     String       @id @default(cuid())
   // P2-4 — VarChar caps. RFC 5321 caps email at 254; we use 255 to
   // match the historic ORM convention. Phones cover any plausible
   // international format including extensions.
-  email                 String       @unique @db.VarChar(255)
-  passwordHash          String?
-  role                  UserRole
-  provider              AuthProvider @default(EMAIL)
-  googleId              String?      @unique
-  appleId               String?      @unique
-  displayName           String
+  email                  String       @unique @db.VarChar(255)
+  passwordHash           String?
+  role                   UserRole
+  provider               AuthProvider @default(EMAIL)
+  googleId               String?      @unique
+  appleId                String?      @unique
+  displayName            String
   // Public, SEO-friendly identifier — used in /agents/<slug> URLs.
-  slug                  String?      @unique
-  phone                 String?      @db.VarChar(32)
-  avatarUrl             String?
+  slug                   String?      @unique
+  phone                  String?      @db.VarChar(32)
+  avatarUrl              String?
   // ── Onboarding tutorial ────────────────────────────────────────
   // Tracks whether the agent has completed (or skipped) the first-run
   // tour, and which platform they first logged in on — we only show
   // the tour on that same platform so it doesn't re-fire after a
   // device switch.
-  hasCompletedTutorial  Boolean      @default(false)
-  firstLoginPlatform    String? // 'web' | 'ios' | 'android'
+  hasCompletedTutorial   Boolean      @default(false)
+  firstLoginPlatform     String? // 'web' | 'ios' | 'android'
   // A-4 — set by POST /api/me/profile when the agent finishes the
   // first-login onboarding form (license number + optional title /
   // agency / phone). If null, the SPA route guard bounces the user
   // to /onboarding from every other authed route until they submit.
-  profileCompletedAt    DateTime?    @db.Timestamptz(6)
+  profileCompletedAt     DateTime?    @db.Timestamptz(6)
   // A-1 — soft delete. When set, /api/me rejects the request and the
   // SPA logs the user out. UI lies gracefully about "permanence" —
   // rows stay intact so a follow-up support request can restore them
@@ -403,31 +403,31 @@ model User {
   // soft-deleted User by hard-deleting the row 30 days later, which
   // cascades to every owned tenant row. Every read of User MUST add
   // `deletedAt: null`; auth.ts already does this in middleware.
-  deletedAt             DateTime?    @db.Timestamptz(6)
+  deletedAt              DateTime?    @db.Timestamptz(6)
   // 2026-04-27 — Compliance/PPL §11. When the user accepted the
   // current Terms + Privacy Policy. Required at signup; updated when
   // a new policy version forces re-consent.
-  termsAcceptedAt       DateTime?    @db.Timestamptz(6)
+  termsAcceptedAt        DateTime?    @db.Timestamptz(6)
   // 2026-04-27 — Cookie/analytics opt-in. NULL = no decision yet
   // (essential cookies only); true = consented to PostHog product
   // analytics; false = explicitly declined. Frontend reads this so
   // it can re-prompt only when null.
-  analyticsConsent      Boolean?
-  analyticsConsentAt    DateTime?    @db.Timestamptz(6)
+  analyticsConsent       Boolean?
+  analyticsConsentAt     DateTime?    @db.Timestamptz(6)
   // 2026-04-27 — JWT revocation anchor. Reject any JWT whose `iat`
   // is older than this timestamp. Bumped on password change and on
   // explicit "log out everywhere" so a leaked 30-day token is dead
   // on the next request after the user remediates.
-  passwordChangedAt     DateTime?    @db.Timestamptz(6)
+  passwordChangedAt      DateTime?    @db.Timestamptz(6)
   // 7.1 — Google Calendar OAuth tokens. Populated by a consent flow
   // that's separate from (but layered on top of) the existing Google
   // login — agents who logged in with email can still connect their
   // Calendar. Access token expires ~1h; we keep the refresh token to
   // mint new ones server-side without user re-consent.
-  googleAccessToken     String?
-  googleRefreshToken    String?
-  googleTokenExpiresAt  DateTime?    @db.Timestamptz(6)
-  googleCalendarEnabled Boolean      @default(false)
+  googleAccessToken      String?
+  googleRefreshToken     String?
+  googleTokenExpiresAt   DateTime?    @db.Timestamptz(6)
+  googleCalendarEnabled  Boolean      @default(false)
   // 2026-05-08 — same shape, but Microsoft Graph (Outlook). Agents
   // using O365 instead of Google can connect their Outlook calendar
   // and have meetings two-way-sync. OAuth scope =
@@ -517,6 +517,10 @@ model User {
   // Market Discovery (2026-04-27) — back-relation for matches the
   // hourly watcher creates against this agent's active LeadSearchProfiles.
   marketListingMatches   MarketListingLeadMatch[]
+  // 2026-06-02 — per-agent Gmail-style labels on /market-discovery rows.
+  // Tag namespace is per-agent; assignments cascade when a tag is deleted
+  // and when the owning agent is deleted.
+  marketTags             MarketTag[]                   @relation("AgentMarketTags")
   // Phase 3 — opt-in notification preferences (email/SMS).
   notificationPreference UserNotificationPreference?
   // Phase 3 — pending email/SMS deliveries the worker drains.
@@ -811,33 +815,33 @@ model Property {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
-  images           PropertyImage[]
-  viewings         PropertyViewing[]
-  videos           PropertyVideo[]
-  documents        UploadedFile[]
-  deal             Deal?
-  agreements       Agreement[]
-  prospects        Prospect[]
-  reminders        Reminder[]
-  assignees        PropertyAssignee[]
+  images          PropertyImage[]
+  viewings        PropertyViewing[]
+  videos          PropertyVideo[]
+  documents       UploadedFile[]
+  deal            Deal?
+  agreements      Agreement[]
+  prospects       Prospect[]
+  reminders       Reminder[]
+  assignees       PropertyAssignee[]
   // 2026-05-03 — external broker contacts the agent is coordinating with on this listing.
-  brokers          PropertyBroker[]
-  adverts          Advert[]
+  brokers         PropertyBroker[]
+  adverts         Advert[]
   // Sprint 6 — in-house digital contracts attached to this property.
-  contracts        Contract[]
+  contracts       Contract[]
   // 2026-05-10 — per-lead "activity log" anchors on this property.
   // Each row is one (lead, property) pair the agent is actively working;
   // all child entities (viewings, offers, agreements, contracts, meetings)
   // optionally point back via `interestId`.
-  interests        PropertyInterest[]
+  interests       PropertyInterest[]
   // 2026-05-10 — meetings tagged with this property (showings, in-person
   // negotiations, walkthroughs). Distinct from generic agent meetings.
-  meetings         LeadMeeting[]
+  meetings        LeadMeeting[]
   // 2026-05-10 — owner-side interaction log (commission talks, price
   // negotiations, owner feedback on specific buyers, marketing approvals,
   // tour permissions, objections). Separate from PropertyInterest which
   // is buyer-side.
-  ownerActivities  OwnerActivity[]
+  ownerActivities OwnerActivity[]
 
   // Excel-import tag. Same purpose as Lead.importBatchId.
   importBatchId   String?
@@ -949,23 +953,23 @@ model PropertyImage {
 // intact. Optionally links back to a Lead if the buyer is already in
 // the agent's CRM.
 model PropertyOffer {
-  id         String              @id @default(cuid())
-  propertyId String
-  property   Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  id             String                 @id @default(cuid())
+  propertyId     String
+  property       Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   // Optional CRM link — when null, the offer captures only the
   // free-form name + phone fields below.
-  leadId     String?
-  lead       Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  buyerName  String
-  buyerPhone String?
-  amount     Int
-  status     PropertyOfferStatus @default(NEW)
+  leadId         String?
+  lead           Lead?                  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  buyerName      String
+  buyerPhone     String?
+  amount         Int
+  status         PropertyOfferStatus    @default(NEW)
   // Free-form notes — financing terms, contingencies, "מציע מותנה
   // בקבלת משכנתא", etc. Hebrew-friendly.
-  notes      String?
+  notes          String?
   // When the offer was received. Defaults to row creation but can be
   // overridden when the agent is recording past offers.
-  receivedAt DateTime            @default(now()) @db.Timestamptz(6)
+  receivedAt     DateTime               @default(now()) @db.Timestamptz(6)
   // 2026-05-10 — "relayed amount" supports the Israeli broker
   // negotiation pattern where the agent passes a SHAVED price to the
   // seller (e.g., buyer offered 2.1M, agent relays 2.08M to keep 20K
@@ -973,28 +977,28 @@ model PropertyOffer {
   // offer; `relayedAmount` is what the agent communicated to the
   // seller. When relayedAmount is null, the agent passed the offer
   // through as-is.
-  relayedAmount Int?
+  relayedAmount  Int?
   // ── Threaded buyer↔owner dialog ──────────────────────────────
   // Each offer is one round of the dialog. `direction` flags which
   // side proposed this round so the timeline can render arrows
   // (BUYER_TO_SELLER ▶, SELLER_TO_BUYER ◀ counter-offer).
   // `replyToOfferId` threads counters to their parent so a multi-round
   // negotiation reads as a conversation, not a flat list.
-  direction       PropertyOfferDirection @default(BUYER_TO_SELLER)
-  replyToOfferId  String?
-  replyToOffer    PropertyOffer? @relation("OfferThread", fields: [replyToOfferId], references: [id], onDelete: SetNull)
-  replies         PropertyOffer[] @relation("OfferThread")
+  direction      PropertyOfferDirection @default(BUYER_TO_SELLER)
+  replyToOfferId String?
+  replyToOffer   PropertyOffer?         @relation("OfferThread", fields: [replyToOfferId], references: [id], onDelete: SetNull)
+  replies        PropertyOffer[]        @relation("OfferThread")
   // ── Agreed deal terms per round ──────────────────────────────
   // Free-text payment schedule and handover date for THIS particular
   // offer round. Lets each counter-offer carry its own terms; the
   // "winning" offer becomes the deal terms.
-  paymentTerms    String?
-  handoverNotes   String?
-  createdAt  DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt  DateTime            @updatedAt @db.Timestamptz(6)
+  paymentTerms   String?
+  handoverNotes  String?
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @db.Timestamptz(6)
   // 2026-05-10 — back-link to the PropertyInterest activity log row.
-  interestId String?
-  interest   PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
+  interestId     String?
+  interest       PropertyInterest?      @relation(fields: [interestId], references: [id], onDelete: SetNull)
 
   @@index([propertyId])
   @@index([leadId])
@@ -1016,8 +1020,8 @@ enum PropertyOfferStatus {
 // relays counter-offers between the two sides; tagging each row makes
 // the timeline read as a coherent dialog.
 enum PropertyOfferDirection {
-  BUYER_TO_SELLER   // buyer's offer (potentially relayed shaved to seller via `relayedAmount`)
-  SELLER_TO_BUYER   // seller's counter-offer back to the buyer
+  BUYER_TO_SELLER // buyer's offer (potentially relayed shaved to seller via `relayedAmount`)
+  SELLER_TO_BUYER // seller's counter-offer back to the buyer
 }
 
 model PropertyVideo {
@@ -1037,12 +1041,12 @@ model PropertyVideo {
 }
 
 model PropertyViewing {
-  id         String   @id @default(cuid())
+  id         String            @id @default(cuid())
   propertyId String
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   leadId     String?
-  lead       Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  viewedAt   DateTime @default(now()) @db.Timestamptz(6)
+  lead       Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  viewedAt   DateTime          @default(now()) @db.Timestamptz(6)
   source     String?
   notes      String?
   // 2026-05-10 — back-link to the PropertyInterest pipeline row that
@@ -1070,18 +1074,18 @@ model PropertyViewing {
 // can run for months with viewings and offers in parallel. The "stage"
 // is just a status flag the agent owns.
 model PropertyInterest {
-  id          String                 @id @default(cuid())
-  agentId     String
-  agent       User                   @relation("AgentInterests", fields: [agentId], references: [id], onDelete: Cascade)
-  propertyId  String
-  property    Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  leadId      String
-  lead        Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  status      PropertyInterestStatus @default(IN_PROGRESS)
-  notes       String?
+  id                      String                 @id @default(cuid())
+  agentId                 String
+  agent                   User                   @relation("AgentInterests", fields: [agentId], references: [id], onDelete: Cascade)
+  propertyId              String
+  property                Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  leadId                  String
+  lead                    Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status                  PropertyInterestStatus @default(IN_PROGRESS)
+  notes                   String?
   // Free-text reason populated when the agent flips to LOST. Used for
   // "why did this fall through?" reporting later.
-  lostReason  String?
+  lostReason              String?
   // ── Buyer-side commission ─────────────────────────────────────
   // The agent's fee from THIS buyer. Mirror of the owner-side
   // commission lives on OwnerActivity (kind=COMMISSION_TALK) — Israeli
@@ -1096,9 +1100,9 @@ model PropertyInterest {
   // amount. All optional so the row works even before commission is
   // pinned down.
   buyerCommissionPct      Float?
-  buyerCommissionBase     Int?    // ₪ — what the % applies to
-  buyerCommissionFlat     Int?    // ₪ — alternative flat fee
-  buyerCommissionDiscount Int?    // ₪ — optional reduction
+  buyerCommissionBase     Int? // ₪ — what the % applies to
+  buyerCommissionFlat     Int? // ₪ — alternative flat fee
+  buyerCommissionDiscount Int? // ₪ — optional reduction
   buyerCommissionNotes    String?
   // ── Agreed deal terms ────────────────────────────────────────
   // Free-form text where the agent records what the parties have
@@ -1110,17 +1114,17 @@ model PropertyInterest {
   dealNotes               String?
   // Server-bumped whenever a child action (viewing/offer/agreement/meeting)
   // is added with this interestId, so the panel can sort by "recent".
-  lastActionAt DateTime?              @db.Timestamptz(6)
-  createdAt   DateTime               @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime               @updatedAt @db.Timestamptz(6)
+  lastActionAt            DateTime?              @db.Timestamptz(6)
+  createdAt               DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime               @updatedAt @db.Timestamptz(6)
 
   // Back-relations to child action tables (all rows are linked through
   // their own interestId column).
-  viewings    PropertyViewing[]
-  offers      PropertyOffer[]
-  agreements  Agreement[]
-  contracts   Contract[]
-  meetings    LeadMeeting[]
+  viewings   PropertyViewing[]
+  offers     PropertyOffer[]
+  agreements Agreement[]
+  contracts  Contract[]
+  meetings   LeadMeeting[]
 
   // Exactly one interest row per (property, lead) pair. Agent can detach
   // (DELETE) and re-create if they want a clean slate.
@@ -1132,10 +1136,10 @@ model PropertyInterest {
 }
 
 enum PropertyInterestStatus {
-  IN_PROGRESS  // בתהליך — default
-  CLOSED       // נסגר   — deal completed
-  FELL         // נפל    — fell through
-  PAUSED       // מושהה  — on hold
+  IN_PROGRESS // בתהליך — default
+  CLOSED // נסגר   — deal completed
+  FELL // נפל    — fell through
+  PAUSED // מושהה  — on hold
 }
 
 // 2026-05-10 — Owner-side interaction log for a listing. Each row is
@@ -1149,37 +1153,37 @@ enum PropertyInterestStatus {
 // different counterparty — there's one owner per listing, but many
 // buyer-side interests, and the kinds of interactions are different.
 model OwnerActivity {
-  id            String   @id @default(cuid())
-  agentId       String
-  agent         User     @relation("AgentOwnerActivities", fields: [agentId], references: [id], onDelete: Cascade)
-  propertyId    String
-  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  kind          OwnerActivityKind
+  id                 String                   @id @default(cuid())
+  agentId            String
+  agent              User                     @relation("AgentOwnerActivities", fields: [agentId], references: [id], onDelete: Cascade)
+  propertyId         String
+  property           Property                 @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  kind               OwnerActivityKind
   // Short summary line the agent types ("הצעתי 2%", "לא יורד מ-3M").
-  title         String
+  title              String
   // Free-form longer notes — what the owner said, agent's reactions,
   // follow-up needed.
-  notes         String?
+  notes              String?
   // ── Commission-talk-specific fields ──────────────────────────
   // Only populated when kind=COMMISSION_TALK. Captures BOTH percentage
   // (e.g., 2%) AND flat-fee (e.g., ₪40,000) variants — Israeli brokers
   // commonly quote one or the other. The agent fills whichever matches
   // the conversation that happened.
   commissionPct      Float?
-  commissionFlat     Int?     // ₪
+  commissionFlat     Int? // ₪
   commissionResponse OwnerCommissionResponse?
   // ── Lead cross-reference ─────────────────────────────────────
   // For kinds where the conversation was *about* a specific buyer
   // (FEEDBACK_ON_LEAD, OBJECTION raised against a buyer, PRICE_TALK
   // tied to a specific offer). SetNull so deleting the lead doesn't
   // delete the historical record of what was said about them.
-  relatedLeadId String?
-  relatedLead   Lead?    @relation("OwnerActivityRelatedLead", fields: [relatedLeadId], references: [id], onDelete: SetNull)
+  relatedLeadId      String?
+  relatedLead        Lead?                    @relation("OwnerActivityRelatedLead", fields: [relatedLeadId], references: [id], onDelete: SetNull)
   // When the conversation happened. Defaults to now() but the agent
   // can override when logging a past conversation.
-  occurredAt    DateTime @default(now()) @db.Timestamptz(6)
-  createdAt     DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+  occurredAt         DateTime                 @default(now()) @db.Timestamptz(6)
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                 @updatedAt @db.Timestamptz(6)
 
   @@index([agentId])
   @@index([propertyId])
@@ -1188,102 +1192,102 @@ model OwnerActivity {
 }
 
 enum OwnerActivityKind {
-  COMMISSION_TALK    // שיחת עמלה
-  PRICE_TALK         // שיחת מחיר
-  FEEDBACK_ON_LEAD   // משוב על מתעניין
-  TOUR_PERMISSION    // אישור סיור
-  MARKETING_UPDATE   // עדכון שיווק
-  OBJECTION          // התנגדות
-  CONTRACT_TALK      // שיחת הסכם
-  GENERAL_UPDATE     // עדכון כללי
-  OTHER              // אחר
+  COMMISSION_TALK // שיחת עמלה
+  PRICE_TALK // שיחת מחיר
+  FEEDBACK_ON_LEAD // משוב על מתעניין
+  TOUR_PERMISSION // אישור סיור
+  MARKETING_UPDATE // עדכון שיווק
+  OBJECTION // התנגדות
+  CONTRACT_TALK // שיחת הסכם
+  GENERAL_UPDATE // עדכון כללי
+  OTHER // אחר
 }
 
 enum OwnerCommissionResponse {
-  PENDING            // ממתין לתשובה
-  ACCEPTED           // התקבל
-  COUNTER            // הצעה נגדית
-  REJECTED           // נדחה
+  PENDING // ממתין לתשובה
+  ACCEPTED // התקבל
+  COUNTER // הצעה נגדית
+  REJECTED // נדחה
 }
 
 model Lead {
-  id                      String           @id @default(cuid())
-  agentId                 String
+  id                         String           @id @default(cuid())
+  agentId                    String
   // onDelete: Cascade — same rationale as Property.agent above.
   // The 30d-retention purge worker depends on every owned-by-agent
   // model cascading on User.delete().
-  agent                   User             @relation("AgentLeads", fields: [agentId], references: [id], onDelete: Cascade)
-  name                    String
+  agent                      User             @relation("AgentLeads", fields: [agentId], references: [id], onDelete: Cascade)
+  name                       String
   // P2-4 — VarChar caps on contact PII.
-  phone                   String           @db.VarChar(32)
-  email                   String?          @db.VarChar(255)
-  interestType            LeadInterestType @default(PRIVATE)
-  lookingFor              LeadLookingFor   @default(BUY)
+  phone                      String           @db.VarChar(32)
+  email                      String?          @db.VarChar(255)
+  interestType               LeadInterestType @default(PRIVATE)
+  lookingFor                 LeadLookingFor   @default(BUY)
   // 2026-04-30 — distinguishes ליד מתעניין (BUYER) from ליד גיוס
   // (SELLER). For SELLER rows the city/neighborhood/street/rooms/budget
   // describe the property the agent wants to recruit, not the lead's
   // criteria — same columns, opposite reading. Default BUYER keeps
   // the legacy semantics for every existing row.
-  kind                    LeadKind         @default(BUYER)
-  city                    String?
-  neighborhood            String?
-  street                  String?
-  rooms                   String?
-  priceRangeLabel         String?
-  budget                  Int?
-  preApproval             Boolean          @default(false)
-  sector                  String?
-  balconyRequired         Boolean          @default(false)
-  parkingRequired         Boolean          @default(false)
-  elevatorRequired        Boolean          @default(false)
-  safeRoomRequired        Boolean          @default(false)
-  acRequired              Boolean          @default(false)
-  storageRequired         Boolean          @default(false)
+  kind                       LeadKind         @default(BUYER)
+  city                       String?
+  neighborhood               String?
+  street                     String?
+  rooms                      String?
+  priceRangeLabel            String?
+  budget                     Int?
+  preApproval                Boolean          @default(false)
+  sector                     String?
+  balconyRequired            Boolean          @default(false)
+  parkingRequired            Boolean          @default(false)
+  elevatorRequired           Boolean          @default(false)
+  safeRoomRequired           Boolean          @default(false)
+  acRequired                 Boolean          @default(false)
+  storageRequired            Boolean          @default(false)
   // Commercial-lead requirement block — mirrors the commercial half
   // of the Property schema. Agents capture these when a business
   // client briefs a brokerage for office / shop / workspace space
   // ("need ≥60 מ"ר ברוטו, shell finish, 3 workstations, kitchenette,
   // ממ"ק, accessibility"). All optional — private-home leads leave
   // them empty.
-  sqmGrossMin             Int?
-  sqmNetMin               Int?
-  accessibilityRequired   Boolean          @default(false)
-  buildStateRequired      String? // "מעטפת" / "גמר" / specific finish
-  workstationsMin         Int? // מספר עמדות עבודה
-  kitchenetteRequired     Boolean          @default(false)
-  floorShelterRequired    Boolean          @default(false) // ממ"ק
-  inOfficeToiletsRequired Boolean          @default(false) // שירותים בתוך המשרד
-  onFloorToiletsRequired  Boolean          @default(false) // שירותים משותפים בקומה
-  openSpaceRequired       Boolean          @default(false) // חלל פתוח
-  schoolProximity         String?
+  sqmGrossMin                Int?
+  sqmNetMin                  Int?
+  accessibilityRequired      Boolean          @default(false)
+  buildStateRequired         String? // "מעטפת" / "גמר" / specific finish
+  workstationsMin            Int? // מספר עמדות עבודה
+  kitchenetteRequired        Boolean          @default(false)
+  floorShelterRequired       Boolean          @default(false) // ממ"ק
+  inOfficeToiletsRequired    Boolean          @default(false) // שירותים בתוך המשרד
+  onFloorToiletsRequired     Boolean          @default(false) // שירותים משותפים בקומה
+  openSpaceRequired          Boolean          @default(false) // חלל פתוח
+  schoolProximity            String?
   // 2026-05-08 — additional brief requirements surfaced on the lead form.
   // Both are agent-side signals (the matching pipeline can prefer
   // properties walkable to schools / transit). Defaults false keep
   // existing rows unaffected.
-  educationProximityRequired Boolean       @default(false)
-  publicTransportRequired    Boolean       @default(false)
+  educationProximityRequired Boolean          @default(false)
+  publicTransportRequired    Boolean          @default(false)
   // 2026-05-08 PR 2 — multi-value brief fields. The single-value
   // `city` / `neighborhood` columns above stay for back-compat (the
   // matching pipeline + leadSearchProfileSeed still read them) and the
   // route writes cities[0] → city / neighborhoods[0] → neighborhood
   // on save. UI binds to the arrays.
-  cities                     String[]      @default([])
-  neighborhoods              String[]      @default([])
-  streets                    String[]      @default([])
-  propertyTypes              String[]      @default([])
+  cities                     String[]         @default([])
+  neighborhoods              String[]         @default([])
+  streets                    String[]         @default([])
+  propertyTypes              String[]         @default([])
   floorMin                   Int?
   floorMax                   Int?
   sqmMin                     Int?
   sqmMax                     Int?
-  source                  String?
+  source                     String?
   // `status` is the thermal temperature rating (HOT/WARM/COLD). New in
   // Sprint 1 / MLS parity Task K2: `customerStatus` is the separate
   // life-cycle flag (אקטואלי / לא אקטואלי / etc.). Kept orthogonal.
-  status                  LeadStatus       @default(WARM)
-  notes                   String?
-  brokerageSignedAt       DateTime?        @db.Timestamptz(6)
-  brokerageExpiresAt      DateTime?        @db.Timestamptz(6)
-  lastContact             DateTime?        @db.Timestamptz(6)
+  status                     LeadStatus       @default(WARM)
+  notes                      String?
+  brokerageSignedAt          DateTime?        @db.Timestamptz(6)
+  brokerageExpiresAt         DateTime?        @db.Timestamptz(6)
+  lastContact                DateTime?        @db.Timestamptz(6)
 
   // Sprint 1 / MLS parity — Task K2. Customer admin block.
   customerStatus      CustomerStatus?
@@ -1318,33 +1322,33 @@ model Lead {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
-  viewings        PropertyViewing[]
-  customerProfile CustomerProfile?
-  agreements      Agreement[]
-  meetings        LeadMeeting[]
-  reminders       Reminder[]
+  viewings              PropertyViewing[]
+  customerProfile       CustomerProfile?
+  agreements            Agreement[]
+  meetings              LeadMeeting[]
+  reminders             Reminder[]
   // Sprint 1 / MLS parity — Task K2. Additional assignees. Primary
   // assignee stays `agentId` on Lead; the join table lets the office
   // share a lead across multiple agents.
-  extraAgents     LeadAgent[]
+  extraAgents           LeadAgent[]
   // Sprint 2 / MLS parity — Task K4. Repeatable "הנכס המבוקש" profiles.
-  searchProfiles  LeadSearchProfile[]
+  searchProfiles        LeadSearchProfile[]
   // Reverse of Prospect.lead — signed prospects linked to this lead.
-  prospects       Prospect[]
+  prospects             Prospect[]
   // E-1 — reverse of Deal.buyer. A lead can be tied to multiple deals
   // across their history (repeat buyers / combined transactions).
-  dealsAsBuyer    Deal[]              @relation("DealBuyer")
+  dealsAsBuyer          Deal[]              @relation("DealBuyer")
   // Sprint 6 — in-house digital contracts tied to this lead.
-  contracts       Contract[]
+  contracts             Contract[]
   // 2026-04-27 — back-relation for PropertyOffer.lead. When a lead
   // makes an offer on a listing the row is captured here too so the
   // CRM can show "all offers from X" across properties.
-  priceOffers     PropertyOffer[]
+  priceOffers           PropertyOffer[]
   // 2026-05-10 — properties this lead is being shown / negotiated for.
-  interests       PropertyInterest[]
+  interests             PropertyInterest[]
   // 2026-05-10 — back-rel for owner-activity rows that reference this
   // lead ("owner said X about buyer Y").
-  ownerActivityMentions OwnerActivity[]        @relation("OwnerActivityRelatedLead")
+  ownerActivityMentions OwnerActivity[]     @relation("OwnerActivityRelatedLead")
 
   // Excel-import tag. Set on every Lead row created via the wizard so
   // an agent who realises the mapping was wrong can bulk-delete the
@@ -1427,11 +1431,11 @@ model Deal {
 }
 
 model Agreement {
-  id          String          @id @default(cuid())
+  id          String            @id @default(cuid())
   leadId      String?
-  lead        Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  lead        Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
   propertyId  String?
-  property    Property?       @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  property    Property?         @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   signerName  String
   signerPhone String?
   signerEmail String?
@@ -1439,10 +1443,10 @@ model Agreement {
   // P0-5 — SetNull on file delete. The Agreement row holds the audit
   // trail (signer, sentAt, signedAt); losing the PDF doesn't invalidate
   // the record, but a dangling FK to a vanished UploadedFile would.
-  file        UploadedFile?   @relation(fields: [fileId], references: [id], onDelete: SetNull)
-  sentAt      DateTime        @default(now()) @db.Timestamptz(6)
-  signedAt    DateTime?       @db.Timestamptz(6)
-  status      AgreementStatus @default(SENT)
+  file        UploadedFile?     @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  sentAt      DateTime          @default(now()) @db.Timestamptz(6)
+  signedAt    DateTime?         @db.Timestamptz(6)
+  status      AgreementStatus   @default(SENT)
   note        String?
   // 2026-05-10 — back-link to the PropertyInterest activity log row.
   interestId  String?
@@ -1555,22 +1559,22 @@ model Prospect {
 // agent's Google Calendar. googleEventId ties the two so subsequent
 // edits / deletes propagate.
 model LeadMeeting {
-  id            String   @id @default(cuid())
+  id             String            @id @default(cuid())
   // Sprint 4.1 — leadId is nullable so the /calendar "פגישה חדשה" CTA
   // can create agent-only events (no lead linked). The relation drops
   // to SetNull on lead delete so removing a lead leaves the agent's
   // meeting record alone rather than cascading it away.
-  leadId        String?
-  lead          Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  agentId       String
-  agent         User     @relation("AgentMeetings", fields: [agentId], references: [id], onDelete: Cascade)
-  title         String
-  notes         String?
-  location      String?
-  meetLink      String?
-  startsAt      DateTime @db.Timestamptz(6)
-  endsAt        DateTime @db.Timestamptz(6)
-  googleEventId String?
+  leadId         String?
+  lead           Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  agentId        String
+  agent          User              @relation("AgentMeetings", fields: [agentId], references: [id], onDelete: Cascade)
+  title          String
+  notes          String?
+  location       String?
+  meetLink       String?
+  startsAt       DateTime          @db.Timestamptz(6)
+  endsAt         DateTime          @db.Timestamptz(6)
+  googleEventId  String?
   // 2026-05-08 — parallel field for Microsoft Graph events when the
   // agent's Outlook integration is on. Either or both can be populated
   // depending on which calendars the agent has connected.
@@ -1580,18 +1584,18 @@ model LeadMeeting {
   // when S3 was unreachable during tests). `summary` holds the Hebrew
   // prose for quick rendering; `summaryJson` holds the structured payload
   // `{ summary, actionItems, nextSteps }` consumed by the meeting card.
-  audioKey      String?
-  summary       String?
-  summaryJson   Json?
+  audioKey       String?
+  summary        String?
+  summaryJson    Json?
   // 2026-05-10 — propertyId + interestId. Lets a meeting be a
   // "property showing" (sale tour for a specific listing) instead of a
   // generic agent meeting. Both nullable for back-compat.
-  propertyId    String?
-  property      Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  interestId    String?
-  interest      PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
-  createdAt     DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+  propertyId     String?
+  property       Property?         @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  interestId     String?
+  interest       PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
 
   @@index([leadId])
   @@index([agentId])
@@ -2042,37 +2046,37 @@ model Notification {
 // drawing can be layered later without a migration.
 // ────────────────────────────────────────────────────────────────────
 model Contract {
-  id            String    @id @default(cuid())
-  agentId       String
-  agent         User      @relation("AgentContracts", fields: [agentId], references: [id], onDelete: Cascade)
-  propertyId    String?
-  property      Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  leadId        String?
-  lead          Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  type          String // 'BROKERAGE' | 'EXCLUSIVITY' | 'BUYER_BROKERAGE' | 'OFFER'
-  title         String
-  body          String // the contract text rendered into the PDF
+  id                       String            @id @default(cuid())
+  agentId                  String
+  agent                    User              @relation("AgentContracts", fields: [agentId], references: [id], onDelete: Cascade)
+  propertyId               String?
+  property                 Property?         @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  leadId                   String?
+  lead                     Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  type                     String // 'BROKERAGE' | 'EXCLUSIVITY' | 'BUYER_BROKERAGE' | 'OFFER'
+  title                    String
+  body                     String // the contract text rendered into the PDF
   // BUYER_BROKERAGE — snapshot of the property list captured at create
   // time so later edits to the underlying Property rows don't mutate
   // the signed PDF. Array of:
   //   { propertyId?, address, city, rooms?, sqm?, marketingPrice?, kind? }
-  propertiesSnapshot Json?
+  propertiesSnapshot       Json?
   // EXCLUSIVITY — self-FK to the BROKERAGE order this exclusivity
   // addendum supplements. NULL for the other three types. SetNull on
   // delete so removing the base order doesn't cascade-kill the signed
   // exclusivity row.
-  baseContractId String?
-  baseContract   Contract?  @relation("ContractBase", fields: [baseContractId], references: [id], onDelete: SetNull)
-  baseFor        Contract[] @relation("ContractBase")
-  signerName    String
-  signerPhone   String?
-  signerEmail   String?
+  baseContractId           String?
+  baseContract             Contract?         @relation("ContractBase", fields: [baseContractId], references: [id], onDelete: SetNull)
+  baseFor                  Contract[]        @relation("ContractBase")
+  signerName               String
+  signerPhone              String?
+  signerEmail              String?
   // Sign-time fields: populated when the signer submits. `signatureHash`
   // is a SHA-256 of (contractId + signerName + signedAt.toISOString())
   // — printed on the signed-lock badge as tamper-evidence.
-  signedAt      DateTime? @db.Timestamptz(6)
-  signatureName String? // the typed-to-sign text
-  signatureHash String?
+  signedAt                 DateTime?         @db.Timestamptz(6)
+  signatureName            String? // the typed-to-sign text
+  signatureHash            String?
   // 2026-05-03 — chain-of-custody fields for tier-2 admissibility under
   // חוק חתימה אלקטרונית, התשס"א-2001. All nullable: legacy rows stay valid.
   // `documentHash` is SHA-256 of body+title at sign time and is the
@@ -2082,11 +2086,11 @@ model Contract {
   // exact consent paragraph the signer was shown (so we can prove what
   // they accepted, even if the wording changes later); `consentAcceptedAt`
   // is set when the signer checks the consent box.
-  documentHash       String?
-  signedIp           String?
-  signedUserAgent    String?
-  consentText        String?
-  consentAcceptedAt  DateTime? @db.Timestamptz(6)
+  documentHash             String?
+  signedIp                 String?
+  signedUserAgent          String?
+  consentText              String?
+  consentAcceptedAt        DateTime?         @db.Timestamptz(6)
   // 2026-06-02 — public sign-by-link surface. The agent shares
   // `/contracts/sign/:publicSignToken` with the customer; the customer
   // reviews the contract + signs without logging in. Token is a 24-byte
@@ -2094,14 +2098,14 @@ model Contract {
   // holds the customer's hand-drawn signature as a PNG data-URL (size-
   // capped to 200KB at the route layer) — rendered above the typed name
   // on the signed PDF when present.
-  publicSignToken          String?   @unique
-  publicSignTokenExpiresAt DateTime? @db.Timestamptz(6)
+  publicSignToken          String?           @unique
+  publicSignTokenExpiresAt DateTime?         @db.Timestamptz(6)
   signatureImage           String?
   // 2026-05-10 — back-link to the PropertyInterest activity log row.
-  interestId    String?
-  interest      PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
-  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+  interestId               String?
+  interest                 PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
+  createdAt                DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime          @updatedAt @db.Timestamptz(6)
 
   @@index([agentId])
   @@index([propertyId])
@@ -2172,13 +2176,17 @@ model MarketListing {
   createdAt         DateTime                 @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime                 @updatedAt @db.Timestamptz(6)
 
-  snapshots     MarketListingSnapshot[]
-  leadMatches   MarketListingLeadMatch[]
+  snapshots      MarketListingSnapshot[]
+  leadMatches    MarketListingLeadMatch[]
   // Back-relation for Property.marketListing (additive column on
   // Property). When an agent duplicates a listing into their own CRM
   // properties, the Property row points back here so "Open Original"
   // remains available after duplication.
-  crmDuplicates Property[]
+  crmDuplicates  Property[]
+  // 2026-06-02 — per-agent Gmail-style labels on each market listing.
+  // Each row in MarketTagAssignment points at this listing and one of
+  // the calling agent's MarketTag rows.
+  tagAssignments MarketTagAssignment[]
 
   @@unique([source, externalListingId])
   @@index([source])
@@ -2198,6 +2206,46 @@ model MarketListing {
   // the unprocessed-listing scan a single index range read regardless
   // of how big MarketListing grows.
   @@index([reactedAt, firstSeenAt])
+}
+
+// 2026-06-02 — Per-agent labels for /market-discovery rows. Kept
+// separate from the existing `Tag` model (which only supports
+// PROPERTY/LEAD/CUSTOMER) so the market namespace can stay
+// independent — agents who use both surfaces shouldn't see their
+// CRM labels leak into the discovery feed and vice versa.
+//
+// Namespace is per-agent: `(agentId, name)` is unique, and a tag
+// can only be assigned to listings by the agent that owns it. No
+// office-wide tags yet (agents have their own discovery scoping
+// via specialtyCities).
+model MarketTag {
+  id        String   @id @default(cuid())
+  agentId   String
+  agent     User     @relation("AgentMarketTags", fields: [agentId], references: [id], onDelete: Cascade)
+  name      String
+  // Stored as a 7-char hex like "#b48b4c". Validated server-side; FE
+  // picks from the design-system palette but freeform hex is allowed.
+  color     String   @default("#b48b4c")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  assignments MarketTagAssignment[]
+
+  @@unique([agentId, name])
+  @@index([agentId])
+}
+
+model MarketTagAssignment {
+  id              String        @id @default(cuid())
+  tagId           String
+  tag             MarketTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  marketListingId String
+  marketListing   MarketListing @relation(fields: [marketListingId], references: [id], onDelete: Cascade)
+  assignedAt      DateTime      @default(now()) @db.Timestamptz(6)
+
+  @@unique([tagId, marketListingId])
+  @@index([marketListingId])
+  @@index([tagId])
 }
 
 model MarketListingSnapshot {

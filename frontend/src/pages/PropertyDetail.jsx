@@ -798,6 +798,9 @@ export default function PropertyDetail() {
                   <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); setContractDialog({ defaultType: 'BROKERAGE' }); }}>
                     <UserPlus size={14} /> צור הסכם תיווך
                   </button>
+                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); navigate('/contracts'); }}>
+                    <FileText size={14} /> כל ההסכמים שלי
+                  </button>
                   {isNative() && (
                     <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); handleInstagramStory(); }}>
                       <Sparkles size={14} /> שתף בסטורי

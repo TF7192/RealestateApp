@@ -950,6 +950,8 @@
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
+  max-width: calc(100% - 24px);
   color: var(--bg-primary);
   background: var(--gold);
   border: 1px solid var(--gold);

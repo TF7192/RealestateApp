@@ -29,7 +29,6 @@ import {
   Plus,
   Trash2,
   AlertCircle,
-  ChevronRight,
 } from 'lucide-react';
 import api from '../lib/api';
 import Portal from './Portal';
@@ -160,12 +159,14 @@ export default function ContractCreateDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Fetch properties when we land on a form that needs them and the
-  // caller did not supply a propertyId (BROKERAGE / EXCLUSIVITY) — or
-  // always for BUYER_BROKERAGE.
+  // Fetch properties whenever we're on a property-bound type. Even when
+  // the caller seeds `context.propertyId`, we still need the full list
+  // so `seededProperty` can resolve into the chip below — otherwise the
+  // chip stays in its "loading" state forever (the 2026-06-02 hang).
   const needsPropertyList =
     type === 'BUYER_BROKERAGE' ||
-    ((type === 'BROKERAGE' || type === 'EXCLUSIVITY') && !context.propertyId);
+    type === 'BROKERAGE' ||
+    type === 'EXCLUSIVITY';
   useEffect(() => {
     if (!open || !needsPropertyList || properties !== null) return;
     let cancelled = false;
@@ -865,44 +866,51 @@ function TypeGrid({ onPick }) {
             onClick={() => onPick(key)}
             style={{
               ...FONT,
-              textAlign: 'right',
+              textAlign: 'center',
               background: DT.white,
               border: `1px solid ${DT.border}`,
               borderRadius: 14,
-              padding: 16,
+              padding: '20px 16px 18px',
               cursor: 'pointer',
-              display: 'flex', flexDirection: 'column', gap: 8,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 10,
+              minHeight: 168,
               transition: 'border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = DT.gold;
               e.currentTarget.style.boxShadow = '0 10px 30px rgba(180,139,76,0.18)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = DT.border;
               e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.transform = 'none';
             }}
           >
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              gap: 8,
+            <span style={{
+              width: 48, height: 48, borderRadius: 14,
+              background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
+              color: DT.ink,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 10px rgba(180,139,76,0.25)',
             }}>
-              <span style={{
-                width: 38, height: 38, borderRadius: 10,
-                background: `linear-gradient(160deg, ${DT.goldLight}, ${DT.gold})`,
-                color: DT.ink, display: 'grid', placeItems: 'center',
-              }}>
-                <Icon size={18} />
-              </span>
-              <ChevronRight size={16} style={{ color: DT.muted }} />
+              <Icon size={22} aria-hidden="true" />
+            </span>
+            <div style={{
+              fontWeight: 800, fontSize: 14, color: DT.ink,
+              lineHeight: 1.3,
+            }}>
+              {meta.label}
             </div>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 14, color: DT.ink }}>
-                {meta.label}
-              </div>
-              <div style={{ fontSize: 12, color: DT.muted, marginTop: 2 }}>
-                {meta.sub}
-              </div>
+            <div style={{
+              fontSize: 12, color: DT.muted,
+              lineHeight: 1.4,
+              marginTop: 'auto',
+            }}>
+              {meta.sub}
             </div>
           </button>
         );

@@ -1149,6 +1149,26 @@ export const api = {
   getMarketPulse:     ()              => request('/market-discovery/pulse'),
   // Phase 4 — admin observability for the watcher.
   listMarketWatcherRuns: () => request('/admin/market-watcher/runs'),
+  // 2026-06-02 — per-agent Gmail-style labels on /market-discovery rows.
+  // Mounted at /api/market/tags (kept separate from /api/tags which only
+  // covers PROPERTY/LEAD/CUSTOMER labels). All endpoints are agent-scoped
+  // via the request cookie; cross-agent reads/writes 404.
+  listMarketTags:   () => request('/market/tags'),
+  createMarketTag:  (body) => request('/market/tags', { method: 'POST', body }),
+  updateMarketTag:  (id, body) => request(`/market/tags/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+  deleteMarketTag:  (id) => request(`/market/tags/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  assignMarketTag:  (tagId, advertId) => request(
+    `/market/tags/${encodeURIComponent(tagId)}/assign`,
+    { method: 'POST', body: { advertId } },
+  ),
+  unassignMarketTag: (tagId, advertId) => request(
+    `/market/tags/${encodeURIComponent(tagId)}/assign/${encodeURIComponent(advertId)}`,
+    { method: 'DELETE' },
+  ),
+  assignMarketTagsBatch: ({ tagIds, advertIds }) => request(
+    '/market/tags/assign-batch',
+    { method: 'POST', body: { tagIds, advertIds } },
+  ),
   // Phase 3 — opt-in notification preferences.
   getNotificationPreferences:    () => request('/notification-preferences'),
   updateNotificationPreferences: (body) => request(
