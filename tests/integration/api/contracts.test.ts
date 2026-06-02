@@ -11,10 +11,10 @@ afterAll(async () => { await app.close(); });
 
 /**
  * Sprint 6 / ScreenContract — in-house digital contract e-sign flow.
- * Four tests: create, sign, cross-agent 404, signed-lock (409 on second
- * sign attempt). The PDF renderer is exercised implicitly via the GET
- * flow but we don't byte-compare the bytes — it's pdfkit output and
- * locking to a checksum would be brittle across font versions.
+ * Agent-side type-to-sign was removed 2026-06-02; these tests cover the
+ * surfaces that remain: create (all four types), get (with baseContract
+ * hydration), pdf, and cross-agent scoping. The customer-via-token
+ * sign flow is covered separately when the public route lands.
  */
 describe('POST /api/contracts', () => {
   it('H — creates an EXCLUSIVITY contract for the authed agent', async () => {
@@ -40,34 +40,86 @@ describe('POST /api/contracts', () => {
     expect(contract.signedAt).toBeNull();
     expect(contract.signatureHash).toBeNull();
   });
-});
 
-describe('POST /api/contracts/:id/sign', () => {
-  it('H — signs the contract and locks it with a SHA-256 hash', async () => {
+  it('H — creates a BUYER_BROKERAGE contract with a property snapshot', async () => {
     const agent = await createAgent(prisma);
     const cookie = await loginAs(app, agent.email, agent._plainPassword);
-    // Seed a contract via the API so the flow is end-to-end.
-    const create = await app.inject({
+    const res = await app.inject({
       method: 'POST', url: '/api/contracts', headers: { cookie },
-      payload: { type: 'BROKERAGE', signerName: 'רונית לוי' },
+      payload: {
+        type: 'BUYER_BROKERAGE',
+        signerName: 'אלון מזרחי',
+        propertiesSnapshot: [
+          {
+            address: 'הרצל 12',
+            city: 'תל אביב',
+            rooms: 3.5,
+            sqm: 78,
+            marketingPrice: 2_450_000,
+            kind: 'דירה',
+          },
+        ],
+      },
     });
-    expect(create.statusCode).toBe(200);
-    const id = create.json().contract.id;
+    expect(res.statusCode).toBe(200);
+    const { contract } = res.json();
+    expect(contract.type).toBe('BUYER_BROKERAGE');
+    expect(Array.isArray(contract.propertiesSnapshot)).toBe(true);
+    expect(contract.propertiesSnapshot).toHaveLength(1);
+    expect(contract.propertiesSnapshot[0].city).toBe('תל אביב');
+  });
 
-    const sign = await app.inject({
-      method: 'POST', url: `/api/contracts/${id}/sign`, headers: { cookie },
-      payload: { signatureName: 'רונית לוי' },
+  it('Az — EXCLUSIVITY rejects a baseContractId belonging to another agent', async () => {
+    const [a, b] = await Promise.all([createAgent(prisma), createAgent(prisma)]);
+    const cookieA = await loginAs(app, a.email, a._plainPassword);
+    const cookieB = await loginAs(app, b.email, b._plainPassword);
+    // A creates a BROKERAGE order.
+    const baseRes = await app.inject({
+      method: 'POST', url: '/api/contracts', headers: { cookie: cookieA },
+      payload: { type: 'BROKERAGE', signerName: 'בעלים א׳' },
     });
-    expect(sign.statusCode).toBe(200);
-    const signed = sign.json().contract;
-    expect(signed.signedAt).not.toBeNull();
-    expect(signed.signatureName).toBe('רונית לוי');
-    // 64-char lowercase hex SHA-256.
-    expect(signed.signatureHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(baseRes.statusCode).toBe(200);
+    const baseId = baseRes.json().contract.id;
+    // B tries to reference it from an EXCLUSIVITY of their own → 404.
+    const cross = await app.inject({
+      method: 'POST', url: '/api/contracts', headers: { cookie: cookieB },
+      payload: {
+        type: 'EXCLUSIVITY',
+        signerName: 'מתעניין ב׳',
+        baseContractId: baseId,
+      },
+    });
+    expect(cross.statusCode).toBe(404);
   });
 });
 
-describe('GET /api/contracts/:id — cross-agent scoping', () => {
+describe('GET /api/contracts/:id', () => {
+  it('H — hydrates baseContract for an EXCLUSIVITY addendum', async () => {
+    const agent = await createAgent(prisma);
+    const cookie = await loginAs(app, agent.email, agent._plainPassword);
+    const baseRes = await app.inject({
+      method: 'POST', url: '/api/contracts', headers: { cookie },
+      payload: { type: 'BROKERAGE', signerName: 'בעלים' },
+    });
+    const baseId = baseRes.json().contract.id;
+    const exRes = await app.inject({
+      method: 'POST', url: '/api/contracts', headers: { cookie },
+      payload: {
+        type: 'EXCLUSIVITY',
+        signerName: 'בעלים',
+        baseContractId: baseId,
+      },
+    });
+    const exId = exRes.json().contract.id;
+    const get = await app.inject({
+      method: 'GET', url: `/api/contracts/${exId}`, headers: { cookie },
+    });
+    expect(get.statusCode).toBe(200);
+    const body = get.json();
+    expect(body.contract.baseContractId).toBe(baseId);
+    expect(body.baseContract?.id).toBe(baseId);
+  });
+
   it('Az — agent B sees 404 on agent A\'s contract', async () => {
     const [a, b] = await Promise.all([createAgent(prisma), createAgent(prisma)]);
     const cookieA = await loginAs(app, a.email, a._plainPassword);
@@ -91,32 +143,27 @@ describe('GET /api/contracts/:id — cross-agent scoping', () => {
   });
 });
 
-describe('POST /api/contracts/:id/sign — signed-lock', () => {
-  it('409 — second sign attempt on an already-signed contract is rejected', async () => {
+describe('GET /api/contracts/:id/pdf', () => {
+  it('H — renders a PDF for a BUYER_BROKERAGE contract', async () => {
     const agent = await createAgent(prisma);
     const cookie = await loginAs(app, agent.email, agent._plainPassword);
     const create = await app.inject({
       method: 'POST', url: '/api/contracts', headers: { cookie },
-      payload: { type: 'EXCLUSIVITY', signerName: 'שרה ישראלי' },
+      payload: {
+        type: 'BUYER_BROKERAGE',
+        signerName: 'רונית לוי',
+        propertiesSnapshot: [
+          { address: 'דיזנגוף 100', city: 'תל אביב', rooms: 4, sqm: 90, marketingPrice: 3_200_000 },
+        ],
+      },
     });
     const id = create.json().contract.id;
-    const first = await app.inject({
-      method: 'POST', url: `/api/contracts/${id}/sign`, headers: { cookie },
-      payload: { signatureName: 'שרה ישראלי' },
+    const pdf = await app.inject({
+      method: 'GET', url: `/api/contracts/${id}/pdf`, headers: { cookie },
     });
-    expect(first.statusCode).toBe(200);
-    const originalHash = first.json().contract.signatureHash;
-
-    const second = await app.inject({
-      method: 'POST', url: `/api/contracts/${id}/sign`, headers: { cookie },
-      payload: { signatureName: 'זייפן' },
-    });
-    expect(second.statusCode).toBe(409);
-    expect(second.json().error?.code).toBe('already_signed');
-
-    // Verify the row wasn't mutated — signatureName + hash unchanged.
-    const after = await prisma.contract.findUnique({ where: { id } });
-    expect(after?.signatureName).toBe('שרה ישראלי');
-    expect(after?.signatureHash).toBe(originalHash);
+    expect(pdf.statusCode).toBe(200);
+    expect(pdf.headers['content-type']).toMatch(/application\/pdf/);
+    // PDF magic bytes — sanity check that pdfkit actually emitted a doc.
+    expect(pdf.rawPayload.slice(0, 4).toString()).toBe('%PDF');
   });
 });

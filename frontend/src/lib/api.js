@@ -493,16 +493,16 @@ export const api = {
   agreementPdfUrl: (id) => `${BASE}/agreements/${encodeURIComponent(id)}/pdf`,
 
   // Sprint 6 / ScreenContract — in-house digital contract e-sign.
-  // EXCLUSIVITY / BROKERAGE / OFFER contracts rendered + signed via
-  // the reused prospect-pdf path (pdfkit). No DocuSign / HelloSign.
+  // Four doc types — BROKERAGE / EXCLUSIVITY / BUYER_BROKERAGE / OFFER
+  // — rendered via the reused prospect-pdf path (pdfkit). No DocuSign /
+  // HelloSign. Agent-side type-to-sign was removed 2026-06-02; the only
+  // remaining sign surface is the customer-via-token flow.
   listContracts: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/contracts${qs ? `?${qs}` : ''}`);
   },
   getContract: (id) => request(`/contracts/${id}`),
   createContract: (body) => request('/contracts', { method: 'POST', body }),
-  signContract: (id, signatureName) =>
-    request(`/contracts/${id}/sign`, { method: 'POST', body: { signatureName } }),
   contractPdfUrl: (id) => `${BASE}/contracts/${id}/pdf`,
 
   dashboard: () => request('/reports/dashboard'),

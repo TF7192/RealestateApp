@@ -1,20 +1,27 @@
 // Sprint 6 / ScreenContract — In-house digital contract e-sign flow.
 //
-// Contracts (exclusivity / brokerage / offer) are rendered and signed
-// entirely inside Estia using the same pdfkit + Noto Sans Hebrew path
-// already proven by prospect-pdf. No DocuSign / HelloSign / third-party
-// vendor — the agent's clients sign by typing their name, the server
-// stamps a SHA-256 hash + timestamp, and the row is permanently locked.
+// Contracts (four types — see below) are rendered and signed entirely
+// inside Estia using the same pdfkit + Noto Sans Hebrew path already
+// proven by prospect-pdf. No DocuSign / HelloSign / third-party vendor.
+//
+// Document types:
+//   BROKERAGE        — seller's non-exclusive brokerage-services order
+//                      (הזמנת שירותי תיווך)
+//   EXCLUSIVITY      — seller's exclusive listing addendum that
+//                      supplements a BROKERAGE order via `baseContractId`
+//   BUYER_BROKERAGE  — buyer's brokerage-services order over a captured
+//                      list of properties (`propertiesSnapshot`)
+//   OFFER            — buyer's price offer against a listing
 //
 // Endpoints (mounted under `/api/contracts`):
 //   POST   /                     — create a draft contract (unsigned)
 //   GET    /                     — list agent's contracts
-//   GET    /:id                  — fetch a contract (with pdfUrl)
+//   GET    /:id                  — fetch a contract (with pdfUrl + baseContract)
 //   GET    /:id/pdf              — render the signed/unsigned PDF
-//   POST   /:id/sign             — stamp signature + lock the row
 //
-// All endpoints are agent-scoped: cross-agent reads return 404, signing
-// a row twice returns 409 (signed-lock).
+// Agent-side type-to-sign was removed 2026-06-02 — the only remaining
+// sign surface is the customer-facing token flow (frontend task).
+// All endpoints are agent-scoped: cross-agent reads return 404.
 
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
@@ -52,25 +59,110 @@ const FONT_BOLD = path.join(FONTS_DIR, 'NotoSansHebrew-Bold.ttf');
 // Default contract body, per type. The agent can override any of these
 // when creating a contract; these are the fallbacks so the first-run
 // UX doesn't force the agent to draft Hebrew legalese from scratch.
+//
+// Legal note: these clauses are Estia's own phrasing of the statutory
+// disclosures every Israeli real-estate brokerage must cover under
+// חוק המתווכים במקרקעין, התשנ"ו-1996. The legal effect is identical
+// to comparable templates on the market; the wording is ours.
 const DEFAULT_BODIES: Record<string, string> = {
-  EXCLUSIVITY: [
-    'אני הח"מ, בעל הזכויות בנכס שבנדון, מעניק/ה בזאת בלעדיות מלאה למתווך ' +
-      'לתקופה של 6 חודשים מיום חתימת הסכם זה.',
-    'במהלך תקופת הבלעדיות, לא אתקשר במישרין או בעקיפין עם מתווך אחר, ' +
-      'ואפנה כל פונה ישירות למתווך החתום.',
-    'עמלת התיווך המוסכמת הינה 2% + מע"מ ממחיר המכירה בפועל.',
-    'הסכם זה ייחשב כמופר אם הנכס יימכר במהלך תקופת הבלעדיות שלא באמצעות ' +
-      'המתווך.',
-  ].join('\n\n'),
+  // BROKERAGE — seller's non-exclusive order. Seven statutory clauses.
   BROKERAGE: [
-    'אני הח"מ מאשר/ת כי המתווך הציג בפניי את הנכס שבנדון, וכי פרטי הנכס ' +
-      'ועלויותיו הובהרו לי במלואם.',
-    'ידוע לי כי המתווך פועל לפי חוק המתווכים במקרקעין, התשנ"ו-1996, וכי ' +
-      'עמלת התיווך תשולם אך ורק במקרה של עסקה שתוצאה ישירה של פעילות ' +
-      'המתווך.',
-    'אני מתחייב/ת שלא להתקשר ישירות עם בעלי הנכס או עם צדדים שלישיים ' +
-      'בקשר לנכס מבלי ליידע את המתווך.',
+    '1. הח"מ מצהיר/ה כי הינו/ה בעל/ת הזכויות בנכס נשוא הזמנה זו, או כי ' +
+      'הינו/ה מורשה/ית כדין לפעול בשמו, וכי כל הפרטים שמסר/ה למתווך ' +
+      'אודות הנכס מלאים, נכונים ועדכניים. המתווך רשאי להעביר את פרטי ' +
+      'הנכס לקונים, שוכרים ולמתווכים נוספים לצורך קידום עסקה.',
+    '2. הח"מ מתחייב/ת להמציא למתווך נסח טאבו עדכני ו/או אישור זכויות ' +
+      'מחברה משכנת, לפי העניין, ככל שיידרשו לצורך השלמת העסקה.',
+    '3. דמי התיווך ישולמו למתווך במועד החתימה על הסכם מחייב לעסקה, או ' +
+      'במועד מתן התחייבות בלתי-חוזרת לביצועה, לפי המוקדם מביניהם, ' +
+      'ובשיעורים הקבועים בסעיף 4 להלן.',
+    '4. שיעור דמי התיווך: במכר — 2% ממחיר המכירה בפועל בתוספת מע"מ ' +
+      'כדין; בשכירות — דמי שכירות של חודש אחד בתוספת מע"מ כדין. ' +
+      'מובהר כי המתווך זכאי לדמי תיווך גם מן הקונה/השוכר.',
+    '5. עם השלמת מכירת הנכס יהא המתווך רשאי לפרסם כי הנכס נמכר.',
+    '6. הח"מ מאשר/ת כי המתווך המליץ בפניו/ה להיעזר בעורך-דין ובאנשי ' +
+      'מקצוע נוספים לצורך ליווי העסקה.',
+    '7. הח"מ מאשר/ת כי דמי התיווך נגבים כנגד חשבונית מס כדין.',
   ].join('\n\n'),
+
+  // EXCLUSIVITY — seller's exclusive listing addendum. Eleven clauses.
+  // The base-contract reference header is rendered by the PDF renderer
+  // when `baseContractId` is set; not part of the body text itself.
+  EXCLUSIVITY: [
+    '1. הח"מ מצהיר/ה כי הינו/ה בעל/ת הזכויות בנכס נשוא הסכם זה, או כי ' +
+      'הינו/ה מורשה/ית כדין לפעול בשמו, וכי הפרטים שנמסרו למתווך ' +
+      'הינם מהותיים, נכונים, מלאים ועדכניים. המתווך רשאי להעביר את ' +
+      'פרטי הנכס לקונים, שוכרים ולמתווכים נוספים לצורך קידום עסקה.',
+    '2. הח"מ ימציא/תמציא למתווך נסח טאבו עדכני ו/או אישור זכויות ' +
+      'מחברה משכנת, ומסמיך/ה בזאת את המתווך לפנות בשמו/ה לכל רשות ' +
+      'מוסמכת לצורך קבלת מידע הדרוש לקידום העסקה.',
+    '3. הח"מ ממנה/ה בזאת את המתווך באופן בלעדי לשיווק הנכס לתקופה ' +
+      'שתחילתה ביום חתימת הסכם זה וסיומה במועד שנקבע בכותרת ההסכם. ' +
+      'בתום תקופת הבלעדיות, יהפוך ההסכם להזמנת תיווך רגילה (שאינה ' +
+      'בלעדית), ויישמר למתווך זכות לדמי תיווך מקונה שהוצג על-ידו ' +
+      'במהלך תקופת הבלעדיות וביצע עסקה לאחריה, בכפוף לסעיף 14(ב) ' +
+      'לחוק המתווכים במקרקעין, התשנ"ו-1996.',
+    '4. הח"מ מתחייב/ת לשלם למתווך את דמי התיווך באופן מיידי עם חתימת ' +
+      'הסכם מחייב לעסקה או במועד מתן התחייבות בלתי-חוזרת לביצועה, אם ' +
+      'אלה ייחתמו: (1) במהלך תקופת הבלעדיות — גם אם, לכאורה, ללא ' +
+      'מעורבות המתווך, וזאת בכפוף לסעיף 14(ב) לחוק; או (2) לאחר ' +
+      'תקופת הבלעדיות, עם צד שנודע לו על הנכס או שהנכס הוצג בפניו ' +
+      'במהלך תקופת הבלעדיות, וזאת בכפוף לסעיף 14(ב) לחוק.',
+    '5. שיעורי דמי התיווך הינם כקבוע בהזמנת התיווך אשר הסכם בלעדיות ' +
+      'זה משלים אותה.',
+    '6. הח"מ מאשר/ת כי דמי התיווך נגבים כנגד חשבונית מס כדין.',
+    '7. הח"מ מאשר/ת כי המתווך המליץ בפניו/ה להיעזר בעורך-דין ובאנשי ' +
+      'מקצוע נוספים לצורך ליווי העסקה.',
+    '8. במהלך תקופת הבלעדיות מתחייב/ת הח"מ שלא להתקשר עם מתווך אחר ' +
+      'בקשר לנכס, ולהפנות כל פונה ישירות אל המתווך החתום. הפרת ' +
+      'התחייבות זו עשויה לזכות את המתווך במלוא דמי התיווך כפיצוי ' +
+      'מוסכם, וזאת מבלי לגרוע מכל סעד אחר העומד לו בדין.',
+    '9. הח"מ מתחייב/ת להודיע לכל פונה ישיר ולכל גורם עמו היו לו ' +
+      'מגעים קודמים בקשר לנכס על קיומה של בלעדיות זו, ולסיים כל ' +
+      'התקשרות קודמת שעלולה לעמוד בסתירה להסכם זה.',
+    '10. המתווך מתחייב לפעול בשקידה ובתום-לב, לשתף פעולה עם מתווכים ' +
+      'אחרים ככל הנדרש לקידום העסקה, ולגבש ולהפעיל תוכנית שיווק ' +
+      'בהתאם לשיקול דעתו המקצועי.',
+    '11. משמונה המתווך כמתווך הפעיל היחיד בנכס, יראו כל פנייה או ' +
+      'עסקה כפועל יוצא של פעילותו, וזאת בכפוף לסעיף 14(ב) לחוק ' +
+      'המתווכים במקרקעין.',
+  ].join('\n\n'),
+
+  // BUYER_BROKERAGE — buyer's brokerage order. Ten clauses. The
+  // property table is rendered by the PDF renderer from
+  // `propertiesSnapshot`; not part of the body text itself.
+  BUYER_BROKERAGE: [
+    '1. הח"מ מתקשר/ת בזאת עם המתווך לקבלת שירותי תיווך בנוגע לנכסים ' +
+      'המפורטים בהזמנה זו.',
+    '2. הח"מ מאשר/ת כי המתווך הציג בפניו/ה את הנכסים המפורטים בהזמנה, ' +
+      'ומתחייב/ת להודיע למתווך על כל משא-ומתן שיתנהל על-ידו/ה לגבי ' +
+      'מי מן הנכסים האמורים.',
+    '3. הח"מ מתחייב/ת לשלם למתווך דמי תיווך כקבוע בסעיף 5 להלן, עם ' +
+      'חתימה על הסכם מחייב או על התחייבות בלתי-חוזרת לביצוע עסקה, ' +
+      'לפי המוקדם מביניהם, ביחס לאחד או יותר מן הנכסים המפורטים.',
+    '4. הח"מ מתחייב/ת שלא להעביר לצדדים שלישיים מידע שנמסר לו/ה על-' +
+      'ידי המתווך אודות הנכסים המפורטים, ומתחייב/ת לשפות את המתווך ' +
+      'בגין כל נזק שייגרם לו עקב הפרת התחייבות זו.',
+    '5. שיעור דמי התיווך: ברכישה — 2% ממחיר הרכישה בפועל בתוספת מע"מ ' +
+      'כדין; בשכירות — דמי שכירות של חודש אחד בתוספת מע"מ כדין. ' +
+      'מובהר כי המתווך זכאי לדמי תיווך גם מן המוכר/המשכיר. התשלום ' +
+      'יבוצע באופן מיידי עם חתימת הסכם מחייב או התחייבות לעסקה; ' +
+      'בפיגור בתשלום יישאו דמי התיווך הפרשי הצמדה וריבית בשיעור ' +
+      'המקובל לחשבונות חח"ד, מן המועד שנקבע לתשלום ועד לפירעון בפועל.',
+    '6. במידה והשוכר/ת ירכוש/תרכוש את הנכס המושכר בתקופת השכירות או ' +
+      'בתוך שלושה חודשים מסיומה, יחויבו הצדדים בדמי תיווך בשיעורים ' +
+      'הקבועים בסעיף 5 לעיל, בתוספת מע"מ כדין.',
+    '7. הח"מ מאשר/ת כי המתווך המליץ בפניו/ה להיעזר בעורך-דין ובאנשי ' +
+      'מקצוע נוספים לצורך ליווי העסקה.',
+    '8. הח"מ מאשר/ת כי דמי התיווך נגבים כנגד חשבונית מס כדין.',
+    '9. הח"מ מסכים/ה לקבל מהמתווך הצעות נוספות לנכסים העשויים להתאים ' +
+      'לצרכיו/ה.',
+    '10. הח"מ מסכים/ה כי המתווך רשאי לייצג גם את הצד השני בעסקה, וכי ' +
+      'הוא רשאי להעביר את פרטיו/ה האישיים אל הצד השני, באי-כוחו או ' +
+      'מי מטעמו, לצורך קידום העסקה.',
+  ].join('\n\n'),
+
+  // OFFER — buyer's purchase offer. Kept as the original three clauses.
   OFFER: [
     'אני הח"מ מציע/ה לרכוש את הנכס שבנדון בתמורה לסכום הנקוב להלן.',
     'הצעה זו תקפה לתקופה של 7 ימים מיום חתימתה, ומותנית בקבלת משכנתא ' +
@@ -80,10 +172,28 @@ const DEFAULT_BODIES: Record<string, string> = {
 };
 
 function contractTypeLabel(type: string): string {
-  if (type === 'EXCLUSIVITY') return 'הסכם בלעדיות';
-  if (type === 'BROKERAGE')   return 'הסכם תיווך';
-  if (type === 'OFFER')       return 'הצעת רכישה';
+  if (type === 'EXCLUSIVITY')     return 'הסכם בלעדיות';
+  if (type === 'BROKERAGE')       return 'הזמנת שירותי תיווך';
+  if (type === 'BUYER_BROKERAGE') return 'הזמנת שירותי תיווך לקניה';
+  if (type === 'OFFER')           return 'הצעת רכישה';
   return 'חוזה';
+}
+
+// Format a Date as dd/MM/yyyy in Asia/Jerusalem — used by the
+// EXCLUSIVITY base-contract reference header.
+function formatIlDate(d: Date): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Jerusalem',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value || '';
+  return `${get('day')}/${get('month')}/${get('year')}`;
+}
+
+// Short, human-friendly contract reference number for display in
+// headers. Full cuid stays in the row id; this is the visible label.
+function shortContractRef(id: string): string {
+  return id.slice(-8).toUpperCase();
 }
 
 function formatIlDateTime(d: Date): string {
@@ -96,16 +206,6 @@ function formatIlDateTime(d: Date): string {
   return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}`;
 }
 
-// Deterministic tamper-evident hash printed on the signed badge. NOT a
-// cryptographic signature in the legal sense — it's a visible change-
-// detector so the agent can notice if the stored row was meddled with.
-function computeSignatureHash(
-  contractId: string, signerName: string, signedAt: Date
-): string {
-  const data = `${contractId}|${signerName}|${signedAt.toISOString()}`;
-  return crypto.createHash('sha256').update(data).digest('hex');
-}
-
 // SHA-256 of the contract body — the canonical tamper-evidence anchor
 // for tier-2 admissibility under חוק חתימה אלקטרונית, התשס"א-2001.
 // Computed at create time so the signed PDF can render the hash, and
@@ -114,26 +214,30 @@ function computeSignatureHash(
 function computeDocumentHash(title: string, body: string): string {
   return crypto.createHash('sha256').update(`${title}\n${body}`).digest('hex');
 }
-
-// Best-effort client-IP extractor that respects upstream proxy chain.
-// EC2 fronts via nginx → Cloudflare so X-Forwarded-For is the source of
-// truth; we keep only the first hop (the actual client).
-function extractClientIp(req: { ip?: string; headers: Record<string, unknown> }): string | null {
-  const xff = req.headers['x-forwarded-for'];
-  if (typeof xff === 'string' && xff.length) {
-    return xff.split(',')[0]!.trim().slice(0, 64);
-  }
-  if (Array.isArray(xff) && xff.length) {
-    const first = xff[0];
-    return typeof first === 'string' ? first.trim().slice(0, 64) : null;
-  }
-  return req.ip ? String(req.ip).slice(0, 64) : null;
-}
+// `computeSignatureHash` + `extractClientIp` were removed 2026-06-02
+// when the agent-side type-to-sign endpoint was deleted. The customer-
+// via-token sign route (frontend pending) will reintroduce its own
+// chain-of-custody capture when it ships.
 
 // Validation schemas. Bodies are bounded so a rogue payload can't blow
 // up the PDF buffer size.
+//
+// `propertiesSnapshot` is captured once at create time so subsequent
+// edits to the underlying Property rows don't mutate a signed PDF.
+// Only meaningful for BUYER_BROKERAGE; we accept it on any type rather
+// than branch the schema, but the renderer only uses it for that type.
+const PropertySnapshotEntry = z.object({
+  propertyId:     z.string().optional(),
+  address:        z.string().min(1).max(300),
+  city:           z.string().max(120).optional(),
+  rooms:          z.number().nullable().optional(),
+  sqm:            z.number().nullable().optional(),
+  marketingPrice: z.number().nullable().optional(),
+  kind:           z.string().max(40).optional(),
+});
+
 const CreateInput = z.object({
-  type: z.enum(['EXCLUSIVITY', 'BROKERAGE', 'OFFER']),
+  type: z.enum(['BROKERAGE', 'EXCLUSIVITY', 'BUYER_BROKERAGE', 'OFFER']),
   title: z.string().min(1).max(200).optional(),
   body: z.string().max(20_000).optional(),
   signerName: z.string().min(1).max(120),
@@ -141,20 +245,36 @@ const CreateInput = z.object({
   signerEmail: z.string().email().max(200).optional().or(z.literal('')),
   propertyId: z.string().optional(),
   leadId: z.string().optional(),
-});
-
-const SignInput = z.object({
-  signatureName: z.string().min(2).max(120),
-  // Consent text the signer was shown (snapshot at sign time so we can
-  // prove what they accepted, even if the wording changes later). Optional
-  // for back-compat with the old client; new sign UI always sends it.
-  consentText: z.string().max(2000).optional(),
-  consentAccepted: z.boolean().optional(),
+  // BUYER_BROKERAGE: snapshot of the property list at create time.
+  propertiesSnapshot: z.array(PropertySnapshotEntry).max(50).optional(),
+  // EXCLUSIVITY: id of the BROKERAGE order this addendum supplements.
+  baseContractId: z.string().optional(),
 });
 
 // Render the contract to a PDF Buffer. Shared between the signed and
 // unsigned fetch paths — the unsigned PDF just omits the signature
 // block.
+// Shape of one row in the BUYER_BROKERAGE property table, as stored in
+// `Contract.propertiesSnapshot`. Captured at create time; immutable.
+type ContractPropertySnapshot = {
+  propertyId?:    string | null;
+  address:        string;
+  city?:          string | null;
+  rooms?:         number | null;
+  sqm?:           number | null;
+  marketingPrice?: number | null;
+  kind?:          string | null;
+};
+
+// Optional thin reference to the underlying BROKERAGE order an
+// EXCLUSIVITY addendum supplements. Passed in by the route after a
+// targeted lookup so the renderer doesn't need a Prisma client.
+type ContractBaseRef = {
+  id: string;
+  signedAt: Date | null;
+  createdAt: Date;
+};
+
 async function renderContractPdf(contract: {
   id: string;
   type: string;
@@ -174,6 +294,9 @@ async function renderContractPdf(contract: {
   signedUserAgent?: string | null;
   consentText?: string | null;
   consentAcceptedAt?: Date | null;
+  // 2026-06-02 — type-specific extensions.
+  propertiesSnapshot?: ContractPropertySnapshot[] | null;
+  baseContract?: ContractBaseRef | null;
   createdAt: Date;
 }, agent: {
   displayName: string | null;
@@ -312,11 +435,114 @@ async function renderContractPdf(contract: {
   }
   doc.moveDown(0.8);
 
+  // BUYER_BROKERAGE — property list table. Rendered between the signer
+  // block and the clauses. Empty placeholder row when snapshot is null/
+  // empty (the buyer-order is still legally formed without it, but the
+  // table is the canonical record of which properties it covers).
+  if (contract.type === 'BUYER_BROKERAGE') {
+    doc.font('He-Bold').fontSize(11).fillColor(GOLD_DEEP);
+    doc.text(rtl('רשימת נכסים'), M, doc.y, {
+      width: innerW, align: 'right', features: ['rtla', 'rtlm'],
+    });
+    const rows = Array.isArray(contract.propertiesSnapshot)
+      ? contract.propertiesSnapshot
+      : [];
+    // Column layout — RTL, so the first (rightmost) column is "סוג הנכס".
+    // Widths sum to innerW. Address is the widest column.
+    const colW = {
+      kind:    70,
+      rooms:   55,
+      sqm:     60,
+      address: innerW - 70 - 55 - 60 - 90,
+      price:   90,
+    };
+    const order: Array<keyof typeof colW> = ['kind', 'rooms', 'sqm', 'address', 'price'];
+    const headers: Record<keyof typeof colW, string> = {
+      kind:    'סוג הנכס',
+      rooms:   'חדרים',
+      sqm:     'שטח',
+      address: 'כתובת',
+      price:   'מחיר מבוקש',
+    };
+    const tableTop = doc.y + 6;
+    // Header strip.
+    doc.save();
+    doc.fillColor('#f7f1e3');
+    doc.rect(M, tableTop, innerW, 18).fill();
+    doc.restore();
+    doc.font('He-Bold').fontSize(9).fillColor(GOLD_DEEP);
+    let cx = PAGE_W - M; // start at right edge, walk left
+    for (const key of order) {
+      const w = colW[key];
+      cx -= w;
+      doc.text(rtl(headers[key]), cx, tableTop + 4, {
+        width: w, align: 'center', features: ['rtla', 'rtlm'],
+      });
+    }
+    // Body rows.
+    doc.font('He').fontSize(9).fillColor(INK);
+    let ry2 = tableTop + 18;
+    const drawCell = (text: string, x: number, w: number) => {
+      doc.text(rtl(text), x, ry2 + 4, {
+        width: w, align: 'center', features: ['rtla', 'rtlm'],
+      });
+    };
+    const fmtPrice = (n: number | null | undefined) =>
+      n == null ? '—' : `₪${Math.round(n).toLocaleString('he-IL')}`;
+    const fmtNum = (n: number | null | undefined) =>
+      n == null ? '—' : String(n);
+    const renderRow = (row: ContractPropertySnapshot | null) => {
+      const rowH = 18;
+      doc.strokeColor(RULE_LIGHT).lineWidth(0.5)
+         .moveTo(M, ry2 + rowH).lineTo(PAGE_W - M, ry2 + rowH).stroke();
+      let x = PAGE_W - M;
+      for (const key of order) {
+        const w = colW[key];
+        x -= w;
+        if (!row) {
+          drawCell(key === 'address' ? '(אין נכסים)' : '', x, w);
+          continue;
+        }
+        if (key === 'kind')         drawCell(row.kind || '—', x, w);
+        else if (key === 'rooms')   drawCell(fmtNum(row.rooms), x, w);
+        else if (key === 'sqm')     drawCell(row.sqm != null ? `${row.sqm} מ״ר` : '—', x, w);
+        else if (key === 'address') {
+          const addr = row.city ? `${row.address}, ${row.city}` : row.address;
+          drawCell(addr, x, w);
+        }
+        else if (key === 'price')   drawCell(fmtPrice(row.marketingPrice), x, w);
+      }
+      ry2 += rowH;
+    };
+    if (rows.length === 0) {
+      renderRow(null);
+    } else {
+      for (const r of rows) renderRow(r);
+    }
+    doc.y = ry2 + 8;
+  }
+
   // Body — split into paragraphs on blank lines.
   doc.font('He-Bold').fontSize(11).fillColor(GOLD_DEEP);
   doc.text(rtl('תנאי החוזה'), M, doc.y, {
     width: innerW, align: 'right', features: ['rtla', 'rtlm'],
   });
+
+  // EXCLUSIVITY — base-contract reference header. Only when this
+  // exclusivity addendum was created against a specific BROKERAGE order.
+  if (contract.type === 'EXCLUSIVITY' && contract.baseContract) {
+    const baseDate = contract.baseContract.signedAt || contract.baseContract.createdAt;
+    const refLine =
+      `הסכם זה מהווה חלק בלתי נפרד מהזמנת שירותי תיווך מספר ` +
+      `${shortContractRef(contract.baseContract.id)} ` +
+      `אשר נחתמה בין הצדדים ביום ${formatIlDate(baseDate)}.`;
+    doc.font('He').fontSize(9).fillColor(INK_SOFT);
+    doc.text(rtl(refLine), M, doc.y + 4, {
+      width: innerW, align: 'right', features: ['rtla', 'rtlm'],
+      lineGap: 1,
+    });
+  }
+
   doc.font('He').fontSize(10).fillColor(INK);
   const paragraphs = contract.body.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
   for (const para of paragraphs) {
@@ -479,6 +705,17 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
         return reply.code(404).send({ error: { message: 'Lead not found' } });
       }
     }
+    // Cross-agent guard on baseContractId — an EXCLUSIVITY addendum
+    // must reference an order belonging to the same agent. Cross-agent
+    // attempts surface as 404 so we don't leak existence.
+    if (input.baseContractId) {
+      const base = await prisma.contract.findUnique({
+        where: { id: input.baseContractId }, select: { agentId: true },
+      });
+      if (!base || base.agentId !== u.id) {
+        return reply.code(404).send({ error: { message: 'Base contract not found' } });
+      }
+    }
 
     const finalTitle = input.title ?? contractTypeLabel(input.type);
     const finalBody  = input.body ?? DEFAULT_BODIES[input.type] ?? '';
@@ -495,12 +732,17 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
         signerEmail: input.signerEmail && input.signerEmail !== '' ? input.signerEmail : null,
         propertyId:  input.propertyId ?? null,
         leadId:      input.leadId ?? null,
+        propertiesSnapshot: input.propertiesSnapshot ?? null,
+        baseContractId:     input.baseContractId ?? null,
       },
     });
     return { contract };
   });
 
   // Fetch a single contract. Agent-scoped: cross-agent reads return 404.
+  // Hydrates `baseContract` (id + signedAt + createdAt) when the row is
+  // an EXCLUSIVITY addendum, so the frontend can show "supplements
+  // order #XXX from dd/MM/yyyy" without a second round-trip.
   app.get('/:id', { onRequest: [app.requireAgent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const u = getUser(req);
@@ -509,8 +751,21 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
     if (!contract || contract.agentId !== u.id) {
       return reply.code(404).send({ error: { message: 'Not found' } });
     }
+    let baseContract: ContractBaseRef | null = null;
+    if (contract.baseContractId) {
+      const b = await prisma.contract.findUnique({
+        where: { id: contract.baseContractId },
+        select: { id: true, signedAt: true, createdAt: true, agentId: true },
+      });
+      // Agent-scope guard on the hydrated ref too — defensive against
+      // a stale FK pointing across agents.
+      if (b && b.agentId === u.id) {
+        baseContract = { id: b.id, signedAt: b.signedAt, createdAt: b.createdAt };
+      }
+    }
     return {
       contract,
+      baseContract,
       pdfUrl: `/api/contracts/${id}/pdf`,
     };
   });
@@ -539,63 +794,33 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
     if (!fs.existsSync(FONT_REG) || !fs.existsSync(FONT_BOLD)) {
       return reply.code(500).send({ error: { message: 'PDF fonts missing on server' } });
     }
-    const buf = await renderContractPdf(contract, agent);
+    // EXCLUSIVITY — fetch the base BROKERAGE order so the renderer can
+    // print the "supplements order #XXX from dd/MM/yyyy" header.
+    let baseContract: ContractBaseRef | null = null;
+    if (contract.baseContractId) {
+      const b = await prisma.contract.findUnique({
+        where: { id: contract.baseContractId },
+        select: { id: true, signedAt: true, createdAt: true, agentId: true },
+      });
+      if (b && b.agentId === u.id) {
+        baseContract = { id: b.id, signedAt: b.signedAt, createdAt: b.createdAt };
+      }
+    }
+    const buf = await renderContractPdf(
+      {
+        ...contract,
+        propertiesSnapshot: contract.propertiesSnapshot as ContractPropertySnapshot[] | null,
+        baseContract,
+      },
+      agent,
+    );
     reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="contract-${contract.id}.pdf"`)
       .header('Cache-Control', 'private, no-store');
     return reply.send(buf);
   });
-
-  // Sign the contract. Stamps the signature name + hash + timestamp
-  // and locks the row forever. Second-sign attempts return 409.
-  app.post('/:id/sign', { onRequest: [app.requireAgent] }, async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const u = getUser(req);
-    if (!u) return reply.code(401).send({ error: { message: 'Unauthorized' } });
-    const parsed = SignInput.safeParse(req.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: { message: 'Invalid request body', issues: parsed.error.issues } });
-    }
-    const contract = await prisma.contract.findUnique({ where: { id } });
-    if (!contract || contract.agentId !== u.id) {
-      return reply.code(404).send({ error: { message: 'Not found' } });
-    }
-    // Signed-lock — second sign attempt is a 409 Conflict so the client
-    // can surface "already signed" cleanly instead of overwriting history.
-    if (contract.signedAt) {
-      return reply.code(409).send({
-        error: { message: 'Contract already signed', code: 'already_signed' },
-      });
-    }
-    const signedAt = new Date();
-    const signatureName = parsed.data.signatureName.trim();
-    const signatureHash = computeSignatureHash(contract.id, signatureName, signedAt);
-    // Tier-2 evidence capture (חוק חתימה אלקטרונית, התשס"א-2001):
-    //   - signedIp / signedUserAgent: device fingerprint at moment of sign
-    //   - consentText: snapshot of the consent paragraph the signer was
-    //     shown (so we can prove what they accepted, even if our wording
-    //     changes later)
-    //   - consentAcceptedAt: only set when the signer ticked the box
-    // documentHash was already captured at create time — kept on the row
-    // so any post-signing edit to body fails to round-trip.
-    const signedIp = extractClientIp(req);
-    const ua = req.headers['user-agent'];
-    const signedUserAgent = typeof ua === 'string' ? ua.slice(0, 512) : null;
-    const consentText = parsed.data.consentText?.trim() || null;
-    const consentAcceptedAt = parsed.data.consentAccepted ? signedAt : null;
-    const updated = await prisma.contract.update({
-      where: { id },
-      data: {
-        signedAt,
-        signatureName,
-        signatureHash,
-        signedIp,
-        signedUserAgent,
-        consentText,
-        consentAcceptedAt,
-      },
-    });
-    return { contract: updated };
-  });
+  // POST /:id/sign — REMOVED 2026-06-02. Agent-side type-to-sign is
+  // gone; the only remaining sign surface is the customer-via-token
+  // flow (frontend work pending in a follow-up pass).
 };

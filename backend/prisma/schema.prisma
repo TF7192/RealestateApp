@@ -2025,10 +2025,15 @@ model Notification {
 // rendered + signed via the in-house pdfkit path reused from
 // prospect-pdf; no external vendor.
 //
-// `type` differentiates the three contract flavors an agent sends:
-//   EXCLUSIVITY — seller grants the agent an exclusive listing window
-//   BROKERAGE   — buyer/seller brokerage-services agreement
-//   OFFER       — buyer's price offer against a listing
+// `type` differentiates the four contract flavors an agent sends:
+//   BROKERAGE        — seller's non-exclusive brokerage-services order
+//                      (הזמנת שירותי תיווך)
+//   EXCLUSIVITY      — seller's exclusive listing addendum that
+//                      supplements a BROKERAGE order; references the
+//                      underlying BROKERAGE via `baseContractId`
+//   BUYER_BROKERAGE  — buyer's brokerage-services order over a
+//                      captured list of properties (`propertiesSnapshot`)
+//   OFFER            — buyer's price offer against a listing
 //
 // `body` is free-form Hebrew legal text the agent can customise per
 // contract (falls back to a sensible default in the route). Once
@@ -2044,9 +2049,21 @@ model Contract {
   property      Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   leadId        String?
   lead          Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  type          String // 'EXCLUSIVITY' | 'BROKERAGE' | 'OFFER'
+  type          String // 'BROKERAGE' | 'EXCLUSIVITY' | 'BUYER_BROKERAGE' | 'OFFER'
   title         String
   body          String // the contract text rendered into the PDF
+  // BUYER_BROKERAGE — snapshot of the property list captured at create
+  // time so later edits to the underlying Property rows don't mutate
+  // the signed PDF. Array of:
+  //   { propertyId?, address, city, rooms?, sqm?, marketingPrice?, kind? }
+  propertiesSnapshot Json?
+  // EXCLUSIVITY — self-FK to the BROKERAGE order this exclusivity
+  // addendum supplements. NULL for the other three types. SetNull on
+  // delete so removing the base order doesn't cascade-kill the signed
+  // exclusivity row.
+  baseContractId String?
+  baseContract   Contract?  @relation("ContractBase", fields: [baseContractId], references: [id], onDelete: SetNull)
+  baseFor        Contract[] @relation("ContractBase")
   signerName    String
   signerPhone   String?
   signerEmail   String?
@@ -2081,6 +2098,7 @@ model Contract {
   @@index([leadId])
   @@index([interestId])
   @@index([type])
+  @@index([baseContractId])
 }
 
 // ────────────────────────────────────────────────────────────────────
