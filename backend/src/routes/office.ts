@@ -106,7 +106,7 @@ export const registerOfficeRoutes: FastifyPluginAsync = async (app) => {
 
   // POST /api/office/members — add a user (by email OR userId) to
   // this office. Owner-only. Accepts `{ userId }` (the frontend's
-  // flow: resolve via searchAgentByEmail first) as well as the
+  // flow: resolve via api.searchAgents first) as well as the
   // legacy `{ email }` path for direct calls.
   const addMemberSchema = z.object({
     email:  z.string().email().optional(),

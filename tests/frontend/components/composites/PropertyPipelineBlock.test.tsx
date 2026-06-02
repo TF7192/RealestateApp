@@ -63,7 +63,7 @@ describe('<PropertyPipelineBlock>', () => {
   it('looks up primary agent by email and shows the matched agent', async () => {
     const user = userEvent.setup();
     server.use(
-      http.get('/api/transfers/agents/search', () =>
+      http.get('/api/agents/search', () =>
         HttpResponse.json({
           agent: {
             id: 'u2', email: 'partner@estia.app',

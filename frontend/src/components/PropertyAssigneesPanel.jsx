@@ -49,8 +49,8 @@ export default function PropertyAssigneesPanel({ propertyId, toast }) {
     setAdding(true);
     try {
       // J10 backend accepts `userId`; resolve email → id first so the
-      // agent doesn't have to look it up. Reuses /transfers/agents/search.
-      const lookup = await api.searchAgentByEmail(email);
+      // agent doesn't have to look it up. Hits /api/agents/search.
+      const lookup = await api.searchAgents(email);
       if (!lookup?.agent) {
         toast?.error?.(lookup?.self ? 'זה אתה — לא ניתן לשייך את עצמך' : 'לא נמצא סוכן עם האימייל הזה');
         return;

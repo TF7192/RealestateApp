@@ -17,7 +17,6 @@ import {
   Trash2,
   MoreHorizontal,
   Share2,
-  ArrowLeftRight,
   Phone,
   CheckSquare,
   Square,
@@ -39,7 +38,6 @@ import { useDebouncedValue } from '../lib/useDebouncedValue';
 import WhatsAppSheet from '../components/WhatsAppSheet';
 import PullRefresh from '../components/PullRefresh';
 import LeadPickerSheet from '../components/LeadPickerSheet';
-import TransferPropertyDialog from '../components/TransferPropertyDialog';
 import SwipeRow from '../components/SwipeRow';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import StickyActionBar from '../components/StickyActionBar';
@@ -502,7 +500,6 @@ export default function Properties() {
   const [leadPickerFor, setLeadPickerFor] = useState(null); // prop being shared
   const [overflowFor, setOverflowFor] = useState(null); // prop for ⋯ menu
   const [similarFor, setSimilarFor] = useState(null); // prop for "חפש דומים"
-  const [transferProp, setTransferProp] = useState(null);
   // N-7 removed the page-level ⋯ sheet; `pageOverflowOpen` is gone and the
   // two actions it hid now live in the toolbar as direct buttons.
   const [matchesPickerFor, setMatchesPickerFor] = useState(null); // P3-M8: { prop, leads }
@@ -951,11 +948,6 @@ export default function Properties() {
           label: 'שיתוף',
           icon: Share2,
           onClick: () => handleShareProp(overflowFor),
-        },
-        {
-          label: 'העברה לסוכן אחר',
-          icon: ArrowLeftRight,
-          onClick: () => setTransferProp(overflowFor),
         },
         {
           label: 'מחק נכס',
@@ -1813,7 +1805,7 @@ export default function Properties() {
                 {/* N-3 — direct card actions. Duplicate + quick-edit icons
                  * sit next to the ⋯ menu at the card's logical-end corner
                  * (visual top-left). The overflow menu stays for the long
-                 * tail (transfer, similar, delete). */}
+                 * tail (similar, delete). */}
                 <div className="property-quick-actions" aria-label={`פעולות מהירות ${prop.street}`}>
                   {/* Favorite star sits inline with the other quick
                       actions so all three controls read as one group at
@@ -2055,14 +2047,6 @@ export default function Properties() {
         title="חיפוש נכסים דומים"
         actions={similarActions}
       />
-
-      {transferProp && (
-        <TransferPropertyDialog
-          property={transferProp}
-          onClose={() => setTransferProp(null)}
-          onDone={() => { setTransferProp(null); load(); }}
-        />
-      )}
 
       {/* P3-M8 — picker filtered to matching leads only */}
       {matchesPickerFor && (

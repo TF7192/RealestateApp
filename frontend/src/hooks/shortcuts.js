@@ -10,7 +10,6 @@ const ROUTE_TITLES = {
   '/properties': 'נכסים',
   '/customers':  'לקוחות',
   '/deals':      'עסקאות',
-  '/transfers':  'העברות',
   '/templates':  'תבניות',
   '/profile':    'פרופיל',
   '/properties/new': 'נכס חדש',

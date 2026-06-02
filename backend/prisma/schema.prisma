@@ -475,8 +475,6 @@ model User {
   leads                  Lead[]                        @relation("AgentLeads")
   deals                  Deal[]                        @relation("AgentDeals")
   files                  UploadedFile[]
-  transfersSent          PropertyTransfer[]            @relation("TransferFrom")
-  transfersReceived      PropertyTransfer[]            @relation("TransferTo")
   templates              MessageTemplate[]
   conversations          Conversation[]                @relation("UserConversations")
   sentMessages           Message[]                     @relation("SentMessages")
@@ -829,7 +827,6 @@ model Property {
   documents        UploadedFile[]
   deal             Deal?
   agreements       Agreement[]
-  transfers        PropertyTransfer[]
   prospects        Prospect[]
   reminders        Reminder[]
   assignees        PropertyAssignee[]
@@ -936,38 +933,6 @@ model OwnerPhone {
   // P1-1 — "primary phone" lookup hits (ownerId, kind='primary') on
   // every owner detail render.
   @@index([ownerId, kind])
-}
-
-enum TransferStatus {
-  PENDING
-  ACCEPTED
-  DECLINED
-  CANCELLED
-  WHATSAPP_SENT
-}
-
-model PropertyTransfer {
-  id           String         @id @default(cuid())
-  propertyId   String
-  property     Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  fromAgentId  String
-  // P0-5 — Cascade on agent delete. PropertyTransfer is a per-agent
-  // workflow record; if the originating agent is hard-deleted there's
-  // nobody to act on the transfer anyway.
-  fromAgent    User           @relation("TransferFrom", fields: [fromAgentId], references: [id], onDelete: Cascade)
-  toAgentId    String?
-  // SetNull on the destination — the transfer history stays for the
-  // sender's audit trail even if the recipient was deleted.
-  toAgent      User?          @relation("TransferTo", fields: [toAgentId], references: [id], onDelete: SetNull)
-  toAgentEmail String? // kept in case the target isn't registered yet
-  status       TransferStatus @default(PENDING)
-  message      String?
-  createdAt    DateTime       @default(now()) @db.Timestamptz(6)
-  respondedAt  DateTime?      @db.Timestamptz(6)
-
-  @@index([fromAgentId])
-  @@index([toAgentId])
-  @@index([status])
 }
 
 model PropertyImage {
@@ -1564,7 +1529,6 @@ enum MessageTemplateKind {
   RENT_PRIVATE // residential + rent
   BUY_COMMERCIAL // commercial + sale
   RENT_COMMERCIAL // commercial + rent
-  TRANSFER // agent-to-agent handoff (no agent info)
 }
 
 model MessageTemplate {

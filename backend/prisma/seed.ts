@@ -552,11 +552,6 @@ async function main() {
   await prisma.activityLog.deleteMany({
     where: { agentId: { in: [manager.id, ...teamAgentIds] } },
   });
-  await prisma.propertyTransfer.deleteMany({
-    where: {
-      OR: [{ fromAgentId: manager.id }, { toAgentId: manager.id }],
-    },
-  });
   await prisma.officeInvite.deleteMany({
     where: { officeId: office.id, acceptedAt: null },
   });
@@ -720,59 +715,6 @@ async function main() {
     });
   }
 
-  // 3. Property transfers — 3 rows that surface on the manager's
-  // /transfers page. Covers all three directions the UI exercises:
-  // pending-incoming (manager is target), accepted-outgoing (manager
-  // gave a lead property away), declined-incoming.
-  const transferSeeds: Array<{
-    propertyId: string;
-    fromAgentId: string;
-    toAgentId: string;
-    status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
-    message: string;
-    daysAgo: number;
-  }> = [
-    {
-      propertyId: teamPropertyIds[`${teamAgents[0].id}::אחד העם 9`],
-      fromAgentId: teamAgents[0].id,
-      toAgentId: manager.id,
-      status: 'PENDING',
-      message: 'דנה, הלקוח שלי ביטל — את יכולה לקחת את זה?',
-      daysAgo: 1,
-    },
-    {
-      propertyId: teamPropertyIds[`${teamAgents[1].id}::קפלן 14`],
-      fromAgentId: manager.id,
-      toAgentId: teamAgents[1].id,
-      status: 'ACCEPTED',
-      message: 'עמית, מעבירה אליך — הלקוח גר ליד המשרד שלך.',
-      daysAgo: 5,
-    },
-    {
-      propertyId: teamPropertyIds[`${teamAgents[2].id}::שינקין 30`],
-      fromAgentId: manager.id,
-      toAgentId: teamAgents[2].id,
-      status: 'DECLINED',
-      message: 'מאיה, נכס להשכרה — מתאים לתיק שלך?',
-      daysAgo: 8,
-    },
-  ];
-  for (const t of transferSeeds) {
-    if (!t.propertyId) continue; // defensive — skip if the lookup missed
-    await prisma.propertyTransfer.create({
-      data: {
-        propertyId: t.propertyId,
-        fromAgentId: t.fromAgentId,
-        toAgentId: t.toAgentId,
-        toAgentEmail: null,
-        status: t.status,
-        message: t.message,
-        createdAt: atOffset(-t.daysAgo, 10, 0),
-        respondedAt: t.status === 'PENDING' ? null : atOffset(-t.daysAgo + 1, 11, 0),
-      },
-    });
-  }
-
   // 4. Pending office invites — 2 unaccepted rows so the /office
   // "pending invites" section renders with real entries.
   const pendingInvites = [
@@ -801,7 +743,7 @@ async function main() {
     data: { agentId: manager.id, attemptedAt: atOffset(-7, 14, 0) },
   });
 
-  console.log(`✓ manager demo: ${reminderRows.length} reminders, ${activityRows.length} activity rows, ${transferSeeds.length} transfers, ${pendingInvites.length} invites, 2 yad2 scans`);
+  console.log(`✓ manager demo: ${reminderRows.length} reminders, ${activityRows.length} activity rows, ${pendingInvites.length} invites, 2 yad2 scans`);
 
   // ─── Manager personal data (properties / owners / leads / deals /
   // documents / meetings) ────────────────────────────────────────────
@@ -817,9 +759,7 @@ async function main() {
   // so the three team agents' personal data stays untouched.
   //
   // Wipe order matters: children before parents because of the FKs.
-  // LeadMeeting → Lead, PropertyTransfer → Property, etc. Transfers
-  // involving the manager's personal properties are already wiped in
-  // the earlier block, so we skip re-wiping here.
+  // LeadMeeting → Lead, etc.
   await prisma.leadMeeting.deleteMany({ where: { agentId: manager.id } });
   await prisma.deal.deleteMany({ where: { agentId: manager.id } });
   await prisma.lead.deleteMany({ where: { agentId: manager.id } });

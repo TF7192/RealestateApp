@@ -12,7 +12,6 @@ import {
   X,
   Images,
   Film,
-  ArrowLeftRight,
   Edit3,
   Trash2,
   Link2,
@@ -54,7 +53,6 @@ import PropertyVideoManager from '../components/PropertyVideoManager';
 import OwnerPicker from '../components/OwnerPicker';
 import WhatsAppSheet from '../components/WhatsAppSheet';
 import ShareDialog from '../components/ShareDialog';
-import TransferPropertyDialog from '../components/TransferPropertyDialog';
 import LeadPickerSheet from '../components/LeadPickerSheet';
 import StickyActionBar from '../components/StickyActionBar';
 import WhatsAppIcon from '../components/WhatsAppIcon';
@@ -319,7 +317,6 @@ export default function PropertyDetail() {
   const [managingPhotos, setManagingPhotos] = useState(false);
   const [managingVideos, setManagingVideos] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
-  const [transferOpen, setTransferOpen] = useState(false);
   const [waShare, setWaShare] = useState(null);
   // Sprint 7 — universal Share dialog (property channel picker).
   const [shareOpen, setShareOpen] = useState(false);
@@ -1084,9 +1081,6 @@ export default function PropertyDetail() {
                   </button>
                   <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); setProspectOpen(true); }}>
                     <UserPlus size={14} /> צור הסכם תיווך
-                  </button>
-                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); setTransferOpen(true); }}>
-                    <ArrowLeftRight size={14} /> העבר לסוכן אחר
                   </button>
                   {isNative() && (
                     <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); handleInstagramStory(); }}>
@@ -2141,14 +2135,6 @@ export default function PropertyDetail() {
           kind="property"
           entity={{ property, agent: user, templates }}
           onClose={() => setShareOpen(false)}
-        />
-      )}
-
-      {transferOpen && (
-        <TransferPropertyDialog
-          property={property}
-          onClose={() => setTransferOpen(false)}
-          onDone={() => load()}
         />
       )}
 

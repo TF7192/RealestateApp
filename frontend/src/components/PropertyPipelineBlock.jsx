@@ -24,10 +24,9 @@ import './PropertyPipelineBlock.css';
 //      the property directly via api.updateProperty when the user hits
 //      "שמור". Used inside the "צנרת תיווך" dashboard card.
 //
-// The "primary agent" picker reuses the same /transfers/agents/search
-// endpoint the transfer dialog uses — email lookup only, no free-form
-// search, because cross-office assignments go through the assignees
-// panel.
+// The "primary agent" picker uses /api/agents/search — email lookup
+// only, no free-form search, because cross-office assignments go
+// through the assignees panel.
 
 const STAGE_OPTIONS = labelsToOptions(PROPERTY_STAGE_LABELS);
 const SERIOUSNESS_OPTIONS = labelsToOptions(SERIOUSNESS_LABELS);
@@ -98,7 +97,7 @@ export default function PropertyPipelineBlock({
     }
     setLookupBusy(true);
     try {
-      const res = await api.searchAgentByEmail(email);
+      const res = await api.searchAgents(email);
       if (!res?.agent) {
         toast?.error?.(res?.self ? 'זה אתה — לא ניתן לשייך את עצמך כסוכן ראשי' : 'לא נמצא סוכן עם האימייל הזה');
         return;

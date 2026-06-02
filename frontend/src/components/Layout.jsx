@@ -25,7 +25,7 @@ import {
   Home, Users, Building2, MessageSquare, Crown, CalendarDays, BellRing, Sparkles,
   BarChart2, Banknote, Upload, UsersRound, Settings,
   Bell, Search, MessageCircle, LogOut, Menu, X,
-  ChevronsLeft, ChevronsRight, Calculator, FileText, ArrowLeftRight,
+  ChevronsLeft, ChevronsRight, Calculator, FileText,
   Activity as ActivityIcon, Download as DownloadIcon, Heart,
   Star, FolderOpen, HelpCircle, IdCard, Megaphone, ShieldCheck,
   UserPlus, Plus,
@@ -94,7 +94,6 @@ const PRIMARY_NAV = [
   // watcher feed. New badge so agents notice the surface; will be
   // dropped once usage stabilises.
   { k: 'market-discovery', to: '/market-discovery', label: 'מודעות חדשות בשוק', Icon: Building2, badge: 'חדש' },
-  { k: 'transfers',   to: '/transfers',  label: 'העברות',     Icon: ArrowLeftRight },
   { k: 'reports',     to: '/reports',    label: 'דוחות',      Icon: BarChart2 },
   // 'פעילות' (/activity) — reachable from the Dashboard instead of the
   // sidebar so the primary nav stays short.

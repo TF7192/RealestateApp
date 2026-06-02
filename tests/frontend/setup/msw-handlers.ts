@@ -80,9 +80,6 @@ export const defaultHandlers = [
   // Deals
   http.get('/api/deals', () => HttpResponse.json({ items: [] })),
 
-  // Transfers
-  http.get('/api/transfers', () => HttpResponse.json({ items: [] })),
-
   // Templates
   http.get('/api/templates', () =>
     HttpResponse.json({

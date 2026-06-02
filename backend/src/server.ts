@@ -39,7 +39,6 @@ import { registerOutlookCalendarRoutes } from './routes/outlook-calendar.js';
 import { registerMeetingRoutes } from './routes/meetings.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { registerAgentRoutes } from './routes/agents.js';
-import { registerTransferRoutes } from './routes/transfers.js';
 import { registerTemplateRoutes } from './routes/templates.js';
 import { registerGeoRoutes } from './routes/geo.js';
 import { registerPublicRoutes } from './routes/public.js';
@@ -313,7 +312,6 @@ export async function build(opts: BuildOptions = {}) {
   await app.register(registerLookupRoutes, { prefix: '/api/lookups' });
   await app.register(registerReportRoutes, { prefix: '/api/reports' });
   await app.register(registerAgentRoutes, { prefix: '/api/agents' });
-  await app.register(registerTransferRoutes, { prefix: '/api' });
   await app.register(registerTemplateRoutes, { prefix: '/api/templates' });
   await app.register(registerGeoRoutes, { prefix: '/api/geo' });
   await app.register(registerPublicRoutes, { prefix: '/api/public' });

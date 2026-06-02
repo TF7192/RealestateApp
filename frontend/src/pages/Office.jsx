@@ -7,7 +7,7 @@
 //   - getOffice()                → office + nested members
 //   - listOfficeInvites()        → pending (OWNER-only, 403-tolerant)
 //   - createOffice()             → first-time user flow
-//   - searchAgentByEmail()       → resolves an existing user to invite
+//   - searchAgents()             → resolves an existing user to invite
 //   - addOfficeMember()          → attaches an existing user
 //   - createOfficeInvite()       → email-based claim-on-login invite
 //   - revokeOfficeInvite() / removeOfficeMember() → housekeeping

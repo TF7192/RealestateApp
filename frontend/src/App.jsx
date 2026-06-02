@@ -36,7 +36,6 @@ const PropertyLandingPage = lazy(() => import('./pages/PropertyLandingPage'));
 // any other surface.
 const LandingEditor = lazy(() => import('./pages/LandingEditor'));
 const CustomerPropertyView = lazy(() => import('./pages/CustomerPropertyView'));
-const AgentTransferView = lazy(() => import('./pages/AgentTransferView'));
 const ProspectSign = lazy(() => import('./pages/ProspectSign'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -52,7 +51,6 @@ const Inbox = lazy(() => import('./pages/Inbox'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
-const Transfers = lazy(() => import('./pages/Transfers'));
 // Sprint 5.1 — public "צרו קשר" page + premium-gate dialog. The page
 // itself is lazy (only reached from premium-gate or landing footer);
 // the dialog is mounted once at the root and stays eager.
@@ -322,7 +320,6 @@ function AppRoutes() {
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
           <Route path="/p/:id" element={<CustomerPropertyView />} />
           <Route path="/a/:agentId" element={<AgentPortal />} />
-          <Route path="/t/:id" element={<AgentTransferView />} />
           {/* D-6 — anything else is a protected authed route. Redirect
               the URL to /login?from=<pathname> so that (a) the address
               bar reflects the fact that the user needs to log in, and
@@ -401,7 +398,6 @@ function AppRoutes() {
                 get bounced back to the dashboard; the active guard
                 above catches the "not onboarded yet" case. */}
             <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/transfers" element={<Transfers />} />
             <Route path="/templates" element={<Templates />} />
             {/* Market Discovery — hourly Yad2 watcher feed. */}
             <Route path="/market-discovery" element={<MarketDiscovery />} />
@@ -508,7 +504,6 @@ function AppRoutes() {
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
           <Route path="/p/:id" element={<CustomerPropertyView />} />
           <Route path="/a/:agentId" element={<AgentPortal />} />
-          <Route path="/t/:id" element={<AgentTransferView />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

@@ -37,10 +37,14 @@ const baseAgent = {
 };
 
 describe('TEMPLATE_KINDS + PLACEHOLDERS', () => {
-  it('exposes exactly the five kinds the backend knows', () => {
-    expect(TEMPLATE_KINDS.map((k) => k.key).sort()).toEqual(
-      ['BUY_COMMERCIAL', 'BUY_PRIVATE', 'RENT_COMMERCIAL', 'RENT_PRIVATE', 'TRANSFER']
-    );
+  it('exposes the four kinds the backend knows', () => {
+    // TEMPLATE_KINDS still includes the historical TRANSFER entry on
+    // the client (templates.js trims happen in §7 of the removal
+    // manifest); the backend no longer accepts it.
+    const keys = TEMPLATE_KINDS.map((k) => k.key);
+    for (const k of ['BUY_COMMERCIAL', 'BUY_PRIVATE', 'RENT_COMMERCIAL', 'RENT_PRIVATE']) {
+      expect(keys).toContain(k);
+    }
   });
 
   it('LABEL_OF covers every placeholder', () => {
@@ -69,14 +73,6 @@ describe('buildVariables', () => {
     const v = buildVariables(baseProperty, baseAgent);
     expect(v.parking).toBe('יש');
     expect(v.storage).toBe('אין');
-  });
-
-  it('stripAgent blanks out the agent fields for the TRANSFER template', () => {
-    const v = buildVariables(baseProperty, baseAgent, { stripAgent: true });
-    expect(v.agentName).toBe('');
-    expect(v.agentAgency).toBe('');
-    expect(v.agentPhone).toBe('');
-    expect(v.agentBio).toBe('');
   });
 
   it('formats the URL using the SEO slug path when both slugs exist', () => {
@@ -127,10 +123,6 @@ describe('renderTemplate', () => {
 });
 
 describe('pickTemplateKind', () => {
-  it('TRANSFER when mode is transfer, regardless of property', () => {
-    expect(pickTemplateKind(baseProperty, 'transfer')).toBe('TRANSFER');
-  });
-
   it.each([
     ['RESIDENTIAL', 'SALE', 'BUY_PRIVATE'],
     ['RESIDENTIAL', 'RENT', 'RENT_PRIVATE'],

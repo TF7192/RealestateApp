@@ -8,12 +8,11 @@ const KINDS = [
   'RENT_PRIVATE',
   'BUY_COMMERCIAL',
   'RENT_COMMERCIAL',
-  'TRANSFER',
 ] as const;
 
 // Default templates — used when the agent hasn't created one yet.
 // All placeholders use the {{var}} syntax; `features` is auto-generated as a
-// comma-list, and agent-* vars resolve to empty on the TRANSFER template.
+// comma-list.
 const DEFAULT_BODIES: Record<string, string> = {
   BUY_PRIVATE:
     `🏡 *{{type}} למכירה — {{street}}, {{city}}*
@@ -77,21 +76,6 @@ const DEFAULT_BODIES: Record<string, string> = {
 
 —
 {{agentName}} · {{agentPhone}}`,
-
-  TRANSFER:
-    `🔁 *העברה בין סוכנים*
-{{type}} ב{{street}}, {{city}}
-
-💰 {{price}}
-🛏️ {{rooms}} חדרים · {{sqm}} מ״ר
-🏢 קומה {{floor}}/{{totalFloors}}
-✨ {{features}}
-🛠️ מצב: {{renovated}}
-📅 פינוי: {{vacancyDate}}
-{{notes}}
-
-📷 פרטים ותמונות:
-{{propertyUrl}}`,
 };
 
 export const registerTemplateRoutes: FastifyPluginAsync = async (app) => {

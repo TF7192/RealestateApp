@@ -9,7 +9,7 @@ let app: FastifyInstance;
 beforeAll(async () => { app = await build(); await app.ready(); });
 afterAll(async () => { await app.close(); });
 
-const KINDS = ['BUY_PRIVATE', 'RENT_PRIVATE', 'BUY_COMMERCIAL', 'RENT_COMMERCIAL', 'TRANSFER'] as const;
+const KINDS = ['BUY_PRIVATE', 'RENT_PRIVATE', 'BUY_COMMERCIAL', 'RENT_COMMERCIAL'] as const;
 
 describe('GET /api/templates', () => {
   it('H — returns one template per kind, falling back to defaults when none are saved', async () => {
@@ -144,7 +144,7 @@ describe('DELETE /api/templates/:kind', () => {
     const agent = await createAgent(prisma);
     const cookie = await loginAs(app, agent.email, agent._plainPassword);
     const res = await app.inject({
-      method: 'DELETE', url: '/api/templates/TRANSFER', headers: { cookie },
+      method: 'DELETE', url: '/api/templates/RENT_COMMERCIAL', headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
   });

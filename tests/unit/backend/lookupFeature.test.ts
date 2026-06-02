@@ -27,22 +27,7 @@ describe('lookup_feature tool', () => {
     )) as any;
     expect(out.count).toBeGreaterThan(0);
     const ids = out.items.map((it: any) => it.id);
-    // The two entries that directly answer this question:
     expect(ids).toContain('property-share');
-    // And the more specific transfer-to-agent answer should also rank.
-    const includesTransferOrPicker =
-      ids.includes('property-transfer') || ids.includes('property-share-via-lead-picker');
-    expect(includesTransferOrPicker).toBe(true);
-  });
-
-  it('finds the transfer-property entry for "להעביר נכס לסוכן אחר"', async () => {
-    const out = (await runChatTool(
-      'lookup_feature',
-      { query: 'להעביר נכס לסוכן אחר' },
-      ctx,
-    )) as any;
-    const ids = out.items.map((it: any) => it.id);
-    expect(ids).toContain('property-transfer');
   });
 
   it('finds the lead-create entry for English "create new lead"', async () => {

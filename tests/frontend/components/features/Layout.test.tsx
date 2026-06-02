@@ -59,11 +59,10 @@ describe('<Layout>', () => {
     }
   });
 
-  it('exposes the major primary-rail entries (reports / reminders / transfers / documents)', () => {
+  it('exposes the major primary-rail entries (reports / reminders / documents)', () => {
     render(<Layout onLogout={() => {}} />);
     expect(screen.getAllByRole('link', { name: 'דוחות' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'תזכורות' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'העברות' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'מסמכים' }).length).toBeGreaterThan(0);
   });
 

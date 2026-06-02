@@ -675,17 +675,11 @@ export const api = {
   resetTemplate: (kind) =>
     request(`/templates/${kind}`, { method: 'DELETE' }),
 
-  // Property transfers
-  searchAgentByEmail: (email) =>
-    request(`/transfers/agents/search?email=${encodeURIComponent(email)}`),
-  listTransfers: () => request('/transfers'),
-  initiateTransfer: (propertyId, body) =>
-    request(`/properties/${propertyId}/transfer`, { method: 'POST', body }),
-  logWhatsappTransfer: (propertyId) =>
-    request(`/properties/${propertyId}/transfer/whatsapp`, { method: 'POST' }),
-  acceptTransfer: (id) => request(`/transfers/${id}/accept`, { method: 'POST' }),
-  declineTransfer: (id) => request(`/transfers/${id}/decline`, { method: 'POST' }),
-  cancelTransfer: (id) => request(`/transfers/${id}/cancel`, { method: 'POST' }),
+  // Agent lookup — used by PropertyAssigneesPanel and PropertyPipelineBlock
+  // to resolve a co-agent / primary-agent by email. Previously lived at
+  // /transfers/agents/search; moved when the transfers feature was deleted.
+  searchAgents: (email) =>
+    request(`/agents/search?email=${encodeURIComponent(email)}`),
 
   // ─── MLS parity surface ────────────────────────────────────────────────
   // Added as Phase 1 infrastructure for the multi-agent MLS UI build. All

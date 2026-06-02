@@ -41,7 +41,7 @@ describe('<PropertyAssigneesPanel>', () => {
     const user = userEvent.setup();
     let postBody: unknown = null;
     server.use(
-      http.get('/api/transfers/agents/search', () =>
+      http.get('/api/agents/search', () =>
         HttpResponse.json({
           agent: {
             id: 'u9', email: 'x@estia.app',
@@ -66,7 +66,7 @@ describe('<PropertyAssigneesPanel>', () => {
   it('surfaces Hebrew error when the email is not found', async () => {
     const user = userEvent.setup();
     server.use(
-      http.get('/api/transfers/agents/search', () => HttpResponse.json({ agent: null }))
+      http.get('/api/agents/search', () => HttpResponse.json({ agent: null }))
     );
     const errs: string[] = [];
     const toast = { success: () => {}, info: () => {}, error: (m: string) => { errs.push(m); } };

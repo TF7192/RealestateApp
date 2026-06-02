@@ -30,7 +30,7 @@ describe('GET /api/notifications', () => {
       data: [
         { userId: a.id, type: 'reminder_due',     title: 'A-oldest', createdAt: new Date('2026-04-20T09:00:00Z') },
         { userId: a.id, type: 'lead_assigned',    title: 'A-middle', createdAt: new Date('2026-04-22T09:00:00Z') },
-        { userId: a.id, type: 'property_transfer', title: 'A-newest', createdAt: new Date('2026-04-24T09:00:00Z') },
+        { userId: a.id, type: 'lead_match',       title: 'A-newest', createdAt: new Date('2026-04-24T09:00:00Z') },
         { userId: b.id, type: 'reminder_due',     title: 'B-only',   createdAt: new Date('2026-04-23T09:00:00Z') },
       ],
     });
