@@ -6,18 +6,16 @@
 // the detail page for a one-tap outreach.
 
 import { useCallback, useEffect, useMemo, useState, memo } from 'react';
-import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Upload, Filter, Phone, MessageCircle, Sparkles, Search,
-  MessageSquareText, Edit3, Check,
+  MessageSquareText, Edit3,
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatPhone } from '../lib/phone';
 import { useViewportMobile, useRefreshOnRefocus } from '../hooks/mobile';
 import LeadFiltersSheet from '../components/LeadFiltersSheet';
 import CustomerEditDialog from '../components/CustomerEditDialog';
-import BulkWhatsAppDialog from '../components/BulkWhatsAppDialog';
 import SwipeRow from '../components/SwipeRow';
 import PullRefresh from '../components/PullRefresh';
 import { telUrl, waUrl } from '../lib/waLink';
@@ -69,24 +67,11 @@ export default function Customers() {
   // budget without leaving the list. Triggered by the negative-style
   // pencil icon next to the row's phone+WhatsApp cluster.
   const [editLead, setEditLead] = useState(null);
-  // 2026-05-08 — bulk WhatsApp send. Set<id> of selected lead rows;
-  // toggle via per-row checkbox + "select all" in the header. The
-  // "שלח WhatsApp לנבחרים" CTA shows up in a sticky toolbar when
-  // selectedIds.size > 0 and opens BulkWhatsAppDialog.
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [bulkOpen, setBulkOpen] = useState(false);
   // Stable callbacks — the memoized DesktopLeadRow does shallow prop
   // equality, so any inline `() => …` we pass it would be a new
   // identity on every render and force every row to rebuild on a
   // single checkbox click. With useCallback the row re-renders only
-  // when its `lead` / `isSelected` actually change.
-  const toggleSelected = useCallback((id, on) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(id); else next.delete(id);
-      return next;
-    });
-  }, []);
+  // when its `lead` actually changes.
   const onRowNavigate = useCallback((id) => navigate(`/customers/${id}`), [navigate]);
   const onRowEdit = useCallback((lead) => setEditLead(lead), []);
 
@@ -428,28 +413,6 @@ export default function Customers() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${DT.border}`, background: DT.cream2 }}>
-                    <th style={{ ...headerCell(), padding: 0, width: 44 }}>
-                      {(() => {
-                        const allSelected = filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id));
-                        return (
-                          <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={allSelected}
-                            aria-label="בחר הכול"
-                            onClick={() => {
-                              if (allSelected) setSelectedIds(new Set());
-                              else setSelectedIds(new Set(filtered.map((l) => l.id)));
-                            }}
-                            className={`estia-cust-select${allSelected ? ' is-on' : ''}`}
-                          >
-                            <span className="estia-cust-select-circle">
-                              {allSelected ? <Check size={14} strokeWidth={3} /> : null}
-                            </span>
-                          </button>
-                        );
-                      })()}
-                    </th>
                     {['שם', 'טלפון', 'עיר', 'תקציב', 'מה מחפש', 'מקור', 'עודכן', ''].map((h) => (
                       <th key={h} style={headerCell()}>{h}</th>
                     ))}
@@ -460,8 +423,6 @@ export default function Customers() {
                     <DesktopLeadRow
                       key={l.id}
                       lead={l}
-                      isSelected={selectedIds.has(l.id)}
-                      onToggle={toggleSelected}
                       onNavigate={onRowNavigate}
                       onEdit={onRowEdit}
                     />
@@ -473,41 +434,11 @@ export default function Customers() {
         </div>
       )}
     </div>
-    {selectedIds.size > 0 && !bulkOpen && createPortal(
-      <div className="bulk-bar" role="region" aria-label="פעולות על מספר מתעניינים" dir="rtl">
-        <div className="bulk-bar-inner">
-          <span className="bulk-bar-count">
-            <strong>{selectedIds.size}</strong> נבחרו
-          </span>
-          <div className="bulk-bar-actions">
-            <button
-              type="button"
-              className="bulk-bar-btn bulk-bar-wa"
-              onClick={() => setBulkOpen(true)}
-            >
-              <MessageCircle size={16} /> שלח WhatsApp
-            </button>
-            <button
-              type="button"
-              className="bulk-bar-btn bulk-bar-ghost"
-              onClick={() => setSelectedIds(new Set())}
-            >ביטול</button>
-          </div>
-        </div>
-      </div>,
-      document.body,
-    )}
     {editLead && (
       <CustomerEditDialog
         lead={editLead}
         onClose={() => setEditLead(null)}
         onSaved={() => { setEditLead(null); load(); }}
-      />
-    )}
-    {bulkOpen && (
-      <BulkWhatsAppDialog
-        leads={leads.filter((l) => selectedIds.has(l.id))}
-        onClose={() => setBulkOpen(false)}
       />
     )}
     </>
@@ -523,38 +454,18 @@ export default function Customers() {
 // rows and visually felt like "the table refreshed".
 const DesktopLeadRow = memo(function DesktopLeadRow({
   lead: l,
-  isSelected,
-  onToggle,
   onNavigate,
   onEdit,
 }) {
   return (
     <tr
-      className={`estia-row-hover estia-cust-row${isSelected ? ' is-selected' : ''}`}
+      className="estia-row-hover estia-cust-row"
       onClick={() => onNavigate(l.id)}
       style={{
         borderBottom: `1px solid ${DT.border}`,
         cursor: 'pointer',
       }}
     >
-      <td
-        className="estia-cust-select-cell"
-        style={{ ...bodyCell(), padding: 0, width: 44 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={isSelected}
-          aria-label={`בחר את ${l.name || 'מתעניין'}`}
-          onClick={(e) => { e.stopPropagation(); onToggle(l.id, !isSelected); }}
-          className={`estia-cust-select${isSelected ? ' is-on' : ''}`}
-        >
-          <span className="estia-cust-select-circle">
-            {isSelected ? <Check size={14} strokeWidth={3} /> : null}
-          </span>
-        </button>
-      </td>
       <td style={bodyCell()}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Avatar name={l.name} />
