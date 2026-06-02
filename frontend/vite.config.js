@@ -46,9 +46,10 @@ export default defineConfig({
     // CJS module wrappers into `var t=t(), n=n(), ...` patterns where
     // the local `var` shadows the closure parameter before it's
     // assigned, producing `TypeError: t is not a function` at module
-    // init in production builds. Switching to esbuild's minifier
-    // dodges the bug; bundle size is within ~1% of the Oxc output.
-    minify: 'esbuild',
+    // init in production. Disable minification as a hotfix; the gzip
+    // hit at the CDN edge is what mostly determines wire size anyway.
+    // TODO(2026-Q3): re-enable once rolldown ships a fix or pin oxc.
+    minify: false,
     // Perf 2026-04-25 — split heavy vendor code out of the main bundle
     // so first-paint downloads only what it needs. lucide-react has
     // 141 importers across the app; React + react-dom + react-router
