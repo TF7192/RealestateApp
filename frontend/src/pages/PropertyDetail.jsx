@@ -61,6 +61,7 @@ import PropertyBrokersCard from '../components/PropertyBrokersCard';
 import PropertyInterestsPanel from '../components/PropertyInterestsPanel';
 import OwnerActivityPanel from '../components/OwnerActivityPanel';
 import OwnerAgreementDialog from '../components/OwnerAgreementDialog';
+import ContractCreateDialog from '../components/ContractCreateDialog';
 import { shareWithPhotos, shareToInstagramStory } from '../native/share';
 import { isNative } from '../native/platform';
 import { track } from '../lib/analytics';
@@ -242,6 +243,10 @@ export default function PropertyDetail() {
   });
   // 1.5 — Prospect intake dialog open-state
   const [prospectOpen, setProspectOpen] = useState(false);
+  // 2026-06-02 — canonical ContractCreateDialog. `contractDialog` holds
+  // the type to launch directly into ({ defaultType }) so the "צור הסכם
+  // תיווך" / "הסכם בלעדיות" rail buttons can deep-link into Step 2.
+  const [contractDialog, setContractDialog] = useState(null); // null | { defaultType }
   // Sprint 5 — "✨ התאמות חכמות" drawer open-state
   const [aiMatchesOpen, setAiMatchesOpen] = useState(false);
   // OwnerPicker for swapping the linked Owner without leaving the page.
@@ -790,7 +795,7 @@ export default function PropertyDetail() {
                   <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); handleDuplicate(); }} disabled={duplicating}>
                     <Copy size={14} /> {duplicating ? 'משכפל…' : 'שכפל נכס'}
                   </button>
-                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); setProspectOpen(true); }}>
+                  <button type="button" className="prd-more-item" onClick={() => { setMoreMenuOpen(false); setContractDialog({ defaultType: 'BROKERAGE' }); }}>
                     <UserPlus size={14} /> צור הסכם תיווך
                   </button>
                   {isNative() && (
@@ -935,11 +940,11 @@ export default function PropertyDetail() {
             </span>
           </button>
 
-          {/* Exclusivity — opens the owner-side agreement popup. The
-              old version routed to the property-edit page; per Adam's
-              UX pass we now show a dedicated dialog so the agent can
-              compose an EXCLUSIVITY contract without leaving the page. */}
-          <button type="button" className="prd-quick" onClick={() => setExclusivityOpen(true)}>
+          {/* Exclusivity — opens the canonical ContractCreateDialog with
+              EXCLUSIVITY pre-seeded. The old OwnerAgreementDialog is
+              still available as a legacy fallback (kept for one more
+              sprint while we settle the field set). */}
+          <button type="button" className="prd-quick" onClick={() => setContractDialog({ defaultType: 'EXCLUSIVITY' })}>
             <span className="prd-quick-ico"><FileText size={15} /></span>
             <span className="prd-quick-body">
               <span className="prd-quick-label">הסכם בלעדיות</span>
@@ -958,11 +963,12 @@ export default function PropertyDetail() {
           {/* Brokerage agreement — promoted out of the kebab menu so
               "צור הסכם תיווך" is a single click from the rail (Adam: "the
               צור הסכם תיווך should be accessible through פעולות מהירות").
-              Wires into the existing ProspectDialog. */}
+              Now routes through the canonical ContractCreateDialog with
+              BROKERAGE pre-seeded. */}
           <button
             type="button"
             className="prd-quick"
-            onClick={() => setProspectOpen(true)}
+            onClick={() => setContractDialog({ defaultType: 'BROKERAGE' })}
           >
             <span className="prd-quick-ico"><UserPlus size={15} /></span>
             <span className="prd-quick-body">
@@ -1219,7 +1225,7 @@ export default function PropertyDetail() {
                         </span>
                       </a>
                     )}
-                    <button type="button" className="prd-quick" onClick={() => setExclusivityOpen(true)}>
+                    <button type="button" className="prd-quick" onClick={() => setContractDialog({ defaultType: 'EXCLUSIVITY' })}>
                       <span className="prd-quick-ico"><FileText size={15} /></span>
                       <span className="prd-quick-body">
                         <span className="prd-quick-label">הסכם בלעדיות</span>
@@ -1620,6 +1626,28 @@ export default function PropertyDetail() {
           onCreated={() => { setExclusivityOpen(false); load(); }}
         />
       )}
+
+      {/* 2026-06-02 — canonical contract-create dialog. Replaces the
+          ProspectDialog / OwnerAgreementDialog entry points for the
+          BROKERAGE + EXCLUSIVITY rail buttons. After create we route
+          to /contracts/:id so the agent lands on the preview page and
+          can send the WhatsApp/SMS link to the signer. */}
+      <ContractCreateDialog
+        open={!!contractDialog}
+        onClose={() => setContractDialog(null)}
+        onCreated={(c) => {
+          setContractDialog(null);
+          if (c?.id) navigate(`/contracts/${c.id}`);
+        }}
+        context={{
+          propertyId: property.id,
+          defaultType: contractDialog?.defaultType,
+          signerName:  property?.owner || undefined,
+          signerPhone: property?.ownerPhone || undefined,
+          signerEmail: property?.ownerEmail || undefined,
+        }}
+      />
+
 
       {/* Attach-from-rail lead picker. Single-pick or multi-pick → bulk
           createPropertyInterests, then switch to the מתעניינים tab so

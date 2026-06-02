@@ -6,9 +6,10 @@
 // lives on the detail page (preview + sign).
 
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FileText, ShieldCheck, Clock, AlertCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { FileText, ShieldCheck, Clock, AlertCircle, Plus } from 'lucide-react';
 import api from '../lib/api';
+import ContractCreateDialog from '../components/ContractCreateDialog';
 
 const DT = {
   cream: '#f7f3ec', cream2: '#efe9df', cream3: '#e8dfcf', cream4: '#fbf7f0',
@@ -23,9 +24,10 @@ const DT = {
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const TYPE_LABEL = {
-  EXCLUSIVITY: 'הסכם בלעדיות',
-  BROKERAGE:   'הסכם תיווך',
-  OFFER:       'הצעת רכישה',
+  EXCLUSIVITY:     'הסכם בלעדיות',
+  BROKERAGE:       'הזמנת שירותי תיווך',
+  BUYER_BROKERAGE: 'הזמנת שירותי תיווך לקניה',
+  OFFER:           'הצעת רכישה',
 };
 
 function formatIlDate(iso) {
@@ -38,9 +40,13 @@ function formatIlDate(iso) {
 }
 
 export default function Contracts() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // 2026-06-02 — canonical create-contract entry. `open` toggles the
+  // 4-card type picker; no seeded context on the list page.
+  const [createOpen, setCreateOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,9 +72,18 @@ export default function Contracts() {
         <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5, margin: 0 }}>
           חוזים
         </h1>
-        <span style={{ fontSize: 12, color: DT.muted }}>
-          {items.length ? `${items.length} חוזים` : null}
-        </span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 12, color: DT.muted }}>
+            {items.length ? `${items.length} חוזים` : null}
+          </span>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus size={14} /> הסכם חדש
+          </button>
+        </div>
       </div>
 
       {loading && (
@@ -102,12 +117,31 @@ export default function Contracts() {
             עוד אין חוזים
           </h2>
           <p style={{ margin: 0, color: DT.muted, fontSize: 13, lineHeight: 1.6 }}>
-            חוזים נוצרים מתוך דף נכס (בלעדיות / הצעת רכישה) או מדף לקוח
-            (הסכם תיווך). כל חוזה חתום נעול באופן סופי עם חתימה דיגיטלית,
-            חותמת זמן ותעודת אימות (SHA-256).
+            חוזים נוצרים מתוך דף נכס (בלעדיות / הצעת רכישה), מדף לקוח
+            (הסכם תיווך), או מכאן בלחיצה על "הסכם חדש". כל חוזה חתום נעול
+            באופן סופי עם חתימה דיגיטלית, חותמת זמן ותעודת אימות (SHA-256).
           </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setCreateOpen(true)}
+            style={{ marginTop: 4 }}
+          >
+            <Plus size={14} /> הסכם חדש
+          </button>
         </div>
       )}
+
+      <ContractCreateDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(c) => {
+          setCreateOpen(false);
+          if (c?.id) navigate(`/contracts/${c.id}`);
+          else load();
+        }}
+        context={{}}
+      />
 
       {!loading && !error && items.length > 0 && (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>

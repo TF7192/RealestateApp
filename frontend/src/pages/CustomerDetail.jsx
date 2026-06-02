@@ -9,11 +9,11 @@
 // internals aren't worth rewriting for this sprint.
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Phone, MessageCircle, MessageSquare, Calendar,
   AlertCircle, History, Flame, Thermometer, Snowflake, Building2,
-  Sparkles, Printer, Maximize2, Edit3,
+  Sparkles, Printer, Maximize2, Edit3, FileText,
 } from 'lucide-react';
 import { popoutCurrentRoute } from '../lib/popout';
 import { printPage } from '../lib/print';
@@ -25,6 +25,7 @@ import PropertyInterestsPanel from '../components/PropertyInterestsPanel';
 import AiMatchesDrawer from '../components/AiMatchesDrawer';
 import MultiPropertySendDialog from '../components/MultiPropertySendDialog';
 import CustomerEditDialog from '../components/CustomerEditDialog';
+import ContractCreateDialog from '../components/ContractCreateDialog';
 import ActivityPanel from '../components/ActivityPanel';
 import MeetingSummarizerCard from '../components/MeetingSummarizerCard';
 import { primeContactBump } from '../hooks/mobile';
@@ -59,6 +60,7 @@ export default function CustomerDetail() {
   // copy now lives directly in the JSX since the app is Hebrew-only and
   // the English locale files were empty stubs.
   const { id } = useParams();
+  const navigate = useNavigate();
   const toast = useToast();
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +73,9 @@ export default function CustomerDetail() {
   // 2026-05-03 — multi-property send: pick N properties and send all in
   // a single WhatsApp message to this customer.
   const [multiSendOpen, setMultiSendOpen] = useState(false);
+  // 2026-06-02 — canonical ContractCreateDialog. `contractDialog` holds
+  // the optional defaultType so a future call can deep-link to Step 2.
+  const [contractDialog, setContractDialog] = useState(null); // null | { defaultType? }
   // Sprint 5 / AI — summariser card hangs off the most-recent meeting
   // for this lead. Reload with `loadLatestMeeting` after a summarize
   // roundtrip so the UI reflects the persisted row.
@@ -217,6 +222,16 @@ export default function CustomerDetail() {
             title="קבע פגישה"
           >
             <Calendar size={14} /> קבע פגישה
+          </button>
+          {/* 2026-06-02 — canonical entry point for the 4-doc-type
+              contract flow. Pre-seeds the signer fields from the lead. */}
+          <button
+            type="button"
+            onClick={() => { haptics.tap(); setContractDialog({}); }}
+            style={secondaryBtn()}
+            title="צור חוזה"
+          >
+            <FileText size={14} /> צור הסכם
           </button>
           {/* 2026-05-03 — Send multiple matching properties in one WhatsApp
               message. The agent's own pick from their listings. */}
@@ -370,6 +385,25 @@ export default function CustomerDetail() {
           onClose={() => setMultiSendOpen(false)}
         />
       )}
+
+      {/* 2026-06-02 — canonical contract-create dialog. Seeded with the
+          lead so the signer fields autofill, plus leadId so the server
+          links the row to this customer. */}
+      <ContractCreateDialog
+        open={!!contractDialog}
+        onClose={() => setContractDialog(null)}
+        onCreated={(c) => {
+          setContractDialog(null);
+          if (c?.id) navigate(`/contracts/${c.id}`);
+        }}
+        context={{
+          leadId:      lead.id,
+          defaultType: contractDialog?.defaultType,
+          signerName:  lead.name || undefined,
+          signerPhone: lead.phone || undefined,
+          signerEmail: lead.email || undefined,
+        }}
+      />
     </div>
   );
 }
