@@ -105,13 +105,14 @@ describe('ShareDialog — rendering', () => {
     message: 'שלום — נכס נהדר',
   };
 
-  it('renders the WhatsApp / SMS / Email / Copy buttons for a property share', () => {
+  it('renders the SMS / Email / Copy buttons for a property share', () => {
     render(<ShareDialog kind="property" entity={propertyEntity} onClose={() => {}} />);
     const dialog = screen.getByRole('dialog');
     expect(dialog).toBeInTheDocument();
     // Each channel button carries a stable data-channel attribute we can
     // assert on without being coupled to the Hebrew copy inside the label.
-    expect(dialog.querySelector('[data-channel="whatsapp"]')).toBeTruthy();
+    // WhatsApp channel removed 2026-06-02 with the feature cull.
+    expect(dialog.querySelector('[data-channel="whatsapp"]')).toBeFalsy();
     expect(dialog.querySelector('[data-channel="sms"]')).toBeTruthy();
     expect(dialog.querySelector('[data-channel="email"]')).toBeTruthy();
     expect(dialog.querySelector('[data-channel="copy"]')).toBeTruthy();

@@ -1,6 +1,6 @@
 // ShareDialog — universal channel-picker for sharing a property / catalog /
-// agent card / contract via WhatsApp, SMS, email, link-copy, and (on iOS)
-// the OS share sheet. All channels are free deep-links — no backend.
+// agent card / contract via SMS, email, link-copy, and (on iOS) the OS
+// share sheet. All channels are free deep-links — no backend.
 //
 // Sprint 7 port-of-the-claude.ai/design bundle: replaces per-page share
 // UIs and the legacy ShareCatalogDialog (which now delegates here).
@@ -23,7 +23,6 @@ import {
   X,
   Copy,
   Check,
-  MessageCircle,
   Mail,
   MessageSquare,
   Link2,
@@ -35,7 +34,7 @@ import Portal from './Portal';
 import { useToast } from '../lib/toast';
 import { track } from '../lib/analytics';
 import { isNative, isIOS } from '../native/platform';
-import { shareSheet, openWhatsApp } from '../native/share';
+import { shareSheet } from '../native/share';
 import { normalizeIsraeliPhone } from '../lib/waLink';
 
 // Cream & Gold DT tokens — match OwnerEditDialog / ContractDetail / the
@@ -200,14 +199,6 @@ export default function ShareDialog({ kind = 'property', entity, onClose }) {
         has_recipient: !!recipient,
       });
     } catch { /* no-op */ }
-  };
-
-  const handleWhatsApp = async () => {
-    setError(null);
-    emit('whatsapp');
-    // Prefer the native/web-aware wrapper so WKWebView jumps to the
-    // WhatsApp app via deep-link instead of opening a nested WebView.
-    await openWhatsApp({ phone: recipient, text: message });
   };
 
   const handleSms = () => {
@@ -434,15 +425,6 @@ export default function ShareDialog({ kind = 'property', entity, onClose }) {
           }}>
             <button
               type="button"
-              data-channel="whatsapp"
-              onClick={handleWhatsApp}
-              style={whatsappBtn()}
-            >
-              <MessageCircle size={14} />
-              שלח בוואטסאפ
-            </button>
-            <button
-              type="button"
               data-channel="sms"
               onClick={handleSms}
               style={secondaryBtn()}
@@ -532,18 +514,6 @@ function inputStyle() {
     color: DT.ink,
     fontSize: 14,
     outline: 'none',
-  };
-}
-
-function whatsappBtn() {
-  return {
-    ...FONT,
-    background: 'linear-gradient(135deg, #25d366 0%, #128c7e 100%)',
-    border: 'none', color: '#fff',
-    padding: '10px 14px', borderRadius: 10,
-    cursor: 'pointer', fontSize: 13, fontWeight: 800,
-    display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 4px 10px rgba(37, 211, 102, 0.32)',
   };
 }
 

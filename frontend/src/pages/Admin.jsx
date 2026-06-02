@@ -11,15 +11,15 @@
 //   • Weekly-growth grouped bar chart — new users, new properties,
 //     new leads, all from `newThisWeek`.
 //   • AI spend by feature donut + a per-feature legend with cost +
-//     call counts. Driven by /office/ai-usage which is now admin-only.
+//     call counts. Driven by /admin/ai-usage.
 //   • Top spenders table — first 8 users by MTD AI spend.
 //   • Searchable recent-users table — filter by name/email/office.
 //
-// Data sources (all in parallel, all pre-existing — no new endpoints):
+// Data sources (all in parallel):
 //   /api/admin/overview        — KPIs + role breakdown + weekly delta
 //   /api/admin/users-summary   — full per-user roll-up
-//   /api/office/ai-usage       — feature/member breakdown for current
-//                                month (admin-gated server-side)
+//   /api/admin/ai-usage        — feature/member AI spend breakdown for
+//                                the current month
 //
 // All charts are inline SVG — no chart-lib dependency, no runtime cost
 // beyond the data fetch. Cream & Gold inline DT to match the rest of
@@ -73,7 +73,7 @@ export default function Admin() {
     let cancelled = false;
     Promise.all([
       api.adminOverview().catch(() => null),
-      api.officeAiUsage().catch(() => null),
+      api.adminAiUsage().catch(() => null),
       api.adminUsersSummary().catch(() => ({ items: [] })),
     ]).then(([o, u, s]) => {
       if (cancelled) return;

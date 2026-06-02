@@ -662,10 +662,10 @@ export const api = {
   // feature so future renames land in one block.
 
   // Admin platform observability — gated on role=ADMIN server-side
-  // (SEC-010; was an email allowlist). The /office/ai-usage endpoint
-  // is admin-only AI spend observability — kept after the "המשרד שלי"
-  // UI removal because the Admin dashboard consumes it.
-  officeAiUsage:       (month) => request(`/office/ai-usage${month ? `?month=${encodeURIComponent(month)}` : ''}`),
+  // (SEC-010; was an email allowlist). Moved from /office/ai-usage to
+  // /admin/ai-usage when the המשרד שלי UI was retired (2026-06-02); the
+  // data was never office-scoped, always rolled up across every user.
+  adminAiUsage:        (month) => request(`/admin/ai-usage${month ? `?month=${encodeURIComponent(month)}` : ''}`),
   adminOverview:       () => request('/admin/overview'),
   adminMonitoring:     () => request('/admin/monitoring'),
   // PERF-007 — single round-trip dashboard load. Returns:

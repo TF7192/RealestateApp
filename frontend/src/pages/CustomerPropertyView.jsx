@@ -10,7 +10,6 @@ import {
   Snowflake,
   Shield,
   Phone,
-  MessageCircle,
   ChevronLeft,
   ChevronRight,
   ArrowRight,
@@ -28,9 +27,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { formatFloor, formatFloorOutOf } from '../lib/formatFloor';
-import WhatsAppIcon from '../components/WhatsAppIcon';
 import LogoMark from '../components/LogoMark';
-import { waUrl } from '../lib/waLink';
 import './CustomerPropertyView.css';
 
 // ── Money & shape helpers ─────────────────────────────────────────────
@@ -239,12 +236,6 @@ export default function CustomerPropertyView() {
   const agentBackLink = agent?.slug
     ? `/agents/${agent.slug}`
     : agent?.id ? `/a/${agent.id}` : null;
-
-  const handleWhatsApp = () => {
-    const text = `שלום ${agentName}, אני מתעניין/ת בנכס ב${property.street}, ${property.city}. אשמח לפרטים נוספים.`;
-    const target = agentPhoneDigits || '';
-    window.open(waUrl(target, text), '_blank');
-  };
 
   const handleShare = async () => {
     const shareData = {
@@ -540,10 +531,6 @@ export default function CustomerPropertyView() {
               <strong>{formatPrice(property.marketingPrice, isRent)}</strong>
             </div>
             <div className="cpv-contact-actions">
-              <button className="cpv-cta cpv-cta-wa" onClick={handleWhatsApp}>
-                <MessageCircle size={18} />
-                שלח הודעה בוואטסאפ
-              </button>
               {agentPhone && (
                 <a
                   href={`tel:${agentPhoneDigits}`}
@@ -564,9 +551,6 @@ export default function CustomerPropertyView() {
 
       {/* Mobile sticky bottom action bar with safe-area inset */}
       <div className="cpv-mobile-bar" role="toolbar" aria-label="יצירת קשר">
-        <button className="cpv-mobile-btn cpv-mobile-wa" onClick={handleWhatsApp}>
-          <WhatsAppIcon size={18} /> וואטסאפ
-        </button>
         {agentPhoneDigits && (
           <a
             href={`tel:${agentPhoneDigits}`}
