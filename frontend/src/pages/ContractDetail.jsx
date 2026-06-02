@@ -1,20 +1,18 @@
-// Sprint 6 / ScreenContract — contract detail + type-to-sign flow.
+// Sprint 6 / ScreenContract — contract detail page.
 //
-// Inline Cream & Gold palette. Split-panel: the iframe preview of the
-// rendered PDF on the left, signer metadata + the type-to-sign input
-// on the right. After signing, the UI flips into locked-state mode:
-// signature hash + timestamp badge replace the input, further sign
-// attempts are blocked client-side (the server 409 is the backstop).
-//
-// v1 ships type-to-sign only. A canvas hand-drawn signature is a
-// deliberate follow-up: adds ~80 lines of touch-event code, sending a
-// data-URL up, and PDF-embedding — none of which we need for the
-// product to deliver value.
+// Agent view of a single contract: PDF preview on the left, status +
+// share/sign-link panel on the right. The in-browser typed-name sign
+// surface was removed 2026-06-02 — agents no longer sign contracts
+// inside Estia. The customer signs on the public kiosk at
+// `/contracts/sign/:publicSignToken`; the agent's only sign-side
+// action here is "שלח לחתימה" which opens ShareDialog over the
+// customer-facing sign URL.
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowRight, FileText, Check, AlertCircle, ShieldCheck, Download, Clock, Share2,
+  ArrowRight, FileText, AlertCircle, ShieldCheck, Download, Clock, Share2,
+  Send,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useToast } from '../lib/toast';
@@ -34,9 +32,10 @@ const DT = {
 const FONT = { fontFamily: 'Assistant, Heebo, -apple-system, sans-serif' };
 
 const TYPE_LABEL = {
-  EXCLUSIVITY: 'הסכם בלעדיות',
-  BROKERAGE:   'הסכם תיווך',
-  OFFER:       'הצעת רכישה',
+  EXCLUSIVITY:     'הסכם בלעדיות',
+  BROKERAGE:       'הזמנת שירותי תיווך',
+  BUYER_BROKERAGE: 'הזמנת שירותי תיווך לקניה',
+  OFFER:           'הצעת רכישה',
 };
 
 function formatIlDateTime(iso) {
@@ -54,18 +53,13 @@ export default function ContractDetail() {
   const navigate = useNavigate();
   const toast = useToast();
   const [contract, setContract] = useState(null);
+  const [publicSignUrl, setPublicSignUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Type-to-sign local state. Separate from the persisted signatureName
-  // because we only commit it on the server round-trip.
-  const [typedName, setTypedName] = useState('');
-  const [signing, setSigning] = useState(false);
-  // Busting the iframe cache after a successful sign so the preview
-  // re-fetches the now-signed PDF. URL-param only; the actual PDF
-  // endpoint is Cache-Control: no-store so this is belt-and-braces.
-  const [pdfNonce, setPdfNonce] = useState(0);
-  // Sprint 7 — universal Share dialog for the contract PDF link.
-  const [shareOpen, setShareOpen] = useState(false);
+  // Sprint 7 — universal Share dialog for both the PDF preview and the
+  // public sign link. We track which "kind" of share is open to pick
+  // the right payload.
+  const [shareOpen, setShareOpen] = useState(null); // null | 'pdf' | 'sign'
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,6 +69,13 @@ export default function ContractDetail() {
       const c = res?.contract || res;
       if (!c) throw new Error('החוזה לא נמצא');
       setContract(c);
+      // Backend returns `publicSignUrl` as a path; we deep-link to the
+      // SPA route. Fall back to constructing from publicSignToken if
+      // the backend didn't surface a URL (e.g. legacy contracts).
+      const fullSignUrl = c.publicSignToken
+        ? `${window.location.origin}/contracts/sign/${c.publicSignToken}`
+        : null;
+      setPublicSignUrl(fullSignUrl);
     } catch (e) {
       setError(e?.message || 'שגיאה בטעינה');
     } finally {
@@ -83,26 +84,6 @@ export default function ContractDetail() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
-
-  const onSign = async () => {
-    const name = typedName.trim();
-    if (!name || name.length < 2) {
-      toast?.error?.('יש להקליד את השם המלא כדי לחתום');
-      return;
-    }
-    setSigning(true);
-    try {
-      const res = await api.signContract(id, name);
-      const signed = res?.contract || res;
-      setContract(signed);
-      setPdfNonce((n) => n + 1);
-      toast?.success?.('החוזה נחתם');
-    } catch (e) {
-      toast?.error?.(e?.message || 'החתימה נכשלה');
-    } finally {
-      setSigning(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -133,7 +114,17 @@ export default function ContractDetail() {
   }
 
   const isSigned = !!contract.signedAt;
-  const pdfUrl = `${api.contractPdfUrl(contract.id)}${pdfNonce ? `?v=${pdfNonce}` : ''}`;
+  const pdfUrl = api.contractPdfUrl(contract.id);
+
+  const copyShareLink = async () => {
+    if (!publicSignUrl) return;
+    try {
+      await navigator.clipboard.writeText(publicSignUrl);
+      toast?.success?.('הקישור הועתק');
+    } catch {
+      toast?.error?.('העתקה נכשלה');
+    }
+  };
 
   return (
     <div dir="rtl" style={{ ...FONT, padding: 28, color: DT.ink, minHeight: '100%' }}>
@@ -150,8 +141,6 @@ export default function ContractDetail() {
           <ArrowRight size={16} />
           חוזים
         </Link>
-        {/* CD-4 — share + download stretch to fill the row on phones, so
-         *  they don't end up tiny + lonely on the right edge. */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a
             href={pdfUrl}
@@ -161,14 +150,12 @@ export default function ContractDetail() {
           >
             <Download size={14} /> הורד PDF
           </a>
-          {/* Sprint 7 — channel picker: WhatsApp / SMS / email / copy /
-           *  OS share. Uses the PDF URL as the shared link. */}
           <button
             type="button"
-            onClick={() => setShareOpen(true)}
+            onClick={() => setShareOpen('pdf')}
             style={{ ...secondaryBtn(), flex: '1 1 140px', justifyContent: 'center' }}
           >
-            <Share2 size={14} /> שתף
+            <Share2 size={14} /> שתף PDF
           </button>
         </div>
       </div>
@@ -225,7 +212,7 @@ export default function ContractDetail() {
         )}
       </div>
 
-      {/* Main grid: preview + sign panel */}
+      {/* Main grid: preview + sign-link panel (or signed badge) */}
       <div style={{
         display: 'grid', gap: 16,
         gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
@@ -240,14 +227,9 @@ export default function ContractDetail() {
           }}>
             תצוגה מקדימה
           </div>
-          {/* iframe renders the signed OR unsigned PDF depending on
-              contract state; the server branches on signedAt. */}
           <iframe
-            key={pdfNonce}
             title="חוזה — תצוגה מקדימה"
             src={pdfUrl}
-            // CD-1 — cap iframe height at 70vh on phones so the share/sign
-            // controls below remain reachable without long scrolls.
             style={{
               width: '100%', height: 'min(70vh, 560px)', border: 'none',
               background: DT.cream,
@@ -255,10 +237,10 @@ export default function ContractDetail() {
           />
         </section>
 
-        {/* Sign panel or locked badge */}
-        <section style={sectionCard()} aria-label={isSigned ? 'חתימה ותיעוד' : 'חתימה דיגיטלית'}>
+        {/* Sign-link panel (unsigned) or signed-state badge (signed) */}
+        <section style={sectionCard()} aria-label={isSigned ? 'חתימה ותיעוד' : 'שליחה לחתימה'}>
           <h3 style={sectionTitle()}>
-            <ShieldCheck size={16} /> {isSigned ? 'פרטי החתימה' : 'חתימה דיגיטלית'}
+            <ShieldCheck size={16} /> {isSigned ? 'פרטי החתימה' : 'שליחה לחתימה'}
           </h3>
 
           {!isSigned && (
@@ -266,49 +248,55 @@ export default function ContractDetail() {
               <p style={{
                 margin: '0 0 14px', color: DT.muted, fontSize: 13, lineHeight: 1.55,
               }}>
-                בדוק/י את תוכן החוזה בתצוגה המקדימה. לחתימה דיגיטלית הקלד/י
-                את שמך המלא בדיוק כפי שהוא מופיע במסמך. לחיצה על "חתום"
-                תנעל את החוזה ותחתום עליו באופן סופי.
+                החוזה ממתין לחתימת הלקוח. שלח/י לו/ה את הקישור הייחודי
+                לחתימה דיגיטלית. הלקוח/ה יוכל/תוכל לעיין בתוכן ההסכם
+                ולחתום מהמכשיר שלו/ה ללא צורך בהתחברות.
               </p>
-              <label style={{
-                display: 'block', fontSize: 11, fontWeight: 700,
-                color: DT.muted, textTransform: 'uppercase', letterSpacing: 0.3,
-                marginBottom: 6,
-              }}>
-                הקלד/י שם מלא לחתימה
-              </label>
-              <input
-                type="text"
-                value={typedName}
-                onChange={(e) => setTypedName(e.target.value)}
-                placeholder={contract.signerName}
-                autoComplete="name"
-                disabled={signing}
-                style={{
-                  ...FONT, width: '100%', boxSizing: 'border-box',
-                  padding: '10px 14px', borderRadius: 10,
-                  border: `1px solid ${DT.borderStrong}`,
-                  fontSize: 18, fontWeight: 700, color: DT.ink,
-                  background: DT.cream4, textAlign: 'center',
-                }}
-                aria-label="הקלד/י שם מלא לחתימה"
-              />
+              {publicSignUrl && (
+                <div style={{
+                  background: DT.cream4,
+                  border: `1px solid ${DT.border}`,
+                  borderRadius: 10,
+                  padding: '10px 12px',
+                  marginBottom: 14,
+                  fontSize: 11,
+                  color: DT.ink2,
+                  direction: 'ltr',
+                  wordBreak: 'break-all',
+                  fontFamily: 'ui-monospace, Menlo, monospace',
+                }}>
+                  {publicSignUrl}
+                </div>
+              )}
               <div style={{
-                marginTop: 14, display: 'flex',
-                justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap',
+                display: 'flex', flexDirection: 'column', gap: 8,
               }}>
                 <button
                   type="button"
-                  onClick={onSign}
-                  disabled={signing || !typedName.trim()}
+                  onClick={() => setShareOpen('sign')}
+                  disabled={!publicSignUrl}
                   style={{
                     ...primaryBtn(),
-                    opacity: signing || !typedName.trim() ? 0.6 : 1,
-                    cursor: signing || !typedName.trim() ? 'not-allowed' : 'pointer',
+                    opacity: publicSignUrl ? 1 : 0.5,
+                    cursor: publicSignUrl ? 'pointer' : 'not-allowed',
+                    justifyContent: 'center',
                   }}
                 >
-                  <Check size={14} />
-                  {signing ? 'חותם…' : 'חתום'}
+                  <Send size={15} />
+                  שלח לחתימה
+                </button>
+                <button
+                  type="button"
+                  onClick={copyShareLink}
+                  disabled={!publicSignUrl}
+                  style={{
+                    ...secondaryBtn(),
+                    opacity: publicSignUrl ? 1 : 0.5,
+                    cursor: publicSignUrl ? 'pointer' : 'not-allowed',
+                    justifyContent: 'center',
+                  }}
+                >
+                  העתק קישור
                 </button>
               </div>
             </>
@@ -321,6 +309,26 @@ export default function ContractDetail() {
             }}>
               <Row label="נחתם על ידי" value={contract.signatureName || contract.signerName} />
               <Row label="זמן חתימה"   value={formatIlDateTime(contract.signedAt)} />
+              {contract.signatureImage ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, color: DT.muted,
+                    textTransform: 'uppercase', letterSpacing: 0.3,
+                  }}>
+                    חתימה
+                  </span>
+                  <img
+                    src={contract.signatureImage}
+                    alt="חתימת הלקוח"
+                    style={{
+                      maxWidth: 220, maxHeight: 80,
+                      background: DT.white,
+                      border: `1px solid ${DT.border}`,
+                      borderRadius: 8, padding: 6,
+                    }}
+                  />
+                </div>
+              ) : null}
               {contract.signatureHash ? (
                 <Row
                   label="מזהה חתימה (SHA-256)"
@@ -340,6 +348,13 @@ export default function ContractDetail() {
                   }
                 />
               ) : null}
+              {contract.signedIp ? (
+                <Row label="IP בעת חתימה" value={
+                  <span style={{ direction: 'ltr', display: 'inline-block' }}>
+                    {contract.signedIp}
+                  </span>
+                } />
+              ) : null}
               <div style={{
                 marginTop: 6,
                 display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -354,7 +369,7 @@ export default function ContractDetail() {
         </section>
       </div>
 
-      {shareOpen && (
+      {shareOpen === 'pdf' && (
         <ShareDialog
           kind="contract"
           entity={{
@@ -362,7 +377,18 @@ export default function ContractDetail() {
             url: pdfUrl,
             recipient: contract.signerName,
           }}
-          onClose={() => setShareOpen(false)}
+          onClose={() => setShareOpen(null)}
+        />
+      )}
+      {shareOpen === 'sign' && publicSignUrl && (
+        <ShareDialog
+          kind="contract"
+          entity={{
+            contract,
+            url: publicSignUrl,
+            recipient: contract.signerName,
+          }}
+          onClose={() => setShareOpen(null)}
         />
       )}
     </div>
@@ -404,17 +430,16 @@ function primaryBtn() {
     ...FONT,
     background: `linear-gradient(180deg, ${DT.goldLight}, ${DT.gold})`,
     border: 'none', color: DT.ink,
-    padding: '10px 18px', borderRadius: 10, cursor: 'pointer',
+    padding: '12px 20px', borderRadius: 10, cursor: 'pointer',
     fontSize: 14, fontWeight: 800,
     display: 'inline-flex', gap: 6, alignItems: 'center',
     boxShadow: '0 4px 10px rgba(180,139,76,0.3)',
+    minHeight: 44,
   };
 }
 function secondaryBtn() {
   return {
     ...FONT, background: DT.white, border: `1px solid ${DT.border}`,
-    // CD-6 — bumped from 7px 12px / no minHeight to a comfortable touch
-    // target on phones (still fine on desktop).
     padding: '11px 14px', borderRadius: 10, cursor: 'pointer',
     fontSize: 12, fontWeight: 700, minHeight: 40,
     display: 'inline-flex', gap: 5, alignItems: 'center', color: DT.ink,

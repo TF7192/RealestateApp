@@ -214,10 +214,22 @@ function formatIlDateTime(d: Date): string {
 function computeDocumentHash(title: string, body: string): string {
   return crypto.createHash('sha256').update(`${title}\n${body}`).digest('hex');
 }
-// `computeSignatureHash` + `extractClientIp` were removed 2026-06-02
-// when the agent-side type-to-sign endpoint was deleted. The customer-
-// via-token sign route (frontend pending) will reintroduce its own
-// chain-of-custody capture when it ships.
+// Best-effort client-IP extractor that respects upstream proxy chain.
+// EC2 fronts via nginx → Cloudflare so X-Forwarded-For is the source of
+// truth; we keep only the first hop (the actual client). Restored
+// 2026-06-02 alongside the public sign-by-link route — the public POST
+// /sign needs to capture the signer's IP for the audit trail.
+export function extractClientIp(req: { ip?: string; headers: Record<string, unknown> }): string | null {
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.length) {
+    return xff.split(',')[0]!.trim().slice(0, 64);
+  }
+  if (Array.isArray(xff) && xff.length) {
+    const first = xff[0];
+    return typeof first === 'string' ? first.trim().slice(0, 64) : null;
+  }
+  return req.ip ? String(req.ip).slice(0, 64) : null;
+}
 
 // Validation schemas. Bodies are bounded so a rogue payload can't blow
 // up the PDF buffer size.
@@ -275,7 +287,7 @@ type ContractBaseRef = {
   createdAt: Date;
 };
 
-async function renderContractPdf(contract: {
+export async function renderContractPdf(contract: {
   id: string;
   type: string;
   title: string;
@@ -297,6 +309,10 @@ async function renderContractPdf(contract: {
   // 2026-06-02 — type-specific extensions.
   propertiesSnapshot?: ContractPropertySnapshot[] | null;
   baseContract?: ContractBaseRef | null;
+  // 2026-06-02 — customer's hand-drawn signature as a PNG data-URL,
+  // captured via the public sign-by-link kiosk. Rendered above the
+  // typed signature line when present.
+  signatureImage?: string | null;
   createdAt: Date;
 }, agent: {
   displayName: string | null;
@@ -559,16 +575,33 @@ async function renderContractPdf(contract: {
     doc.text(rtl('חתימה'), M, doc.y, {
       width: innerW, align: 'right', features: ['rtla', 'rtlm'],
     });
-    // Type-to-sign: render the typed name in a script-ish style on a
-    // baseline rule.
     const sigY = doc.y + 10;
     const sigCenter = PAGE_W / 2;
     const sigLineW = 220;
+    // 2026-06-02 — when the customer drew a signature on the public
+    // kiosk, render the PNG above the typed name. pdfkit handles
+    // `data:image/png;base64,...` URLs natively. The typed name still
+    // appears underneath — it's the legal evidence anchor under
+    // חוק חתימה אלקטרונית, התשס"א-2001 even with the drawn signature.
+    let typedNameY = sigY;
+    if (contract.signatureImage && contract.signatureImage.startsWith('data:image/')) {
+      try {
+        const SIG_IMG_W = 220;
+        const SIG_IMG_H = 60;
+        doc.image(contract.signatureImage, sigCenter - SIG_IMG_W / 2, sigY, {
+          fit: [SIG_IMG_W, SIG_IMG_H],
+          align: 'center',
+        });
+        typedNameY = sigY + SIG_IMG_H + 4;
+      } catch {
+        // Bad data-URL — fall back silently to typed-name-only.
+      }
+    }
     doc.font('He-Bold').fontSize(18).fillColor(INK);
-    doc.text(rtl(contract.signatureName), sigCenter - sigLineW / 2, sigY, {
+    doc.text(rtl(contract.signatureName), sigCenter - sigLineW / 2, typedNameY, {
       width: sigLineW, align: 'center', features: ['rtla', 'rtlm'],
     });
-    const baselineY = sigY + 28;
+    const baselineY = typedNameY + 28;
     doc.strokeColor(INK_MUTED).lineWidth(0.5)
        .moveTo(sigCenter - sigLineW / 2, baselineY)
        .lineTo(sigCenter + sigLineW / 2, baselineY).stroke();
@@ -720,6 +753,11 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
     const finalTitle = input.title ?? contractTypeLabel(input.type);
     const finalBody  = input.body ?? DEFAULT_BODIES[input.type] ?? '';
     const documentHash = computeDocumentHash(finalTitle, finalBody);
+    // 2026-06-02 — every contract gets a 30-day public sign token at
+    // create time. Agents share `/contracts/sign/:token` with the
+    // customer; the customer reviews + signs without logging in.
+    const publicSignToken = crypto.randomBytes(24).toString('hex');
+    const publicSignTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const contract = await prisma.contract.create({
       data: {
         agentId:     u.id,
@@ -734,6 +772,8 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
         leadId:      input.leadId ?? null,
         propertiesSnapshot: input.propertiesSnapshot ?? null,
         baseContractId:     input.baseContractId ?? null,
+        publicSignToken,
+        publicSignTokenExpiresAt,
       },
     });
     return { contract };
@@ -763,10 +803,18 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
         baseContract = { id: b.id, signedAt: b.signedAt, createdAt: b.createdAt };
       }
     }
+    // 2026-06-02 — surface the public sign URL alongside the row so
+    // the agent UI can copy / share the customer-facing link. The
+    // `publicSignToken` is also on the row itself (Prisma returns all
+    // scalars by default); the URL is a convenience.
+    const publicSignUrl = contract.publicSignToken
+      ? `/contracts/sign/${contract.publicSignToken}`
+      : null;
     return {
       contract,
       baseContract,
       pdfUrl: `/api/contracts/${id}/pdf`,
+      publicSignUrl,
     };
   });
 
@@ -811,6 +859,7 @@ export const registerContractRoutes: FastifyPluginAsync = async (app) => {
         ...contract,
         propertiesSnapshot: contract.propertiesSnapshot as ContractPropertySnapshot[] | null,
         baseContract,
+        signatureImage: contract.signatureImage ?? null,
       },
       agent,
     );

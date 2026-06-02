@@ -19,6 +19,7 @@ import { registerOwnerActivityRoutes } from './routes/owner-activity.js';
 import { registerDealRoutes } from './routes/deals.js';
 import { registerAgreementRoutes } from './routes/agreements.js';
 import { registerContractRoutes } from './routes/contracts.js';
+import { registerContractPublicRoutes } from './routes/contractsPublic.js';
 import { registerLookupRoutes } from './routes/lookups.js';
 import { registerReportRoutes } from './routes/reports.js';
 import { registerMeRoutes } from './routes/me.js';
@@ -304,6 +305,8 @@ export async function build(opts: BuildOptions = {}) {
   await app.register(registerDealRoutes, { prefix: '/api/deals' });
   await app.register(registerAgreementRoutes, { prefix: '/api/agreements' });
   await app.register(registerContractRoutes, { prefix: '/api/contracts' });
+  // Public sign-by-link surface for Contract — token-gated, no auth.
+  await app.register(registerContractPublicRoutes, { prefix: '/api/public/contracts' });
   await app.register(registerLookupRoutes, { prefix: '/api/lookups' });
   await app.register(registerReportRoutes, { prefix: '/api/reports' });
   await app.register(registerAgentRoutes, { prefix: '/api/agents' });

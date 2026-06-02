@@ -2087,6 +2087,16 @@ model Contract {
   signedUserAgent    String?
   consentText        String?
   consentAcceptedAt  DateTime? @db.Timestamptz(6)
+  // 2026-06-02 — public sign-by-link surface. The agent shares
+  // `/contracts/sign/:publicSignToken` with the customer; the customer
+  // reviews the contract + signs without logging in. Token is a 24-byte
+  // url-safe hex string, expires 30 days after create. `signatureImage`
+  // holds the customer's hand-drawn signature as a PNG data-URL (size-
+  // capped to 200KB at the route layer) — rendered above the typed name
+  // on the signed PDF when present.
+  publicSignToken          String?   @unique
+  publicSignTokenExpiresAt DateTime? @db.Timestamptz(6)
+  signatureImage           String?
   // 2026-05-10 — back-link to the PropertyInterest activity log row.
   interestId    String?
   interest      PropertyInterest? @relation(fields: [interestId], references: [id], onDelete: SetNull)

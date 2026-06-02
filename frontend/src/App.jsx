@@ -32,6 +32,10 @@ const DealDetail = lazy(() => import('./pages/DealDetail'));
 const AgentPortal = lazy(() => import('./pages/AgentPortal'));
 const CustomerPropertyView = lazy(() => import('./pages/CustomerPropertyView'));
 const ProspectSign = lazy(() => import('./pages/ProspectSign'));
+// Public customer-facing contract-sign kiosk (2026-06-02) — no auth,
+// token-gated. Mounted in both the UNAUTH and AUTH route blocks so
+// an agent who clicks their own share link doesn't hit a 404.
+const ContractSign = lazy(() => import('./pages/ContractSign'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Profile = lazy(() => import('./pages/Profile'));
 // Sprint 7 — two small new pages (agent business-card + full per-lead
@@ -293,6 +297,8 @@ function AppRoutes() {
           <Route path="/agents/:agentSlug/:propertySlug" element={<CustomerPropertyView />} />
           {/* Public prospect sign page (1.5) — no login required. */}
           <Route path="/public/p/:token" element={<ProspectSign />} />
+          {/* Public contract sign page (2026-06-02) — no login required. */}
+          <Route path="/contracts/sign/:token" element={<ContractSign />} />
           {/* Legacy short routes — kept forever for shared-link backwards-compat */}
           <Route path="/p/:id" element={<CustomerPropertyView />} />
           <Route path="/a/:agentId" element={<AgentPortal />} />
@@ -460,6 +466,11 @@ function AppRoutes() {
               reaches the kiosk page instead of a 404. ProspectSign is
               self-contained (no Layout / nav), so no session leakage. */}
           <Route path="/public/p/:token" element={<ProspectSign />} />
+          {/* Public contract sign page — also mounted here so an agent
+              clicking their own share link while signed in reaches the
+              kiosk instead of a 404. ContractSign is self-contained
+              (no Layout / nav), so no session leakage. */}
+          <Route path="/contracts/sign/:token" element={<ContractSign />} />
           {/* Sprint 5.1 — authed users can reach /contact too. The
               page renders its own full-bleed shell without the app Layout. */}
           <Route path="/contact" element={<Contact />} />

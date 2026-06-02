@@ -504,6 +504,13 @@ export const api = {
   getContract: (id) => request(`/contracts/${id}`),
   createContract: (body) => request('/contracts', { method: 'POST', body }),
   contractPdfUrl: (id) => `${BASE}/contracts/${id}/pdf`,
+  // Public sign-by-link surface — no auth, token-gated. The agent shares
+  // `/contracts/sign/:token` with the customer; the customer reviews +
+  // signs on the public kiosk page.
+  publicContract: (token) => request(`/public/contracts/${token}`),
+  signPublicContract: (token, body) =>
+    request(`/public/contracts/${token}/sign`, { method: 'POST', body }),
+  publicContractPdfUrl: (token) => `${BASE}/public/contracts/${token}/pdf`,
 
   dashboard: () => request('/reports/dashboard'),
   propertyWeekly: (id) => request(`/reports/property/${id}/weekly`),
