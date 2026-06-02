@@ -15,13 +15,14 @@ import { useAuth } from '../lib/auth';
 import { useViewportMobile } from '../hooks/mobile';
 import Portal from '../components/Portal';
 import NewMeetingDialog from '../components/NewMeetingDialog';
+import { Suspense } from 'react';
 import {
   PipelineDonut,
   LeadSourceDonut,
   MatchCoverageGauge,
   DaysOnMarketBar,
   SilenceBucketsBar,
-} from '../components/DashboardCharts';
+} from '../components/DashboardChartsLazy';
 
 // ─── Tokens lifted from the bundle's shell.jsx ──────────────
 const DT = {
@@ -681,9 +682,11 @@ export default function Dashboard() {
         gap: 14,
         marginBottom: 14,
       }}>
-        <PipelineDonut deals={deals} />
-        <LeadSourceDonut leads={leads} />
-        <MatchCoverageGauge leads={leads} properties={properties} />
+        <Suspense fallback={<div style={{ minHeight: 220 }} />}>
+          <PipelineDonut deals={deals} />
+          <LeadSourceDonut leads={leads} />
+          <MatchCoverageGauge leads={leads} properties={properties} />
+        </Suspense>
       </div>
       <div style={{
         display: 'grid',
@@ -691,8 +694,10 @@ export default function Dashboard() {
         gap: 14,
         marginBottom: 14,
       }}>
-        <DaysOnMarketBar properties={properties} />
-        <SilenceBucketsBar leads={leads} />
+        <Suspense fallback={<div style={{ minHeight: 220 }} />}>
+          <DaysOnMarketBar properties={properties} />
+          <SilenceBucketsBar leads={leads} />
+        </Suspense>
       </div>
 
       <div style={{
