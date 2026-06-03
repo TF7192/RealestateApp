@@ -723,9 +723,10 @@ export default function MarketDiscovery() {
 
             <div className="md-segmented compact" role="tablist" aria-label="סוג עסקה">
               {[
-                { value: '',        label: 'הכל' },
-                { value: 'forsale', label: 'למכירה' },
-                { value: 'rent',    label: 'להשכרה' },
+                { value: '',          label: 'הכל' },
+                { value: 'forsale',   label: 'למכירה' },
+                { value: 'rent',      label: 'להשכרה' },
+                { value: 'commercial', label: 'מסחרי' },
               ].map((opt) => (
                 <button
                   key={opt.value || '_all'}

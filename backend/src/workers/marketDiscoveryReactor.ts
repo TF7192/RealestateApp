@@ -271,11 +271,12 @@ export async function drainOnce() {
 
 // In-app notification body — short, fits in the bell dropdown.
 // 2026-05-08 — listing kind label in Hebrew. Maps the Prisma enum
-// MarketListingKind (`forsale` / `rent`) onto the natural Hebrew
-// preposition phrase that reads inside a sentence.
-function listingKindLabel(kind: 'forsale' | 'rent' | null | undefined): string {
+// MarketListingKind (`forsale` / `rent` / `commercial`) onto the
+// natural Hebrew preposition phrase that reads inside a sentence.
+function listingKindLabel(kind: 'forsale' | 'rent' | 'commercial' | null | undefined): string {
   if (kind === 'rent') return 'להשכרה';
   if (kind === 'forsale') return 'למכירה';
+  if (kind === 'commercial') return 'מסחרי';
   return '';
 }
 
@@ -304,7 +305,7 @@ function formatMatchedNames(
 // Each segment is opt-in so missing fields don't leave dangling words:
 // e.g. "נכס חדש מתאים לטל" if both kind + city are null.
 function notificationTitle(
-  l: { city: string | null; kind: 'forsale' | 'rent' | null | undefined },
+  l: { city: string | null; kind: 'forsale' | 'rent' | 'commercial' | null | undefined },
   matches: { leadName: string }[],
 ): string {
   const kind = listingKindLabel(l.kind);

@@ -45,6 +45,13 @@ enum MarketListingStatus {
 enum MarketListingKind {
   forsale
   rent
+  // 2026-06-03 — commercial added to the hourly Yad2 watcher's kind set.
+  // Yad2 surfaces commercial under /realestate/commercial/<region>; the
+  // listings span both sale + rent of commercial real estate (offices,
+  // stores, warehouses, etc.), and the watcher persists them with
+  // kind=commercial. The downstream "create property" action defaults
+  // category to SALE for commercial; the agent overrides if needed.
+  commercial
 }
 
 enum MarketListingPosterType {

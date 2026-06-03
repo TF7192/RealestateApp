@@ -67,7 +67,7 @@ function asNumber(v: unknown): number | null {
   return null;
 }
 
-export type ExtractKind = 'forsale' | 'rent';
+export type ExtractKind = 'forsale' | 'rent' | 'commercial';
 
 export function extractYad2Listing(
   raw: RawYad2Item,

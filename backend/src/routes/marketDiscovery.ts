@@ -17,7 +17,7 @@ const listFiltersSchema = z.object({
   city:           z.string().trim().min(1).optional(),
   neighborhood:   z.string().trim().min(1).optional(),
   propertyType:   z.string().trim().min(1).optional(),
-  kind:           z.enum(['forsale', 'rent']).optional(),
+  kind:           z.enum(['forsale', 'rent', 'commercial']).optional(),
   posterType:     z.enum(['private', 'agency']).optional(),
   minPrice:       z.coerce.number().int().min(0).optional(),
   maxPrice:       z.coerce.number().int().min(0).optional(),
@@ -333,13 +333,18 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     // PII from the watcher). Use empty-string placeholders so the
     // create succeeds; the agent immediately lands on /edit and can
     // fill in real values. category mirrors the listing's kind:
-    // 'rent' → RENT, anything else → SALE.
-    const category =
-      (listing as { kind?: string | null }).kind === 'rent' ? 'RENT' : 'SALE';
+    // 'rent' → RENT, 'commercial' → SALE (commercial covers both
+    // sale + rent on Yad2; agent overrides on edit), default SALE.
+    const listingKind = (listing as { kind?: string | null }).kind;
+    const category = listingKind === 'rent' ? 'RENT' : 'SALE';
+    // 'commercial' listings span offices/stores/warehouses → tag
+    // the CRM row as COMMERCIAL so it lands in the right filter on
+    // /properties. forsale/rent stay RESIDENTIAL by default.
+    const assetClass = listingKind === 'commercial' ? 'COMMERCIAL' : 'RESIDENTIAL';
     const newProp = await prisma.property.create({
       data: {
         agentId: userId,
-        assetClass: 'RESIDENTIAL',
+        assetClass,
         category,
         type: listing.propertyType ?? 'דירה',
         city: listing.city ?? '',

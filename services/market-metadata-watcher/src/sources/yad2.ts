@@ -1,7 +1,7 @@
 // Yad2 region/kind feed discovery.
 //
 // Live-verified scan plan (see MARKET_DISCOVERY_PLAN.md / chat audit):
-//   - 7 regions × 2 kinds (forsale, rent) = 14 page fetches/hour steady-state.
+//   - 7 regions × 3 kinds (forsale, rent, commercial) = 21 page fetches/hour steady-state.
 //   - Bare regional URL is sort-by-date by default (UI-confirmed).
 //   - Listings live at __NEXT_DATA__.props.pageProps.feed.private + .agency.
 //   - Early-exit when ALL items on the current page are already known
@@ -44,7 +44,7 @@ export const REGION_SLUGS = [
 
 export type RegionSlug = typeof REGION_SLUGS[number];
 
-const ALL_KINDS: ExtractKind[] = ['forsale', 'rent'];
+const ALL_KINDS: ExtractKind[] = ['forsale', 'rent', 'commercial'];
 
 // Human-pacing gap range. Replaces the old fixed 600ms gap — a
 // constant cadence is itself a fingerprint signal. Real users vary
