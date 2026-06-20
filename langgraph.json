@@ -1,0 +1,8 @@
+{
+  "node_version": "20",
+  "dependencies": ["./langgraph-agent"],
+  "graphs": {
+    "estia_agent": "./langgraph-agent/src/graph.ts:graph"
+  },
+  "env": ".env"
+}
