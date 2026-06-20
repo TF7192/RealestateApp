@@ -1744,6 +1744,32 @@ model PublicMatchSeen {
 // See MARKET_DISCOVERY_PLAN.md for the full design.
 // ────────────────────────────────────────────────────────────────────
 
+// Enums mirror the backend schema (backend/prisma/schema.prisma). The
+// watcher and backend share ONE Postgres database, whose MarketListing
+// columns are Postgres enums defined+migrated by the backend. The
+// watcher's generated client needs the matching enum types so tick.ts
+// can write strict enum values. Keep these in lock-step with the
+// backend enum definitions.
+enum MarketListingKind {
+  forsale
+  rent
+  commercial
+  // 2026-06-20 — commercial sale/rent split (subcategoryId 7=sale, 4=rent).
+  commercial_forsale
+  commercial_rent
+}
+
+enum MarketListingPosterType {
+  private
+  agency
+}
+
+enum MarketListingStatus {
+  active
+  removed
+  unknown
+}
+
 model MarketListingSource {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -1771,13 +1797,13 @@ model MarketListing {
   floor              Int?
   price              Int?
   pricePerSqm        Int?
-  // "forsale" | "rent"
-  kind               String?
-  // "private" | "agency"
-  posterType         String?
+  // forsale | rent | commercial | commercial_forsale | commercial_rent
+  kind               MarketListingKind?
+  // private | agency
+  posterType         MarketListingPosterType?
   firstSeenAt        DateTime  @default(now())
   lastSeenAt         DateTime  @default(now())
-  status             String    @default("active")             // "active" | "removed" | "unknown"
+  status             MarketListingStatus @default(active)      // active | removed | unknown
   // sha256 of canonicalized metadata; new snapshots only when this changes.
   metadataHash       String
   // Reactor cursor (Phase 3 refactor). NULL = the backend

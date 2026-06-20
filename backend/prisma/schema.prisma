@@ -52,6 +52,14 @@ enum MarketListingKind {
   // kind=commercial. The downstream "create property" action defaults
   // category to SALE for commercial; the agent overrides if needed.
   commercial
+  // 2026-06-20 — commercial sale/rent split. The Yad2 commercial feed
+  // (/realestate/commercial/<region>) mixes both transaction types; the
+  // item's subcategoryId encodes it (7 = sale, 4 = rent). The watcher
+  // now derives the split kind at extraction time. Legacy `commercial`
+  // rows (pre-split) can't be retro-classified — the signal wasn't
+  // stored — so the flat value stays as a third commercial bucket.
+  commercial_forsale
+  commercial_rent
 }
 
 enum MarketListingPosterType {
