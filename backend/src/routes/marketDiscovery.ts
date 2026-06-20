@@ -29,7 +29,7 @@ const listFiltersSchema = z.object({
   // ISO date or "24h" / "3d" / "7d" / "30d" / "all" shorthand. Default
   // is 3 days — agents return to this page across a workday and want
   // continuity, but not 6-month-old listings.
-  firstSeenAfter: z.union([z.coerce.date(), z.enum(['24h', '3d', '7d', '30d', 'all'])]).optional(),
+  firstSeenAfter: z.union([z.coerce.date(), z.string().regex(/^(24h|all|\d{1,4}d)$/)]).optional(),
   // Phase 2 sort options. Allowlisted enum so the orderBy mapping
   // below can't be tricked into ordering by a column that has no
   // index (every value here corresponds to a real index on
@@ -135,15 +135,17 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     // 3d is the default: agents revisit this page across a workday and
     // expect continuity (a hot listing seen at 9am should still be on
     // the list at 4pm). Pass `firstSeenAfter=all` to disable.
-    const sinceShorthand: Record<string, number | null> = {
-      '24h': 24 * 3600 * 1000,
-      '3d':  3 * 24 * 3600 * 1000,
-      '7d':  7 * 24 * 3600 * 1000,
-      '30d': 30 * 24 * 3600 * 1000,
-      'all': null,
-    };
+    // Accepts '24h', 'all', or 'Nd' for any whole number of days (the UI
+    // lets agents type a custom day count, e.g. '5d').
     if (typeof f.firstSeenAfter === 'string') {
-      const ms = sinceShorthand[f.firstSeenAfter];
+      let ms: number | null = null;
+      if (f.firstSeenAfter === '24h') {
+        ms = 24 * 3600 * 1000;
+      } else if (f.firstSeenAfter !== 'all') {
+        const m = /^(\d{1,4})d$/.exec(f.firstSeenAfter);
+        if (m) ms = Number(m[1]) * 24 * 3600 * 1000;
+      }
+      // 'all' (or unparseable) → ms stays null → no firstSeenAt filter.
       if (ms != null) where.firstSeenAt = { gte: new Date(Date.now() - ms) };
     } else if (f.firstSeenAfter instanceof Date) {
       where.firstSeenAt = { gte: f.firstSeenAfter };

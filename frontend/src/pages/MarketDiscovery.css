@@ -212,6 +212,7 @@
   letter-spacing: 0.5px;
   color: var(--text-muted);
 }
+.md-rail-days { width: 84px; }
 /* Push "clear all" to the far end of the bar. */
 .md-rail .md-rail-clear { margin-inline-start: auto; align-self: center; }
 /* Lay the match checkboxes inline so the group isn't a tall column. */

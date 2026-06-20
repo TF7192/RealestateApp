@@ -14,17 +14,20 @@ import {
 } from '../../lib/inputProps';
 import Portal from '../../components/Portal';
 
-const TIME_OPTIONS = [
-  { value: '24h', label: 'היום' },
-  { value: '3d',  label: '3 ימים' },
-  { value: '7d',  label: 'שבוע' },
-  { value: 'all', label: 'הכל' },
-];
 const POSTER_OPTIONS = [
   { value: 'private', label: 'פרטי' },
   { value: 'agency',  label: 'תיווך' },
   { value: '',        label: 'הכל' },
 ];
+
+// Time window is stored as 'Nd' (N days) / '24h' / 'all'; the input shows
+// the day count (empty = all). The backend accepts any 'Nd'.
+function daysFromWindow(v) {
+  if (!v || v === 'all') return '';
+  if (v === '24h') return '1';
+  const m = /^(\d+)d$/.exec(String(v));
+  return m ? m[1] : '';
+}
 
 export default function FilterRail({ filters, onUpdate, onClear, mobileOpen, onCloseMobile }) {
   const body = <FilterRailBody filters={filters} onUpdate={onUpdate} onClear={onClear} />;
@@ -61,31 +64,32 @@ function FilterRailBody({ filters, onUpdate, onClear }) {
     <>
       <div className="md-rail-group md-rail-quick" aria-label="סינון מהיר">
         <label className="md-rail-qf">
-          <span className="md-rail-qf-label">חלון זמן</span>
-          <select
-            className="md-rail-select"
-            value={filters.firstSeenAfter}
-            onChange={(e) => onUpdate({ firstSeenAfter: e.target.value })}
-            aria-label="חלון זמן"
-          >
-            {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <span className="md-rail-qf-label">חלון זמן (ימים)</span>
+          <input
+            className="md-rail-input md-rail-days"
+            type="text"
+            inputMode="numeric"
+            placeholder="הכל"
+            value={daysFromWindow(filters.firstSeenAfter)}
+            onChange={(e) => {
+              const n = e.target.value.replace(/\D/g, '');
+              onUpdate({ firstSeenAfter: n ? `${n}d` : 'all' });
+            }}
+            aria-label="חלון זמן בימים (ריק = הכל)"
+          />
         </label>
-        <label className="md-rail-qf">
+        <div className="md-rail-qf">
           <span className="md-rail-qf-label">מפרסם</span>
-          <select
-            className="md-rail-select"
+          <Segmented
+            options={POSTER_OPTIONS}
             value={filters.posterType}
-            onChange={(e) => onUpdate({ posterType: e.target.value })}
-            aria-label="מפרסם"
-          >
-            {POSTER_OPTIONS.map((o) => <option key={o.value || '_all'} value={o.value}>{o.label}</option>)}
-          </select>
-        </label>
+            onChange={(v) => onUpdate({ posterType: v })}
+          />
+        </div>
       </div>
 
-      <div className="md-rail-group md-checkboxes">
-        <h4>התאמות</h4>
+      <details className="md-rail-collapser md-checkboxes">
+        <summary>התאמות</summary>
         <label>
           <input
             type="checkbox"
@@ -110,15 +114,16 @@ function FilterRailBody({ filters, onUpdate, onClear }) {
           />
           הסתר מודעות שכבר שכפלתי
         </label>
-      </div>
+      </details>
 
-      <div className="md-rail-group">
-        <h4>מיקום</h4>
+      <details className="md-rail-collapser">
+        <summary>מיקום</summary>
         <input
           className="md-rail-input"
           placeholder="עיר"
           value={filters.city}
           onChange={(e) => onUpdate({ city: e.target.value })}
+          style={{ marginTop: 6 }}
           {...inputPropsForCity()}
         />
         <input
@@ -126,8 +131,9 @@ function FilterRailBody({ filters, onUpdate, onClear }) {
           placeholder="שכונה"
           value={filters.neighborhood}
           onChange={(e) => onUpdate({ neighborhood: e.target.value })}
+          style={{ marginTop: 6 }}
         />
-      </div>
+      </details>
 
       <details className="md-rail-collapser">
         <summary>סוג נכס</summary>
@@ -219,5 +225,23 @@ function FilterRailBody({ filters, onUpdate, onClear }) {
         נקה את כל הסינונים
       </button>
     </>
+  );
+}
+
+function Segmented({ options, value, onChange }) {
+  return (
+    <div className="md-segmented compact" role="tablist">
+      {options.map((opt) => (
+        <button
+          key={opt.value || '_all'}
+          type="button"
+          role="tab"
+          aria-pressed={value === opt.value}
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
   );
 }
