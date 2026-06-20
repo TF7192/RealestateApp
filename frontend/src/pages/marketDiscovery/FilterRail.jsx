@@ -90,135 +90,146 @@ function FilterRailBody({ filters, onUpdate, onClear }) {
 
       <details className="md-rail-collapser md-checkboxes">
         <summary>התאמות</summary>
-        <label>
-          <input
-            type="checkbox"
-            checked={!!filters.matchedOnly}
-            onChange={(e) => onUpdate({ matchedOnly: e.target.checked })}
-          />
-          רק עם התאמה למתעניין שלי
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={!!filters.hideViewed}
-            onChange={(e) => onUpdate({ hideViewed: e.target.checked })}
-          />
-          הסתר מודעות שכבר ראיתי
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={!!filters.hideDuplicated}
-            onChange={(e) => onUpdate({ hideDuplicated: e.target.checked })}
-          />
-          הסתר מודעות שכבר שכפלתי
-        </label>
+        <div className="md-rail-pop">
+          <label>
+            <input
+              type="checkbox"
+              checked={!!filters.matchedOnly}
+              onChange={(e) => onUpdate({ matchedOnly: e.target.checked })}
+            />
+            רק עם התאמה למתעניין שלי
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={!!filters.hideViewed}
+              onChange={(e) => onUpdate({ hideViewed: e.target.checked })}
+            />
+            הסתר מודעות שכבר ראיתי
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={!!filters.hideDuplicated}
+              onChange={(e) => onUpdate({ hideDuplicated: e.target.checked })}
+            />
+            הסתר מודעות שכבר שכפלתי
+          </label>
+        </div>
       </details>
 
       <details className="md-rail-collapser">
         <summary>מיקום</summary>
-        <input
-          className="md-rail-input"
-          placeholder="עיר"
-          value={filters.city}
-          onChange={(e) => onUpdate({ city: e.target.value })}
-          style={{ marginTop: 6 }}
-          {...inputPropsForCity()}
-        />
-        <input
-          className="md-rail-input"
-          placeholder="שכונה"
-          value={filters.neighborhood}
-          onChange={(e) => onUpdate({ neighborhood: e.target.value })}
-          style={{ marginTop: 6 }}
-        />
+        <div className="md-rail-pop">
+          <input
+            className="md-rail-input"
+            placeholder="עיר"
+            value={filters.city}
+            onChange={(e) => onUpdate({ city: e.target.value })}
+            {...inputPropsForCity()}
+          />
+          <input
+            className="md-rail-input"
+            placeholder="שכונה"
+            value={filters.neighborhood}
+            onChange={(e) => onUpdate({ neighborhood: e.target.value })}
+            style={{ marginTop: 6 }}
+          />
+        </div>
       </details>
 
       <details className="md-rail-collapser">
         <summary>סוג נכס</summary>
-        <input
-          className="md-rail-input"
-          placeholder="דירה / בית / …"
-          value={filters.propertyType}
-          onChange={(e) => onUpdate({ propertyType: e.target.value })}
-          style={{ marginTop: 6 }}
-        />
+        <div className="md-rail-pop">
+          <input
+            className="md-rail-input"
+            placeholder="דירה / בית / …"
+            value={filters.propertyType}
+            onChange={(e) => onUpdate({ propertyType: e.target.value })}
+          />
+        </div>
       </details>
 
       <details className="md-rail-collapser">
         <summary>חדרים</summary>
-        <div className="md-rail-row" style={{ marginTop: 6 }}>
-          <input
-            className="md-rail-input"
-            placeholder="מינ׳"
-            value={filters.minRooms}
-            onChange={(e) => onUpdate({ minRooms: e.target.value })}
-            {...inputPropsForRooms()}
-          />
-          <input
-            className="md-rail-input"
-            placeholder="מקס׳"
-            value={filters.maxRooms}
-            onChange={(e) => onUpdate({ maxRooms: e.target.value })}
-            {...inputPropsForRooms()}
-          />
+        <div className="md-rail-pop">
+          <div className="md-rail-row">
+            <input
+              className="md-rail-input"
+              placeholder="מינ׳"
+              value={filters.minRooms}
+              onChange={(e) => onUpdate({ minRooms: e.target.value })}
+              {...inputPropsForRooms()}
+            />
+            <input
+              className="md-rail-input"
+              placeholder="מקס׳"
+              value={filters.maxRooms}
+              onChange={(e) => onUpdate({ maxRooms: e.target.value })}
+              {...inputPropsForRooms()}
+            />
+          </div>
         </div>
       </details>
 
       <details className="md-rail-collapser">
         <summary>שטח (מ״ר)</summary>
-        <div className="md-rail-row" style={{ marginTop: 6 }}>
-          <input
-            className="md-rail-input"
-            placeholder="מינ׳"
-            value={filters.minSqm}
-            onChange={(e) => onUpdate({ minSqm: e.target.value })}
-            {...inputPropsForSqm()}
-          />
-          <input
-            className="md-rail-input"
-            placeholder="מקס׳"
-            value={filters.maxSqm}
-            onChange={(e) => onUpdate({ maxSqm: e.target.value })}
-            {...inputPropsForSqm()}
-          />
+        <div className="md-rail-pop">
+          <div className="md-rail-row">
+            <input
+              className="md-rail-input"
+              placeholder="מינ׳"
+              value={filters.minSqm}
+              onChange={(e) => onUpdate({ minSqm: e.target.value })}
+              {...inputPropsForSqm()}
+            />
+            <input
+              className="md-rail-input"
+              placeholder="מקס׳"
+              value={filters.maxSqm}
+              onChange={(e) => onUpdate({ maxSqm: e.target.value })}
+              {...inputPropsForSqm()}
+            />
+          </div>
         </div>
       </details>
 
       <details className="md-rail-collapser">
         <summary>מחיר</summary>
-        <div className="md-rail-row" style={{ marginTop: 6 }}>
-          <input
-            className="md-rail-input"
-            placeholder="מינ׳"
-            value={filters.minPrice}
-            onChange={(e) => onUpdate({ minPrice: e.target.value })}
-            {...inputPropsForPrice()}
-          />
-          <input
-            className="md-rail-input"
-            placeholder="מקס׳"
-            value={filters.maxPrice}
-            onChange={(e) => onUpdate({ maxPrice: e.target.value })}
-            {...inputPropsForPrice()}
-          />
+        <div className="md-rail-pop">
+          <div className="md-rail-row">
+            <input
+              className="md-rail-input"
+              placeholder="מינ׳"
+              value={filters.minPrice}
+              onChange={(e) => onUpdate({ minPrice: e.target.value })}
+              {...inputPropsForPrice()}
+            />
+            <input
+              className="md-rail-input"
+              placeholder="מקס׳"
+              value={filters.maxPrice}
+              onChange={(e) => onUpdate({ maxPrice: e.target.value })}
+              {...inputPropsForPrice()}
+            />
+          </div>
         </div>
       </details>
 
       <details className="md-rail-collapser">
         <summary>סטטוס</summary>
-        <select
-          className="md-rail-select"
-          value={filters.status}
-          onChange={(e) => onUpdate({ status: e.target.value })}
-          style={{ marginTop: 6 }}
-        >
-          <option value="active">פעיל בלבד</option>
-          <option value="">הכל</option>
-          <option value="removed">הוסר</option>
-          <option value="unknown">לא ידוע</option>
-        </select>
+        <div className="md-rail-pop">
+          <select
+            className="md-rail-select"
+            value={filters.status}
+            onChange={(e) => onUpdate({ status: e.target.value })}
+          >
+            <option value="active">פעיל בלבד</option>
+            <option value="">הכל</option>
+            <option value="removed">הוסר</option>
+            <option value="unknown">לא ידוע</option>
+          </select>
+        </div>
       </details>
 
       <button type="button" className="md-rail-clear" onClick={onClear}>
