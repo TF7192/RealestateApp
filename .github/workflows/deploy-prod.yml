@@ -29,6 +29,11 @@ on:
         required: false
         default: 'false'
         type: boolean
+      restart_watcher:
+        description: 'Recreate the market-watcher container too (set true only when shipping watcher/scraper changes; default leaves it running so scrape timing isn''t reset).'
+        required: false
+        default: 'false'
+        type: boolean
 
 concurrency:
   group: estia-prod
@@ -173,9 +178,10 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ESTIA_TAG: ${{ needs.resolve.outputs.short }}
           SKIP_MIGRATIONS: ${{ inputs.skip_migrations }}
+          RESTART_WATCHER: ${{ inputs.restart_watcher }}
         run: |
           ssh -i ~/.ssh/estia.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
-            "GHCR_TOKEN='$GHCR_TOKEN' ESTIA_TAG='$ESTIA_TAG' SKIP_MIGRATIONS='$SKIP_MIGRATIONS' bash -s" <<'REMOTE'
+            "GHCR_TOKEN='$GHCR_TOKEN' ESTIA_TAG='$ESTIA_TAG' SKIP_MIGRATIONS='$SKIP_MIGRATIONS' RESTART_WATCHER='$RESTART_WATCHER' bash -s" <<'REMOTE'
           set -euo pipefail
           cd /home/ec2-user/estia-new
           echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u token --password-stdin >/dev/null
@@ -187,8 +193,21 @@ jobs:
           # effect within ~10s without an nginx reload. The exec call
           # below targets backend-1 explicitly to run prisma migrate
           # deploy exactly once (not per-replica).
-          sudo -E docker compose -f docker-compose.prod.yml up -d \
-            --scale backend=3 --remove-orphans
+          #
+          # Each `up -d` recreated the market-watcher container, which
+          # resets the scraper's in-process schedule. Only roll the
+          # watcher when explicitly asked (restart_watcher=true);
+          # otherwise recreate just backend+frontend with --no-deps so
+          # the running watcher keeps its scrape timing.
+          if [ "$RESTART_WATCHER" = "true" ]; then
+            echo 'restart_watcher=true — recreating market-watcher too'
+            sudo -E docker compose -f docker-compose.prod.yml up -d \
+              --scale backend=3 --remove-orphans
+          else
+            echo 'leaving market-watcher running (restart_watcher=false)'
+            sudo -E docker compose -f docker-compose.prod.yml up -d \
+              --scale backend=3 --no-deps backend frontend
+          fi
           if [ "$SKIP_MIGRATIONS" = "true" ]; then
             echo 'skip_migrations=true — not running prisma migrate deploy'
           else
