@@ -254,6 +254,16 @@
   color: var(--bg-primary);
 }
 .md-segmented.compact button { padding: 6px 10px; font-size: 12px; min-height: 32px; }
+/* Two-level deal-type filter: asset-class segment + category segment
+   sit together as one control. Tighter inline gap than the toolbar's
+   default so they read as connected levels; wraps as a unit on narrow
+   viewports. Logical props keep it RTL-correct. */
+.md-dealtype {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .md-rail-input,
 .md-rail-select {
   width: 100%;

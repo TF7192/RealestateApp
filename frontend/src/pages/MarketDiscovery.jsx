@@ -42,7 +42,10 @@ const SORTS = [
 
 const DEFAULT_FILTERS = {
   city: '', neighborhood: '', propertyType: '',
-  kind: '',
+  // Two-level deal-type filter. assetClass: '' | 'residential' | 'commercial';
+  // category: '' | 'sale' | 'rent'. Empty on an axis = "all" on that axis.
+  // Both empty (default) = the whole catalogue.
+  assetClass: '', category: '',
   posterType: 'private',
   minPrice: '', maxPrice: '',
   minRooms: '', maxRooms: '',
@@ -244,7 +247,8 @@ export default function MarketDiscovery() {
     // (applied to `orderedItems` below) — they intentionally don't
     // re-trigger this fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.city, filters.neighborhood, filters.propertyType, filters.kind,
+  }, [filters.city, filters.neighborhood, filters.propertyType,
+      filters.assetClass, filters.category,
       filters.posterType, filters.minPrice, filters.maxPrice, filters.minRooms,
       filters.maxRooms, filters.minSqm, filters.maxSqm, filters.status,
       filters.firstSeenAfter, sort,
@@ -760,23 +764,45 @@ export default function MarketDiscovery() {
               {activeFilterCount > 0 && <span className="md-active-filter-badge">{activeFilterCount}</span>}
             </button>
 
-            <div className="md-segmented compact" role="tablist" aria-label="סוג עסקה">
+            {/* Two-level deal-type filter. Level 1 = asset class
+                (הכל / פרטי / מסחרי); level 2 = category (הכל / למכירה /
+                להשכרה). They combine into a stored-kind set server-side. */}
+            <div className="md-dealtype">
+            <div className="md-segmented compact" role="tablist" aria-label="סוג נכס">
               {[
-                { value: '',          label: 'הכל' },
-                { value: 'forsale',   label: 'למכירה' },
-                { value: 'rent',      label: 'להשכרה' },
-                { value: 'commercial', label: 'מסחרי' },
+                { value: '',            label: 'הכל' },
+                { value: 'residential', label: 'פרטי' },
+                { value: 'commercial',  label: 'מסחרי' },
               ].map((opt) => (
                 <button
                   key={opt.value || '_all'}
                   type="button"
                   role="tab"
-                  aria-pressed={filters.kind === opt.value}
-                  onClick={() => updateFilters({ kind: opt.value })}
+                  aria-pressed={filters.assetClass === opt.value}
+                  onClick={() => updateFilters({ assetClass: opt.value })}
                 >
                   {opt.label}
                 </button>
               ))}
+            </div>
+
+            <div className="md-segmented compact" role="tablist" aria-label="סוג עסקה">
+              {[
+                { value: '',     label: 'הכל' },
+                { value: 'sale', label: 'למכירה' },
+                { value: 'rent', label: 'להשכרה' },
+              ].map((opt) => (
+                <button
+                  key={opt.value || '_all'}
+                  type="button"
+                  role="tab"
+                  aria-pressed={filters.category === opt.value}
+                  onClick={() => updateFilters({ category: opt.value })}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             </div>
 
             <div className="md-toolbar-spacer" />

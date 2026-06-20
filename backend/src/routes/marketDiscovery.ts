@@ -17,7 +17,15 @@ const listFiltersSchema = z.object({
   city:           z.string().trim().min(1).optional(),
   neighborhood:   z.string().trim().min(1).optional(),
   propertyType:   z.string().trim().min(1).optional(),
+  // Legacy single-kind param — kept for back-compat with older clients
+  // and deep links. When assetClass/category are present they take
+  // precedence (they express the same intent via the two-level filter).
   kind:           z.enum(['forsale', 'rent', 'commercial']).optional(),
+  // 2026-06-20 — two-level filter. assetClass = residential | commercial;
+  // category = sale | rent. Either can be omitted (= "all" on that axis).
+  // The two combine into a set of stored MarketListingKind values below.
+  assetClass:     z.enum(['residential', 'commercial']).optional(),
+  category:       z.enum(['sale', 'rent']).optional(),
   posterType:     z.enum(['private', 'agency']).optional(),
   minPrice:       z.coerce.number().int().min(0).optional(),
   maxPrice:       z.coerce.number().int().min(0).optional(),
@@ -77,6 +85,58 @@ function ilMidnight(now: Date, daysAgo: number): Date {
   return new Date(Date.UTC(y, m - 1, d - daysAgo, 0, 0, 0) - offsetMs);
 }
 
+// Map the two-level filter (assetClass × category) onto the set of
+// stored MarketListingKind values to filter on. Returns null when both
+// axes are unconstrained ("all" / "all") — i.e. no kind filter at all.
+//
+//   residential + sale  -> forsale
+//   residential + rent  -> rent
+//   residential + (all) -> forsale, rent
+//   commercial  + sale  -> commercial_forsale, commercial (legacy)
+//   commercial  + rent  -> commercial_rent
+//   commercial  + (all) -> commercial_forsale, commercial_rent, commercial
+//   (all)       + sale  -> forsale, commercial_forsale, commercial
+//   (all)       + rent  -> rent, commercial_rent
+//   (all)       + (all) -> null (no filter)
+//
+// The legacy flat `commercial` value rides along with the SALE-side
+// buckets (its create-property default is SALE) so those rows stay
+// visible; it is never excluded by a sale/commercial filter.
+function resolveKindSet(
+  assetClass: 'residential' | 'commercial' | undefined,
+  category: 'sale' | 'rent' | undefined,
+): string[] | null {
+  if (assetClass === 'residential') {
+    if (category === 'sale') return ['forsale'];
+    if (category === 'rent') return ['rent'];
+    return ['forsale', 'rent'];
+  }
+  if (assetClass === 'commercial') {
+    if (category === 'sale') return ['commercial_forsale', 'commercial'];
+    if (category === 'rent') return ['commercial_rent'];
+    return ['commercial_forsale', 'commercial_rent', 'commercial'];
+  }
+  // assetClass = all
+  if (category === 'sale') return ['forsale', 'commercial_forsale', 'commercial'];
+  if (category === 'rent') return ['rent', 'commercial_rent'];
+  return null;
+}
+
+// Stored MarketListingKind -> Property (assetClass, category) for the
+// "duplicate into my CRM" action. See callsite comment for the table.
+function mapKindToProperty(
+  kind: string | null | undefined,
+): { assetClass: 'COMMERCIAL' | 'RESIDENTIAL'; category: 'SALE' | 'RENT' } {
+  switch (kind) {
+    case 'commercial_forsale': return { assetClass: 'COMMERCIAL', category: 'SALE' };
+    case 'commercial_rent':    return { assetClass: 'COMMERCIAL', category: 'RENT' };
+    case 'commercial':         return { assetClass: 'COMMERCIAL', category: 'SALE' };
+    case 'rent':               return { assetClass: 'RESIDENTIAL', category: 'RENT' };
+    case 'forsale':
+    default:                   return { assetClass: 'RESIDENTIAL', category: 'SALE' };
+  }
+}
+
 function sortToOrderBy(sort: string): { [k: string]: 'asc' | 'desc' }[] {
   switch (sort) {
     case 'price-asc':       return [{ price: 'asc' },       { firstSeenAt: 'desc' }];
@@ -129,7 +189,21 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     if (f.city)         where.city         = { contains: f.city,         mode: 'insensitive' };
     if (f.neighborhood) where.neighborhood = { contains: f.neighborhood, mode: 'insensitive' };
     if (f.propertyType) where.propertyType = { contains: f.propertyType, mode: 'insensitive' };
-    if (f.kind) where.kind = f.kind;
+    // Kind filter. Two-level (assetClass + category) takes precedence;
+    // it maps onto a SET of stored MarketListingKind values that covers
+    // the residential split (forsale/rent), the commercial split
+    // (commercial_forsale/commercial_rent) AND the legacy flat
+    // `commercial` value (pre-split rows whose transaction type is
+    // unknown — surfaced under both commercial views + the sale view so
+    // they don't vanish from the feed).
+    if (f.assetClass || f.category) {
+      const kinds = resolveKindSet(f.assetClass, f.category);
+      // kinds === null means "no kind filter" (both axes "all").
+      if (kinds) where.kind = { in: kinds };
+    } else if (f.kind) {
+      // Back-compat: legacy single-kind param.
+      where.kind = f.kind;
+    }
     if (f.posterType) where.posterType = f.posterType;
     if (f.status) where.status = f.status;
     // 3d is the default: agents revisit this page across a workday and
@@ -334,15 +408,17 @@ export const registerMarketDiscoveryRoutes: FastifyPluginAsync = async (app) => 
     // (owner / ownerPhone — by legal-safety design we never store
     // PII from the watcher). Use empty-string placeholders so the
     // create succeeds; the agent immediately lands on /edit and can
-    // fill in real values. category mirrors the listing's kind:
-    // 'rent' → RENT, 'commercial' → SALE (commercial covers both
-    // sale + rent on Yad2; agent overrides on edit), default SALE.
+    // fill in real values.
+    //
+    // Map the stored listing kind onto the Property's (assetClass,
+    // category) pair:
+    //   commercial_forsale -> COMMERCIAL / SALE
+    //   commercial_rent    -> COMMERCIAL / RENT
+    //   commercial (legacy)-> COMMERCIAL / SALE (txn type unknown; agent overrides)
+    //   rent               -> RESIDENTIAL / RENT
+    //   forsale (+ default)-> RESIDENTIAL / SALE
     const listingKind = (listing as { kind?: string | null }).kind;
-    const category = listingKind === 'rent' ? 'RENT' : 'SALE';
-    // 'commercial' listings span offices/stores/warehouses → tag
-    // the CRM row as COMMERCIAL so it lands in the right filter on
-    // /properties. forsale/rent stay RESIDENTIAL by default.
-    const assetClass = listingKind === 'commercial' ? 'COMMERCIAL' : 'RESIDENTIAL';
+    const { assetClass, category } = mapKindToProperty(listingKind);
     const newProp = await prisma.property.create({
       data: {
         agentId: userId,
