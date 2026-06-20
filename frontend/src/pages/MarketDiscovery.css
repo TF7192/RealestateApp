@@ -343,6 +343,18 @@
   background-repeat: no-repeat;
   background-position: 10px center;
 }
+/* Quick-filter dropdowns in the toolbar (חלון זמן / מפרסם). */
+.md-toolbar-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.md-toolbar-filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
 .md-view-toggle {
   display: inline-flex;
   border: 1px solid var(--border);

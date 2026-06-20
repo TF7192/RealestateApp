@@ -11,18 +11,6 @@ import {
 } from '../../lib/inputProps';
 import Portal from '../../components/Portal';
 
-const TIME_OPTIONS = [
-  { value: '24h', label: 'היום' },
-  { value: '3d',  label: '3 ימים' },
-  { value: '7d',  label: 'שבוע' },
-  { value: 'all', label: 'הכל' },
-];
-const POSTER_OPTIONS = [
-  { value: 'private', label: 'פרטי' },
-  { value: 'agency',  label: 'תיווך' },
-  { value: '',        label: 'הכל' },
-];
-
 export default function FilterRail({ filters, onUpdate, onClear, mobileOpen, onCloseMobile }) {
   const body = <FilterRailBody filters={filters} onUpdate={onUpdate} onClear={onClear} />;
 
@@ -56,24 +44,6 @@ export default function FilterRail({ filters, onUpdate, onClear, mobileOpen, onC
 function FilterRailBody({ filters, onUpdate, onClear }) {
   return (
     <>
-      <div className="md-rail-group">
-        <h4>חלון זמן</h4>
-        <Segmented
-          options={TIME_OPTIONS}
-          value={filters.firstSeenAfter}
-          onChange={(v) => onUpdate({ firstSeenAfter: v })}
-        />
-      </div>
-
-      <div className="md-rail-group">
-        <h4>מפרסם</h4>
-        <Segmented
-          options={POSTER_OPTIONS}
-          value={filters.posterType}
-          onChange={(v) => onUpdate({ posterType: v })}
-        />
-      </div>
-
       <div className="md-rail-group md-checkboxes">
         <h4>התאמות</h4>
         <label>
@@ -209,23 +179,5 @@ function FilterRailBody({ filters, onUpdate, onClear }) {
         נקה את כל הסינונים
       </button>
     </>
-  );
-}
-
-function Segmented({ options, value, onChange }) {
-  return (
-    <div className="md-segmented compact" role="tablist">
-      {options.map((opt) => (
-        <button
-          key={opt.value || '_all'}
-          type="button"
-          role="tab"
-          aria-pressed={value === opt.value}
-          onClick={() => onChange(opt.value)}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
   );
 }
