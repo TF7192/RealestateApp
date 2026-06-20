@@ -1420,14 +1420,16 @@ ${compsText || '(אין נכסים להשוואה)'}
                 assistant_id: process.env.LANGGRAPH_ASSISTANT_ID || 'estia_agent',
                 input: { messages: convo },
                 config: {
-                  // thread_id groups a conversation's turns in LangSmith's
-                  // Threads view. The FE replays the full transcript each
-                  // turn (no session id), so derive a stable id from the
-                  // agent + opening message. estiaToken auths the tools.
-                  configurable: { estiaToken, thread_id: lgThreadId(user.id, convo) },
-                  // Indexed metadata: scope evaluators per agent + separate
-                  // prod/staging traffic; user_id also enables cost-by-user.
+                  configurable: { estiaToken },
+                  // session_id groups a conversation's turns in LangSmith's
+                  // Threads view (it takes priority over LangGraph's per-run
+                  // thread_id). The FE replays the full transcript each turn
+                  // and we don't use stateful threads — so no history
+                  // doubling — yet the opening user message is stable across
+                  // a conversation, giving a stable id. user_id + environment
+                  // scope evaluators and separate prod/staging + cost-by-user.
                   metadata: {
+                    session_id: lgThreadId(user.id, convo),
                     user_id: user.id,
                     environment: process.env.NODE_ENV ?? 'development',
                   },
