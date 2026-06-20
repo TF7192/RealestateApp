@@ -22,6 +22,7 @@ import { CHAT_TOOLS, runChatTool } from '../lib/aiChatTools.js';
 import { recordAnthropic } from '../lib/aiUsage.js';
 import { langsmithEnabled } from '../lib/langsmith.js';
 import { traceable } from 'langsmith/traceable';
+import { signAgentToolToken } from '../lib/agentToolToken.js';
 import { requireAiQuota, loadQuota, publicQuota } from '../middleware/aiQuota.js';
 
 const AI_AGENT_URL = (process.env.AI_AGENT_URL || 'http://estia-ai-agent:8080').replace(/\/$/, '');
@@ -1369,6 +1370,84 @@ ${compsText || '(אין נכסים להשוואה)'}
 
         const convo: Array<AssistantMsg | UserMsg> =
           parsed.data.messages.map((m) => ({ role: m.role, content: m.content } as any));
+
+        // ── LangGraph Platform cutover ──────────────────────────────
+        // When LANGGRAPH_API_URL is set, the chat runs on the hosted
+        // LangGraph graph instead of the in-app agent. We mint a
+        // short-lived per-agent token (the graph forwards it to
+        // /api/internal/agent-tool for its tools), stream the run's
+        // SSE, and forward AI text deltas as the same `text` frames the
+        // FE already renders. Unset the env var to revert instantly.
+        const lgUrl = process.env.LANGGRAPH_API_URL;
+        if (lgUrl) {
+          try {
+            const estiaToken = await signAgentToolToken(user.id);
+            const controller = new AbortController();
+            activeStream = { abort: () => controller.abort() } as any;
+            const res = await fetch(`${lgUrl.replace(/\/$/, '')}/runs/stream`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Api-Key': process.env.LANGSMITH_API_KEY || '',
+              },
+              body: JSON.stringify({
+                assistant_id: process.env.LANGGRAPH_ASSISTANT_ID || 'estia_agent',
+                input: { messages: convo },
+                config: { configurable: { estiaToken } },
+                stream_mode: ['messages-tuple'],
+              }),
+              signal: controller.signal,
+            });
+            if (!res.ok || !res.body) {
+              throw new Error(`langgraph run failed: ${res.status}`);
+            }
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done || !active) break;
+              buf += decoder.decode(value, { stream: true });
+              let sep;
+              // SSE events are separated by a blank line.
+              while ((sep = buf.indexOf('\n\n')) !== -1) {
+                const evtBlock = buf.slice(0, sep);
+                buf = buf.slice(sep + 2);
+                let ev = '';
+                let dataStr = '';
+                for (const ln of evtBlock.split('\n')) {
+                  if (ln.startsWith('event:')) ev = ln.slice(6).trim();
+                  else if (ln.startsWith('data:')) dataStr += ln.slice(5).trim();
+                }
+                if (ev === 'messages' && dataStr) {
+                  try {
+                    const d = JSON.parse(dataStr);
+                    const msg = Array.isArray(d) ? d[0] : d;
+                    // Only AI message chunks carry the answer text; tool
+                    // messages (type 'tool') are skipped.
+                    if (msg && msg.type === 'ai' && Array.isArray(msg.content)) {
+                      let text = '';
+                      for (const b of msg.content) {
+                        if (b && b.type === 'text' && typeof b.text === 'string') text += b.text;
+                      }
+                      if (text) send({ type: 'text', delta: text });
+                    }
+                  } catch { /* skip unparseable frame */ }
+                } else if (ev === 'error' && dataStr) {
+                  req.log.error({ data: dataStr.slice(0, 300) }, 'langgraph stream error event');
+                  send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
+                }
+              }
+            }
+            send({ type: 'done' });
+            try { socket.close(1000, 'done'); } catch { /* noop */ }
+          } catch (e: any) {
+            req.log.error({ err: e }, 'langgraph chat proxy failed');
+            send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
+            try { socket.close(1011, 'lg'); } catch { /* noop */ }
+          }
+          return;
+        }
 
         try {
           for (let iter = 0; iter < 6; iter += 1) {

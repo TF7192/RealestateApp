@@ -25,6 +25,11 @@ services:
       # /app/uploads is ephemeral by design — UPLOADS_BACKEND=s3 in .env
       # routes writes to S3. See docker-compose.yml header note.
       UPLOADS_DIR: /app/uploads
+      # 2026-06-20 — chat cutover: when set, the AI chat WS proxies to the
+      # hosted LangGraph deployment (mints a per-agent token, streams it
+      # back) instead of the in-app agent. Unset this to revert instantly.
+      # Auth to the deployment uses LANGSMITH_API_KEY (already in .env).
+      LANGGRAPH_API_URL: "https://estia-54651bb3f54e58598b7ad95426d8865c.us.langgraph.app"
     ports:
       # Port range so `docker compose up --scale backend=N` (PERF —
       # 2026-05-01) auto-allocates a host-side port per replica. With
