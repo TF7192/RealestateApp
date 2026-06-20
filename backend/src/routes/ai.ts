@@ -1401,26 +1401,29 @@ ${compsText || '(אין נכסים להשוואה)'}
             if (!res.ok || !res.body) {
               throw new Error(`langgraph run failed: ${res.status}`);
             }
+            req.log.info({ status: res.status }, 'lg.connected');
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buf = '';
+            let evtCount = 0;
+            let textCount = 0;
             for (;;) {
               const { done, value } = await reader.read();
               if (done || !active) break;
-              buf += decoder.decode(value, { stream: true });
-              // SSE events are separated by a blank line — handle both LF
-              // and CRLF line endings.
-              let boundary: RegExpMatchArray | null;
-              while ((boundary = buf.match(/\r?\n\r?\n/)) !== null) {
-                const sep = boundary.index as number;
+              // Strip CR so CRLF SSE collapses to LF, then split on blank
+              // lines via indexOf (always advances — no regex-index edge).
+              buf += decoder.decode(value, { stream: true }).replace(/\r/g, '');
+              let sep: number;
+              while ((sep = buf.indexOf('\n\n')) !== -1) {
                 const evtBlock = buf.slice(0, sep);
-                buf = buf.slice(sep + boundary[0].length);
+                buf = buf.slice(sep + 2);
                 let ev = '';
                 let dataStr = '';
-                for (const ln of evtBlock.split(/\r?\n/)) {
+                for (const ln of evtBlock.split('\n')) {
                   if (ln.startsWith('event:')) ev = ln.slice(6).trim();
                   else if (ln.startsWith('data:')) dataStr += ln.slice(5).trim();
                 }
+                evtCount += 1;
                 if (ev === 'messages' && dataStr) {
                   try {
                     const d = JSON.parse(dataStr);
@@ -1432,7 +1435,7 @@ ${compsText || '(אין נכסים להשוואה)'}
                       for (const b of msg.content) {
                         if (b && b.type === 'text' && typeof b.text === 'string') text += b.text;
                       }
-                      if (text) send({ type: 'text', delta: text });
+                      if (text) { send({ type: 'text', delta: text }); textCount += 1; }
                     }
                   } catch { /* skip unparseable frame */ }
                 } else if (ev === 'error' && dataStr) {
@@ -1441,6 +1444,7 @@ ${compsText || '(אין נכסים להשוואה)'}
                 }
               }
             }
+            req.log.info({ evtCount, textCount }, 'lg.stream-end');
             send({ type: 'done' });
             try { socket.close(1000, 'done'); } catch { /* noop */ }
           } catch (e: any) {
