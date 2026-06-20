@@ -123,6 +123,7 @@ jobs:
           POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
           POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          ESTIA_AGENT_TOKEN_SECRET: ${{ secrets.ESTIA_AGENT_TOKEN_SECRET }}
         run: |
           umask 077
           PATCH=$(mktemp)
@@ -141,6 +142,9 @@ jobs:
               echo "LANGSMITH_ENDPOINT=https://api.smith.langchain.com"
               echo "LANGSMITH_PROJECT=estia agent"
             fi
+            # HMAC secret for the hosted-LangGraph agent-tool path. Unset =
+            # the /api/internal/agent-tool path stays disabled (fail-closed).
+            [ -n "$ESTIA_AGENT_TOKEN_SECRET" ] && echo "ESTIA_AGENT_TOKEN_SECRET=$ESTIA_AGENT_TOKEN_SECRET"
           } > "$PATCH"
           if [ ! -s "$PATCH" ]; then
             echo "No managed secrets set — skipping .env patch"
