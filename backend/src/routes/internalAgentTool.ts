@@ -1,9 +1,11 @@
 // Internal tool endpoint for the hosted LangGraph agent.
 //
-//   POST /internal/agent-tool  { name, input, agentId }
+//   POST /api/internal/agent-tool  { name, input }
+//     headers: Authorization: Bearer <short-lived per-agent token>
 //     200: { ok: true, result }   — runChatTool output
-//     400: invalid payload
-//     401: missing / wrong service token
+//     400: invalid payload / unknown tool
+//     401: missing / invalid / expired token (or wrong purpose)
+//     503: ESTIA_AGENT_TOKEN_SECRET unset (path disabled — fail closed)
 //     500: tool execution threw
 //
 // The Estia chat agent has been ported to a graph that runs on
@@ -16,97 +18,82 @@
 // the data side.
 //
 // ────────────────────────────────────────────────────────────────────
-//  ⚠️  SECURITY TODO — PRODUCTION HARDENING REQUIRED BEFORE GO-LIVE  ⚠️
+//  AUTH MODEL — short-lived, per-agent SIGNED token (production-ready)
 // ────────────────────────────────────────────────────────────────────
-// This skeleton authenticates with a single static service token
-// (`ESTIA_INTERNAL_TOKEN`) and TRUSTS the `agentId` supplied in the
-// request body. That is acceptable for local `langgraph dev` parity
-// testing ONLY. It is NOT safe for production:
+// The previous skeleton authenticated with a single static service
+// token and TRUSTED the agentId in the request body. That is replaced.
+// A leaked static token + body-supplied agentId = the ability to read
+// ANY agent's data — defeating the per-agent `where: { agentId }`
+// scoping that is the agent's security boundary.
 //
-//   • A leak of the static token = the ability to read ANY agent's
-//     data by passing their id (cross-agent data exposure — the exact
-//     thing the per-agent `where: { agentId }` scoping exists to stop).
+// Now:
+//   1. Estia mints a short-lived (5 min) signed JWT scoped to ONE
+//      agentId via GET /api/ai/agent-token (see routes/agentToken.ts).
+//   2. The graph threads that token through its run config and each
+//      tool call forwards it here as `Authorization: Bearer <token>`.
+//   3. This endpoint verifies the signature + expiry + purpose claim
+//      and derives agentId FROM THE TOKEN'S `sub` CLAIM. Any agentId
+//      in the body is IGNORED (and not accepted by the schema).
 //
-// Production must replace "static token + body agentId" with a
-// SHORT-LIVED, PER-AGENT SIGNED TOKEN, as recommended in the scoping
-// doc (§"Per-agent auth for the graph"):
+// Defense-in-depth: also restrict /api/internal/* to LangGraph's egress
+// IPs at the nginx layer (see the commented snippet in
+// frontend/nginx.conf). The signed token is the primary control; the
+// IP allowlist is belt-and-suspenders.
 //
-//   1. Estia mints a short-lived JWT (e.g. jose, 5–15 min TTL) scoped
-//      to ONE agentId when it kicks off / authorizes a graph run.
-//   2. The token travels in the graph run config and each tool call
-//      forwards it in the Authorization header to THIS endpoint.
-//   3. This endpoint verifies the signature + expiry and derives the
-//      agentId FROM THE TOKEN CLAIM — never from the request body.
-//      The body agentId is then ignored entirely.
-//
-// Until that lands, deploy this endpoint only on a trusted network
-// path and keep ESTIA_INTERNAL_TOKEN secret + rotated.
-// ────────────────────────────────────────────────────────────────────
-//
-// NOTE: this plugin is intentionally NOT registered in server.ts by
-// this change (that file is being edited elsewhere). To wire it up,
-// add — next to the other `app.register(...)` calls in
-// backend/src/server.ts — the line documented in
-// langgraph-agent/README.md, e.g.:
-//
-//   import { registerInternalAgentToolRoutes } from './routes/internalAgentTool.js';
-//   await app.register(registerInternalAgentToolRoutes, { prefix: '/internal' });
+// Registered in server.ts under the /api/internal prefix so it rides
+// the existing /api/* nginx proxy:
+//   await app.register(registerInternalAgentToolRoutes, { prefix: '/api/internal' });
 
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { runChatTool, CHAT_TOOLS } from '../lib/aiChatTools.js';
+import {
+  verifyAgentToolToken,
+  isAgentToolConfigured,
+} from '../lib/agentToolToken.js';
 
 const VALID_TOOL_NAMES = new Set(CHAT_TOOLS.map((t) => t.name));
 
-const bodySchema = z.object({
-  name: z.string().min(1).max(64),
-  // `input` is the tool's argument object. We accept any shape and let
-  // runChatTool clamp / validate per-tool (it already does, defensively).
-  input: z.record(z.any()).optional().default({}),
-  // SECURITY TODO (see header): in production this comes from a signed
-  // token claim, NOT the body. Kept here for the skeleton only.
-  agentId: z.string().min(1).max(128),
-});
-
-// Constant-time-ish token comparison. Avoids a length-leaking early
-// return; not a true timing-safe compare (Buffer + timingSafeEqual
-// would be stricter) but good enough for a static skeleton token and
-// keeps this file dependency-free.
-function tokensMatch(provided: string, expected: string): boolean {
-  if (provided.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < provided.length; i += 1) {
-    diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return diff === 0;
-}
+const bodySchema = z
+  .object({
+    name: z.string().min(1).max(64),
+    // `input` is the tool's argument object. We accept any shape and let
+    // runChatTool clamp / validate per-tool (it already does, defensively).
+    input: z.record(z.any()).optional().default({}),
+    // NOTE: agentId is intentionally NOT part of the schema. It is
+    // derived from the verified token's `sub` claim — never the body.
+    // .strict() so a body-supplied agentId (or any extra field) is
+    // rejected rather than silently ignored.
+  })
+  .strict();
 
 export const registerInternalAgentToolRoutes: FastifyPluginAsync = async (app) => {
   app.post('/agent-tool', async (req, reply) => {
-    const expected = process.env.ESTIA_INTERNAL_TOKEN;
-    if (!expected) {
-      // Fail closed: if the operator never configured the token, the
-      // endpoint must not run with no auth at all.
-      req.log.error('ESTIA_INTERNAL_TOKEN not set — refusing /internal/agent-tool');
+    // Fail closed: if the signing secret is unconfigured, the whole
+    // path is disabled — never run with no/weak auth.
+    if (!isAgentToolConfigured()) {
+      req.log.error('ESTIA_AGENT_TOKEN_SECRET not set — refusing /api/internal/agent-tool');
       return reply.code(503).send({
         error: { code: 'not_configured', message: 'internal tool endpoint not configured' },
       });
     }
 
-    // Accept the token from a dedicated header or a Bearer
-    // Authorization header (the graph forwards whichever is simplest).
-    const headerToken = (req.headers['x-estia-internal-token'] as string | undefined)?.trim();
+    // Bearer token only. (The old X-Estia-Internal-Token header is gone.)
     const auth = (req.headers.authorization as string | undefined)?.trim();
-    const bearer = auth?.toLowerCase().startsWith('bearer ')
+    const token = auth?.toLowerCase().startsWith('bearer ')
       ? auth.slice(7).trim()
-      : undefined;
-    const provided = headerToken || bearer || '';
+      : '';
 
-    if (!provided || !tokensMatch(provided, expected)) {
+    const claims = await verifyAgentToolToken(token);
+    if (!claims) {
+      // Covers missing / malformed / bad-signature / expired / wrong
+      // purpose. We don't disclose which to the caller.
       return reply.code(401).send({
-        error: { code: 'unauthorized', message: 'invalid service token' },
+        error: { code: 'unauthorized', message: 'invalid or expired token' },
       });
     }
+
+    const agentId = claims.sub; // derived from the token, not the body
 
     const parsed = bodySchema.safeParse(req.body);
     if (!parsed.success) {
@@ -119,7 +106,7 @@ export const registerInternalAgentToolRoutes: FastifyPluginAsync = async (app) =
       });
     }
 
-    const { name, input, agentId } = parsed.data;
+    const { name, input } = parsed.data;
 
     if (!VALID_TOOL_NAMES.has(name)) {
       return reply.code(400).send({
@@ -128,8 +115,6 @@ export const registerInternalAgentToolRoutes: FastifyPluginAsync = async (app) =
     }
 
     try {
-      // SECURITY TODO: derive agentId from a verified signed token,
-      // not from the body. See file header.
       const result = await runChatTool(name, input, { agentId });
       return { ok: true, result };
     } catch (e: any) {

@@ -52,6 +52,8 @@ import { registerActivityRoutes } from './routes/activity.js';
 import { registerAdvertRoutes } from './routes/adverts.js';
 import { registerDocumentRoutes } from './routes/documents.js';
 import { registerAiRoutes } from './routes/ai.js';
+import { registerAgentTokenRoutes } from './routes/agentToken.js';
+import { registerInternalAgentToolRoutes } from './routes/internalAgentTool.js';
 import { registerVoiceIngestRoutes } from './routes/voice-ingest.js';
 import { registerContactRoutes } from './routes/contact.js';
 import {
@@ -345,6 +347,17 @@ export async function build(opts: BuildOptions = {}) {
   await app.register(registerAdvertRoutes, { prefix: '/api' });
   await app.register(registerDocumentRoutes, { prefix: '/api' });
   await app.register(registerAiRoutes, { prefix: '/api/ai' });
+  // Agent-token mint for the hosted-LangGraph agent-tool path. Sits
+  // next to /api/ai/* (its own small file to avoid churn in ai.ts).
+  // GET /api/ai/agent-token → { token } (authenticated agent only).
+  await app.register(registerAgentTokenRoutes, { prefix: '/api/ai' });
+  // Internal re-entry endpoint the hosted graph's tools call back into.
+  // POST /api/internal/agent-tool — authed by the per-agent signed
+  // token minted above (NOT a static service key). Rides the /api/*
+  // nginx proxy; consider IP-restricting /api/internal/* to LangGraph
+  // egress (see frontend/nginx.conf). Fails closed (503) until
+  // ESTIA_AGENT_TOKEN_SECRET is set.
+  await app.register(registerInternalAgentToolRoutes, { prefix: '/api/internal' });
   // Voice-ingest POC — agent records 2 min of audio, backend returns
   // Whisper transcript + Haiku-extracted structured JSON.
   await app.register(registerVoiceIngestRoutes, { prefix: '/api/voice' });
