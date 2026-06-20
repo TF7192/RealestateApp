@@ -38,6 +38,7 @@
     "heic-convert": "^2.1.0",
     "ioredis": "^5.4.1",
     "jose": "^6.2.2",
+    "langsmith": "^0.7.10",
     "openai": "^6.34.0",
     "pdfkit": "^0.15.0",
     "pino-pretty": "^11.2.2",

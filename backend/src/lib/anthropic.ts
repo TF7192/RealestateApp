@@ -11,11 +11,15 @@
 // the Anthropic API, so one extra ctor per call is noise in the profile.
 
 import Anthropic from '@anthropic-ai/sdk';
+import { traceAnthropic } from './langsmith.js';
 
 export function buildAnthropic(): Anthropic | null {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
-  return new Anthropic({ apiKey: key });
+  // traceAnthropic is a no-op unless LangSmith tracing is enabled via env,
+  // so this is the single chokepoint that lights up tracing for every
+  // route that builds its client through buildAnthropic().
+  return traceAnthropic(new Anthropic({ apiKey: key }));
 }
 
 // Model string is centralized so a migration sprint only touches one line.

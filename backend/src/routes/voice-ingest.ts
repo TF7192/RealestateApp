@@ -19,9 +19,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import { requireUser } from '../middleware/auth.js';
 import { recordAnthropic, recordWhisper } from '../lib/aiUsage.js';
 import { normalizeStreet, normalizeCity } from '../lib/addressNormalize.js';
+import { traceOpenAI, traceAnthropic } from '../lib/langsmith.js';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
+// Wrapped for LangSmith tracing (no-op unless tracing env is set).
+const openai = traceOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' }));
+const anthropic = traceAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' }));
 
 const SYSTEM_PROMPT = `You are an extraction assistant for an Israeli real-estate CRM.
 
