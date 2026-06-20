@@ -78,6 +78,11 @@ services:
       NODE_ENV: production
       MARKET_WATCHER_INTERVAL_MS: "3600000"
       MARKET_WATCHER_JITTER_MS: "600000"
+      # 2026-06-20 — per-kind cadence dropped to every 8h (3 ticks/day
+      # per kind, 6 total/day). Offset = half the interval (4h) so rent
+      # and forsale alternate evenly: rent 0/8/16, forsale 4/12/20.
+      MARKET_WATCHER_KIND_INTERVAL_MS: "28800000"
+      MARKET_WATCHER_KIND_OFFSET_MS: "14400000"
       MARKET_MATCH_MIN_SCORE: "70"
       # Residential proxy pool. Two ways to configure (file wins):
       #   1) WATCHER_PROXIES_FILE=/run/proxies.txt — bind-mounted below.
