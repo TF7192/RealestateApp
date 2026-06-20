@@ -117,6 +117,7 @@ jobs:
           PUBLIC_ORIGIN: ${{ secrets.PUBLIC_ORIGIN }}
           POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
           POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
         run: |
           umask 077
           PATCH=$(mktemp)
@@ -126,6 +127,15 @@ jobs:
             [ -n "$PUBLIC_ORIGIN" ]           && echo "PUBLIC_ORIGIN=$PUBLIC_ORIGIN"
             [ -n "$POSTHOG_PROJECT_API_KEY" ] && echo "POSTHOG_PROJECT_API_KEY=$POSTHOG_PROJECT_API_KEY"
             [ -n "$POSTHOG_HOST" ]            && echo "POSTHOG_HOST=$POSTHOG_HOST"
+            # LangSmith tracing — only configured when the key secret is
+            # present. The other three are non-secret config, kept here so
+            # the whole group is managed by the deploy (survives .env rebuilds).
+            if [ -n "$LANGSMITH_API_KEY" ]; then
+              echo "LANGSMITH_API_KEY=$LANGSMITH_API_KEY"
+              echo "LANGSMITH_TRACING=true"
+              echo "LANGSMITH_ENDPOINT=https://api.smith.langchain.com"
+              echo "LANGSMITH_PROJECT=estia agent"
+            fi
           } > "$PATCH"
           if [ ! -s "$PATCH" ]; then
             echo "No managed secrets set — skipping .env patch"
