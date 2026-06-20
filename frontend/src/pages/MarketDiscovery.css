@@ -1002,10 +1002,9 @@
 
 /* Picker popover (inline per-row). */
 .mt-picker {
-  position: absolute;
-  inset-block-start: calc(100% + 4px);
-  inset-inline-start: 0;
-  z-index: 40;
+  /* Positioned by PopoverPortal (fixed, off the anchor rect) so it
+     escapes the row/card overflow + stacking context that previously
+     let the next listing overshadow it. */
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;

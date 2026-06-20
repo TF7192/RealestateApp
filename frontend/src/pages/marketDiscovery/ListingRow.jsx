@@ -9,6 +9,7 @@ import { displayPriceShort } from '../../lib/display';
 import { freshLabel } from './freshLabel';
 import { floorLabel } from './floorLabel';
 import MarketTagPicker from './MarketTagPicker';
+import PopoverPortal from './PopoverPortal';
 
 export default function ListingRow({
   listing, isMatched, isDuplicated,
@@ -137,11 +138,18 @@ function RowActions({ isDuplicated, onOpenMine, onDuplicate, onOverflow, source 
 
 function RowOverflow({ onOverflow }) {
   const ref = useRef(null);
+  const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return undefined;
-    const close = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    // The menu is portaled to <body>, so it's outside `ref`. Exclude both
+    // the trigger cluster and the menu itself from the click-outside test.
+    const close = (e) => {
+      if (ref.current?.contains(e.target)) return;
+      if (menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
@@ -157,30 +165,29 @@ function RowOverflow({ onOverflow }) {
         <MoreHorizontal size={16} />
       </button>
       {open && (
-        <div
-          role="menu"
-          style={{
-            position: 'absolute',
-            insetBlockStart: '110%',
-            insetInlineStart: 0,
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-sm)',
-            boxShadow: 'var(--shadow-md)',
-            padding: 4,
-            zIndex: 10,
-            minWidth: 180,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {['send-to-lead', 'mark-viewed', 'copy-link', 'dismiss'].map((action) => (
-            <OverflowItem
-              key={action}
-              action={action}
-              onPick={(a) => { setOpen(false); onOverflow?.(a); }}
-            />
-          ))}
-        </div>
+        <PopoverPortal anchorRef={ref}>
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              boxShadow: 'var(--shadow-md)',
+              padding: 4,
+              minWidth: 180,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {['send-to-lead', 'mark-viewed', 'copy-link', 'dismiss'].map((action) => (
+              <OverflowItem
+                key={action}
+                action={action}
+                onPick={(a) => { setOpen(false); onOverflow?.(a); }}
+              />
+            ))}
+          </div>
+        </PopoverPortal>
       )}
     </div>
   );
@@ -226,15 +233,17 @@ function TagChipCluster({ listing, tags, onAttachTag, onDetachTag, onCreateAndAt
         {assignedTags.length === 0 ? 'הוסף תגית' : null}
       </button>
       {open && (
-        <MarketTagPicker
-          tags={tags}
-          assignedTagIds={assignedIds}
-          onAttach={onAttachTag}
-          onDetach={onDetachTag}
-          onCreateAndAttach={onCreateAndAttachTag}
-          onClose={() => setOpen(false)}
-          anchorRef={anchorRef}
-        />
+        <PopoverPortal anchorRef={anchorRef}>
+          <MarketTagPicker
+            tags={tags}
+            assignedTagIds={assignedIds}
+            onAttach={onAttachTag}
+            onDetach={onDetachTag}
+            onCreateAndAttach={onCreateAndAttachTag}
+            onClose={() => setOpen(false)}
+            anchorRef={anchorRef}
+          />
+        </PopoverPortal>
       )}
     </div>
   );
