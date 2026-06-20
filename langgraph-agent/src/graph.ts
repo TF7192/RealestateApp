@@ -61,12 +61,30 @@ async function callModel(
   state: typeof MessagesAnnotation.State,
   config?: RunnableConfig,
 ): Promise<{ messages: AIMessage[] }> {
-  const aiTurns = state.messages.filter((m) => m.getType() === 'ai').length;
-  if (aiTurns >= MAX_TURNS) {
-    // Polite punt — same copy as the in-app 6-iteration cap.
+  // Scope the cap to the CURRENT user turn: count only AI tool-use
+  // messages after the last human message. The backend is stateless and
+  // the FE replays the full transcript each request, so counting every
+  // AI message in state would make the cap fire on conversation length.
+  let lastHumanIdx = -1;
+  for (let i = state.messages.length - 1; i >= 0; i--) {
+    if (state.messages[i].getType() === 'human') {
+      lastHumanIdx = i;
+      break;
+    }
+  }
+  const inTurnToolSteps = state.messages
+    .slice(lastHumanIdx + 1)
+    .filter((m) => {
+      if (m.getType() !== 'ai') return false;
+      const calls = (m as AIMessage).tool_calls;
+      return Array.isArray(calls) && calls.length > 0;
+    }).length;
+  if (inTurnToolSteps >= MAX_TURNS) {
     return {
       messages: [
-        new AIMessage('לא הצלחתי להרכיב תשובה. נסו/י לנסח את השאלה שוב.'),
+        new AIMessage(
+          'ניסיתי כמה פעמים ולא הצלחתי להגיע לתשובה. נסו/י לפצל את השאלה לחלקים קטנים יותר.',
+        ),
       ],
     };
   }
