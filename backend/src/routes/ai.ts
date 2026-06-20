@@ -1408,14 +1408,16 @@ ${compsText || '(אין נכסים להשוואה)'}
               const { done, value } = await reader.read();
               if (done || !active) break;
               buf += decoder.decode(value, { stream: true });
-              let sep;
-              // SSE events are separated by a blank line.
-              while ((sep = buf.indexOf('\n\n')) !== -1) {
+              // SSE events are separated by a blank line — handle both LF
+              // and CRLF line endings.
+              let boundary: RegExpMatchArray | null;
+              while ((boundary = buf.match(/\r?\n\r?\n/)) !== null) {
+                const sep = boundary.index as number;
                 const evtBlock = buf.slice(0, sep);
-                buf = buf.slice(sep + 2);
+                buf = buf.slice(sep + boundary[0].length);
                 let ev = '';
                 let dataStr = '';
-                for (const ln of evtBlock.split('\n')) {
+                for (const ln of evtBlock.split(/\r?\n/)) {
                   if (ln.startsWith('event:')) ev = ln.slice(6).trim();
                   else if (ln.startsWith('data:')) dataStr += ln.slice(5).trim();
                 }
