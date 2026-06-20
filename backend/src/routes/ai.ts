@@ -1379,11 +1379,15 @@ ${compsText || '(אין נכסים להשוואה)'}
         // SSE, and forward AI text deltas as the same `text` frames the
         // FE already renders. Unset the env var to revert instantly.
         const lgUrl = process.env.LANGGRAPH_API_URL;
+        req.log.info({ usingLangGraph: !!lgUrl, msgs: convo.length }, 'chat.received');
         if (lgUrl) {
+          const controller = new AbortController();
+          const lgTimer = setTimeout(() => controller.abort(), 90_000);
           try {
+            req.log.info('lg.branch-start');
             const estiaToken = await signAgentToolToken(user.id);
-            const controller = new AbortController();
-            activeStream = { abort: () => controller.abort() } as any;
+            req.log.info('lg.token-minted');
+            activeStream = { abort: () => { clearTimeout(lgTimer); controller.abort(); } } as any;
             const res = await fetch(`${lgUrl.replace(/\/$/, '')}/runs/stream`, {
               method: 'POST',
               headers: {
@@ -1444,11 +1448,13 @@ ${compsText || '(אין נכסים להשוואה)'}
                 }
               }
             }
+            clearTimeout(lgTimer);
             req.log.info({ evtCount, textCount }, 'lg.stream-end');
             send({ type: 'done' });
             try { socket.close(1000, 'done'); } catch { /* noop */ }
           } catch (e: any) {
-            req.log.error({ err: e }, 'langgraph chat proxy failed');
+            clearTimeout(lgTimer);
+            req.log.error({ err: String(e?.message || e), name: e?.name }, 'langgraph chat proxy failed');
             send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
             try { socket.close(1011, 'lg'); } catch { /* noop */ }
           }
