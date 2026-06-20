@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, X as XIcon, Check, Edit2 } from 'lucide-react';
+import Portal from '../../components/Portal';
 
 const PALETTE = [
   '#b48b4c', '#7a5c2c', '#8c6d4a',
@@ -54,6 +55,7 @@ export default function MarketTagManager({
   };
 
   return (
+    <Portal>
     <div
       className="mt-manager-backdrop"
       role="presentation"
@@ -131,6 +133,7 @@ export default function MarketTagManager({
         </footer>
       </aside>
     </div>
+    </Portal>
   );
 }
 

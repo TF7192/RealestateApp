@@ -39,19 +39,6 @@ const SORTS = [
   { value: 'pricePerSqm-asc',  label: 'מחיר למ״ר נמוך' },
 ];
 
-// Quick filters surfaced as top-toolbar dropdowns (moved out of the
-// FilterRail). The detailed numeric/location filters stay in the rail.
-const TIME_OPTIONS = [
-  { value: '24h', label: 'היום' },
-  { value: '3d',  label: '3 ימים' },
-  { value: '7d',  label: 'שבוע' },
-  { value: 'all', label: 'הכל' },
-];
-const POSTER_OPTIONS = [
-  { value: 'private', label: 'פרטי' },
-  { value: 'agency',  label: 'תיווך' },
-  { value: '',        label: 'הכל' },
-];
 
 const DEFAULT_FILTERS = {
   city: '', neighborhood: '', propertyType: '',
@@ -791,30 +778,6 @@ export default function MarketDiscovery() {
                 </button>
               ))}
             </div>
-
-            <label className="md-toolbar-filter">
-              <span className="md-toolbar-filter-label">חלון זמן</span>
-              <select
-                className="md-sort-select"
-                value={filters.firstSeenAfter}
-                onChange={(e) => updateFilters({ firstSeenAfter: e.target.value })}
-                aria-label="חלון זמן"
-              >
-                {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </label>
-
-            <label className="md-toolbar-filter">
-              <span className="md-toolbar-filter-label">מפרסם</span>
-              <select
-                className="md-sort-select"
-                value={filters.posterType}
-                onChange={(e) => updateFilters({ posterType: e.target.value })}
-                aria-label="מפרסם"
-              >
-                {POSTER_OPTIONS.map((o) => <option key={o.value || '_all'} value={o.value}>{o.label}</option>)}
-              </select>
-            </label>
 
             <div className="md-toolbar-spacer" />
 

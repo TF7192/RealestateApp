@@ -1,6 +1,9 @@
-// FilterRail — sticky-left filter column on desktop, opened as a
-// bottom sheet on mobile. Operates on the same `filters` shape that
-// MarketDiscovery owns; emits granular updates via `onUpdate`.
+// FilterRail — horizontal filter bar above the results on desktop,
+// opened as a bottom sheet on mobile. Operates on the same `filters`
+// shape that MarketDiscovery owns; emits granular updates via `onUpdate`.
+//
+// Leads with a "quick filter" group (חלון זמן + מפרסם) visually separated
+// from the detailed filters (location / rooms / sqm / price / status).
 //
 // The rail is purely presentational; gating logic (active count, reset
 // defaults) is in the parent so the page header and rail share state.
@@ -10,6 +13,18 @@ import {
   inputPropsForPrice, inputPropsForRooms, inputPropsForSqm, inputPropsForCity,
 } from '../../lib/inputProps';
 import Portal from '../../components/Portal';
+
+const TIME_OPTIONS = [
+  { value: '24h', label: 'היום' },
+  { value: '3d',  label: '3 ימים' },
+  { value: '7d',  label: 'שבוע' },
+  { value: 'all', label: 'הכל' },
+];
+const POSTER_OPTIONS = [
+  { value: 'private', label: 'פרטי' },
+  { value: 'agency',  label: 'תיווך' },
+  { value: '',        label: 'הכל' },
+];
 
 export default function FilterRail({ filters, onUpdate, onClear, mobileOpen, onCloseMobile }) {
   const body = <FilterRailBody filters={filters} onUpdate={onUpdate} onClear={onClear} />;
@@ -44,6 +59,31 @@ export default function FilterRail({ filters, onUpdate, onClear, mobileOpen, onC
 function FilterRailBody({ filters, onUpdate, onClear }) {
   return (
     <>
+      <div className="md-rail-group md-rail-quick" aria-label="סינון מהיר">
+        <label className="md-rail-qf">
+          <span className="md-rail-qf-label">חלון זמן</span>
+          <select
+            className="md-rail-select"
+            value={filters.firstSeenAfter}
+            onChange={(e) => onUpdate({ firstSeenAfter: e.target.value })}
+            aria-label="חלון זמן"
+          >
+            {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+        <label className="md-rail-qf">
+          <span className="md-rail-qf-label">מפרסם</span>
+          <select
+            className="md-rail-select"
+            value={filters.posterType}
+            onChange={(e) => onUpdate({ posterType: e.target.value })}
+            aria-label="מפרסם"
+          >
+            {POSTER_OPTIONS.map((o) => <option key={o.value || '_all'} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+      </div>
+
       <div className="md-rail-group md-checkboxes">
         <h4>התאמות</h4>
         <label>
