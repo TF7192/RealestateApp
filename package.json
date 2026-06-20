@@ -4,8 +4,7 @@
   "type": "module",
   "packageManager": "npm@11.6.0",
   "engines": {
-    "node": "20.20.2",
-    "npm": ">=11"
+    "node": "20.20.2"
   },
   "workspaces": [
     "frontend",
