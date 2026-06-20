@@ -17,9 +17,11 @@ import { requireUser } from '../middleware/auth.js';
 import { requirePremium } from '../middleware/requirePremium.js';
 import { logActivity } from '../lib/activity.js';
 import { prisma } from '../lib/prisma.js';
-import { buildAnthropic } from '../lib/anthropic.js';
+import { buildAnthropic, buildAnthropicRaw } from '../lib/anthropic.js';
 import { CHAT_TOOLS, runChatTool } from '../lib/aiChatTools.js';
 import { recordAnthropic } from '../lib/aiUsage.js';
+import { langsmithEnabled } from '../lib/langsmith.js';
+import { traceable } from 'langsmith/traceable';
 import { requireAiQuota, loadQuota, publicQuota } from '../middleware/aiQuota.js';
 
 const AI_AGENT_URL = (process.env.AI_AGENT_URL || 'http://estia-ai-agent:8080').replace(/\/$/, '');
@@ -1234,7 +1236,10 @@ ${compsText || '(אין נכסים להשוואה)'}
         }
       }
 
-      const client = buildAnthropic();
+      // Raw (un-traced) client: this handler streams via finalMessage(), so
+      // it traces each turn explicitly with `traceable` below. Using the
+      // wrapSDK-traced client here would leave a never-closed "pending" run.
+      const client = buildAnthropicRaw();
       if (!client) {
         try {
           socket.send(JSON.stringify({
@@ -1368,25 +1373,33 @@ ${compsText || '(אין נכסים להשוואה)'}
         try {
           for (let iter = 0; iter < 6; iter += 1) {
             if (!active) return;
-            const stream = client.messages.stream({
-              model: 'claude-haiku-4-5',
-              max_tokens: 1024,
-              system: systemCached as any,
-              tools: toolsCached as any,
-              messages: convo as any,
-            });
-            activeStream = stream;
-
-            // Forward each text delta as soon as it arrives. WebSocket
-            // frames hit the browser without CF buffering — no padding
-            // tricks needed.
-            stream.on('text', (delta) => {
-              send({ type: 'text', delta });
-            });
+            // One streamed turn. Forward each text delta as it arrives
+            // (WebSocket frames reach the browser without CF buffering),
+            // then resolve with the final message. Wrapped in `traceable`
+            // (when LangSmith is on) so the run ends on finalMessage() —
+            // the generic wrapSDK can't, which is what left traces pending.
+            const runTurn = (messages: typeof convo) => {
+              const stream = client.messages.stream({
+                model: 'claude-haiku-4-5',
+                max_tokens: 1024,
+                system: systemCached as any,
+                tools: toolsCached as any,
+                messages: messages as any,
+              });
+              activeStream = stream;
+              stream.on('text', (delta) => { send({ type: 'text', delta }); });
+              return stream.finalMessage();
+            };
 
             let finalMsg;
             try {
-              finalMsg = await stream.finalMessage();
+              finalMsg = langsmithEnabled()
+                ? await traceable(runTurn, {
+                    name: 'anthropic.chat',
+                    run_type: 'llm',
+                    metadata: { model: 'claude-haiku-4-5', ls_provider: 'anthropic' },
+                  })(convo)
+                : await runTurn(convo);
             } catch (e: any) {
               req.log.error({ err: e }, 'ai chat ws upstream error');
               send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });

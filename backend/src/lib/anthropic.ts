@@ -22,6 +22,18 @@ export function buildAnthropic(): Anthropic | null {
   return traceAnthropic(new Anthropic({ apiKey: key }));
 }
 
+// Un-traced client. Use for code paths that manage their OWN LangSmith run
+// (e.g. streaming via messages.stream() consumed by events/finalMessage()):
+// the generic wrapSDK can't end a run for a stream that isn't fully
+// async-iterated, leaving traces stuck "pending". Those call sites wrap the
+// operation in `traceable` instead, so they must start from a raw client to
+// avoid a duplicate, never-closed run.
+export function buildAnthropicRaw(): Anthropic | null {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return null;
+  return new Anthropic({ apiKey: key });
+}
+
 // Model string is centralized so a migration sprint only touches one line.
 // Opus 4.7 is the strongest generally available model — marketing copy
 // is short and high-value-per-token, so the cost difference vs Sonnet
