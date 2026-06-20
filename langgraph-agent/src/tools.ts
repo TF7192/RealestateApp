@@ -7,9 +7,11 @@
 // internal endpoint via callEstiaTool() and returns the JSON result.
 //
 // Agent identity: LangChain passes the run config as the 2nd arg to
-// each tool callback. We read `config.configurable.agentId` (threaded
-// in by graph.ts from the run config) and forward it to the backend.
-// See estiaClient.ts for the production per-agent-token TODO.
+// each tool callback. We read `config.configurable.estiaToken` — a
+// short-lived per-agent signed token minted by Estia and supplied by
+// the graph caller per run — and forward it to the backend, which
+// derives the agentId from the verified token claim. We never send an
+// agentId ourselves. See estiaClient.ts for the auth model.
 //
 // Tool execute() must return a STRING (LangChain stringifies tool
 // output into a ToolMessage). We JSON.stringify the backend result so
@@ -21,17 +23,20 @@ import type { RunnableConfig } from '@langchain/core/runnables';
 import { z } from 'zod';
 import { callEstiaTool } from './estiaClient.js';
 
-// Pull the per-run agent identity off the LangGraph run config.
-// graph.ts sets config.configurable.agentId for every invocation.
-function agentIdFrom(config?: RunnableConfig): string {
-  const id = (config?.configurable as Record<string, unknown> | undefined)?.agentId;
-  if (typeof id !== 'string' || !id) {
+// Pull the per-run agent token off the LangGraph run config. The graph
+// caller supplies config.configurable.estiaToken (a short-lived signed
+// token minted by Estia, scoped to one agent). The backend derives the
+// agentId from it — we never carry an agentId.
+function estiaTokenFrom(config?: RunnableConfig): string {
+  const token = (config?.configurable as Record<string, unknown> | undefined)?.estiaToken;
+  if (typeof token !== 'string' || !token) {
     throw new Error(
-      'agentId missing from run config.configurable — the graph must be ' +
-        'invoked with { configurable: { agentId } }',
+      'estiaToken missing from run config.configurable — the graph must be ' +
+        'invoked with { configurable: { estiaToken } } (mint it from ' +
+        'GET /api/ai/agent-token on the Estia backend)',
     );
   }
-  return id;
+  return token;
 }
 
 // Helper: build a tool whose execute forwards to the Estia backend.
@@ -44,11 +49,11 @@ function estiaTool<S extends z.ZodObject<any>>(opts: {
 }) {
   return tool(
     async (input: z.infer<S>, config?: RunnableConfig): Promise<string> => {
-      const agentId = agentIdFrom(config);
+      const estiaToken = estiaTokenFrom(config);
       const result = await callEstiaTool(
         opts.name,
         (input ?? {}) as Record<string, unknown>,
-        agentId,
+        estiaToken,
         config?.signal,
       );
       return JSON.stringify(result);

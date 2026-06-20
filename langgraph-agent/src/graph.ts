@@ -18,10 +18,12 @@
 // langchain packages wires tracing for every run — no code needed here.
 //
 // Agent identity: callers invoke the graph with
-//   config: { configurable: { agentId: "<the signed-in agent's id>" } }
-// tools.ts reads that and forwards it to the backend. (Production:
-// thread a short-lived per-agent signed token instead — see
-// estiaClient.ts / internalAgentTool.ts security TODOs.)
+//   config: { configurable: { estiaToken: "<short-lived per-agent token>" } }
+// where estiaToken is minted by Estia (GET /api/ai/agent-token) and
+// scoped to one agent. tools.ts reads it off the config and forwards it
+// to the backend, which derives the agentId from the verified token
+// claim. No agentId is carried by the graph. See estiaClient.ts /
+// backend/src/routes/internalAgentTool.ts for the full auth model.
 
 import { ChatAnthropic } from '@langchain/anthropic';
 import { AIMessage, SystemMessage } from '@langchain/core/messages';

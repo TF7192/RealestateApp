@@ -25,9 +25,11 @@ START → agent ──(tool calls?)──▶ tools ──▶ agent ─┐
   turns (same cap as the in-app `iter < 6`).
 - **tools** — a `ToolNode`. The graph runs in LangChain's cloud and
   **cannot reach our private RDS**, so each tool does an authenticated
-  `POST {ESTIA_API_BASE}/internal/agent-tool { name, input, agentId }`
-  back to the Estia backend, which runs the existing
-  `runChatTool(name, input, { agentId })`. No tool logic is duplicated.
+  `POST {ESTIA_API_BASE}/api/internal/agent-tool { name, input }` back
+  to the Estia backend (with `Authorization: Bearer <per-agent token>`),
+  which verifies the token, derives the agentId from its claim, and runs
+  the existing `runChatTool(name, input, { agentId })`. No tool logic is
+  duplicated, and the body carries **no** agentId.
 
 ### Files
 
@@ -47,11 +49,14 @@ Set these in a `.env` at the **repo root** (`langgraph.json` declares
 | Var | Required | What |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | yes | model key for `claude-haiku-4-5` |
-| `ESTIA_API_BASE` | yes | Estia backend base URL, e.g. `https://estia.co.il` (no trailing slash) |
-| `ESTIA_INTERNAL_TOKEN` | yes | service token shared with the backend endpoint |
+| `ESTIA_API_BASE` | yes | Estia backend base URL, e.g. `https://estia.co.il` (no trailing slash, no `/api`) |
 | `LANGSMITH_TRACING` | no | `true` to enable tracing |
 | `LANGSMITH_API_KEY` | no | LangSmith key (tracing) |
 | `LANGSMITH_PROJECT` | no | LangSmith project name |
+
+There is **no** `ESTIA_INTERNAL_TOKEN` (the static-token model is
+removed). Auth is a short-lived **per-agent** token supplied per run via
+`config.configurable.estiaToken` — see "Run locally" and "Auth" below.
 
 **LangSmith tracing is automatic** — when the `LANGSMITH_*` vars are
 set, importing the langchain packages wires tracing for every run. No
@@ -71,17 +76,20 @@ npx --prefix langgraph-agent langgraph dev
 ```
 
 `langgraph dev` starts a local LangGraph server and opens LangGraph
-Studio. Invoke the `estia_agent` graph with a run config that carries
-the agent identity:
+Studio. Invoke the `estia_agent` graph with a run config that carries a
+short-lived **per-agent token** (mint it from the running Estia backend:
+`GET /api/ai/agent-token` while logged in as the agent → `{ token }`):
 
 ```jsonc
 {
-  "configurable": { "agentId": "<the signed-in agent's user id>" }
+  "configurable": { "estiaToken": "<token from GET /api/ai/agent-token>" }
 }
 ```
 
-The graph forwards `agentId` to the backend, which scopes every query
-to that agent (`where: { agentId }`).
+The graph forwards the token as `Authorization: Bearer <token>`; the
+backend verifies it, derives the agentId from the token's `sub` claim,
+and scopes every query to that agent (`where: { agentId }`). The token
+expires in 5 minutes, so mint a fresh one per session.
 
 ## Deploy on LangGraph Platform
 
@@ -90,60 +98,61 @@ to that agent (`where: { agentId }`).
    It auto-discovers `langgraph.json` and builds the `estia_agent`
    graph.
 3. Set the env vars above in the deployment's environment
-   (`ANTHROPIC_API_KEY`, `ESTIA_API_BASE`, `ESTIA_INTERNAL_TOKEN`, and
-   `LANGSMITH_*` for tracing).
-4. The Estia backend must expose `/internal/agent-tool` (next section)
-   and be reachable from LangGraph's cloud over HTTPS.
+   (`ANTHROPIC_API_KEY`, `ESTIA_API_BASE`, and `LANGSMITH_*` for
+   tracing). No static service token.
+4. The Estia backend must expose `/api/internal/agent-tool` (next
+   section) and be reachable from LangGraph's cloud over HTTPS, and have
+   `ESTIA_AGENT_TOKEN_SECRET` set so it can verify the per-agent tokens.
 
 > Per the repo rules: **do not push or deploy without explicit
 > go-ahead.** The steps above are for when that go-ahead is given.
 
-## Wire up the backend internal endpoint
+## Backend internal endpoint (already wired)
 
-The endpoint already exists at
-`backend/src/routes/internalAgentTool.ts` but is **not** registered
-(that file's registration site, `backend/src/server.ts`, is being
-edited elsewhere). To register it, add — next to the other
-`app.register(...)` calls in `backend/src/server.ts`:
+The backend exposes `POST /api/internal/agent-tool`, registered in
+`backend/src/server.ts` (`prefix: '/api/internal'`) so it rides the
+existing `/api/*` nginx proxy. It is authenticated by the short-lived
+per-agent token (below) — **not** a static key. It fails closed with
+`503` until `ESTIA_AGENT_TOKEN_SECRET` is set in the backend env.
 
-```ts
-import { registerInternalAgentToolRoutes } from './routes/internalAgentTool.js';
+> `/api/internal/*` should additionally be IP-restricted to LangGraph's
+> egress at the nginx / security-group layer (a commented, ready-to-
+> enable snippet lives in `frontend/nginx.conf`). The signed token is
+> the primary control; the IP allowlist is defense-in-depth.
 
-// ...alongside the other route registrations:
-await app.register(registerInternalAgentToolRoutes, { prefix: '/internal' });
-```
+## Auth — short-lived, per-agent signed token
 
-That mounts `POST /internal/agent-tool`. Make sure `ESTIA_INTERNAL_TOKEN`
-is set in the backend's environment (the endpoint fails closed with
-`503` if it isn't).
+The static-token model is gone. Auth is now:
 
-> Note: `/internal/*` should NOT be exposed publicly without auth in
-> front of it. The endpoint authenticates via the service token, but
-> consider also restricting it at the nginx / security-group layer to
-> the LangGraph egress IPs.
-
-## ⚠️ Production security TODO (the key upgrade from the scoping doc)
-
-The skeleton uses a **single static service token** and **trusts the
-`agentId` in the request body**. That is fine for local `langgraph dev`
-parity testing but **NOT for production**: a leaked token lets a caller
-read *any* agent's data by passing their id — defeating the per-agent
-scoping that is the agent's security boundary.
-
-Before production, replace "static token + body agentId" with a
-**short-lived, per-agent signed token**:
-
-1. Estia mints a short-lived JWT (e.g. via `jose`, 5–15 min TTL) scoped
-   to **one** `agentId` when it authorizes a graph run.
-2. The token is threaded through the run config
-   (`configurable.estiaAgentToken`) and forwarded by each tool call as
-   the `Authorization: Bearer …` header (`src/estiaClient.ts`).
+1. Estia mints a short-lived (5 min) HMAC-signed JWT scoped to **one**
+   `agentId`, with a `purpose: 'agent-tool'` claim, via
+   `GET /api/ai/agent-token` (authenticated agent only). The signing
+   secret is `ESTIA_AGENT_TOKEN_SECRET` (separate from the app's
+   `JWT_SECRET`). Helper: `backend/src/lib/agentToolToken.ts`.
+2. The graph caller threads that token through the run config
+   (`configurable.estiaToken`); each tool call forwards it as the
+   `Authorization: Bearer …` header (`src/estiaClient.ts`).
 3. `backend/src/routes/internalAgentTool.ts` verifies the signature +
-   expiry and derives `agentId` **from the verified token claim**,
-   ignoring the body.
+   expiry + purpose and derives `agentId` **from the verified token's
+   `sub` claim**. The request body carries no agentId and the schema
+   rejects one (`.strict()`).
 
-The exact TODO markers live in:
+Everything fails closed when `ESTIA_AGENT_TOKEN_SECRET` is unset, so the
+whole path is inert (and safe to merge/deploy) until it's configured.
 
-- `backend/src/routes/internalAgentTool.ts` (endpoint header + inline)
-- `langgraph-agent/src/estiaClient.ts` (header)
-- `langgraph-agent/src/tools.ts` (agent-identity note)
+The relevant code:
+
+- `backend/src/lib/agentToolToken.ts` (sign + verify helper)
+- `backend/src/routes/agentToken.ts` (the mint route)
+- `backend/src/routes/internalAgentTool.ts` (the verify + dispatch)
+- `langgraph-agent/src/estiaClient.ts` / `src/tools.ts` (forwards the token)
+
+## Remaining for a full cutover (not in this change)
+
+The frontend ↔ LangGraph-Platform wiring is **not** implemented here.
+To go live, still needed: (a) the frontend (or a backend proxy) calls
+`GET /api/ai/agent-token`, opens a LangGraph run with
+`configurable.estiaToken`, and renders the stream; (b) deploy the graph
+to LangGraph Platform with `ANTHROPIC_API_KEY` + `ESTIA_API_BASE`;
+(c) set `ESTIA_AGENT_TOKEN_SECRET` on the backend; (d) enable the nginx
+IP allowlist with LangGraph's published egress IPs.

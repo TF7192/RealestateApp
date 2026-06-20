@@ -4,33 +4,29 @@
 // private RDS, so every tool execution does an authenticated POST to
 // the Estia internal endpoint (backend/src/routes/internalAgentTool.ts):
 //
-//   POST {ESTIA_API_BASE}/internal/agent-tool
-//   headers: Authorization: Bearer {token}, X-Estia-Internal-Token: {token}
-//   body:    { name, input, agentId }
+//   POST {ESTIA_API_BASE}/api/internal/agent-tool
+//   headers: Authorization: Bearer {estiaToken}
+//   body:    { name, input }
 //   -> { ok: true, result }   (result is the runChatTool output)
 //
 // Config:
-//   • ESTIA_API_BASE       — base URL of the Estia backend, e.g.
-//                            https://estia.co.il  (no trailing /internal).
-//   • ESTIA_INTERNAL_TOKEN — service token. SKELETON DEFAULT (static).
-//                            See the per-agent-token TODO below.
+//   • ESTIA_API_BASE — base URL of the Estia backend, e.g.
+//                      https://estia.co.il (no trailing slash, no /api).
 //
 // ────────────────────────────────────────────────────────────────────
-//  AGENT IDENTITY THREADING (how `agentId` reaches a tool call)
+//  AUTH — short-lived, per-agent SIGNED token (production model)
 // ────────────────────────────────────────────────────────────────────
-// LangGraph tools receive the run config as their 2nd argument. The
-// caller supplies the per-run agent identity via
-//   config.configurable.agentId   (or .estiaAgentToken in production).
-// graph.ts pulls it off config and hands it to callEstiaTool below.
+// There is NO static service token anymore. The graph caller mints a
+// short-lived (5 min) per-agent token from Estia
+// (GET /api/ai/agent-token) and supplies it per run via
+//   config.configurable.estiaToken
+// graph.ts → tools.ts pulls it off the run config and passes it here as
+// `estiaToken`. We forward it as `Authorization: Bearer <estiaToken>`.
 //
-//  ⚠️  SECURITY TODO — see backend/src/routes/internalAgentTool.ts.
-// In the skeleton we send a STATIC service token + the agentId in the
-// body. Production must mint a SHORT-LIVED, PER-AGENT SIGNED TOKEN in
-// Estia, thread it through config.configurable, forward it as the
-// Authorization header here, and have the endpoint derive agentId from
-// the verified token claim (ignoring the body). Do NOT ship the static
-// token to production.
-// ────────────────────────────────────────────────────────────────────
+// The backend verifies the token's signature + expiry + purpose and
+// derives the agentId from the token's `sub` claim — the body carries
+// NO agentId (the endpoint rejects one). A leaked token is scoped to a
+// single agent and expires in minutes.
 
 function getBaseUrl(): string {
   const base = process.env.ESTIA_API_BASE;
@@ -42,42 +38,31 @@ function getBaseUrl(): string {
   return base.replace(/\/+$/, '');
 }
 
-function getServiceToken(): string {
-  const token = process.env.ESTIA_INTERNAL_TOKEN;
-  if (!token) {
-    throw new Error(
-      'ESTIA_INTERNAL_TOKEN is not set — cannot authenticate tool calls to Estia',
-    );
-  }
-  return token;
-}
-
 export type EstiaToolResult = unknown;
 
 /**
  * Execute one Estia chat tool via the internal endpoint.
  *
- * @param name    tool name (must match a CHAT_TOOLS entry on the backend)
- * @param input   the tool's argument object
- * @param agentId identity the tool runs as. SKELETON: trusted by the
- *                backend. PRODUCTION: replace with a per-agent token
- *                (see header TODO).
- * @param signal  optional AbortSignal to cancel in-flight requests.
+ * @param name       tool name (must match a CHAT_TOOLS entry on the backend)
+ * @param input      the tool's argument object
+ * @param estiaToken short-lived per-agent signed token (from the run
+ *                   config). The backend derives agentId from it; we
+ *                   never send an agentId in the body.
+ * @param signal     optional AbortSignal to cancel in-flight requests.
  */
 export async function callEstiaTool(
   name: string,
   input: Record<string, unknown>,
-  agentId: string,
+  estiaToken: string,
   signal?: AbortSignal,
 ): Promise<EstiaToolResult> {
-  if (!agentId) {
+  if (!estiaToken) {
     throw new Error(
-      'missing agentId — pass it via run config.configurable.agentId',
+      'missing estiaToken — pass it via run config.configurable.estiaToken',
     );
   }
 
-  const url = `${getBaseUrl()}/internal/agent-tool`;
-  const token = getServiceToken();
+  const url = `${getBaseUrl()}/api/internal/agent-tool`;
 
   let res: Response;
   try {
@@ -85,12 +70,9 @@ export async function callEstiaTool(
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        // Send both header styles — the endpoint accepts either. In
-        // production the Bearer value becomes the per-agent signed token.
-        authorization: `Bearer ${token}`,
-        'x-estia-internal-token': token,
+        authorization: `Bearer ${estiaToken}`,
       },
-      body: JSON.stringify({ name, input, agentId }),
+      body: JSON.stringify({ name, input }),
       signal,
     });
   } catch (e: any) {
