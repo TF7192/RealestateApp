@@ -944,6 +944,10 @@ ${compsText || '(אין נכסים להשוואה)'}
       // the prompt budget.
       content: z.string().min(1).max(4000),
     })).min(1).max(40),
+    // Stable id for the chat session/thread. Forwarded as
+    // `configurable.thread_id` on the LangGraph run so multi-turn
+    // turns group in the LangSmith Threads view.
+    conversationId: z.string().min(1).max(128).optional(),
   });
 
   app.post(
@@ -1371,6 +1375,12 @@ ${compsText || '(אין נכסים להשוואה)'}
         const convo: Array<AssistantMsg | UserMsg> =
           parsed.data.messages.map((m) => ({ role: m.role, content: m.content } as any));
 
+        // Stable per-conversation id: prefer the client-supplied
+        // conversationId so multi-turn turns group in the LangSmith
+        // Threads view; fall back to a server-generated id when the
+        // client hasn't been updated yet.
+        const conversationId = parsed.data.conversationId ?? crypto.randomUUID();
+
         // ── LangGraph Platform cutover ──────────────────────────────
         // When LANGGRAPH_API_URL is set, the chat runs on the hosted
         // LangGraph graph instead of the in-app agent. We mint a
@@ -1393,7 +1403,13 @@ ${compsText || '(אין נכסים להשוואה)'}
               body: JSON.stringify({
                 assistant_id: process.env.LANGGRAPH_ASSISTANT_ID || 'estia_agent',
                 input: { messages: convo },
-                config: { configurable: { estiaToken } },
+                config: {
+                  configurable: { thread_id: conversationId, estiaToken },
+                  metadata: {
+                    user_id: user.id,
+                    environment: process.env.NODE_ENV ?? 'development',
+                  },
+                },
                 stream_mode: ['messages-tuple'],
               }),
               signal: controller.signal,

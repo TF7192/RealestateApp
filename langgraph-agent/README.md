@@ -62,6 +62,25 @@ removed). Auth is a short-lived **per-agent** token supplied per run via
 set, importing the langchain packages wires tracing for every run. No
 code change needed.
 
+## Tracing requirements
+
+Callers MUST pass `thread_id`, `user_id`, and `environment` on every
+invocation so the LangSmith Threads view groups multi-turn turns,
+per-tenant filtering works, and prod/staging traffic stays separate.
+
+```jsonc
+{
+  "configurable": {
+    "thread_id": "<chat conversation/session id>",
+    "estiaToken": "<token from GET /api/ai/agent-token>"
+  },
+  "metadata": {
+    "user_id": "<signed-in agent id>",
+    "environment": "production"
+  }
+}
+```
+
 ## Run locally
 
 ```bash

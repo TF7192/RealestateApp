@@ -44,6 +44,10 @@ const model = new ChatAnthropic({
   model: 'claude-haiku-4-5',
   maxTokens: 1024,
   temperature: 0,
+  metadata: {
+    ls_provider: 'anthropic',
+    ls_model_name: 'claude-haiku-4-5',
+  },
 }).bindTools(ESTIA_TOOLS);
 
 const toolNode = new ToolNode(ESTIA_TOOLS);
@@ -93,7 +97,10 @@ const workflow = new StateGraph(MessagesAnnotation)
   .addConditionalEdges('agent', shouldContinue, ['tools', END])
   .addEdge('tools', 'agent');
 
-export const graph = workflow.compile();
+export const graph = workflow.compile().withConfig({
+  runName: 'estia-chat',
+  tags: ['estia', 'chat'],
+});
 
 // Default export too, so langgraph.json can reference either form.
 export default graph;
