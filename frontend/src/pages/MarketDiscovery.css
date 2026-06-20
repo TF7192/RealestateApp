@@ -61,6 +61,7 @@
   flex-wrap: wrap;
 }
 .md-icon-button {
+  position: relative;
   background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border);
@@ -78,6 +79,25 @@
   border-color: var(--gold-border);
   color: var(--gold-readable);
 }
+/* Selected-cities count badge on the cities icon button. */
+.md-icon-badge {
+  position: absolute;
+  inset-block-start: -5px;
+  inset-inline-start: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--bg-primary);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+/* Cities editor rendered as a header-anchored popover (PopoverPortal). */
+.md-cities-pop { width: min(92vw, 340px); }
+.md-cities-pop .md-city-bar { margin: 0; box-shadow: var(--shadow-md); }
 
 /* ── Pulse strip ────────────────────────────────────────────────── */
 .md-pulse-strip {

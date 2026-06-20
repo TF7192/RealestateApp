@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Filter, Mail, MailCheck, Eye, EyeOff, List, Grid, X, Sparkles, Tags } from 'lucide-react';
+import { Building2, Filter, Mail, MailCheck, Eye, EyeOff, List, Grid, X, Sparkles, Tags, MapPin } from 'lucide-react';
 import api from './../lib/api';
 import { useToast } from './../lib/toast';
 import { freshLabel } from './marketDiscovery/freshLabel';
@@ -29,6 +29,7 @@ import MatchSendDialog from './marketDiscovery/MatchSendDialog';
 import EmailSignupModal from './marketDiscovery/EmailSignupModal';
 import MarketTagManager from './marketDiscovery/MarketTagManager';
 import CityFilterBar from './marketDiscovery/CityFilterBar';
+import PopoverPortal from './marketDiscovery/PopoverPortal';
 import './MarketDiscovery.css';
 
 const SORTS = [
@@ -95,6 +96,27 @@ export default function MarketDiscovery() {
   const [selectedTagIds, setSelectedTagIds] = useState([]);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [cityScope, setCityScope] = useState([]);
+  const [citiesOpen, setCitiesOpen] = useState(false);
+  const citiesBtnRef = useRef(null);
+  const citiesPopRef = useRef(null);
+
+  // Close the cities popover on outside click / Escape. The popover is
+  // portaled to <body>, so exclude both the trigger and the popover node.
+  useEffect(() => {
+    if (!citiesOpen) return undefined;
+    const onDown = (e) => {
+      if (citiesBtnRef.current?.contains(e.target)) return;
+      if (citiesPopRef.current?.contains(e.target)) return;
+      setCitiesOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setCitiesOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [citiesOpen]);
 
   // Email pref state — same shape as the legacy page.
   const [emailPref, setEmailPref] = useState(null);
@@ -600,6 +622,27 @@ export default function MarketDiscovery() {
 
         <div className="md-head-actions">
           <button
+            ref={citiesBtnRef}
+            type="button"
+            className="md-icon-button"
+            onClick={() => setCitiesOpen((v) => !v)}
+            aria-pressed={citiesOpen || cityScope.length > 0}
+            aria-expanded={citiesOpen}
+            title="ערים שבהן אני עובד/ת"
+          >
+            <MapPin size={16} />
+            {cityScope.length > 0 && (
+              <span className="md-icon-badge" aria-hidden>{cityScope.length}</span>
+            )}
+          </button>
+          {citiesOpen && (
+            <PopoverPortal anchorRef={citiesBtnRef}>
+              <div ref={citiesPopRef} className="md-cities-pop">
+                <CityFilterBar value={cityScope} onChange={handleCityScopeChange} />
+              </div>
+            </PopoverPortal>
+          )}
+          <button
             type="button"
             className="md-icon-button"
             onClick={() => updateFilters({ hideViewed: !filters.hideViewed })}
@@ -638,11 +681,6 @@ export default function MarketDiscovery() {
           )}
         </div>
       </div>
-
-      <CityFilterBar
-        value={cityScope}
-        onChange={handleCityScopeChange}
-      />
 
       <PulseStrip
         pulse={pulse}
