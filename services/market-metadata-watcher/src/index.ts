@@ -48,40 +48,33 @@ async function main() {
     return;
   }
 
-  // 2026-05-08 — cadence dropped to twice-a-day per kind (was every 2
-  // hours = 12×/day per kind). Two scans cover the daily flow without
-  // burning Reblaze quota or our proxy budget. Cadence:
-  //   t =  0:00  → rent
-  //   t =  6:00  → forsale
-  //   t = 12:00  → rent
-  //   t = 18:00  → forsale
-  //   …
-  // Rent boots first (~0–30s) so the under-represented kind gets fresh
-  // deal flow sooner; forsale follows 6 hours later. The wider stagger
-  // means Reblaze sees rent + forsale as two independent visitors
-  // hitting once-per-cycle each, and per-IP rate-limit budgets fully
-  // refresh between ticks.
-  const KIND_INTERVAL_MS = config.kindIntervalMs;  // env-driven (12 h default → 2 ticks/day per kind)
-  const KIND_OFFSET_MS   = config.kindOffsetMs;    // env-driven (6 h default — kinds alternate across the day)
-  const rentBootDelay = Math.floor(Math.random() * 30_000);
-  const forsaleBootDelay = rentBootDelay + KIND_OFFSET_MS;
-  const stopRent = scheduleLoop({
-    label: 'rent',
-    intervalMs: KIND_INTERVAL_MS,
+  // 2026-06-20 — single scheduled loop crawling ALL kinds back-to-back
+  // each cycle. Replaces the previous two-loop design (rent boots +~17s,
+  // forsale boots +4h) that starved forsale: every deploy recreates the
+  // container, resetting forsale's large boot offset, so with frequent
+  // deploys forsale rarely reached its first tick while rent (tiny boot
+  // delay) always ran fresh. A single loop with one small boot delay
+  // fixes that — each cycle scrapes rent + forsale + commercial in one
+  // run via discoverYad2, which already iterates kinds × regions with
+  // polite gaps, so the three kinds go one after another in a single
+  // browser session lifecycle.
+  //
+  // Cadence: every config.kindIntervalMs (8h in prod → 3 cycles/day,
+  // each cycle covering all three kinds). config.kindOffsetMs is now
+  // UNUSED — the offset-staggering it drove is gone with the two-loop
+  // design; the config field is kept to avoid an env/compose change.
+  const CYCLE_INTERVAL_MS = config.kindIntervalMs;
+  const bootDelayMs = Math.floor(Math.random() * 20_000);
+  const stopAll = scheduleLoop({
+    label: 'all-kinds',
+    intervalMs: CYCLE_INTERVAL_MS,
     jitterMs: config.jitterMs,
-    bootDelayMs: rentBootDelay,
-    tick: () => runWatcherTick({ prisma, logger }, { kinds: ['rent'] }),
+    bootDelayMs,
+    tick: () =>
+      runWatcherTick({ prisma, logger }, { kinds: ['rent', 'forsale', 'commercial'] }),
     log,
   });
-  const stopForsale = scheduleLoop({
-    label: 'forsale',
-    intervalMs: KIND_INTERVAL_MS,
-    jitterMs: config.jitterMs,
-    bootDelayMs: forsaleBootDelay,
-    tick: () => runWatcherTick({ prisma, logger }, { kinds: ['forsale'] }),
-    log,
-  });
-  const stop = () => { stopForsale(); stopRent(); };
+  const stop = () => { stopAll(); };
 
   // Graceful shutdown — Docker sends SIGTERM 10s before SIGKILL on
   // `compose down` / `up -d --recreate`. Mark every in-flight run row

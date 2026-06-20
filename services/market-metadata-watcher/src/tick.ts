@@ -41,7 +41,12 @@ type Deps = { prisma: PrismaClient; logger: Logger };
 // browser sessions (15+ min apart) gives each kind a fresh Reblaze
 // challenge slot, since challenge cookies + IP reputation accumulate
 // over a single context's lifetime.
-export type WatcherKind = 'forsale' | 'rent';
+// FETCH kinds a tick can crawl — these map to Yad2 URL sections
+// (/realestate/<kind>/<region>). 'commercial' is one mixed bucket that
+// the extractor splits per-item into the stored commercial_forsale /
+// commercial_rent kinds via subcategoryId; the upsert path below writes
+// item.kind (the STORED kind) unchanged.
+export type WatcherKind = 'forsale' | 'rent' | 'commercial';
 
 // Sweep up `running` rows that have been hanging since before this
 // process booted. They almost always indicate a previous container
@@ -173,8 +178,9 @@ export async function runWatcherTick(
             // HashableListing types these as `string | null` to keep the
             // hash function generic; Prisma's enums are strict. Cast at
             // the boundary — the source extractors emit only valid
-            // lowercase enum values ('forsale'|'rent', 'private'|'agency',
-            // 'active'|'removed'|'unknown').
+            // lowercase enum values (kind: 'forsale'|'rent'|
+            // 'commercial_forsale'|'commercial_rent'; poster:
+            // 'private'|'agency'; status: 'active'|'removed'|'unknown').
             kind: item.kind as MarketListingKind | null,
             posterType: item.posterType as MarketListingPosterType | null,
             status: (item.status || 'active') as MarketListingStatus,

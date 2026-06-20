@@ -383,9 +383,12 @@ export type PageContext = { region: string; kind: ExtractKind; page: number };
  */
 export async function discoverYad2(opts: {
   regions: readonly string[];
-  // Subset of ['forsale', 'rent'] to crawl this tick. Defaults to
-  // BOTH if omitted, but production schedules them in separate ticks
-  // 15 min apart to give each kind a fresh Reblaze challenge slot.
+  // Subset of ['forsale', 'rent', 'commercial'] to crawl this tick.
+  // Defaults to ALL_KINDS if omitted. Production schedules all three in
+  // one cycle (single all-kinds loop); they run back-to-back here, each
+  // (region, kind) separated by polite human-pacing gaps. The
+  // 'commercial' section is split per-item into commercial_forsale /
+  // commercial_rent by the extractor (via subcategoryId).
   kinds?: readonly ExtractKind[];
   knownTokens: Set<string>;
   hardCeiling: number;
