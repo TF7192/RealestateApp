@@ -1188,6 +1188,18 @@ ${compsText || '(אין נכסים להשוואה)'}
     async (socket, req) => {
       const user = requireUser(req);
 
+      // Register the message listener SYNCHRONOUSLY — before any await —
+      // so the prompt the FE sends on 'open' isn't dropped during the
+      // async premium/quota setup below (ws delivers nothing if there's
+      // no 'message' listener yet). Buffer an early message until the real
+      // handler is wired up at the end of connection setup.
+      let earlyRaw: Buffer | string | null = null;
+      let deliver: ((raw: Buffer | string) => void) | null = null;
+      socket.on('message', (raw: Buffer | string) => {
+        if (deliver) deliver(raw);
+        else earlyRaw = raw;
+      });
+
       // Premium gate — same Hebrew envelope the REST routes use, just
       // delivered as a WS frame + a 1008 ("Policy Violation") close.
       const u = await prisma.user.findUnique({
@@ -1347,7 +1359,7 @@ ${compsText || '(אין נכסים להשוואה)'}
       // per socket so back-pressure / abort semantics stay simple;
       // the FE opens a fresh socket per turn.
       let started = false;
-      socket.on('message', async (raw: Buffer | string) => {
+      const handleMessage = async (raw: Buffer | string) => {
         if (!active) return;
         if (started) return; // ignore extra frames
         started = true;
@@ -1379,14 +1391,11 @@ ${compsText || '(אין נכסים להשוואה)'}
         // SSE, and forward AI text deltas as the same `text` frames the
         // FE already renders. Unset the env var to revert instantly.
         const lgUrl = process.env.LANGGRAPH_API_URL;
-        req.log.info({ usingLangGraph: !!lgUrl, msgs: convo.length }, 'chat.received');
         if (lgUrl) {
           const controller = new AbortController();
           const lgTimer = setTimeout(() => controller.abort(), 90_000);
           try {
-            req.log.info('lg.branch-start');
             const estiaToken = await signAgentToolToken(user.id);
-            req.log.info('lg.token-minted');
             activeStream = { abort: () => { clearTimeout(lgTimer); controller.abort(); } } as any;
             const res = await fetch(`${lgUrl.replace(/\/$/, '')}/runs/stream`, {
               method: 'POST',
@@ -1555,7 +1564,12 @@ ${compsText || '(אין נכסים להשוואה)'}
           send({ type: 'error', message: 'שירות ה-AI החזיר שגיאה — נסה/י שוב' });
           try { socket.close(1011, 'fatal'); } catch { /* noop */ }
         }
-      });
+      };
+
+      // Setup is complete — wire the real handler and flush any prompt
+      // that arrived during the async setup above.
+      deliver = (raw) => { void handleMessage(raw); };
+      if (earlyRaw !== null) { const r = earlyRaw; earlyRaw = null; deliver(r); }
 
       // Greeting frame — same pattern the support-chat WS uses. Lets
       // the FE log "connected" before the user sends their prompt.
