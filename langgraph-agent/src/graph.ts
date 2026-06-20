@@ -44,6 +44,9 @@ const model = new ChatAnthropic({
   model: 'claude-haiku-4-5',
   maxTokens: 1024,
   temperature: 0,
+  // Populate the LangSmith-indexed model fields so traces report a
+  // model/provider and cost can be computed (otherwise total_cost is null).
+  metadata: { ls_provider: 'anthropic', ls_model_name: 'claude-haiku-4-5' },
 }).bindTools(ESTIA_TOOLS);
 
 const toolNode = new ToolNode(ESTIA_TOOLS);
@@ -93,7 +96,9 @@ const workflow = new StateGraph(MessagesAnnotation)
   .addConditionalEdges('agent', shouldContinue, ['tools', END])
   .addEdge('tools', 'agent');
 
-export const graph = workflow.compile();
+// withConfig gives the root run a meaningful name + tags (otherwise every
+// run shows as the default "LangGraph" in LangSmith).
+export const graph = workflow.compile().withConfig({ runName: 'estia-chat', tags: ['estia', 'chat'] });
 
 // Default export too, so langgraph.json can reference either form.
 export default graph;

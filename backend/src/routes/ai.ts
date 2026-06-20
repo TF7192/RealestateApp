@@ -23,9 +23,22 @@ import { recordAnthropic } from '../lib/aiUsage.js';
 import { langsmithEnabled } from '../lib/langsmith.js';
 import { traceable } from 'langsmith/traceable';
 import { signAgentToolToken } from '../lib/agentToolToken.js';
+import { createHash } from 'node:crypto';
 import { requireAiQuota, loadQuota, publicQuota } from '../middleware/aiQuota.js';
 
 const AI_AGENT_URL = (process.env.AI_AGENT_URL || 'http://estia-ai-agent:8080').replace(/\/$/, '');
+
+// Stable LangSmith thread id for a chat conversation, used by the
+// LangGraph chat proxy. The chat WS replays the full transcript each turn
+// (no FE session id), so we derive a deterministic UUID from the agent +
+// opening user message — turns of the same conversation share it and group
+// in LangSmith's Threads view.
+function lgThreadId(agentId: string, convo: Array<{ role: string; content: unknown }>): string {
+  const first = convo.find((m) => m.role === 'user');
+  const seed = `${agentId}|${typeof first?.content === 'string' ? first.content : ''}`;
+  const h = createHash('sha256').update(seed).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
 
 // 30MB audio cap — at 16kbps opus this is ~4 hours; real agent memos
 // are <2 minutes. Anything bigger is probably the wrong file.
@@ -1406,7 +1419,19 @@ ${compsText || '(אין נכסים להשוואה)'}
               body: JSON.stringify({
                 assistant_id: process.env.LANGGRAPH_ASSISTANT_ID || 'estia_agent',
                 input: { messages: convo },
-                config: { configurable: { estiaToken } },
+                config: {
+                  // thread_id groups a conversation's turns in LangSmith's
+                  // Threads view. The FE replays the full transcript each
+                  // turn (no session id), so derive a stable id from the
+                  // agent + opening message. estiaToken auths the tools.
+                  configurable: { estiaToken, thread_id: lgThreadId(user.id, convo) },
+                  // Indexed metadata: scope evaluators per agent + separate
+                  // prod/staging traffic; user_id also enables cost-by-user.
+                  metadata: {
+                    user_id: user.id,
+                    environment: process.env.NODE_ENV ?? 'development',
+                  },
+                },
                 stream_mode: ['messages-tuple'],
               }),
               signal: controller.signal,

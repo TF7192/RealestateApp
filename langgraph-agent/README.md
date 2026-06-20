@@ -156,3 +156,38 @@ To go live, still needed: (a) the frontend (or a backend proxy) calls
 to LangGraph Platform with `ANTHROPIC_API_KEY` + `ESTIA_API_BASE`;
 (c) set `ESTIA_AGENT_TOKEN_SECRET` on the backend; (d) enable the nginx
 IP allowlist with LangGraph's published egress IPs.
+
+## Tracing requirements
+
+LangSmith trace quality depends on the **caller** passing config on every
+run. The graph sets its own `runName` (`estia-chat`) and model metadata
+(`ls_provider` / `ls_model_name`, so cost is computed), but callers MUST
+provide:
+
+- `configurable.thread_id` — the conversation/session id, so multi-turn
+  turns group in the **Threads** view. (Estia's backend derives a stable
+  id from the agent + opening message since the chat replays the full
+  transcript each turn; a real FE session id is better if available.)
+- `configurable.estiaToken` — the short-lived per-agent token the tools
+  forward to Estia's `/api/internal/agent-tool`.
+- `metadata.user_id` — the signed-in agent's id (scopes evaluators +
+  per-user cost).
+- `metadata.environment` — `process.env.NODE_ENV ?? 'development'`
+  (separates prod/staging traffic).
+
+Example (LangGraph SDK):
+
+```ts
+await client.runs.stream(threadId, 'estia_agent', {
+  input: { messages },
+  config: {
+    configurable: { thread_id: conversationId, estiaToken },
+    metadata: { user_id: agentId, environment: process.env.NODE_ENV ?? 'development' },
+  },
+  streamMode: 'messages-tuple',
+});
+```
+
+Estia's backend calls the deployment over HTTP (`POST /runs/stream`) and
+sets the same fields in the request body's `config` — see
+`backend/src/routes/ai.ts`.
