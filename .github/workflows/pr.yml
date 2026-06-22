@@ -53,7 +53,7 @@ jobs:
       AUTH_RATE_LIMIT_DISABLED: '1'
       RATE_LIMIT_MAX_PER_MIN: '100000'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-project
         with: { install-frontend: 'false', prisma-generate: 'true' }
       - name: Apply migrations + seed
@@ -105,7 +105,7 @@ jobs:
       # has no way to reach /api/*.
       VITE_API_PROXY: http://127.0.0.1:4000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-project
         with: { prisma-generate: 'true' }
 
@@ -184,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-project
         with: { install-backend: 'false', install-frontend: 'false' }
       - uses: actions/download-artifact@v4
@@ -205,7 +205,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -228,7 +228,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Compute aggregate status
         id: agg
         run: |
