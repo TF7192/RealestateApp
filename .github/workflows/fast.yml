@@ -81,7 +81,7 @@ jobs:
       - uses: ./.github/actions/setup-project
         with: { install-backend: 'false' }
       - name: Restore ESLint cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: frontend/.eslintcache
           key: eslint-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json', 'frontend/eslint.config.js') }}
@@ -107,7 +107,7 @@ jobs:
       - uses: ./.github/actions/setup-project
         with: { install-frontend: 'false', prisma-generate: 'true' }
       - name: Restore tsbuildinfo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: backend/.tsbuildinfo
           key: tsbuildinfo-${{ runner.os }}-${{ hashFiles('backend/package-lock.json', 'backend/tsconfig.json') }}-${{ github.sha }}
