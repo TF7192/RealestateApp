@@ -8,7 +8,7 @@
 # Reblaze's JS challenge needs to render correctly. PLAYWRIGHT_BROWSERS_PATH
 # is already set in the base image (/ms-playwright).
 
-FROM mcr.microsoft.com/playwright:v1.59.1-noble AS base
+FROM mcr.microsoft.com/playwright:v1.61.1-noble AS base
 WORKDIR /app
 # Base image already has openssl + ca-certificates; nothing extra needed.
 
